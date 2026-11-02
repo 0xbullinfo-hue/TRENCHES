@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  ::selection {
+    background: #245415;
+    color: #eaecef;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #0A0E13; }
+  ::-webkit-scrollbar-thumb { background: #1C3D12; }
+  ::-webkit-scrollbar-thumb:hover { background: #4DFE15; }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+}
+
+@layer components {
+  /* Card shell: flat 1px hairline (#1C3D12), zero glow, zero shadow */
+  .card {
+    @apply bg-surface border border-toxic-border rounded-lg transition-colors duration-150 shadow-none;
+  }
+  .card-hover:hover {
+    @apply border-toxic;
+  }
+  .card-head {
+    @apply flex h-9 items-center justify-between gap-2 border-b border-toxic-border px-3 font-mono text-2xs uppercase tracking-[0.08em] text-muted;
+  }
+  .label {
+    @apply font-mono text-2xs uppercase tracking-[0.08em] text-dim;
+  }
+
+  .btn {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 font-sans text-xs font-bold uppercase tracking-[0.04em] transition-colors duration-150 shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply h-7 px-2.5 text-2xs;
+  }
+  .btn-primary {
+    @apply bg-toxic text-canvas hover:bg-toxic-bright shadow-none;
+  }
+  .btn-secondary {
+    @apply border border-toxic-border bg-surface-card text-ink hover:border-toxic hover:bg-surface-3 shadow-none;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-surface-card hover:text-ink shadow-none;
+  }
+
+  .chip {
+    @apply inline-flex h-6 items-center rounded-md border border-toxic-border bg-surface-card px-2 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
+  }
+  .chip-active {
+    @apply border-toxic bg-toxic-bg text-toxic hover:text-toxic-bright shadow-none;
+  }
+
+  .input {
+    @apply h-8 w-full rounded-md border border-toxic-border bg-surface-card px-2.5 font-mono text-xs text-ink placeholder:text-dim focus:border-toxic focus:outline-none shadow-none;
+  }
+}
+
+/* ── Solana wallet-adapter overrides (flat 1px toxic theme, zero glow) ─── */
+.wallet-adapter-button {
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 6px !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  line-height: 32px !important;
+  background: #4DFE15 !important;
+  color: #0A0E13 !important;
+  box-shadow: none !important;
+  transition: background-color 150ms;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background: #76FF32 !important;
+}
+.wallet-adapter-button-start-icon {
+  width: 16px !important;
+  height: 16px !important;
+  margin-right: 8px !important;
+}
+.wallet-adapter-button-start-icon img {
+  width: 16px;
+  height: 16px;
+}
+.wallet-adapter-dropdown-list {
+  background: #11161D !important;
+  border: 1px solid #1C3D12;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 4px !important;
+  font-family: var(--font-mono), monospace !important;
+}
+.wallet-adapter-dropdown-list-item {
+  height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #EAECEF !important;
+}
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  background: #161C24 !important;
+  color: #4DFE15 !important;
+}
+.wallet-adapter-modal-wrapper {
+  background: #11161D !important;
+  border: 1px solid #1C3D12;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  font-family: var(--font-inter), sans-serif !important;
+}
+.wallet-adapter-modal-title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #EAECEF !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: transparent !important;
+  color: #EAECEF !important;
+  box-shadow: none !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  font-family: var(--font-inter), sans-serif !important;
+  font-size: 13px !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: #161C24 !important;
+  color: #4DFE15 !important;
+}
+.wallet-adapter-modal-list li:not(:first-of-type) {
+  margin-top: 2px !important;
+}
+.wallet-adapter-modal-overlay {
+  background: #0A0E13 !important;
+  opacity: 0.9;
+}
+.wallet-adapter-modal-button-close {
+  background: #161C24 !important;
+}
+.wallet-adapter-modal-list-more {
+  color: #848E9C !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 11px !important;
+}
