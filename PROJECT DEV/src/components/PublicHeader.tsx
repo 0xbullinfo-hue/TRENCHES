@@ -69,8 +69,9 @@ export const PublicHeader: React.FC = () => {
   const handleConnectClick = () => {
     if (!connected) {
       openWalletModal(true);
+    } else {
+      router.push('/dashboard');
     }
-    router.push('/dashboard');
   };
 
   return (

@@ -502,6 +502,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       wallet.disconnect().catch(() => {});
     }
     setDemoPresetState('disconnected');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   }, [wallet]);
 
   const refreshAll = useCallback(async () => {

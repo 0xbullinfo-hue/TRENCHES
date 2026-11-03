@@ -105,13 +105,24 @@ export const HeroTerminal: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column (6 cols): Transparent Cutout Hero Rat Image Bottom-Aligned Flush With the X Button */}
+          {/* Right Column (6 cols): Transparent Cutout Hero Rat Image with Toxic Beaker Green Glow Effect */}
           <div className="lg:col-span-6 flex items-end justify-center">
-            <div className="relative w-full flex items-end">
+            <div className="relative w-full flex items-end justify-center">
+              {/* Radioactive Beaker Toxic Glow Behind Hero Image */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 max-w-[460px] mx-auto rounded-full pointer-events-none"
+                style={{
+                  background:
+                    'radial-gradient(circle at 55% 55%, rgba(77, 254, 21, 0.42) 0%, rgba(118, 255, 50, 0.22) 35%, rgba(77, 254, 21, 0.08) 60%, transparent 75%)',
+                  filter: 'blur(50px)',
+                  transform: 'scale(0.95)',
+                }}
+              />
               <img
                 src="/images/trenchlabs-hero-removebg.png"
                 alt="TrenchLabs Rat Scientist holding toxic green Erlenmeyer flask"
-                className="w-full h-auto max-h-[500px] object-contain object-bottom block select-none"
+                className="relative z-10 w-full h-auto max-h-[500px] object-contain object-bottom block select-none drop-shadow-[0_0_28px_rgba(77,254,21,0.5)] drop-shadow-[0_0_60px_rgba(77,254,21,0.25)]"
               />
             </div>
           </div>

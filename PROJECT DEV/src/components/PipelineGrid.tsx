@@ -1,73 +1,78 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp } from 'lucide-react';
+import { ArrowUpRight, TrendingUp } from 'lucide-react';
 
 interface PastIncubationToken {
   id: string;
   cohort: string;
   name: string;
   ticker: string;
-  chain: 'SOL' | 'BASE' | 'ETH' | 'BSC';
+  chain: 'BSC' | 'SOL' | 'ETH' | 'BASE';
   profitMultiple: string;
   entryMc: string;
   peakMc: string;
-  holderRewardsPaid: string;
+  gainPercent: string;
+  dexUrl: string;
   summary: string;
 }
 
 const PAST_INCUBATIONS: PastIncubationToken[] = [
   {
     id: 'EXP01',
-    cohort: 'Cohort #14',
-    name: 'Pill Protocol',
-    ticker: '$PILL',
-    chain: 'SOL',
-    profitMultiple: '64.2x',
-    entryMc: '$12.4K',
-    peakMc: '$796K',
-    holderRewardsPaid: '$692,353',
+    cohort: 'Incubation #01',
+    name: 'LITY',
+    ticker: '$LITY',
+    chain: 'BSC',
+    profitMultiple: '12.1x',
+    entryMc: '$580K',
+    peakMc: '$7.0M',
+    gainPercent: '+1,106%',
+    dexUrl: 'https://dexscreener.com/bsc/0x91727e4485542612e9ed4293d1021414dbf5e588',
     summary:
-      'Lab members unlocked the contract address at $12.4K market cap before public graduation, capturing a 64.2x peak run.',
+      'High-conviction BSC alpha trade call dispatched to Lab members at $580K market cap before a violent parabolic expansion reaching a $7.0M peak.',
   },
   {
     id: 'EXP02',
-    cohort: 'Cohort #15',
-    name: 'Baton Relay AI',
-    ticker: '$BATON',
-    chain: 'SOL',
-    profitMultiple: '48.5x',
-    entryMc: '$72.0K',
-    peakMc: '$3.50M',
-    holderRewardsPaid: '$591,806',
+    cohort: 'Incubation #02',
+    name: 'BITCOIN CULTIVATOR 400',
+    ticker: '$BC400',
+    chain: 'BSC',
+    profitMultiple: '7.0x',
+    entryMc: '$880K',
+    peakMc: '$6.2M',
+    gainPercent: '+604%',
+    dexUrl: 'https://dexscreener.com/bsc/0xa02e8735cdc35aea44a770cb511513826e6c68c5',
     summary:
-      'Early contract address dispatched to verified $GENESIS holders at $72K entry prior to its expansion to $3.5M market cap.',
+      'Early BSC trade setup shared with verified $GENESIS holders at $880K entry prior to multi-million expansion and a $6.2M peak market cap.',
   },
   {
     id: 'EXP03',
-    cohort: 'Cohort #16',
-    name: 'Big Trench Coin',
-    ticker: '$BTC',
-    chain: 'ETH',
-    profitMultiple: '32.0x',
-    entryMc: '$265K',
-    peakMc: '$8.52M',
-    holderRewardsPaid: '$281,485',
+    cohort: 'Incubation #03',
+    name: 'Clean Water',
+    ticker: '$WATER',
+    chain: 'BSC',
+    profitMultiple: '15.0x',
+    entryMc: '$8.0K',
+    peakMc: '$120K',
+    gainPercent: '+1,400%',
+    dexUrl: 'https://dexscreener.com/bsc/0xe8d2a16a9526ca7706c4a13e8b119416791c99b0',
     summary:
-      'Cross-chain incubation call unlocked for verified Lab members at $265K market cap before surging to $8.52M.',
+      'Micro-cap trench entry unlocked for Lab members at just $8K market cap before surging into a massive 15x run peaking at $120K market cap.',
   },
   {
     id: 'EXP04',
-    cohort: 'Cohort #17',
-    name: 'SwordCat',
-    ticker: '$SWORDCAT',
-    chain: 'SOL',
-    profitMultiple: '19.4x',
-    entryMc: '$94.8K',
-    peakMc: '$1.84M',
-    holderRewardsPaid: '$236,336',
+    cohort: 'Incubation #04',
+    name: 'AZUKI ANIME',
+    ticker: '$AZUKI',
+    chain: 'BSC',
+    profitMultiple: '2.6x',
+    entryMc: '$21K',
+    peakMc: '$55K',
+    gainPercent: '+162%',
+    dexUrl: 'https://dexscreener.com/bsc/0x2d6025e3d98fa8d0406267dc5a06694371c93c12',
     summary:
-      'High-conviction Solana launch where verified $GENESIS holders received early access at $94.8K market cap before hitting $1.84M.',
+      'Fast-moving momentum trade call alerted at $21K entry on BSC, locking in high-probability take profit targets at a $55K peak market cap.',
   },
 ];
 
@@ -86,7 +91,7 @@ export const PipelineGrid: React.FC = () => {
           <p className="font-sans text-sm sm:text-base text-muted mt-1.5 max-w-2xl">
             Past tokens that verified <span className="text-toxic-bright font-bold">$GENESIS</span>{' '}
             holders got into early — and the peak{' '}
-            <span className="text-toxic font-bold">X profits</span> they earned.
+            <span className="text-toxic font-bold">X profits</span> achieved.
           </p>
         </div>
 
@@ -135,8 +140,8 @@ export const PipelineGrid: React.FC = () => {
                 </div>
               </div>
 
-              {/* Clean Metrics Table */}
-              <div className="px-5 pb-5">
+              {/* Clean Metrics Table (No Holder Rewards) */}
+              <div className="px-5 pb-5 space-y-3">
                 <div className="bg-surface-card border border-toxic-border rounded-lg divide-y divide-toxic-border font-sans text-xs">
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
                     <span className="text-muted font-medium">Early Entry MC</span>
@@ -149,12 +154,23 @@ export const PipelineGrid: React.FC = () => {
                     </span>
                   </div>
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
-                    <span className="text-muted font-medium">Holder Rewards</span>
+                    <span className="text-muted font-medium">Net Return</span>
                     <span className="text-toxic-bright font-bold tnum">
-                      {token.holderRewardsPaid}
+                      {token.gainPercent}
                     </span>
                   </div>
                 </div>
+
+                {/* DexScreener Chart Verification Link */}
+                <a
+                  href={token.dexUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 px-3 rounded-lg bg-surface-card hover:bg-surface border border-toxic-border hover:border-toxic text-muted hover:text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <span>DEXSCREENER CHART</span>
+                  <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
+                </a>
               </div>
             </article>
           ))}
