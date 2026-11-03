@@ -111,6 +111,7 @@ const GenesisContext = createContext<GenesisContextValue | undefined>(undefined)
 
 const EVM_STORAGE_KEY = 'trenchlabs_bound_evm_v2';
 const WATCHLIST_STORAGE_KEY = 'trenchlabs_watchlist_v3';
+const DEMO_PRESET_STORAGE_KEY = 'trenchlabs_demo_preset_v1';
 
 export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const { connection } = useConnection();
@@ -134,6 +135,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
+      if (savedPreset) setDemoPresetState(savedPreset);
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
       if (savedEvm) setBoundEvmAddressState(savedEvm);
       const savedWatch = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
@@ -524,6 +527,11 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const setDemoPreset = useCallback((preset: DemoPreset) => {
     setDemoPresetState(preset);
+    try {
+      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, preset);
+    } catch {
+      // ignore
+    }
   }, []);
 
   const disconnectDemoOrWallet = useCallback(() => {
@@ -531,6 +539,11 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       wallet.disconnect().catch(() => {});
     }
     setDemoPresetState('disconnected');
+    try {
+      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'disconnected');
+    } catch {
+      // ignore
+    }
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }

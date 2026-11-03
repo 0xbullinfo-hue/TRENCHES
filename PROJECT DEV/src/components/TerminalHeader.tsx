@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { MascotRat } from '@/components/MascotRat';
 import { useGenesisBalance } from '@/context/GenesisContext';
@@ -25,7 +24,11 @@ export const TerminalHeader: React.FC = () => {
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Brand Wordmark */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0 group">
+          <a
+            href="/"
+            className="flex items-center gap-2 sm:gap-2.5 shrink-0 group cursor-pointer"
+            title="Go to TrenchLabs Landing Page"
+          >
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-md bg-surface border border-toxic-border group-hover:border-toxic flex items-center justify-center transition-colors">
               <MascotRat variant="icon" size={26} />
             </div>
@@ -34,7 +37,7 @@ export const TerminalHeader: React.FC = () => {
                 Trench<span className="text-toxic">Labs</span>HQ
               </span>
             </div>
-          </Link>
+          </a>
         </div>
 
         {/* Center: JOIN THE LAB Button & Search Calls Input (Right side of JOIN THE LAB) */}

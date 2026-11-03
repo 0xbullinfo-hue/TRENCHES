@@ -118,7 +118,7 @@ export const PublicHeader: React.FC = () => {
             className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
           >
             <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-            <span>{connected ? shortAddress : 'CONNECT WALLET'}</span>
+            <span>{connected ? `DASHBOARD (${shortAddress})` : 'CONNECT WALLET'}</span>
           </button>
         </div>
       </div>
