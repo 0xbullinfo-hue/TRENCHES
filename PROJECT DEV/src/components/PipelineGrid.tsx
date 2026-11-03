@@ -135,11 +135,8 @@ export const PipelineGrid: React.FC = () => {
                 className="rounded-xl bg-surface border border-toxic-border hover:border-toxic transition-all flex flex-col justify-between overflow-hidden group"
               >
                 <div>
-                  {/* Top Header Strip: Serial Tag (EXP01) + Blockchain (BSC) */}
-                  <div className="px-5 py-3 bg-surface-card border-b border-toxic-border flex items-center justify-between text-xs font-semibold">
-                    <span className="px-2 py-0.5 rounded bg-surface border border-toxic text-toxic font-mono text-xs font-black">
-                      {token.serialTag}
-                    </span>
+                  {/* Top Header Strip: Blockchain (BSC) */}
+                  <div className="px-5 py-2.5 bg-surface-card border-b border-toxic-border flex items-center justify-end text-xs font-semibold">
                     <span className="px-2.5 py-0.5 rounded bg-toxic-bg border border-toxic-border text-toxic font-mono text-xs font-bold">
                       {token.chain} (BNB Chain)
                     </span>
