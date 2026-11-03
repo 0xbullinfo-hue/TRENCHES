@@ -46,29 +46,19 @@ export const TerminalHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* Center: Enlarged Navigation Menu Tabs */}
+        {/* Center: Navigation Menu Tabs (Home & Experiments removed per user instruction) */}
         <nav
           aria-label="Terminal Navigation"
           className="hidden xl:flex items-center gap-6 font-sans text-base lg:text-lg font-extrabold tracking-wide"
         >
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
-          >
-            Home
-          </Link>
-          <Link
-            href="/#pipeline-section"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
-          >
-            Experiments
-          </Link>
-          <Link
-            href="/#join-lab-section"
+          <a
+            href="https://t.me/TrenchLabsHQ"
+            target="_blank"
+            rel="noreferrer"
             className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
           >
             Join the Lab
-          </Link>
+          </a>
         </nav>
 
         {/* Right: Live Balance Pill + Wallet & Disconnect (Hard Flat Toxic Theme) */}

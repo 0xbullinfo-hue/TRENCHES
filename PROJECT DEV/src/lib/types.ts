@@ -97,6 +97,8 @@ export interface AlphaItem {
   callerWinRate: string;
   deployedVia: string;
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
+  /** Serial call tag, e.g. EXP01, EXP02, EXP03 */
+  serialTag?: string;
   sparkline: number[];
   art: AlphaArtTheme;
   marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE';

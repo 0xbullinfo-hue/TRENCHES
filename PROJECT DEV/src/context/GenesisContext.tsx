@@ -35,8 +35,8 @@ import type {
 export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
 
 const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string> = {
-  '0': '8xK4ZeroBal1111111111111111111111111119Lm2',
-  '1m': '8xK4LabMember1M111111111111111111111119Lm2',
+  '0': 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  '1m': '11111111111111111111111111111111',
   admin: ADMIN_WALLET,
 };
 
@@ -59,6 +59,7 @@ export interface CreateCallPayload {
   takeProfitInput: string;
   pinned: boolean;
   summary?: string;
+  serialTag?: string;
 }
 
 interface GenesisContextValue {

@@ -59,6 +59,8 @@ export interface AlphaRecord {
   callerWinRate: string;
   deployedVia: string;
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
+  /** Serial call tag, e.g. EXP01, EXP02, EXP03 */
+  serialTag?: string;
   sparkline: number[];
   art: AlphaArtTheme;
 }
@@ -701,9 +703,10 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
     return a.ageMinutes - b.ageMinutes;
   });
 
-  return sorted.map((r) => {
+  return sorted.map((r, idx) => {
     const locked = TIERS[r.minTier].rank > rank;
     const minBalanceRequired = TIERS[r.minTier].min;
+    const serialTag = r.serialTag || `EXP${String(idx + 1).padStart(2, '0')}`;
     return {
       id: r.id,
       name: r.name,
@@ -749,6 +752,7 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
       callerWinRate: r.callerWinRate,
       deployedVia: r.deployedVia,
       spotlightRank: r.spotlightRank,
+      serialTag,
       sparkline: r.sparkline,
       art: r.art,
     };
