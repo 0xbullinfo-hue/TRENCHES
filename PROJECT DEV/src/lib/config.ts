@@ -32,6 +32,29 @@ export const BUY_LINKS = {
   dexscreener: `https://dexscreener.com/solana/${GENESIS_MINT}`,
 };
 
+/** Official Social & Community Links */
+export const SOCIAL_LINKS = {
+  telegram: 'https://t.me/TrenchLabsHQ',
+  x: 'https://x.com/Trenchlabshq',
+};
+
+/**
+ * Maintenance Mode Configuration
+ * Toggle via NEXT_PUBLIC_MAINTENANCE_MODE="true" in .env.local,
+ * or change MAINTENANCE_MODE to true directly here anytime.
+ */
+export const MAINTENANCE_MODE =
+  process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true' || false;
+
+export const MAINTENANCE_CONFIG = {
+  enabled: MAINTENANCE_MODE,
+  title: 'LAB TELEMETRY MAINTENANCE',
+  headline: 'THE LAB IS UNDER SCHEDULED UPGRADE',
+  message:
+    'TrenchLabsHQ is undergoing routine infrastructure maintenance, node synchronization, and multi-chain telemetry upgrades. Normal access will be restored shortly.',
+  estimatedDuration: 'Back shortly',
+};
+
 export const CHAIN_METADATA = {
   SOL: {
     id: 'SOL',

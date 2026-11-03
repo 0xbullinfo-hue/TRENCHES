@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUp } from 'lucide-react';
 
 export const Footer: React.FC = () => {
@@ -16,7 +17,7 @@ export const Footer: React.FC = () => {
 
         <div className="flex items-center gap-4">
           <a
-            href="https://t.me/TrenchLabsHQ"
+            href={SOCIAL_LINKS.telegram}
             target="_blank"
             rel="noreferrer"
             className="hover:text-pump transition-colors font-medium"
@@ -24,7 +25,7 @@ export const Footer: React.FC = () => {
             Telegram
           </a>
           <a
-            href="https://x.com/Trenchlabshq"
+            href={SOCIAL_LINKS.x}
             target="_blank"
             rel="noreferrer"
             className="hover:text-pump transition-colors font-medium"

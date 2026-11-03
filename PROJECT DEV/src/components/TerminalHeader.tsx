@@ -3,6 +3,7 @@
 import React from 'react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
+import { SOCIAL_LINKS } from '@/lib/config';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { ArrowUpRight, LogOut, Search, Send, Wallet } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export const TerminalHeader: React.FC = () => {
         {/* Center: JOIN THE LAB Button & Search Calls Input (Right side of JOIN THE LAB) */}
         <div className="flex items-center gap-2 sm:gap-3">
           <a
-            href="https://t.me/TrenchLabsHQ"
+            href={SOCIAL_LINKS.telegram}
             target="_blank"
             rel="noreferrer"
             className="h-9 sm:h-10 px-3 sm:px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0"

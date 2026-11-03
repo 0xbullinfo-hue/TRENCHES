@@ -5,7 +5,8 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
-import { SOLANA_RPC } from '@/lib/config';
+import { MAINTENANCE_CONFIG, SOLANA_RPC } from '@/lib/config';
+import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { GenesisProvider } from '@/context/GenesisContext';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -16,6 +17,10 @@ import '@solana/wallet-adapter-react-ui/styles.css';
  */
 export function Providers({ children }: { children: ReactNode }) {
   const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+
+  if (MAINTENANCE_CONFIG.enabled) {
+    return <MaintenanceScreen />;
+  }
 
   return (
     <ConnectionProvider endpoint={SOLANA_RPC} config={{ commitment: 'confirmed' }}>

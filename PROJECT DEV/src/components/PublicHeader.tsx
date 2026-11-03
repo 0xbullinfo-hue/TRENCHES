@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
-import { Wallet } from 'lucide-react';
+import { SOCIAL_LINKS } from '@/lib/config';
+import { ArrowUpRight, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const router = useRouter();
@@ -50,10 +51,13 @@ export const PublicHeader: React.FC = () => {
             Experiments
           </a>
           <a
-            href="#join-lab-section"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
+            href={SOCIAL_LINKS.telegram}
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors inline-flex items-center gap-1.5"
           >
-            Join the Lab
+            <span>Join the Lab</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
           </a>
         </nav>
 

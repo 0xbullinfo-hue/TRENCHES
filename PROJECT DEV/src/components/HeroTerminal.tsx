@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BUY_LINKS } from '@/lib/config';
+import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUpRight, Send } from 'lucide-react';
 
 const TRUST_METRICS = [
@@ -83,20 +83,20 @@ export const HeroTerminal: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <a
-                  href="https://t.me/TrenchLabsHQ"
+                  href={SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-toxic" />
-                  <span>JOIN TELEGRAM</span>
+                  <span>JOIN THE LAB</span>
                 </a>
 
                 <a
-                  href="https://x.com/Trenchlabshq"
+                  href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-4 h-4 text-toxic" />
                   <span>FOLLOW ON X</span>

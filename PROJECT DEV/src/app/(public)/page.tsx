@@ -3,10 +3,11 @@
 import React from 'react';
 import { HeroTerminal } from '@/components/HeroTerminal';
 import { PipelineGrid } from '@/components/PipelineGrid';
-import { BUY_LINKS, GENESIS_MINT } from '@/lib/config';
+import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
 import {
   ArrowUpRight,
   FlaskConical,
+  Send,
   ShieldCheck,
 } from 'lucide-react';
 
@@ -84,16 +85,27 @@ export default function LandingPage() {
                   </p>
                 </div>
 
-                {/* Single Merged Full-Width Buy Button */}
-                <div className="pt-2">
+                {/* Dual Community & Buy Action Buttons */}
+                <div className="pt-2 space-y-3">
+                  <a
+                    href={SOCIAL_LINKS.telegram}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full h-14 px-6 rounded-xl bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-base uppercase tracking-wide flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <Send className="w-5 h-5 stroke-[2.5]" />
+                    <span>JOIN THE LAB</span>
+                    <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
+                  </a>
+
                   <a
                     href={BUY_LINKS.pump}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full h-14 px-6 rounded-xl bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-base uppercase tracking-wide flex items-center justify-center gap-2.5 transition-colors"
+                    className="w-full h-12 px-6 rounded-xl bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-extrabold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                   >
                     <span>BUY $GENESIS ON PUMP.FUN</span>
-                    <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
+                    <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2.5]" />
                   </a>
                 </div>
               </div>
