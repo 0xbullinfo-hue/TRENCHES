@@ -613,10 +613,7 @@ export const IncubatorHub: React.FC = () => {
           <strong className="text-white uppercase tracking-wider mr-1.5">
             ALPHA CALLS DISCLAIMER:
           </strong>
-          Admin posts trade calls for verified{' '}
-          <strong className="text-pump">1,000,000+ $GENESIS</strong> holders. Users take all
-          trades at their own risk (DYOR). Information provided is for research purposes only
-          and can lose value.
+          All Users are to take all trades at their own risk (DYOR). You are not subject to take any trade by the admins. All Information provided here are for research purposes only and can lose value.
         </p>
       </div>
 

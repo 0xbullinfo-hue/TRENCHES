@@ -429,9 +429,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               <div className="px-3.5 py-2.5 rounded-lg bg-canvas border border-line flex items-center gap-2.5 font-sans text-xs text-muted">
                 <AlertTriangle className="w-4 h-4 text-amber shrink-0" />
                 <span>
-                  <strong className="text-white">DYOR Disclaimer:</strong> All calls are posted
-                  for informational purposes only. Users execute trades on external DEXs at
-                  their own risk.
+                  <strong className="text-white">DYOR Disclaimer:</strong> All Users are to take all trades at their own risk (DYOR). You are not subject to take any trade by the admins. All Information provided here are for research purposes only and can lose value.
                 </span>
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { MascotRat } from '@/components/MascotRat';
+import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { ArrowUpRight, LogOut, Search, Send, Wallet } from 'lucide-react';
 
@@ -22,21 +22,17 @@ export const TerminalHeader: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border overflow-hidden">
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left: Brand Wordmark */}
+        {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark (Matches Landing Page) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <a
             href="/"
-            className="flex items-center gap-2 sm:gap-2.5 shrink-0 group cursor-pointer"
+            className="flex items-center gap-2 sm:gap-3 shrink-0 group cursor-pointer"
             title="Go to TrenchLabs Landing Page"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-md bg-surface border border-toxic-border group-hover:border-toxic flex items-center justify-center transition-colors">
-              <MascotRat variant="icon" size={26} />
-            </div>
-            <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="font-sans font-extrabold tracking-tight text-base sm:text-xl text-white">
-                Trench<span className="text-toxic">Labs</span>HQ
-              </span>
-            </div>
+            <HexCubeLogo />
+            <span className="font-sans font-extrabold tracking-tight text-lg sm:text-2xl text-white">
+              Trench<span className="text-toxic">Labs</span>HQ
+            </span>
           </a>
         </div>
 
