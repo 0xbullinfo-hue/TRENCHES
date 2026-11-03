@@ -54,7 +54,6 @@ export const IncubatorHub: React.FC = () => {
     demoPreset,
     setDemoPreset,
     alphas,
-    callers,
     watchlist,
     toggleWatchlist,
     boundEvmAddress,
@@ -73,11 +72,9 @@ export const IncubatorHub: React.FC = () => {
   const [selectedChain, setSelectedChain] = useState<Chain | 'ALL'>('ALL');
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
-  const [leaderboardWindow, setLeaderboardWindow] = useState<'24h' | '7d'>('24h');
 
   const [inspectedToken, setInspectedToken] = useState<AlphaItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [followedCallers, setFollowedCallers] = useState<string[]>(['@TrenchLabsAdmin']);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Admin Create Call Form State
@@ -213,12 +210,6 @@ export const IncubatorHub: React.FC = () => {
     } else {
       showToast('Failed to post call — ensure Admin Wallet is active.');
     }
-  };
-
-  const toggleFollowCaller = (handle: string) => {
-    setFollowedCallers((prev) =>
-      prev.includes(handle) ? prev.filter((h) => h !== handle) : [...prev, handle]
-    );
   };
 
   const handleSaveEvm = (e: React.FormEvent) => {
@@ -1403,103 +1394,8 @@ export const IncubatorHub: React.FC = () => {
         )}
       </div>
 
-      {/* 6. Split Panels: "Top Syndicate Callers" & "Top Performing Calls" */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-2">
-        <div className="lg:col-span-6 rounded-xl bg-surface border border-line p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between gap-2 pb-4 border-b border-line">
-              <div>
-                <h3 className="font-sans text-lg font-extrabold text-white">
-                  Top syndicate callers
-                </h3>
-                <p className="font-sans text-xs text-muted">
-                  Verified callers feeding curated multi-chain setups to Lab members
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1 bg-surface-card border border-line rounded-md p-0.5 font-mono text-xs">
-                {(['24h', '7d'] as const).map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => setLeaderboardWindow(w)}
-                    className={`px-2.5 py-1 rounded font-bold cursor-pointer ${
-                      leaderboardWindow === w
-                        ? 'bg-pump text-canvas'
-                        : 'text-muted hover:text-white'
-                    }`}
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="divide-y divide-line mt-2">
-              {callers.map((caller) => {
-                const isFollowing = followedCallers.includes(caller.handle);
-                return (
-                  <div
-                    key={caller.handle}
-                    className="py-3.5 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-mono text-xs text-muted w-4 tnum">
-                        {caller.rank}
-                      </span>
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center font-mono text-xs font-bold text-white border border-line shrink-0"
-                        style={{ backgroundColor: caller.avatarBg }}
-                      >
-                        {caller.avatarText}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-sans font-bold text-sm text-white truncate">
-                            {caller.handle}
-                          </span>
-                          <span className="font-mono text-xs text-pump-pill">
-                            {caller.winRate}
-                          </span>
-                        </div>
-                        <div className="font-sans text-xs text-muted mt-0.5">
-                          Top call:{' '}
-                          <strong className="text-pump">
-                            {caller.topCallTicker}
-                          </strong>{' '}
-                          ({caller.callsCount} dispatches)
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right font-mono tnum">
-                        <div className="text-sm font-bold text-pump">
-                          {caller.pnl24h}
-                        </div>
-                        <div className="text-xs text-muted">{caller.pnl7d}</div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleFollowCaller(caller.handle)}
-                        className={`px-3 py-1.5 rounded-full font-sans text-xs font-semibold border transition-colors cursor-pointer ${
-                          isFollowing
-                            ? 'bg-surface-card border-line text-pump'
-                            : 'bg-surface-card hover:bg-surface-3 border-line text-white'
-                        }`}
-                      >
-                        {isFollowing ? 'Following' : 'Follow'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-6 rounded-xl bg-surface border border-line p-5 flex flex-col justify-between">
+      {/* 6. Top Performing Alpha Calls (Clean Full-Width, Top Callers removed) */}
+      <div className="rounded-xl bg-surface border border-line p-5 flex flex-col justify-between pt-2">
           <div>
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-line">
               <div>
@@ -1574,7 +1470,6 @@ export const IncubatorHub: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
 
       {/* 7. Bottom Utility Bar: Cross-Chain EVM Wallet Binding & Private Syndicate Telegram Key */}
       <div className="rounded-xl bg-surface border border-line p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
