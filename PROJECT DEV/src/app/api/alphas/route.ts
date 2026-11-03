@@ -18,6 +18,7 @@ import {
   saveCallsRegistry,
   SYNDICATE_CALLERS,
 } from '@/server/alphas-data';
+import { verifyAdminAuth } from '@/server/auth';
 import type {
   AlphasErr,
   AlphasOk,
@@ -29,7 +30,10 @@ import type {
 export const dynamic = 'force-dynamic';
 
 const SERVER_RPC = process.env.SOLANA_RPC || SOLANA_RPC;
-const ALLOW_DEMO_BALANCE = process.env.ALLOW_DEMO_BALANCE !== 'false';
+
+// Security Policy: Never allow client-asserted demo balances in production
+const IS_PROD = process.env.NODE_ENV === 'production';
+const ALLOW_DEMO_BALANCE = !IS_PROD && process.env.ALLOW_DEMO_BALANCE === 'true';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -53,7 +57,9 @@ function err(status: number, error: AlphasErr['error'], message: string) {
   return NextResponse.json(body, { status, headers: NO_STORE });
 }
 
-/** Server-verified $GENESIS balance: sum of all token accounts for the mint EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump. */
+/**
+ * Server-verified $GENESIS balance: sum of all token accounts for the mint EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump.
+ */
 async function readGenesisBalance(owner: string): Promise<number> {
   if (!MINT_CONFIGURED) return 0;
   const res = await fetch(SERVER_RPC, {
@@ -71,14 +77,14 @@ async function readGenesisBalance(owner: string): Promise<number> {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`RPC ${res.status}`);
+  if (!res.ok) throw new Error(`RPC returned ${res.status}`);
   const json = await res.json();
-  if (json.error) throw new Error(json.error.message ?? 'RPC error');
+  if (json.error) throw new Error(json.error.message ?? 'Solana RPC error');
   const accounts: Array<{
     account: { data: { parsed: { info: { tokenAmount: { uiAmount: number | null } } } } };
   }> = json.result?.value ?? [];
   return accounts.reduce(
-    (sum, a) => sum + (a.account.data.parsed.info.tokenAmount.uiAmount ?? 0),
+    (sum, a) => sum + (a.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0),
     0
   );
 }
@@ -96,7 +102,7 @@ function parseShorthandUsd(str: string): number {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const wallet = searchParams.get('wallet');
+  const wallet = searchParams.get('wallet')?.trim();
   const balanceParam = searchParams.get('balance');
 
   const isAdmin = isAdminWallet(wallet);
@@ -114,22 +120,23 @@ export async function GET(req: NextRequest) {
     if (balance < MIN_GENESIS_REQUIRED) {
       balance = MIN_GENESIS_REQUIRED;
     }
-  } else if (wallet && balanceParam === null) {
+  } else if (wallet) {
     if (!isBase58Address(wallet)) {
-      return err(400, 'BAD_REQUEST', 'wallet must be a base58 Solana address');
+      return err(400, 'BAD_REQUEST', 'wallet must be a valid base58 Solana address');
     }
     try {
       balance = await readGenesisBalance(wallet);
       verified = true;
     } catch (e) {
-      return err(502, 'RPC_UNAVAILABLE', `Balance lookup failed: ${(e as Error).message}`);
+      return err(502, 'RPC_UNAVAILABLE', `Solana RPC balance lookup failed: ${(e as Error).message}`);
     }
   } else if (balanceParam !== null) {
+    // Reject client-supplied balance in production
     if (!ALLOW_DEMO_BALANCE) {
       return err(
         403,
         'DEMO_BALANCE_DISABLED',
-        'Client-asserted balances are disabled. Pass ?wallet='
+        'Client-asserted demo balances are disabled. Connect a Solana wallet passing ?wallet='
       );
     }
     balance = Number(balanceParam);
@@ -137,14 +144,14 @@ export async function GET(req: NextRequest) {
       return err(400, 'BAD_REQUEST', 'balance must be a non-negative number');
     }
   } else {
-    return err(400, 'BAD_REQUEST', 'Provide ?wallet= or ?balance=');
+    return err(400, 'BAD_REQUEST', 'Authentication required. Provide ?wallet=<solana_address>');
   }
 
   if (!isAdmin && balance < MIN_GENESIS_REQUIRED) {
     return err(
       403,
       'ACCESS_DENIED_ZERO_BALANCE',
-      `Minimum 1,000,000 $GENESIS (${GENESIS_MINT}) required to access the Lab.`
+      `Access restricted. Holding at least 1,000,000 $GENESIS (${GENESIS_MINT}) is required.`
     );
   }
 
@@ -167,20 +174,19 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(body, { headers: NO_STORE });
 }
 
-/** POST /api/alphas — Admin creates a new trade call */
+/** POST /api/alphas — Admin creates a new trade call (Cryptographically Verified) */
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
-    const adminWallet = payload.adminWallet || req.headers.get('x-admin-wallet');
-
-    if (!isAdminWallet(adminWallet)) {
+    const auth = verifyAdminAuth(req.headers);
+    if (!auth.authorized) {
       return err(
         403,
         'UNAUTHORIZED_ADMIN',
-        `Only Admin Wallet (${ADMIN_WALLET}) is authorized to post trade calls.`
+        auth.error || `Only Master Admin (${ADMIN_WALLET}) with valid cryptographic signature is authorized.`
       );
     }
 
+    const payload = await req.json();
     const name = String(payload.name || '').trim();
     const rawTicker = String(payload.ticker || '').trim();
     const ticker = rawTicker.startsWith('$') ? rawTicker : `$${rawTicker}`;
@@ -234,7 +240,7 @@ export async function POST(req: NextRequest) {
         ? [
             { label: 'DexScreener', href: `https://dexscreener.com/solana/${ca}` },
             { label: 'Pump.fun', href: `https://pump.fun/coin/${ca}` },
-            { label: 'Photon', href: 'https://photon-sol.tinyastro.io/' },
+            { label: 'Photon', href: `https://photon-sol.tinyastro.io/` },
           ]
         : chain === 'BSC'
         ? [
@@ -264,7 +270,7 @@ export async function POST(req: NextRequest) {
           ];
 
     const newRecord: AlphaRecord = {
-      id: `${ rawTicker.toLowerCase().replace(/[^a-z0-9]/g, '') }-${Date.now().toString(36)}`,
+      id: `${rawTicker.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`,
       name,
       ticker,
       chain,
@@ -319,7 +325,10 @@ export async function POST(req: NextRequest) {
 
     const current = loadCallsRegistry();
     const updated = [newRecord, ...current];
-    saveCallsRegistry(updated);
+    const saveRes = saveCallsRegistry(updated);
+    if (!saveRes.success) {
+      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+    }
 
     return NextResponse.json(
       { ok: true, items: alphasForTier('LAB_MEMBER') },
@@ -330,20 +339,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** PATCH /api/alphas — Admin pins/unpins or updates a trade call (or toggles TP hit / updates MC) */
+/** PATCH /api/alphas — Admin pins/unpins or updates a trade call (Cryptographically Verified) */
 export async function PATCH(req: NextRequest) {
   try {
-    const payload = await req.json();
-    const adminWallet = payload.adminWallet || req.headers.get('x-admin-wallet');
-
-    if (!isAdminWallet(adminWallet)) {
+    const auth = verifyAdminAuth(req.headers);
+    if (!auth.authorized) {
       return err(
         403,
         'UNAUTHORIZED_ADMIN',
-        `Only Admin Wallet (${ADMIN_WALLET}) is authorized to modify trade calls.`
+        auth.error || `Only Master Admin (${ADMIN_WALLET}) with valid cryptographic signature is authorized.`
       );
     }
 
+    const payload = await req.json();
     const id = String(payload.id || '');
     if (!id) return err(400, 'BAD_REQUEST', 'Call id is required');
 
@@ -384,7 +392,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     registry[idx] = target;
-    saveCallsRegistry(registry);
+    const saveRes = saveCallsRegistry(registry);
+    if (!saveRes.success) {
+      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+    }
 
     return NextResponse.json(
       { ok: true, items: alphasForTier('LAB_MEMBER') },
@@ -395,27 +406,28 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-/** DELETE /api/alphas — Admin deletes a trade call */
+/** DELETE /api/alphas — Admin deletes a trade call (Cryptographically Verified) */
 export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = req.nextUrl;
-    const id = searchParams.get('id');
-    const adminWallet =
-      searchParams.get('adminWallet') || req.headers.get('x-admin-wallet');
-
-    if (!isAdminWallet(adminWallet)) {
+    const auth = verifyAdminAuth(req.headers);
+    if (!auth.authorized) {
       return err(
         403,
         'UNAUTHORIZED_ADMIN',
-        `Only Admin Wallet (${ADMIN_WALLET}) is authorized to delete trade calls.`
+        auth.error || `Only Master Admin (${ADMIN_WALLET}) with valid cryptographic signature is authorized.`
       );
     }
 
+    const { searchParams } = req.nextUrl;
+    const id = searchParams.get('id');
     if (!id) return err(400, 'BAD_REQUEST', 'Provide ?id=');
 
     const registry = loadCallsRegistry();
     const filtered = registry.filter((r) => r.id !== id);
-    saveCallsRegistry(filtered);
+    const saveRes = saveCallsRegistry(filtered);
+    if (!saveRes.success) {
+      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+    }
 
     return NextResponse.json(
       { ok: true, items: alphasForTier('LAB_MEMBER') },

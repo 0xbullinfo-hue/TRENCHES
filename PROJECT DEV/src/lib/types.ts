@@ -99,6 +99,9 @@ export interface AlphaItem {
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
   sparkline: number[];
   art: AlphaArtTheme;
+  marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE';
+  dataFreshness?: 'LIVE' | 'CACHED' | 'FIXTURE';
+  lastPriceUpdated?: string;
 }
 
 export interface SyndicateCaller {
@@ -128,6 +131,8 @@ export interface AllocationRecord {
 export interface Portfolio {
   claimedCount: number;
   totalRealizedPnl: string;
+  isSample?: boolean;
+  note?: string;
   history: AllocationRecord[];
 }
 

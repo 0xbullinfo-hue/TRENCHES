@@ -610,15 +610,18 @@ export function loadCallsRegistry(): AlphaRecord[] {
   return DEFAULT_REGISTRY;
 }
 
-export function saveCallsRegistry(records: AlphaRecord[]): void {
+export function saveCallsRegistry(records: AlphaRecord[]): { success: boolean; error?: string } {
   try {
     const dir = path.dirname(DATA_FILE_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(records, null, 2), 'utf-8');
-  } catch {
-    // Ignore write errors in read-only environments
+    return { success: true };
+  } catch (err) {
+    const message = (err as Error).message || 'Failed to write calls registry';
+    console.error('[TrenchLabs] Registry write failed:', message);
+    return { success: false, error: message };
   }
 }
 
@@ -752,11 +755,13 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
   });
 }
 
-/** SAMPLE portfolio — replace with claims indexer keyed by wallet. */
+/** SAMPLE portfolio — illustrative benchmark cohort records. */
 export function samplePortfolio(): Portfolio {
   return {
     claimedCount: 4,
     totalRealizedPnl: '+42.50 SOL',
+    isSample: true,
+    note: 'Historical Cohort Benchmark Sample (Illustrative)',
     history: [
       {
         ticker: '$PILL',

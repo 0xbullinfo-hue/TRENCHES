@@ -65,6 +65,15 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
   } = useGenesisBalance();
   const [copiedCa, setCopiedCa] = useState(false);
 
+  React.useEffect(() => {
+    if (!token) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [token, onClose]);
+
   if (!token) return null;
 
   const handleCopyCa = () => {
@@ -79,11 +88,14 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-canvas/95 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-canvas/95 flex items-center justify-center p-4 animate-in fade-in duration-150"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-token-name"
     >
       <div
-        className="w-full max-w-2xl rounded-xl bg-surface border border-line overflow-hidden"
+        className="w-full max-w-2xl rounded-xl bg-surface border border-line overflow-hidden shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
@@ -114,6 +126,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close modal dialog"
             className="w-7 h-7 rounded bg-surface hover:bg-surface-3 border border-line flex items-center justify-center text-muted hover:text-white cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -133,7 +146,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="font-sans text-xl font-extrabold text-white flex items-center gap-2">
+                  <h3 id="modal-token-name" className="font-sans text-xl font-extrabold text-white flex items-center gap-2">
                     <span>{token.name}</span>
                     <span className="font-mono text-sm text-pump">{token.ticker}</span>
                   </h3>

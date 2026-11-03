@@ -59,6 +59,9 @@ export const IncubatorHub: React.FC = () => {
     togglePinCall,
     toggleTpHit,
     deleteAlphaCall,
+    apiLoading,
+    apiError,
+    refreshAll,
   } = useGenesisBalance();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,6 +128,14 @@ export const IncubatorHub: React.FC = () => {
       const res = await fetch(
         `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(cleanCa)}`
       );
+      if (!res.ok) {
+        if (res.status === 429) {
+          showToast('DexScreener rate limit reached (HTTP 429). Please retry in a few seconds.');
+        } else {
+          showToast(`DexScreener request failed (HTTP ${res.status}). Enter details manually.`);
+        }
+        return;
+      }
       const data = await res.json();
       const pair = data?.pairs?.[0];
       if (pair) {
@@ -147,12 +158,12 @@ export const IncubatorHub: React.FC = () => {
           setFormCurrentMc(formatted);
           setFormEntryMc(formatted);
         }
-        showToast(`Fetched live market data for ${pair.baseToken?.symbol || cleanCa}`);
+        showToast(`Auto-filled live telemetry for ${pair.baseToken?.symbol || cleanCa}`);
       } else {
-        showToast('No DexScreener pair found — enter token details manually.');
+        showToast('No active DEX trading pair found for this CA. Enter details manually.');
       }
-    } catch {
-      showToast('Could not reach DexScreener — enter token details manually.');
+    } catch (err) {
+      showToast(`Network error reaching DexScreener: ${(err as Error).message || 'offline'}`);
     } finally {
       setFetchingDex(false);
     }
@@ -933,6 +944,22 @@ export const IncubatorHub: React.FC = () => {
 
       {/* 5. ALL CATEGORIZED ALPHA TRADE CALLS (Filterable by Blockchain: SOL, BSC, ETH, BASE, ROBIN, AVAX) */}
       <div className="space-y-4 pt-2">
+        {apiError && (
+          <div className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
+            <div className="flex items-center gap-2.5 text-danger font-semibold">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>RPC / Telemetry Notice: {apiError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => refreshAll()}
+              className="px-3 py-1 rounded bg-surface border border-line hover:border-danger text-white font-mono text-xs font-bold cursor-pointer shrink-0"
+            >
+              Retry Connection ⟳
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="font-sans text-lg sm:text-xl font-extrabold text-white">
@@ -1056,19 +1083,64 @@ export const IncubatorHub: React.FC = () => {
 
         {/* VIEW MODE A: TRADE CALL CARDS GRID */}
         {viewMode === 'GRID' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredTokens.map((token) => {
-              const isStarred = watchlist.includes(token.id);
-              const marketUrl = getPrimaryMarketUrl(token);
-
-              return (
-                <article
-                  key={token.id}
-                  onClick={() => setInspectedToken(token)}
-                  className={`group flex flex-col justify-between rounded-xl bg-surface border transition-all cursor-pointer overflow-hidden p-4 ${
-                    token.pinned ? 'border-pump' : 'border-line hover:border-pump'
-                  }`}
+          apiLoading && alphas.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-xl bg-surface border border-line p-4 space-y-3 animate-pulse"
                 >
+                  <div className="w-full aspect-square bg-surface-card rounded-md" />
+                  <div className="h-4 bg-surface-card rounded w-3/4" />
+                  <div className="h-3 bg-surface-card rounded w-1/2" />
+                  <div className="h-10 bg-surface-card rounded w-full" />
+                </div>
+              ))}
+            </div>
+          ) : filteredTokens.length === 0 ? (
+            <div className="rounded-xl bg-surface border border-line p-10 text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-surface-card border border-line mx-auto flex items-center justify-center text-muted">
+                <Search className="w-4 h-4" />
+              </div>
+              <h3 className="font-sans text-base font-bold text-white">No trade calls found</h3>
+              <p className="font-sans text-xs text-muted max-w-sm mx-auto">
+                No alpha calls match your active filter or search query &quot;{searchQuery}&quot;. Try switching blockchains or reset filters.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedChain('ALL');
+                  setActiveFilter('ALL');
+                }}
+                className="px-4 py-2 rounded-md bg-surface-card hover:bg-surface-3 border border-line text-xs font-mono font-bold text-pump cursor-pointer"
+              >
+                Reset All Filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredTokens.map((token) => {
+                const isStarred = watchlist.includes(token.id);
+                const marketUrl = getPrimaryMarketUrl(token);
+
+                return (
+                  <article
+                    key={token.id}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Inspect ${token.name} (${token.ticker}) call`}
+                    onClick={() => setInspectedToken(token)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setInspectedToken(token);
+                      }
+                    }}
+                    className={`group flex flex-col justify-between rounded-xl bg-surface border transition-all cursor-pointer overflow-hidden p-4 focus:outline-none focus:border-pump ${
+                      token.pinned ? 'border-pump' : 'border-line hover:border-pump'
+                    }`}
+                  >
                   <div className="space-y-3">
                     {/* Artwork + Top Overlays */}
                     <div className="relative">
@@ -1327,7 +1399,8 @@ export const IncubatorHub: React.FC = () => {
                 </article>
               );
             })}
-          </div>
+            </div>
+          )
         ) : (
           /* VIEW MODE B: FULL TRADE CALLS TABLE */
           <div className="rounded-xl bg-surface border border-line overflow-x-auto">
@@ -1343,14 +1416,30 @@ export const IncubatorHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line font-sans text-sm">
-                {filteredTokens.map((token) => {
-                  const marketUrl = getPrimaryMarketUrl(token);
-                  return (
-                    <tr
-                      key={token.id}
-                      onClick={() => setInspectedToken(token)}
-                      className="hover:bg-surface-card transition-colors cursor-pointer"
-                    >
+                {filteredTokens.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted font-mono text-xs">
+                      No alpha calls match active filters or search query &quot;{searchQuery}&quot;.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTokens.map((token) => {
+                    const marketUrl = getPrimaryMarketUrl(token);
+                    return (
+                      <tr
+                        key={token.id}
+                        tabIndex={0}
+                        role="row"
+                        aria-label={`Inspect ${token.name} (${token.ticker})`}
+                        onClick={() => setInspectedToken(token)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setInspectedToken(token);
+                          }
+                        }}
+                        className="hover:bg-surface-card transition-colors cursor-pointer focus:outline-none focus:bg-surface-card"
+                      >
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <TokenArtwork
@@ -1473,7 +1562,7 @@ export const IncubatorHub: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -1663,8 +1752,8 @@ export const IncubatorHub: React.FC = () => {
             Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
             is verified with{' '}
             <strong className="text-pump">{formattedBalance} $GENESIS</strong>.
-            Optionally bind an EVM address for Base/ETH/BSC/ROBIN/AVAX alerts and generate
-            your private Telegram key.
+            Optionally save a local EVM address for multi-chain notifications or generate
+            a simulated Telegram signal key (stored in local browser storage).
           </p>
         </div>
 

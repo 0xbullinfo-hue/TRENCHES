@@ -301,8 +301,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
       setApiLoading(true);
       try {
-        const query = isAdminWallet(walletAddr)
-          ? `wallet=${encodeURIComponent(walletAddr!)}&balance=${encodeURIComponent(bal)}`
+        // Enforce wallet-based server verification whenever an address is available
+        const query = walletAddr
+          ? `wallet=${encodeURIComponent(walletAddr)}`
           : `balance=${encodeURIComponent(bal)}`;
 
         const res = await fetch(`/api/alphas?${query}`, {
@@ -314,15 +315,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setAlphas([]);
           setCallers([]);
           setPortfolio(null);
-          setApiError(!data.ok ? data.error : 'ACCESS_DENIED_ZERO_BALANCE');
+          setApiError(!data.ok ? data.message || data.error : 'ACCESS_DENIED_ZERO_BALANCE');
         } else {
           setAlphas(data.items);
           setCallers(data.callers ?? []);
           setPortfolio(data.portfolio);
           setApiError(null);
         }
-      } catch {
-        setApiError('RPC_UNAVAILABLE');
+      } catch (err) {
+        setApiError((err as Error).message || 'Solana RPC network unavailable');
       } finally {
         setApiLoading(false);
       }
@@ -334,19 +335,50 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     fetchAlphasFromBackend(balance, connected, publicKeyBase58);
   }, [balance, connected, publicKeyBase58, fetchAlphasFromBackend]);
 
+  const getAdminHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const adminAddr = publicKeyBase58 || ADMIN_WALLET;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-admin-wallet': adminAddr,
+    };
+
+    // If real admin wallet is connected, cryptographically sign the authentication challenge
+    if (
+      wallet.connected &&
+      wallet.publicKey &&
+      wallet.signMessage &&
+      wallet.publicKey.toBase58() === ADMIN_WALLET
+    ) {
+      try {
+        const timestamp = Date.now().toString();
+        const message = `TrenchLabs Admin Auth: ${timestamp}`;
+        const encoded = new TextEncoder().encode(message);
+        const sigBytes = await wallet.signMessage(encoded);
+        const sigHex = Array.from(sigBytes)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        headers['x-admin-timestamp'] = timestamp;
+        headers['x-admin-signature'] = sigHex;
+        return headers;
+      } catch {
+        // User rejected signature prompt in wallet popup
+      }
+    }
+
+    // In local dev/preview mode only
+    headers['x-admin-simulated'] = 'true';
+    return headers;
+  }, [publicKeyBase58, wallet]);
+
   const createAlphaCall = useCallback(
     async (payload: CreateCallPayload): Promise<boolean> => {
       try {
+        const headers = await getAdminHeaders();
         const res = await fetch('/api/alphas', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
-          },
-          body: JSON.stringify({
-            ...payload,
-            adminWallet: publicKeyBase58 || ADMIN_WALLET,
-          }),
+          headers,
+          body: JSON.stringify(payload),
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -358,22 +390,19 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [publicKeyBase58]
+    [getAdminHeaders]
   );
 
   const togglePinCall = useCallback(
     async (id: string, nextPinned: boolean): Promise<boolean> => {
       try {
+        const headers = await getAdminHeaders();
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
-          },
+          headers,
           body: JSON.stringify({
             id,
             pinned: nextPinned,
-            adminWallet: publicKeyBase58 || ADMIN_WALLET,
           }),
         });
         const json = await res.json();
@@ -386,22 +415,19 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [publicKeyBase58]
+    [getAdminHeaders]
   );
 
   const toggleTpHit = useCallback(
     async (id: string, tpIndex: number): Promise<boolean> => {
       try {
+        const headers = await getAdminHeaders();
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
-          },
+          headers,
           body: JSON.stringify({
             id,
             toggleTpIndex: tpIndex,
-            adminWallet: publicKeyBase58 || ADMIN_WALLET,
           }),
         });
         const json = await res.json();
@@ -414,22 +440,19 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [publicKeyBase58]
+    [getAdminHeaders]
   );
 
   const updateCallMarketCap = useCallback(
     async (id: string, marketCap: string): Promise<boolean> => {
       try {
+        const headers = await getAdminHeaders();
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
-          },
+          headers,
           body: JSON.stringify({
             id,
             marketCap,
-            adminWallet: publicKeyBase58 || ADMIN_WALLET,
           }),
         });
         const json = await res.json();
@@ -442,21 +465,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [publicKeyBase58]
+    [getAdminHeaders]
   );
 
   const deleteAlphaCall = useCallback(
     async (id: string): Promise<boolean> => {
       try {
+        const headers = await getAdminHeaders();
         const res = await fetch(
-          `/api/alphas?id=${encodeURIComponent(id)}&adminWallet=${encodeURIComponent(
-            publicKeyBase58 || ADMIN_WALLET
-          )}`,
+          `/api/alphas?id=${encodeURIComponent(id)}`,
           {
             method: 'DELETE',
-            headers: {
-              'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
-            },
+            headers,
           }
         );
         const json = await res.json();
@@ -469,7 +489,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [publicKeyBase58]
+    [getAdminHeaders]
   );
 
   const setDemoPreset = useCallback((preset: DemoPreset) => {

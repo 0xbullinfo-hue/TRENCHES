@@ -47,7 +47,7 @@ export const BalanceCard: React.FC = () => {
           {/* Card Header */}
           <div className="card-head">
             <div className="flex items-center gap-1.5">
-              <span className="text-accent font-semibold">// COL_01</span>
+              <span className="text-accent font-semibold">COL_01</span>
               <span>:: GENESIS_BALANCE</span>
             </div>
             <span className="text-accent font-semibold">SPL VERIFIED</span>
@@ -190,7 +190,7 @@ export const BalanceCard: React.FC = () => {
             <div className="card-head">
               <div className="flex items-center gap-1.5 text-ink font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-accent" />
-                <span>// PORTFOLIO_SNAPSHOT // SOLANA_SPL</span>
+                <span>PORTFOLIO_SNAPSHOT : SOLANA_SPL</span>
               </div>
               <button
                 type="button"

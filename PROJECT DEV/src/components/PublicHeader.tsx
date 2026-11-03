@@ -74,12 +74,12 @@ export const PublicHeader: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border">
-      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border overflow-hidden">
+      <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark */}
-        <Link href="/" className="flex items-center gap-3 shrink-0 group">
+        <Link href="/" className="flex items-center gap-2 sm:gap-3 shrink-0 group">
           <HexCubeLogo />
-          <span className="font-sans font-extrabold tracking-tight text-xl sm:text-2xl text-white">
+          <span className="font-sans font-extrabold tracking-tight text-lg sm:text-2xl text-white">
             Trench<span className="text-toxic">Labs</span>HQ
           </span>
         </Link>
@@ -110,14 +110,14 @@ export const PublicHeader: React.FC = () => {
         </nav>
 
         {/* Right: CONNECT Button (Hard Flat Toxic Theme) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleConnectClick}
-            className="h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm sm:text-base font-black uppercase tracking-wide inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
           >
-            <Wallet className="w-4 h-4 stroke-[2.5]" />
-            <span>{connected ? `CONNECT (${shortAddress})` : 'CONNECT'}</span>
+            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+            <span>{connected ? shortAddress : 'CONNECT'}</span>
           </button>
         </div>
       </div>

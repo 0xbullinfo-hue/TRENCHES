@@ -94,7 +94,7 @@ export const ActiveAlphas: React.FC = () => {
                 <span className="animate-ping1hz absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
               </span>
-              <span className="text-ink font-semibold">// ACTIVE ALPHAS</span>
+              <span className="text-ink font-semibold">ACTIVE ALPHAS</span>
             </div>
 
             <div className="flex items-center gap-1" role="group" aria-label="Chain Filter">
@@ -317,7 +317,7 @@ export const ActiveAlphas: React.FC = () => {
           <div className="card w-full max-w-lg">
             <div className="card-head">
               <div className="flex items-center gap-2 text-ink font-semibold">
-                <span>// ALPHA_DOSSIER</span>
+                <span>ALPHA_DOSSIER</span>
                 <span className="text-accent">{activeModalItem.ticker}</span>
                 <span className="px-1.5 py-0.5 rounded-sm bg-surface-2 border border-line text-2xs">
                   {activeModalItem.chain}

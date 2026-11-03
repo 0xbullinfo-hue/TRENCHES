@@ -39,7 +39,7 @@ const config: Config = {
         line: "#1C3D12",
         ink: "#EAECEF",
         muted: "#848E9C",
-        dim: "#474D57",
+        dim: "#8E9BAE",
         amber: "#F59E0B",
         idle: "#6B7280",
         danger: "#F6465D",
