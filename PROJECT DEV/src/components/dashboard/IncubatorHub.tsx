@@ -539,66 +539,123 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 1. TOP CARD: User Connected Wallet, SOL Wallet Balance, and Join The Lab (Telegram Group) */}
-      <div className="rounded-xl bg-surface border border-line p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 sm:gap-5 min-w-0">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-lg bg-surface-card border border-line flex items-center justify-center text-pump shrink-0">
-              <Wallet className="w-5 h-5" />
-            </span>
-            <div>
-              <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
-                CONNECTED WALLET
-              </div>
-              <div className="font-mono text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <span>{connected ? shortAddress : 'No Wallet Connected'}</span>
-                {connected && (
-                  <button
-                    type="button"
-                    onClick={(e) =>
-                      handleCopyText(publicKeyBase58 || '', 'user-wallet', 'Wallet Address', e)
-                    }
-                    className="text-muted hover:text-pump cursor-pointer"
-                    title="Copy Connected Address"
-                  >
-                    {copiedId === 'user-wallet' ? (
-                      <Check className="w-3.5 h-3.5 text-pump" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                )}
-              </div>
+      {/* 1. DISCLAIMER BANNER (Directly on top of Welcome To The Lab card) */}
+      <div className="rounded-xl bg-surface border border-pump/30 p-3.5 sm:p-4 flex items-center gap-3">
+        <AlertTriangle className="w-4 h-4 text-pump shrink-0" />
+        <p className="font-sans text-xs text-muted leading-relaxed">
+          <strong className="text-white uppercase tracking-wider mr-1.5">
+            ALPHA CALLS DISCLAIMER:
+          </strong>
+          Admin posts trade calls for verified{' '}
+          <strong className="text-pump">1,000,000+ $GENESIS</strong> holders. Users take all
+          trades at their own risk (DYOR). Information provided is for research purposes only
+          and can lose value.
+        </p>
+      </div>
+
+      {/* 3. WELCOME TO THE LAB CARD */}
+      <div className="relative rounded-xl border border-line bg-surface p-5 sm:p-6 overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+          <div className="space-y-1.5 max-w-3xl">
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-full bg-surface-card border border-line flex items-center justify-center text-pump">
+                <Flame className="w-4 h-4" />
+              </span>
+              <h1 className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                Welcome To The Lab
+              </h1>
             </div>
+            <p className="font-sans text-sm text-muted leading-relaxed">
+              Exclusive multi-chain trade calls for verified{' '}
+              <span className="text-pump font-bold">1,000,000+ $GENESIS</span> holders
+              across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
+              Every card displays live Market Cap, dual Risk Ratio, and Take Profit
+              multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
+            </p>
           </div>
 
-          <div className="h-8 w-px bg-line hidden sm:block" />
-
-          <div>
-            <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
-              SOL WALLET BALANCE
-            </div>
-            <div className="font-sans text-sm sm:text-base font-extrabold text-white flex items-center gap-2 tnum">
-              <span className="text-pump">{formattedBalance} $GENESIS</span>
-              <span className="px-2 py-0.5 rounded bg-surface-card border border-line font-mono text-[10px] font-bold text-pump">
-                {isAdmin ? 'MASTER ADMIN' : tier?.label?.toUpperCase() || 'LAB MEMBER'}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
+              className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {copiedId === 'hero-gen-ca' ? (
+                <Check className="w-3.5 h-3.5 text-pump" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-pump" />
+              )}
+              <span>
+                {copiedId === 'hero-gen-ca' ? 'Copied $GENESIS CA' : 'Copy $GENESIS CA'}
               </span>
-            </div>
+            </button>
+
+            <a
+              href={BUY_LINKS.pump}
+              target="_blank"
+              rel="noreferrer"
+              className="px-5 py-2 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 transition-all"
+            >
+              <span>Buy $GENESIS on Pump.fun</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
           </div>
         </div>
 
-        {/* Action Button: Join The Lab (Telegram Group) */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <a
-            href="https://t.me/TrenchLabsHQ"
-            target="_blank"
-            rel="noreferrer"
-            className="h-10 px-5 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors shrink-0"
-          >
-            <Send className="w-4 h-4 stroke-[2.5]" />
-            <span>JOIN THE LAB (TELEGRAM)</span>
-            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-          </a>
+        {/* 4-Column KPI Stat Box (Supported Blockchains: 2 lines, 3 per line) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line">
+          <div className="p-5">
+            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
+              ACTIVE ALPHA CALLS
+            </div>
+            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
+              {alphas.length} CALLS
+            </div>
+            <div className="font-sans text-xs text-muted mt-1">
+              {pinnedCalls.length} Pinned Priority • 6 Chains
+            </div>
+          </div>
+
+          {/* Supported Blockchains in 2 lines, 3 per line */}
+          <div className="p-5">
+            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
+              SUPPORTED BLOCKCHAINS
+            </div>
+            <div className="font-mono text-sm sm:text-base font-extrabold text-white mt-1.5 space-y-0.5">
+              <div>SOL • BSC • ETH</div>
+              <div className="text-pump">BASE • ROBIN • AVAX</div>
+            </div>
+            <div className="font-sans text-[11px] text-muted mt-1">
+              Includes Robinhood Chain (ROBIN)
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
+              LAB ACCESS PASS
+            </div>
+            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
+              1,000,000
+            </div>
+            <div className="font-sans text-xs text-white mt-1 flex items-center gap-1.5">
+              <span className="px-2 py-0.5 rounded bg-surface border border-line text-pump font-bold">
+                $GENESIS REQUIRED
+              </span>
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="flex items-center justify-between font-sans text-xs text-muted uppercase tracking-wider font-bold">
+              <span>ADMIN DESK WIN RATE</span>
+              <span className="text-pump font-bold">2X+ HIT RATE</span>
+            </div>
+            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-white mt-1 tnum">
+              86.4% <span className="text-pump text-sm font-mono">(2x / 5x TP)</span>
+            </div>
+            <div className="w-full h-1.5 bg-canvas rounded-full overflow-hidden mt-2 border border-line">
+              <div className="h-full bg-pump w-[86%]" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -829,126 +886,6 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 2. DISCLAIMER BANNER (Visible on top of Welcome To The Lab, clean and not too big) */}
-      <div className="rounded-xl bg-surface border border-pump/30 p-3.5 sm:p-4 flex items-center gap-3">
-        <AlertTriangle className="w-4 h-4 text-pump shrink-0" />
-        <p className="font-sans text-xs text-muted leading-relaxed">
-          <strong className="text-white uppercase tracking-wider mr-1.5">
-            ALPHA CALLS DISCLAIMER:
-          </strong>
-          Admin posts trade calls for verified{' '}
-          <strong className="text-pump">1,000,000+ $GENESIS</strong> holders. Users take all
-          trades at their own risk (DYOR). Information provided is for research purposes only
-          and can lose value.
-        </p>
-      </div>
-
-      {/* 3. WELCOME TO THE LAB CARD */}
-      <div className="relative rounded-xl border border-line bg-surface p-5 sm:p-6 overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-          <div className="space-y-1.5 max-w-3xl">
-            <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 rounded-full bg-surface-card border border-line flex items-center justify-center text-pump">
-                <Flame className="w-4 h-4" />
-              </span>
-              <h1 className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Welcome To The Lab
-              </h1>
-            </div>
-            <p className="font-sans text-sm text-muted leading-relaxed">
-              Exclusive multi-chain trade calls for verified{' '}
-              <span className="text-pump font-bold">1,000,000+ $GENESIS</span> holders
-              across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
-              Every card displays live Market Cap, dual Risk Ratio, and Take Profit
-              multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
-              className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              {copiedId === 'hero-gen-ca' ? (
-                <Check className="w-3.5 h-3.5 text-pump" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-pump" />
-              )}
-              <span>
-                {copiedId === 'hero-gen-ca' ? 'Copied $GENESIS CA' : 'Copy $GENESIS CA'}
-              </span>
-            </button>
-
-            <a
-              href={BUY_LINKS.pump}
-              target="_blank"
-              rel="noreferrer"
-              className="px-5 py-2 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 transition-all"
-            >
-              <span>Buy $GENESIS on Pump.fun</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-
-        {/* 4-Column KPI Stat Box (Supported Blockchains: 2 lines, 3 per line) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line">
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              ACTIVE ALPHA CALLS
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
-              {alphas.length} CALLS
-            </div>
-            <div className="font-sans text-xs text-muted mt-1">
-              {pinnedCalls.length} Pinned Priority • 6 Chains
-            </div>
-          </div>
-
-          {/* Supported Blockchains in 2 lines, 3 per line */}
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              SUPPORTED BLOCKCHAINS
-            </div>
-            <div className="font-mono text-sm sm:text-base font-extrabold text-white mt-1.5 space-y-0.5">
-              <div>SOL • BSC • ETH</div>
-              <div className="text-pump">BASE • ROBIN • AVAX</div>
-            </div>
-            <div className="font-sans text-[11px] text-muted mt-1">
-              Includes Robinhood Chain (ROBIN)
-            </div>
-          </div>
-
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              YOUR VERIFIED $GENESIS
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
-              {formattedBalance}
-            </div>
-            <div className="font-sans text-xs text-white mt-1 flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded bg-surface border border-line text-pump font-bold">
-                {isAdmin ? 'MASTER ADMIN (FULL ACCESS)' : 'LAB MEMBER (1M+ PASS)'}
-              </span>
-            </div>
-          </div>
-
-          <div className="p-5">
-            <div className="flex items-center justify-between font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              <span>ADMIN DESK WIN RATE</span>
-              <span className="text-pump font-bold">2X+ HIT RATE</span>
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-white mt-1 tnum">
-              86.4% <span className="text-pump text-sm font-mono">(2x / 5x TP)</span>
-            </div>
-            <div className="w-full h-1.5 bg-canvas rounded-full overflow-hidden mt-2 border border-line">
-              <div className="h-full bg-pump w-[86%]" />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* 4. UNIFIED DASHBOARD CARD (Matches Screenshot: Status + Admin Preview + Search + Gate Token + Watchlist) */}
       <div className="rounded-xl bg-surface border border-line overflow-hidden divide-y divide-line">
         {/* Top Strip: Dashboard Status + Gate Contract + Admin Address + User Balance */}
@@ -966,10 +903,8 @@ export const IncubatorHub: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 font-mono text-xs">
-            <span className="text-muted">Wallet Balance:</span>
-            <span className="text-pump font-bold">{formattedBalance} $GENESIS</span>
-            <span className="px-2 py-0.5 rounded bg-surface border border-line text-pump font-bold text-[11px]">
-              {isAdmin ? 'Admin Verified' : 'Lab Member (1M+ Verified)'}
+            <span className="px-2.5 py-1 rounded bg-surface border border-line text-pump font-bold text-xs">
+              {isAdmin ? 'Master Admin' : 'Lab Member (1M+ Verified)'}
             </span>
           </div>
         </div>

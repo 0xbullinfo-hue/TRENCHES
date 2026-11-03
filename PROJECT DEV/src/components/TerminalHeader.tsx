@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { MascotRat } from '@/components/MascotRat';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { LogOut, Wallet } from 'lucide-react';
+import { ArrowUpRight, LogOut, Send, Wallet } from 'lucide-react';
 
 export const TerminalHeader: React.FC = () => {
   const { setVisible: openWalletModal } = useWalletModal();
@@ -35,43 +35,22 @@ export const TerminalHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* Center: Navigation Menu Tabs (Home & Experiments removed per user instruction) */}
-        <nav
-          aria-label="Terminal Navigation"
-          className="hidden xl:flex items-center gap-6 font-sans text-base lg:text-lg font-extrabold tracking-wide"
-        >
+        {/* Center: JOIN THE LAB Button (Replaces plain text link) */}
+        <div className="flex items-center">
           <a
             href="https://t.me/TrenchLabsHQ"
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
+            className="h-9 sm:h-10 px-4 sm:px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors shrink-0"
           >
-            Join the Lab
+            <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>JOIN THE LAB</span>
+            <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
           </a>
-        </nav>
+        </div>
 
-        {/* Right: Live Balance Pill + Wallet & Disconnect (Hard Flat Toxic Theme) */}
+        {/* Right: Wallet & Disconnect (SOL wallet balance completely removed) */}
         <div className="flex items-center gap-2.5">
-          {connected && (
-            <div
-              className={`hidden sm:flex items-center gap-2 h-10 px-3.5 rounded-lg border font-mono text-xs tnum ${
-                isUnlocked
-                  ? 'bg-surface border-toxic-border text-white'
-                  : 'bg-danger/10 border-danger/40 text-danger'
-              }`}
-            >
-              <span className="font-bold">{formattedBalance} $GENESIS</span>
-              <span className="text-dim">•</span>
-              <span
-                className={
-                  isUnlocked ? 'text-toxic font-bold' : 'text-danger font-bold'
-                }
-              >
-                {tier.label.toUpperCase()}
-              </span>
-            </div>
-          )}
-
           {connected ? (
             <div className="flex items-center gap-1.5 shrink-0">
               <button
