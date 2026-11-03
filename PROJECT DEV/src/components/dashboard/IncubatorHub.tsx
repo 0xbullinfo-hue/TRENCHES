@@ -1475,21 +1475,41 @@ export const IncubatorHub: React.FC = () => {
         </div>
 
         <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-2.5">
-          <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={evmDraft}
-              onChange={(e) => setEvmDraft(e.target.value)}
-              placeholder="Bind 0x... wallet for BSC / ETH / BASE / ROBIN / AVAX"
-              className="flex-1 h-9 px-3 rounded bg-surface-card border border-line font-mono text-xs text-white placeholder:text-dim focus:outline-none focus:border-pump"
-            />
-            <button
-              type="submit"
-              className="h-9 px-3.5 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-pump cursor-pointer shrink-0"
-            >
-              {evmSaved ? 'SAVED ✓' : 'BIND 0x'}
-            </button>
-          </form>
+          {!boundEvmAddress ? (
+            <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={evmDraft}
+                onChange={(e) => setEvmDraft(e.target.value)}
+                placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
+                className="flex-1 h-9 px-3 rounded bg-surface-card border border-line font-mono text-xs text-white placeholder:text-dim focus:outline-none focus:border-pump"
+              />
+              <button
+                type="submit"
+                className="h-9 px-3.5 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-pump cursor-pointer shrink-0 transition-colors"
+              >
+                {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-toxic-bg border border-toxic-border font-mono text-xs">
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-pump font-bold uppercase text-[10px]">MAPPED:</span>
+                <span className="text-white truncate font-medium">{boundEvmAddress}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBoundEvmAddress('');
+                  setEvmDraft('');
+                }}
+                className="text-muted hover:text-danger ml-2 text-[11px] underline cursor-pointer shrink-0"
+                title="Change mapped address"
+              >
+                Change
+              </button>
+            </div>
+          )}
 
           {tgKey ? (
             <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-surface-card border border-line font-mono text-xs">
