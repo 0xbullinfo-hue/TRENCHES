@@ -61,6 +61,8 @@ export interface AlphaRecord {
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
   /** Serial call tag, e.g. EXP01, EXP02, EXP03 */
   serialTag?: string;
+  /** Admin outcome classification: PROFIT made, LOSS made, or PENDING */
+  outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
   sparkline: number[];
   art: AlphaArtTheme;
 }
@@ -944,6 +946,7 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
       deployedVia: r.deployedVia,
       spotlightRank: r.spotlightRank,
       serialTag,
+      outcome: r.outcome || (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
       sparkline: r.sparkline,
       art: r.art,
     };

@@ -89,6 +89,7 @@ interface GenesisContextValue {
   createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
   toggleTpHit: (id: string, tpIndex: number) => Promise<boolean>;
+  setCallOutcome: (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING') => Promise<boolean>;
   updateCallMarketCap: (id: string, marketCap: string) => Promise<boolean>;
   deleteAlphaCall: (id: string) => Promise<boolean>;
 
@@ -256,8 +257,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [connected, demoPreset, wallet.publicKey]);
 
   const isAdmin = useMemo(
-    () => isAdminWallet(publicKeyBase58) || demoPreset === 'admin',
-    [publicKeyBase58, demoPreset]
+    () => Boolean(connected && publicKeyBase58 && isAdminWallet(publicKeyBase58)),
+    [connected, publicKeyBase58]
   );
 
   const shortAddress = useMemo(() => {
@@ -444,6 +445,31 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     [getAdminHeaders]
   );
 
+  const setCallOutcome = useCallback(
+    async (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING'): Promise<boolean> => {
+      try {
+        const headers = await getAdminHeaders();
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            id,
+            outcome,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [getAdminHeaders]
+  );
+
   const updateCallMarketCap = useCallback(
     async (id: string, marketCap: string): Promise<boolean> => {
       try {
@@ -538,6 +564,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     createAlphaCall,
     togglePinCall,
     toggleTpHit,
+    setCallOutcome,
     updateCallMarketCap,
     deleteAlphaCall,
     watchlist,

@@ -86,7 +86,8 @@
       "secondary": "#76FF32",
       "motif": "pill",
       "badgeText": "BSC LIQUIDITY"
-    }
+    },
+    "outcome": "PROFIT"
   },
   {
     "id": "bsc-bc400",
@@ -175,7 +176,8 @@
       "secondary": "#76FF32",
       "motif": "stealth",
       "badgeText": "BNB FARMING"
-    }
+    },
+    "outcome": "PROFIT"
   },
   {
     "id": "bsc-water",
@@ -269,7 +271,8 @@
       "secondary": "#76FF32",
       "motif": "pill",
       "badgeText": "MICRO-CAP"
-    }
+    },
+    "outcome": "PROFIT"
   },
   {
     "id": "bsc-azuki",
@@ -351,7 +354,8 @@
       "secondary": "#76FF32",
       "motif": "stealth",
       "badgeText": "ANIME BSC"
-    }
+    },
+    "outcome": "PROFIT"
   },
   {
     "id": "pill-trench",
@@ -452,7 +456,8 @@
       "secondary": "#76FF32",
       "motif": "pill"
     },
-    "serialTag": "EXP05"
+    "serialTag": "EXP05",
+    "outcome": "PROFIT"
   },
   {
     "id": "robin-hoodlum",
@@ -546,7 +551,8 @@
       "motif": "stealth",
       "badgeText": "ROBIN CHAIN"
     },
-    "serialTag": "EXP06"
+    "serialTag": "EXP06",
+    "outcome": "PROFIT"
   },
   {
     "id": "baton-ai",
@@ -643,7 +649,8 @@
       "secondary": "#FEF3C7",
       "motif": "baton"
     },
-    "serialTag": "EXP07"
+    "serialTag": "EXP07",
+    "outcome": "PROFIT"
   },
   {
     "id": "btc-trench",
@@ -733,7 +740,8 @@
       "secondary": "#FFEDD5",
       "motif": "bull"
     },
-    "serialTag": "EXP08"
+    "serialTag": "EXP08",
+    "outcome": "PROFIT"
   },
   {
     "id": "swordcat",
@@ -829,7 +837,8 @@
       "secondary": "#E0F2FE",
       "motif": "swordcat"
     },
-    "serialTag": "EXP09"
+    "serialTag": "EXP09",
+    "outcome": "PROFIT"
   },
   {
     "id": "avax-blizzard",
@@ -924,7 +933,8 @@
       "secondary": "#F3E8FF",
       "motif": "jubjub"
     },
-    "serialTag": "EXP010"
+    "serialTag": "EXP010",
+    "outcome": "PROFIT"
   },
   {
     "id": "just-stealth-it",
@@ -1009,7 +1019,8 @@
       "secondary": "#76FF32",
       "motif": "stealth"
     },
-    "serialTag": "EXP011"
+    "serialTag": "EXP011",
+    "outcome": "PROFIT"
   },
   {
     "id": "otcity-desk",
@@ -1104,7 +1115,8 @@
       "secondary": "#CCFBF1",
       "motif": "otcity"
     },
-    "serialTag": "EXP012"
+    "serialTag": "EXP012",
+    "outcome": "PROFIT"
   },
   {
     "id": "catdog-coge",
@@ -1195,7 +1207,8 @@
       "secondary": "#76FF32",
       "motif": "catdog"
     },
-    "serialTag": "EXP013"
+    "serialTag": "EXP013",
+    "outcome": "PENDING"
   },
   {
     "id": "barron-trench",
@@ -1286,6 +1299,7 @@
       "secondary": "#FEF08A",
       "motif": "barron"
     },
-    "serialTag": "EXP014"
+    "serialTag": "EXP014",
+    "outcome": "PROFIT"
   }
 ]

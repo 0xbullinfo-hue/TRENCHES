@@ -421,6 +421,14 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    if (
+      payload.outcome === 'PROFIT' ||
+      payload.outcome === 'LOSS' ||
+      payload.outcome === 'PENDING'
+    ) {
+      target.outcome = payload.outcome;
+    }
+
     registry[idx] = target;
     const saveRes = saveCallsRegistry(registry);
     if (!saveRes.success) {

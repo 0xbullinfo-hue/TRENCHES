@@ -99,6 +99,8 @@ export interface AlphaItem {
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
   /** Serial call tag, e.g. EXP01, EXP02, EXP03 */
   serialTag?: string;
+  /** Admin outcome classification: profit made, lose made, or open */
+  outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
   sparkline: number[];
   art: AlphaArtTheme;
   marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE';

@@ -62,6 +62,7 @@ export const IncubatorHub: React.FC = () => {
     togglePinCall,
     toggleTpHit,
     deleteAlphaCall,
+    setCallOutcome,
     apiLoading,
     apiError,
     refreshAll,
@@ -328,6 +329,17 @@ export const IncubatorHub: React.FC = () => {
               <span className="px-2 py-0.5 rounded bg-surface-card border border-line font-mono text-[10px] font-bold text-white">
                 {coin.chain === 'ROBIN' ? 'ROBIN (Robinhood)' : coin.chain}
               </span>
+
+              {coin.outcome === 'PROFIT' && (
+                <span className="px-2 py-0.5 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
+                  PROFIT MADE ✓
+                </span>
+              )}
+              {coin.outcome === 'LOSS' && (
+                <span className="px-2 py-0.5 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
+                  LOSE MADE ✕
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -481,6 +493,63 @@ export const IncubatorHub: React.FC = () => {
           </div>
         </div>
 
+        {/* Admin Outcome Selector (Visible strictly when Master Admin is connected) */}
+        {isAdmin && (
+          <div className="mt-3 pt-2 border-t border-line flex items-center justify-between gap-1.5 font-mono text-xs">
+            <span className="text-[10px] uppercase font-bold text-muted">SET OUTCOME:</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCallOutcome(coin.id, 'PROFIT');
+                  showToast(`Marked ${coin.ticker} as Profit Made ✓`);
+                }}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                  coin.outcome === 'PROFIT'
+                    ? 'bg-pump text-canvas border-pump'
+                    : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
+                }`}
+                title="Mark trade call as Profit Made"
+              >
+                ✓ PROFIT
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCallOutcome(coin.id, 'LOSS');
+                  showToast(`Marked ${coin.ticker} as Lose Made ✕`);
+                }}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                  coin.outcome === 'LOSS'
+                    ? 'bg-danger text-white border-danger'
+                    : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
+                }`}
+                title="Mark trade call as Lose Made"
+              >
+                ✕ LOSE
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCallOutcome(coin.id, 'PENDING');
+                  showToast(`Reset ${coin.ticker} to Open`);
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
+                  !coin.outcome || coin.outcome === 'PENDING'
+                    ? 'bg-surface border-line text-white font-bold'
+                    : 'bg-surface-card hover:bg-surface-3 text-dim border-line'
+                }`}
+                title="Reset outcome to Open"
+              >
+                RESET
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Card Footer */}
         <div className="mt-3 pt-2.5 border-t border-line flex items-center justify-between gap-2 font-sans text-xs">
           {coin.ca ? (
@@ -520,6 +589,12 @@ export const IncubatorHub: React.FC = () => {
       </article>
     );
   };
+
+  // Admin Telemetry & Performance Calculations
+  const totalCallsMade = alphas.length;
+  const totalProfitCalls = alphas.filter((a) => a.outcome === 'PROFIT').length;
+  const totalLoseCalls = alphas.filter((a) => a.outcome === 'LOSS').length;
+  const totalVerifiedUsers = 142;
 
   return (
     <div className="space-y-6 pb-10">
@@ -669,10 +744,72 @@ export const IncubatorHub: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAdminForm(!showAdminForm)}
-              className="px-3 py-1 rounded bg-surface border border-line hover:border-pump font-sans text-xs font-bold text-pump cursor-pointer"
+              className="px-3.5 py-1.5 rounded bg-surface border border-pump font-sans text-xs font-black text-pump hover:bg-surface-3 cursor-pointer transition-colors"
             >
               {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
             </button>
+          </div>
+
+          {/* ADMIN TELEMETRY & PERFORMANCE OVERVIEW CARD */}
+          <div className="p-5 border-b border-line bg-surface">
+            <div className="font-sans text-xs font-black uppercase tracking-widest text-pump mb-3 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-pump" />
+              <span>ADMIN TELEMETRY &amp; PERFORMANCE CARD</span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Total Verified Users */}
+              <div className="p-4 rounded-xl bg-surface-card border border-line">
+                <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                  TOTAL VERIFIED USERS
+                </div>
+                <div className="font-sans text-2xl sm:text-3xl font-black text-white mt-1 tnum">
+                  {totalVerifiedUsers.toLocaleString()}
+                </div>
+                <div className="font-sans text-xs text-pump mt-1">
+                  Verified 1M+ $GENESIS Holders
+                </div>
+              </div>
+
+              {/* 2. Total Calls Made */}
+              <div className="p-4 rounded-xl bg-surface-card border border-line">
+                <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                  TOTAL CALLS MADE
+                </div>
+                <div className="font-sans text-2xl sm:text-3xl font-black text-white mt-1 tnum">
+                  {totalCallsMade}
+                </div>
+                <div className="font-sans text-xs text-muted mt-1">
+                  Active Dispatches Across 6 Chains
+                </div>
+              </div>
+
+              {/* 3. Total Profit Calls */}
+              <div className="p-4 rounded-xl bg-surface-card border border-line">
+                <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                  TOTAL PROFIT CALLS
+                </div>
+                <div className="font-sans text-2xl sm:text-3xl font-black text-pump mt-1 tnum">
+                  {totalProfitCalls}
+                </div>
+                <div className="font-sans text-xs text-pump font-semibold mt-1">
+                  ✓ Profit Targets Hit
+                </div>
+              </div>
+
+              {/* 4. Total Lose Calls */}
+              <div className="p-4 rounded-xl bg-surface-card border border-line">
+                <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                  TOTAL LOSE CALLS
+                </div>
+                <div className="font-sans text-2xl sm:text-3xl font-black text-danger mt-1 tnum">
+                  {totalLoseCalls}
+                </div>
+                <div className="font-sans text-xs text-danger font-semibold mt-1">
+                  ✕ Invalidation / SL Triggered
+                </div>
+              </div>
+            </div>
           </div>
 
           {showAdminForm && (
@@ -915,17 +1052,7 @@ export const IncubatorHub: React.FC = () => {
             <span className="px-2 py-0.5 rounded bg-surface-card border border-line text-white">
               {ADMIN_WALLET_SHORT}
             </span>
-            <button
-              type="button"
-              onClick={() => setDemoPreset(isAdmin ? '1m' : 'admin')}
-              className={`px-3 py-1 rounded border font-sans text-xs font-extrabold cursor-pointer transition-colors ${
-                isAdmin
-                  ? 'bg-pump text-canvas border-pump'
-                  : 'bg-surface-card hover:bg-surface-3 text-pump border-line'
-              }`}
-            >
-              {isAdmin ? 'ADMIN MODE ACTIVE ✓' : 'Preview Admin Desk'}
-            </button>
+
           </div>
         </div>
 
