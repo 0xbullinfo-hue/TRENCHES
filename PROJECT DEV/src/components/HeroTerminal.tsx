@@ -55,8 +55,8 @@ export const HeroTerminal: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-end">
           {/* Left Column (6 cols): Display Headline + Subtext + Buy Button + 2 Social Buttons */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
-            <h1 className="font-display uppercase text-white text-5xl sm:text-7xl lg:text-[86px] leading-[0.94] tracking-[0.015em]">
-              <span className="block">THE STRONGEST</span>
+            <h1 className="font-display uppercase text-white text-4xl sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[86px] leading-[0.94] tracking-[0.015em]">
+              <span className="block">BUILDING THE STRONGEST</span>
               <span className="block">COMMUNITY IN THE</span>
               <span className="block text-toxic">TRENCHES</span>
             </h1>
