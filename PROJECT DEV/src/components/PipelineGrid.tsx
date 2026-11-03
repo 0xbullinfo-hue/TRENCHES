@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { ArrowUpRight, Check, Copy, TrendingUp } from 'lucide-react';
 
 interface PastIncubationToken {
@@ -146,14 +147,13 @@ export const PipelineGrid: React.FC = () => {
                   <div className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <img
+                        <Image
                           src={token.logoUrl}
                           alt={`${token.name} logo`}
+                          width={44}
+                          height={44}
+                          unoptimized
                           className="w-11 h-11 rounded-lg border border-toxic-border object-cover bg-surface-card shrink-0"
-                          onError={(e) => {
-                            // Fallback if CDN blocked
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
                         />
                         <div>
                           <h3 className="font-sans text-base sm:text-lg font-extrabold text-white leading-tight">

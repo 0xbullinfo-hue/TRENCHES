@@ -59,11 +59,19 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     formattedBalance,
     isAdmin,
     setDemoPreset,
+    demoEnabled,
     togglePinCall,
     toggleTpHit,
     deleteAlphaCall,
   } = useGenesisBalance();
   const [copiedCa, setCopiedCa] = useState(false);
+  const copyTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!token) return;
@@ -76,11 +84,16 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
   if (!token) return null;
 
-  const handleCopyCa = () => {
+  const handleCopyCa = async () => {
     if (!token.ca) return;
-    navigator.clipboard.writeText(token.ca);
-    setCopiedCa(true);
-    setTimeout(() => setCopiedCa(false), 1800);
+    try {
+      await navigator.clipboard.writeText(token.ca);
+      setCopiedCa(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedCa(false), 1800);
+    } catch {
+      // clipboard write failed
+    }
   };
 
   const primaryMarketUrl = getPrimaryMarketUrl(token);
@@ -95,7 +108,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
       aria-labelledby="modal-token-name"
     >
       <div
-        className="w-full max-w-2xl rounded-xl bg-surface border border-line overflow-hidden shadow-none"
+        className="w-full max-w-2xl rounded bg-surface border border-line overflow-hidden shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
@@ -333,14 +346,16 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
-                <button
-                  type="button"
-                  onClick={() => setDemoPreset('1m')}
-                  className="h-9 px-3.5 rounded-md bg-surface border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-pump" />
-                  <span>Preview 1M $GENESIS Member →</span>
-                </button>
+                {demoEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setDemoPreset('1m')}
+                    className="h-9 px-3.5 rounded-md bg-surface border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-pump" />
+                    <span>Preview 1M $GENESIS Member →</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (

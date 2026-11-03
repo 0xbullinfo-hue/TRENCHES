@@ -47,12 +47,19 @@ function BeakerRiskGauge({ level }: { level: number }) {
 }
 
 export const ActiveAlphas: React.FC = () => {
-  const { alphas, tier, setDemoPreset } = useGenesisBalance();
+  const { alphas, tier, setDemoPreset, demoEnabled } = useGenesisBalance();
   const [chainFilter, setChainFilter] = useState<'ALL' | Chain>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [activeModalItem, setActiveModalItem] = useState<AlphaItem | null>(null);
   const [claimedIds, setClaimedIds] = useState<Record<string, boolean>>({});
   const [timers, setTimers] = useState<Record<string, number>>(INITIAL_TIMERS);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   // 1Hz countdown tick for live timers
   useEffect(() => {
@@ -72,11 +79,16 @@ export const ActiveAlphas: React.FC = () => {
     chainFilter === 'ALL' ? true : item.chain === chainFilter
   );
 
-  const handleCopyCa = (id: string, ca: string | null) => {
+  const handleCopyCa = async (id: string, ca: string | null) => {
     if (!ca) return;
-    navigator.clipboard.writeText(ca);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    try {
+      await navigator.clipboard.writeText(ca);
+      setCopiedId(id);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // ignore
+    }
   };
 
   const handleClaim = (id: string) => {
@@ -207,13 +219,15 @@ export const ActiveAlphas: React.FC = () => {
                             {tier.label})
                           </span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setDemoPreset('1m')}
-                          className="text-accent hover:underline font-semibold cursor-pointer"
-                        >
-                          Simulate 1M →
-                        </button>
+                        {demoEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => setDemoPreset('1m')}
+                            className="text-accent hover:underline font-semibold cursor-pointer"
+                          >
+                            Simulate 1M →
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <>

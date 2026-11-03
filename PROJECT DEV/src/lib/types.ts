@@ -160,6 +160,7 @@ export interface AlphasErr {
   ok: false;
   error:
     | 'BAD_REQUEST'
+    | 'UNAUTHORIZED'
     | 'ACCESS_DENIED_ZERO_BALANCE'
     | 'UNAUTHORIZED_ADMIN'
     | 'RPC_UNAVAILABLE'

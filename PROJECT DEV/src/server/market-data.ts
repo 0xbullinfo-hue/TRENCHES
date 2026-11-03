@@ -1,6 +1,6 @@
 /**
  * Market Data Integration Service
- * Supports CoinStats API and DexScreener with server-side caching and fallback.
+ * Supports CoinStats API and DexScreener with server-side caching, chain-matching, and fallback.
  */
 
 interface CachedMarketPrice {
@@ -14,6 +14,14 @@ interface CachedMarketPrice {
 
 const priceCache = new Map<string, CachedMarketPrice>();
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+const CHAIN_TO_DEX_SLUG: Record<string, string> = {
+  SOL: 'solana',
+  BASE: 'base',
+  ETH: 'ethereum',
+  BSC: 'bsc',
+  AVAX: 'avalanche',
+};
 
 export interface TokenMarketTelemetry {
   marketCapUsd?: number;
@@ -33,13 +41,18 @@ async function fetchFromCoinStats(ca: string): Promise<CachedMarketPrice | null>
   if (!apiKey) return null;
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+
     const res = await fetch(`https://openapiv1.coinstats.app/coins/token/${encodeURIComponent(ca)}`, {
+      signal: controller.signal,
       headers: {
         'X-API-KEY': apiKey,
         'Accept': 'application/json',
       },
       next: { revalidate: 60 },
     });
+    clearTimeout(timer);
 
     if (!res.ok) return null;
 
@@ -62,9 +75,9 @@ async function fetchFromCoinStats(ca: string): Promise<CachedMarketPrice | null>
 }
 
 /**
- * Fetch token market cap and price from DexScreener
+ * Fetch token market cap and price from DexScreener with chain matching and highest liquidity selection
  */
-async function fetchFromDexScreener(ca: string): Promise<CachedMarketPrice | null> {
+async function fetchFromDexScreener(ca: string, expectedChain?: string): Promise<CachedMarketPrice | null> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -81,7 +94,31 @@ async function fetchFromDexScreener(ca: string): Promise<CachedMarketPrice | nul
     if (!res.ok) return null;
 
     const json = await res.json();
-    const pair = json?.pairs?.[0];
+    const expectedDexSlug = expectedChain ? CHAIN_TO_DEX_SLUG[expectedChain.toUpperCase()] : undefined;
+    const pairs: Array<{
+      chainId?: string;
+      liquidity?: { usd?: number };
+      marketCap?: number;
+      fdv?: number;
+      priceUsd?: string;
+      priceChange?: { h24?: number };
+      volume?: { h24?: number };
+    }> = json?.pairs ?? [];
+
+    const onChainPairs = expectedDexSlug
+      ? pairs.filter((p) => p.chainId === expectedDexSlug)
+      : pairs;
+
+    const highLiqPairs = onChainPairs.filter(
+      (p) => Number(p.liquidity?.usd || 0) > 5_000
+    );
+
+    const candidates = highLiqPairs.length > 0 ? highLiqPairs : (onChainPairs.length > 0 ? onChainPairs : pairs);
+
+    const pair = [...candidates].sort(
+      (a, b) => Number(b.liquidity?.usd || 0) - Number(a.liquidity?.usd || 0)
+    )[0];
+
     if (pair) {
       const mc = Number(pair.marketCap || pair.fdv || 0);
       const price = Number(pair.priceUsd || 0);
@@ -111,7 +148,8 @@ async function fetchFromDexScreener(ca: string): Promise<CachedMarketPrice | nul
 export async function getMarketTelemetry(
   ca: string | null | undefined,
   fallbackMcUsd: number,
-  fallbackChange24h: number
+  fallbackChange24h: number,
+  chain?: string
 ): Promise<TokenMarketTelemetry> {
   if (!ca || ca.length < 8) {
     return {
@@ -124,7 +162,8 @@ export async function getMarketTelemetry(
   }
 
   const normalizedCa = ca.trim();
-  const cached = priceCache.get(normalizedCa);
+  const cacheKey = chain ? `${chain}:${normalizedCa}` : normalizedCa;
+  const cached = priceCache.get(cacheKey);
 
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
     return {
@@ -141,13 +180,17 @@ export async function getMarketTelemetry(
   // 1. Try CoinStats
   let liveData = await fetchFromCoinStats(normalizedCa);
 
-  // 2. Fallback to DexScreener
+  // 2. Fallback to DexScreener with chain matching
   if (!liveData) {
-    liveData = await fetchFromDexScreener(normalizedCa);
+    liveData = await fetchFromDexScreener(normalizedCa, chain);
   }
 
   if (liveData) {
-    priceCache.set(normalizedCa, liveData);
+    if (priceCache.size > 1000) {
+      const firstKey = priceCache.keys().next().value;
+      if (firstKey) priceCache.delete(firstKey);
+    }
+    priceCache.set(cacheKey, liveData);
     return {
       marketCapUsd: liveData.marketCapUsd,
       priceUsd: liveData.priceUsd,
@@ -168,4 +211,3 @@ export async function getMarketTelemetry(
     updatedAt: new Date().toISOString(),
   };
 }
-

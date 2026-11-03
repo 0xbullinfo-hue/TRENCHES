@@ -21,17 +21,6 @@ function XIcon({ className = 'w-4 h-4' }: { className?: string }) {
 export const MaintenanceScreen: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-canvas flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-      {/* Background Radial Glow */}
-      <div
-        aria-hidden="true"
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(52, 211, 153, 0.18) 0%, rgba(16, 185, 129, 0.06) 45%, transparent 70%)',
-          filter: 'blur(60px)',
-        }}
-      />
-
       <div className="relative z-10 max-w-xl w-full text-center space-y-6">
         {/* Brand Logo */}
         <div className="flex items-center justify-center gap-3">
@@ -42,7 +31,7 @@ export const MaintenanceScreen: React.FC = () => {
         </div>
 
         {/* Maintenance Box */}
-        <div className="rounded-2xl bg-surface border border-toxic-border p-6 sm:p-8 space-y-5 shadow-2xl">
+        <div className="rounded bg-surface border border-toxic-border p-6 sm:p-8 space-y-5 shadow-none">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-mono text-xs font-bold uppercase tracking-wider">
             <ShieldAlert className="w-4 h-4 text-toxic" />
             <span>{MAINTENANCE_CONFIG.title}</span>

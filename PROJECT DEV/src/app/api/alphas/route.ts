@@ -16,9 +16,11 @@ import {
   loadCallsRegistry,
   samplePortfolio,
   saveCallsRegistry,
+  withRegistryLock,
   SYNDICATE_CALLERS,
 } from '@/server/alphas-data';
-import { verifyAdminAuth } from '@/server/auth';
+import { verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
+import { getMarketTelemetry } from '@/server/market-data';
 import type {
   AlphasErr,
   AlphasOk,
@@ -30,11 +32,6 @@ import type {
 export const dynamic = 'force-dynamic';
 
 const SERVER_RPC = process.env.SOLANA_RPC || SOLANA_RPC;
-
-// Security Policy: Never allow client-asserted demo balances in production
-const IS_PROD = process.env.NODE_ENV === 'production';
-const ALLOW_DEMO_BALANCE = !IS_PROD && process.env.ALLOW_DEMO_BALANCE === 'true';
-
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 const MOTIFS: ArtMotif[] = [
@@ -52,20 +49,24 @@ const MOTIFS: ArtMotif[] = [
   'otcity',
 ];
 
+const VALID_CHAINS: Chain[] = ['SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
+
 function err(status: number, error: AlphasErr['error'], message: string) {
   const body: AlphasErr = { ok: false, error, message, items: [] };
   return NextResponse.json(body, { status, headers: NO_STORE });
 }
 
-/**
- * Server-verified $GENESIS balance: sum of all token accounts for the mint EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump.
- */
-async function readGenesisBalance(owner: string): Promise<number> {
+// In-memory 30s cache for on-chain balances to prevent RPC hammering and DoS
+const balanceCache = new Map<string, { v: number; t: number }>();
+const BALANCE_TTL_MS = 30_000;
+
+async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<number> {
   if (!MINT_CONFIGURED) return 0;
   const res = await fetch(SERVER_RPC, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
+    signal,
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
@@ -89,6 +90,22 @@ async function readGenesisBalance(owner: string): Promise<number> {
   );
 }
 
+async function readGenesisBalanceCached(owner: string): Promise<number> {
+  const hit = balanceCache.get(owner);
+  if (hit && Date.now() - hit.t < BALANCE_TTL_MS) return hit.v;
+  if (balanceCache.size > 5_000) balanceCache.clear();
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5_000);
+  try {
+    const v = await readGenesisBalance(owner, ctrl.signal);
+    balanceCache.set(owner, { v, t: Date.now() });
+    return v;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parseShorthandUsd(str: string): number {
   if (!str) return 0;
   const clean = str.replace(/[$,\s]/g, '').toUpperCase();
@@ -101,77 +118,23 @@ function parseShorthandUsd(str: string): number {
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const wallet = searchParams.get('wallet')?.trim();
-  const balanceParam = searchParams.get('balance');
+  const auth = verifyWalletAuth(req.headers);
+  if (!auth.ok) {
+    return err(401, 'UNAUTHORIZED', auth.error || 'Cryptographic wallet signature authentication required.');
+  }
+
+  const wallet = auth.wallet!;
+  if (!isBase58Address(wallet)) {
+    return err(400, 'BAD_REQUEST', 'Invalid base58 Solana wallet address');
+  }
 
   const isAdmin = isAdminWallet(wallet);
   let balance = 0;
-  let verified = false;
-
-  if (isAdmin) {
-    // Master admin wallet FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e has full access
-    try {
-      balance = await readGenesisBalance(ADMIN_WALLET);
-      verified = true;
-    } catch {
-      balance = MIN_GENESIS_REQUIRED;
-    }
-    if (balance < MIN_GENESIS_REQUIRED) {
-      balance = MIN_GENESIS_REQUIRED;
-    }
-  } else if (wallet) {
-    if (!isBase58Address(wallet)) {
-      return err(400, 'BAD_REQUEST', 'wallet must be a valid base58 Solana address');
-    }
-    // Handle simulated demo wallets safely without making invalid RPC calls
-    if (
-      ALLOW_DEMO_BALANCE &&
-      (wallet === '11111111111111111111111111111111' ||
-        wallet.includes('1M') ||
-        wallet.includes('Member'))
-    ) {
-      balance = MIN_GENESIS_REQUIRED;
-      verified = false;
-    } else if (
-      ALLOW_DEMO_BALANCE &&
-      (wallet === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' ||
-        wallet.includes('Zero'))
-    ) {
-      balance = 0;
-      verified = false;
-    } else {
-      try {
-        balance = await readGenesisBalance(wallet);
-        verified = true;
-      } catch {
-        if (ALLOW_DEMO_BALANCE) {
-          balance = MIN_GENESIS_REQUIRED;
-          verified = false;
-        } else {
-          return err(
-            502,
-            'RPC_UNAVAILABLE',
-            'Solana RPC network unavailable. Retrying balance check...'
-          );
-        }
-      }
-    }
-  } else if (balanceParam !== null) {
-    // Reject client-supplied balance in production
-    if (!ALLOW_DEMO_BALANCE) {
-      return err(
-        403,
-        'DEMO_BALANCE_DISABLED',
-        'Client-asserted demo balances are disabled. Connect a Solana wallet passing ?wallet='
-      );
-    }
-    balance = Number(balanceParam);
-    if (!Number.isFinite(balance) || balance < 0) {
-      return err(400, 'BAD_REQUEST', 'balance must be a non-negative number');
-    }
-  } else {
-    return err(400, 'BAD_REQUEST', 'Authentication required. Provide ?wallet=<solana_address>');
+  try {
+    balance = await readGenesisBalanceCached(wallet);
+  } catch {
+    // Fail CLOSED for everyone, admin included
+    return err(502, 'RPC_UNAVAILABLE', 'Solana RPC unavailable. Retry shortly.');
   }
 
   if (!isAdmin && balance < MIN_GENESIS_REQUIRED) {
@@ -183,6 +146,29 @@ export async function GET(req: NextRequest) {
   }
 
   const tier = tierFor(Math.max(balance, isAdmin ? MIN_GENESIS_REQUIRED : 0));
+  const baseItems = alphasForTier(tier.id);
+
+  // Wire live market telemetry into calls with CA
+  const items = await Promise.all(
+    baseItems.map(async (it) => {
+      if (!it.ca) return it;
+      try {
+        const t = await getMarketTelemetry(it.ca, it.marketCapUsd, it.change24hPct, it.chain);
+        const mc = t.marketCapUsd ?? it.marketCapUsd;
+        return {
+          ...it,
+          marketCapUsd: mc,
+          marketCap: formatCompactUsd(mc),
+          change24hPct: t.change24hPct ?? it.change24hPct,
+          dataFreshness: t.freshness,
+          marketDataSource: t.source,
+        };
+      } catch {
+        return it;
+      }
+    })
+  );
+
   const body: AlphasOk = {
     ok: true,
     tier: tier.id,
@@ -190,21 +176,23 @@ export async function GET(req: NextRequest) {
     multiplier: tier.multiplier,
     allocationCap: allocationCap(tier),
     balance,
-    verified,
+    verified: true,
     isAdmin,
     genesisMint: GENESIS_MINT,
-    items: alphasForTier(tier.id),
+    items,
     callers: SYNDICATE_CALLERS,
     portfolio: samplePortfolio(),
     serverTime: new Date().toISOString(),
   };
+
   return NextResponse.json(body, { headers: NO_STORE });
 }
 
-/** POST /api/alphas — Admin creates a new trade call (Cryptographically Verified) */
+/** POST /api/alphas — Admin creates a new trade call (Cryptographically Verified, Request-Bound) */
 export async function POST(req: NextRequest) {
   try {
-    const auth = verifyAdminAuth(req.headers);
+    const raw = await req.text();
+    const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
       return err(
         403,
@@ -213,15 +201,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const payload = await req.json();
-    const name = String(payload.name || '').trim();
-    const rawTicker = String(payload.ticker || '').trim();
+    const payload = JSON.parse(raw || '{}');
+    const name = String(payload.name || '').trim().slice(0, 64);
+    const rawTicker = String(payload.ticker || '').trim().slice(0, 16);
     const ticker = rawTicker.startsWith('$') ? rawTicker : `$${rawTicker}`;
     const ca = String(payload.ca || '').trim();
-    const chain = (payload.chain as Chain) || 'SOL';
+    const chainRaw = String(payload.chain || 'SOL').toUpperCase() as Chain;
+    const chain = VALID_CHAINS.includes(chainRaw) ? chainRaw : 'SOL';
 
     if (!name || !rawTicker || !ca) {
       return err(400, 'BAD_REQUEST', 'Token Name, Ticker, and Contract Address (CA) are required.');
+    }
+
+    // P2-2 Contract address format validation
+    if (chain === 'SOL') {
+      if (!isBase58Address(ca) || ca.length < 32 || ca.length > 44) {
+        return err(400, 'BAD_REQUEST', 'Invalid Solana token contract address format');
+      }
+    } else if (chain === 'ETH' || chain === 'BASE' || chain === 'BSC' || chain === 'AVAX') {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(ca)) {
+        return err(400, 'BAD_REQUEST', `Invalid EVM token contract address for chain ${chain}`);
+      }
+    } else if (ca.length < 4 || ca.length > 128) {
+      return err(400, 'BAD_REQUEST', 'Invalid contract address length');
     }
 
     const currentMcStr = String(payload.marketCap || '$100K').trim();
@@ -237,8 +239,8 @@ export async function POST(req: NextRequest) {
         : parseShorthandUsd(entryMcStr) || currentMcUsd;
 
     const risk = Math.min(5, Math.max(1, Number(payload.risk) || 3));
-    const riskRewardRatio = String(payload.riskRewardRatio || '1:4 R:R').trim();
-    const stopLoss = String(payload.stopLoss || '-25% SL').trim();
+    const riskRewardRatio = String(payload.riskRewardRatio || '1:4 R:R').trim().slice(0, 32);
+    const stopLoss = String(payload.stopLoss || '-25% SL').trim().slice(0, 32);
 
     const rawMultipliers: number[] = Array.isArray(payload.multipliers)
       ? payload.multipliers.map((m: unknown) => Number(m)).filter((n: number) => n > 0)
@@ -320,29 +322,29 @@ export async function POST(req: NextRequest) {
       ca,
       links,
       summary:
-        String(payload.summary || '').trim() ||
+        String(payload.summary || '').trim().slice(0, 500) ||
         `Admin trade call on ${chain}. Entry MC ${formatCompactUsd(entryMcUsd)} targeting ${multipliers
           .map((m) => `${m}x`)
           .join(' / ')}. Trade at your own risk.`,
       marketCap: formatCompactUsd(currentMcUsd),
       marketCapUsd: currentMcUsd,
-      holderRewardsUsd: formatCompactUsd(Math.round(currentMcUsd * 0.18)),
-      holderRewardsRaw: Math.round(currentMcUsd * 0.18),
-      holderRewardsQuote: `${quoteToken} Pool`,
-      holdersPaid: Math.max(120, Math.round(currentMcUsd / 85)),
-      volume24h: String(payload.volume24h || formatCompactUsd(currentMcUsd * 1.4)),
-      netInflow24h: `+${formatCompactUsd(currentMcUsd * 0.12)}`,
-      change24hPct: Number(payload.change24hPct) || 125.0,
+      holderRewardsUsd: '—',
+      holderRewardsRaw: 0,
+      holderRewardsQuote: '—',
+      holdersPaid: 0,
+      volume24h: String(payload.volume24h || '—'),
+      netInflow24h: '—',
+      change24hPct: Number(payload.change24hPct) || 0,
       age: 'Just now',
       ageMinutes: 1,
-      caller: String(payload.caller || '@TrenchLabsAdmin'),
-      callerWinRate: '86.4% win',
+      caller: String(payload.caller || '@TrenchLabsAdmin').trim().slice(0, 40),
+      callerWinRate: '—',
       deployedVia: 'https://trenchlabshq.com',
       spotlightRank: pinned ? 1 : undefined,
       serialTag:
         payload.serialTag ||
         `EXP${String(loadCallsRegistry().length + 1).padStart(2, '0')}`,
-      sparkline: [20, 25, 28, 35, 42, 48, 55, 62, 68, 75, 82, 88, 94, 98],
+      sparkline: [],
       art: {
         bgFrom: '#161C24',
         bgTo: '#0A0E13',
@@ -353,9 +355,12 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const current = loadCallsRegistry();
-    const updated = [newRecord, ...current];
-    const saveRes = saveCallsRegistry(updated);
+    const saveRes = await withRegistryLock(() => {
+      const current = loadCallsRegistry();
+      const updated = [newRecord, ...current];
+      return saveCallsRegistry(updated);
+    });
+
     if (!saveRes.success) {
       return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
     }
@@ -369,10 +374,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** PATCH /api/alphas — Admin pins/unpins or updates a trade call (Cryptographically Verified) */
+/** PATCH /api/alphas — Admin pins/unpins or updates a trade call (Cryptographically Verified, Request-Bound) */
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = verifyAdminAuth(req.headers);
+    const raw = await req.text();
+    const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
       return err(
         403,
@@ -381,56 +387,61 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const payload = await req.json();
+    const payload = JSON.parse(raw || '{}');
     const id = String(payload.id || '');
     if (!id) return err(400, 'BAD_REQUEST', 'Call id is required');
 
-    const registry = loadCallsRegistry();
-    const idx = registry.findIndex((r) => r.id === id);
-    if (idx === -1) return err(400, 'BAD_REQUEST', 'Call not found');
-
-    const target = { ...registry[idx] };
-
-    if (typeof payload.pinned === 'boolean') {
-      target.pinned = payload.pinned;
-      target.pinnedAt = payload.pinned ? new Date().toISOString() : null;
-      target.statusLabel = payload.pinned ? 'PRIORITY CALL' : 'LIVE CALL';
-    }
-
-    if (payload.marketCap) {
-      const mcUsd = parseShorthandUsd(String(payload.marketCap));
-      if (mcUsd > 0) {
-        target.marketCapUsd = mcUsd;
-        target.marketCap = formatCompactUsd(mcUsd);
-        target.takeProfits = target.takeProfits.map((tp) => ({
-          ...tp,
-          hit:
-            tp.hit ||
-            (target.entryMarketCapUsd > 0 &&
-              mcUsd >= target.entryMarketCapUsd * tp.multiple),
-        }));
+    const saveRes = await withRegistryLock(() => {
+      const registry = loadCallsRegistry();
+      const idx = registry.findIndex((r) => r.id === id);
+      if (idx === -1) {
+        throw new Error('Call not found');
       }
-    }
 
-    if (typeof payload.toggleTpIndex === 'number') {
-      const tpIdx = payload.toggleTpIndex;
-      if (target.takeProfits[tpIdx]) {
-        target.takeProfits = target.takeProfits.map((tp, i) =>
-          i === tpIdx ? { ...tp, hit: !tp.hit } : tp
-        );
+      const target = { ...registry[idx] };
+
+      if (typeof payload.pinned === 'boolean') {
+        target.pinned = payload.pinned;
+        target.pinnedAt = payload.pinned ? new Date().toISOString() : null;
+        target.statusLabel = payload.pinned ? 'PRIORITY CALL' : 'LIVE CALL';
       }
-    }
 
-    if (
-      payload.outcome === 'PROFIT' ||
-      payload.outcome === 'LOSS' ||
-      payload.outcome === 'PENDING'
-    ) {
-      target.outcome = payload.outcome;
-    }
+      if (payload.marketCap) {
+        const mcUsd = parseShorthandUsd(String(payload.marketCap));
+        if (mcUsd > 0) {
+          target.marketCapUsd = mcUsd;
+          target.marketCap = formatCompactUsd(mcUsd);
+          target.takeProfits = target.takeProfits.map((tp) => ({
+            ...tp,
+            hit:
+              tp.hit ||
+              (target.entryMarketCapUsd > 0 &&
+                mcUsd >= target.entryMarketCapUsd * tp.multiple),
+          }));
+        }
+      }
 
-    registry[idx] = target;
-    const saveRes = saveCallsRegistry(registry);
+      if (typeof payload.toggleTpIndex === 'number') {
+        const tpIdx = payload.toggleTpIndex;
+        if (target.takeProfits[tpIdx]) {
+          target.takeProfits = target.takeProfits.map((tp, i) =>
+            i === tpIdx ? { ...tp, hit: !tp.hit } : tp
+          );
+        }
+      }
+
+      if (
+        payload.outcome === 'PROFIT' ||
+        payload.outcome === 'LOSS' ||
+        payload.outcome === 'PENDING'
+      ) {
+        target.outcome = payload.outcome;
+      }
+
+      registry[idx] = target;
+      return saveCallsRegistry(registry);
+    });
+
     if (!saveRes.success) {
       return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
     }
@@ -444,10 +455,11 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-/** DELETE /api/alphas — Admin deletes a trade call (Cryptographically Verified) */
+/** DELETE /api/alphas — Admin deletes a trade call (Cryptographically Verified, Request-Bound) */
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = verifyAdminAuth(req.headers);
+    const raw = await req.text();
+    const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
       return err(
         403,
@@ -460,9 +472,12 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return err(400, 'BAD_REQUEST', 'Provide ?id=');
 
-    const registry = loadCallsRegistry();
-    const filtered = registry.filter((r) => r.id !== id);
-    const saveRes = saveCallsRegistry(filtered);
+    const saveRes = await withRegistryLock(() => {
+      const registry = loadCallsRegistry();
+      const filtered = registry.filter((r) => r.id !== id);
+      return saveCallsRegistry(filtered);
+    });
+
     if (!saveRes.success) {
       return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
     }

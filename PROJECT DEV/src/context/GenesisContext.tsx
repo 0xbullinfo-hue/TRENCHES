@@ -6,15 +6,15 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
   ADMIN_WALLET,
   GENESIS_MINT,
-  MINT_CONFIGURED,
   isAdminWallet,
 } from '@/lib/config';
 import {
@@ -33,6 +33,8 @@ import type {
 } from '@/lib/types';
 
 export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
+
+export const DEMO_ENABLED = process.env.NODE_ENV !== 'production';
 
 const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string> = {
   '0': 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
@@ -84,7 +86,9 @@ interface GenesisContextValue {
   portfolio: Portfolio | null;
   apiLoading: boolean;
   apiError: string | null;
+  needsSignature: boolean;
   refreshAll: () => Promise<void>;
+  requestUnlockSignature: () => Promise<void>;
 
   createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
@@ -100,11 +104,12 @@ interface GenesisContextValue {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   boundEvmAddress: string;
-  setBoundEvmAddress: (addr: string) => void;
+  setBoundEvmAddress: (addr: string) => boolean;
 
   demoPreset: DemoPreset;
   setDemoPreset: (preset: DemoPreset) => void;
   disconnectDemoOrWallet: () => void;
+  demoEnabled: boolean;
 }
 
 const GenesisContext = createContext<GenesisContextValue | undefined>(undefined);
@@ -112,14 +117,20 @@ const GenesisContext = createContext<GenesisContextValue | undefined>(undefined)
 const EVM_STORAGE_KEY = 'trenchlabs_bound_evm_v2';
 const WATCHLIST_STORAGE_KEY = 'trenchlabs_watchlist_v3';
 const DEMO_PRESET_STORAGE_KEY = 'trenchlabs_demo_preset_v1';
+const ACCESS_STORAGE_KEY = 'trenchlabs_access_v1';
+
+async function sha256Hex(str: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export function GenesisProvider({ children }: { children: React.ReactNode }) {
-  const { connection } = useConnection();
   const wallet = useWallet();
 
-  // Default to '1m' (1,000,000 $GENESIS Lab Member) so the dashboard can be inspected immediately,
-  // and switches to 'live' automatically when a real Solana wallet connects.
-  const [demoPreset, setDemoPresetState] = useState<DemoPreset>('1m');
+  // In production, default strictly to 'disconnected'. In local development only, allow '1m'
+  const [demoPreset, setDemoPresetState] = useState<DemoPreset>(DEMO_ENABLED ? '1m' : 'disconnected');
   const [onChainBalance, setOnChainBalance] = useState<number>(0);
   const [ataAddress, setAtaAddress] = useState<string | null>(null);
 
@@ -128,15 +139,20 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [apiLoading, setApiLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [needsSignature, setNeedsSignature] = useState<boolean>(false);
 
   const [boundEvmAddress, setBoundEvmAddressState] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     try {
-      const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
-      if (savedPreset) setDemoPresetState(savedPreset);
+      if (DEMO_ENABLED) {
+        const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
+        if (savedPreset) setDemoPresetState(savedPreset);
+      }
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
       if (savedEvm) setBoundEvmAddressState(savedEvm);
       const savedWatch = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
@@ -149,13 +165,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setBoundEvmAddress = useCallback((addr: string) => {
-    setBoundEvmAddressState(addr);
+  const setBoundEvmAddress = useCallback((addr: string): boolean => {
+    const trimmed = addr.trim();
+    if (trimmed && !/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+      return false;
+    }
+    setBoundEvmAddressState(trimmed);
     try {
-      window.localStorage.setItem(EVM_STORAGE_KEY, addr);
+      window.localStorage.setItem(EVM_STORAGE_KEY, trimmed);
     } catch {
       // ignore
     }
+    return true;
   }, []);
 
   const toggleWatchlist = useCallback((tokenId: string) => {
@@ -171,6 +192,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // P1-4: Never fabricate blockchain transaction signatures. Label clearly as simulated/illustrative.
   const recordAllocation = useCallback(
     (ticker: string, chain: Chain, amountSol: string) => {
       setPortfolio((prev) => {
@@ -185,9 +207,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           size: amountSol,
           pnl: 'OPEN ALLOC',
           pnlPositive: true,
-          slot: 299_104_880 + Math.floor(Math.random() * 900),
+          slot: 0,
           claimedAt: new Date().toISOString(),
-          sig: `5xGen${Math.random().toString(36).slice(2, 10)}TrenchLabsVerifiedAllocationSig99`,
+          sig: `SIMULATED_${Date.now().toString(36)}`,
         };
         return {
           ...base,
@@ -205,50 +227,25 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     }
   }, [wallet.connected, wallet.publicKey]);
 
-  const readSplBalance = useCallback(async () => {
+  // Compute ATA address for display without issuing client-side RPC token queries
+  useEffect(() => {
     if (!wallet.publicKey) {
-      setOnChainBalance(0);
       setAtaAddress(null);
       return;
     }
-
     try {
       const mintKey = new PublicKey(GENESIS_MINT);
       const ata = getAssociatedTokenAddressSync(mintKey, wallet.publicKey);
       setAtaAddress(ata.toBase58());
-
-      if (!MINT_CONFIGURED) {
-        setOnChainBalance(0);
-        return;
-      }
-
-      const parsed = await connection.getParsedTokenAccountsByOwner(
-        wallet.publicKey,
-        { mint: mintKey },
-        'confirmed'
-      );
-
-      const total = parsed.value.reduce((acc, item) => {
-        const uiAmount = item.account.data.parsed?.info?.tokenAmount?.uiAmount;
-        return acc + (typeof uiAmount === 'number' ? uiAmount : 0);
-      }, 0);
-
-      setOnChainBalance(total);
     } catch {
-      setOnChainBalance(0);
+      setAtaAddress(null);
     }
-  }, [connection, wallet.publicKey]);
-
-  useEffect(() => {
-    if (demoPreset === 'live') {
-      readSplBalance();
-    }
-  }, [demoPreset, readSplBalance]);
+  }, [wallet.publicKey]);
 
   const connected = useMemo(() => {
     if (demoPreset === 'disconnected') return false;
     if (demoPreset === 'live') return wallet.connected && !!wallet.publicKey;
-    return true;
+    return DEMO_ENABLED;
   }, [demoPreset, wallet.connected, wallet.publicKey]);
 
   const publicKeyBase58 = useMemo(() => {
@@ -256,7 +253,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     if (demoPreset === 'live' && wallet.publicKey) {
       return wallet.publicKey.toBase58();
     }
-    if (demoPreset !== 'disconnected' && demoPreset !== 'live') {
+    if (DEMO_ENABLED && demoPreset !== 'disconnected' && demoPreset !== 'live') {
       return DEMO_WALLETS[demoPreset];
     }
     return null;
@@ -280,7 +277,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       }
       return onChainBalance;
     }
-    if (demoPreset !== 'disconnected') return DEMO_BALANCES[demoPreset];
+    if (DEMO_ENABLED && demoPreset !== 'disconnected') {
+      return DEMO_BALANCES[demoPreset];
+    }
     return 0;
   }, [connected, demoPreset, onChainBalance, isAdmin]);
 
@@ -297,25 +296,107 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const isZeroBalance = connected && !isAdmin && balance < MIN_GENESIS_REQUIRED;
   const isUnlocked = connected && (isAdmin || balance >= MIN_GENESIS_REQUIRED);
 
+  /**
+   * Patch 1: Request or retrieve cached ed25519 signature headers proving wallet ownership.
+   */
+  const getAccessHeaders = useCallback(
+    async (interactive = false): Promise<Record<string, string> | null> => {
+      if (!wallet.publicKey || !wallet.signMessage) {
+        return null;
+      }
+      const addr = wallet.publicKey.toBase58();
+
+      try {
+        const cached = JSON.parse(sessionStorage.getItem(ACCESS_STORAGE_KEY) || 'null');
+        if (cached && cached.wallet === addr && Date.now() - cached.ts < 4 * 60_000) {
+          return cached.headers;
+        }
+      } catch {
+        // ignore cache read failure
+      }
+
+      if (!interactive) {
+        // In non-interactive background fetches, do not trigger an unsolicited wallet popup
+        return null;
+      }
+
+      try {
+        const ts = Date.now();
+        const msg = `TrenchLabs Access: ${ts}`;
+        const sig = await wallet.signMessage(new TextEncoder().encode(msg));
+        const headers = {
+          'x-wallet': addr,
+          'x-timestamp': String(ts),
+          'x-signature': Array.from(sig)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join(''),
+        };
+        try {
+          sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
+        } catch {
+          // ignore cache write failure
+        }
+        return headers;
+      } catch {
+        return null;
+      }
+    },
+    [wallet]
+  );
+
   const fetchAlphasFromBackend = useCallback(
-    async (bal: number, isConn: boolean, walletAddr: string | null) => {
-      if (!isConn) {
+    async (interactiveAuth = false) => {
+      if (!connected) {
         setAlphas([]);
         setCallers([]);
         setPortfolio(null);
         setApiError(null);
+        setNeedsSignature(false);
         return;
       }
 
+      // In dev mode with a demo preset, load fixture directly
+      if (DEMO_ENABLED && demoPreset !== 'live') {
+        setApiLoading(true);
+        try {
+          const res = await fetch('/api/alphas/fixture', { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            setAlphas(data.items || []);
+            setCallers(data.callers || []);
+            setPortfolio(data.portfolio || null);
+            setApiError(null);
+            setNeedsSignature(false);
+            setApiLoading(false);
+            return;
+          }
+        } catch {
+          // fallback
+        }
+        setApiLoading(false);
+      }
+
+      // Live connected wallet: acquire cryptographic authorization headers
+      const headers = await getAccessHeaders(interactiveAuth);
+      if (!headers) {
+        setNeedsSignature(true);
+        setApiError('SIGNATURE_REQUIRED');
+        return;
+      }
+      setNeedsSignature(false);
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       setApiLoading(true);
       try {
-        // Enforce wallet-based server verification whenever an address is available
-        const query = walletAddr
-          ? `wallet=${encodeURIComponent(walletAddr)}`
-          : `balance=${encodeURIComponent(bal)}`;
-
-        const res = await fetch(`/api/alphas?${query}`, {
+        const res = await fetch('/api/alphas', {
+          headers,
           cache: 'no-store',
+          signal: controller.signal,
         });
         const data: AlphasResponse = await res.json();
 
@@ -325,68 +406,76 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setPortfolio(null);
           setApiError(!data.ok ? data.message || data.error : 'ACCESS_DENIED_ZERO_BALANCE');
         } else {
+          // Patch 7: Read verified balance from server response
+          setOnChainBalance(data.balance);
           setAlphas(data.items);
           setCallers(data.callers ?? []);
           setPortfolio(data.portfolio);
           setApiError(null);
         }
       } catch (err) {
-        setApiError((err as Error).message || 'Solana RPC network unavailable');
+        if ((err as Error).name !== 'AbortError') {
+          setApiError((err as Error).message || 'Solana RPC network unavailable');
+        }
       } finally {
         setApiLoading(false);
       }
     },
-    []
+    [connected, demoPreset, getAccessHeaders]
   );
 
+  const requestUnlockSignature = useCallback(async () => {
+    await fetchAlphasFromBackend(true);
+  }, [fetchAlphasFromBackend]);
+
   useEffect(() => {
-    fetchAlphasFromBackend(balance, connected, publicKeyBase58);
-  }, [balance, connected, publicKeyBase58, fetchAlphasFromBackend]);
+    fetchAlphasFromBackend(false);
+  }, [fetchAlphasFromBackend]);
 
-  const getAdminHeaders = useCallback(async (): Promise<Record<string, string>> => {
-    const adminAddr = publicKeyBase58 || ADMIN_WALLET;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'x-admin-wallet': adminAddr,
-    };
+  /**
+   * Patch 3: Admin request authentication bound to method, path, timestamp, and body hash.
+   */
+  const getAdminHeaders = useCallback(
+    async (method: string, urlPath: string, bodyStr: string): Promise<Record<string, string>> => {
+      const adminAddr = (wallet.publicKey ? wallet.publicKey.toBase58() : '') || ADMIN_WALLET;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-admin-wallet': adminAddr,
+      };
 
-    // If real admin wallet is connected, cryptographically sign the authentication challenge
-    if (
-      wallet.connected &&
-      wallet.publicKey &&
-      wallet.signMessage &&
-      wallet.publicKey.toBase58() === ADMIN_WALLET
-    ) {
-      try {
-        const timestamp = Date.now().toString();
-        const message = `TrenchLabs Admin Auth: ${timestamp}`;
-        const encoded = new TextEncoder().encode(message);
-        const sigBytes = await wallet.signMessage(encoded);
+      if (
+        wallet.connected &&
+        wallet.publicKey &&
+        wallet.signMessage &&
+        wallet.publicKey.toBase58() === ADMIN_WALLET
+      ) {
+        const ts = Date.now();
+        const bodyHash = await sha256Hex(bodyStr);
+        const message = ['TrenchLabs Admin', method, urlPath, ts, bodyHash].join('|');
+        const sigBytes = await wallet.signMessage(new TextEncoder().encode(message));
         const sigHex = Array.from(sigBytes)
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('');
 
-        headers['x-admin-timestamp'] = timestamp;
+        headers['x-admin-timestamp'] = String(ts);
         headers['x-admin-signature'] = sigHex;
         return headers;
-      } catch {
-        // User rejected signature prompt in wallet popup
       }
-    }
 
-    // In local dev/preview mode only
-    headers['x-admin-simulated'] = 'true';
-    return headers;
-  }, [publicKeyBase58, wallet]);
+      throw new Error('Cryptographic signature required: connect Master Admin wallet');
+    },
+    [wallet]
+  );
 
   const createAlphaCall = useCallback(
     async (payload: CreateCallPayload): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
+        const bodyStr = JSON.stringify(payload);
+        const headers = await getAdminHeaders('POST', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
           method: 'POST',
           headers,
-          body: JSON.stringify(payload),
+          body: bodyStr,
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -394,7 +483,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] createAlphaCall error:', err);
         return false;
       }
     },
@@ -404,14 +494,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const togglePinCall = useCallback(
     async (id: string, nextPinned: boolean): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
+        const bodyStr = JSON.stringify({ id, pinned: nextPinned });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            id,
-            pinned: nextPinned,
-          }),
+          body: bodyStr,
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -419,7 +507,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] togglePinCall error:', err);
         return false;
       }
     },
@@ -429,14 +518,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const toggleTpHit = useCallback(
     async (id: string, tpIndex: number): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
+        const bodyStr = JSON.stringify({ id, toggleTpIndex: tpIndex });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            id,
-            toggleTpIndex: tpIndex,
-          }),
+          body: bodyStr,
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -444,7 +531,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] toggleTpHit error:', err);
         return false;
       }
     },
@@ -454,14 +542,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const setCallOutcome = useCallback(
     async (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING'): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
+        const bodyStr = JSON.stringify({ id, outcome });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            id,
-            outcome,
-          }),
+          body: bodyStr,
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -469,7 +555,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] setCallOutcome error:', err);
         return false;
       }
     },
@@ -479,14 +566,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const updateCallMarketCap = useCallback(
     async (id: string, marketCap: string): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
+        const bodyStr = JSON.stringify({ id, marketCap });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            id,
-            marketCap,
-          }),
+          body: bodyStr,
         });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
@@ -494,7 +579,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] updateCallMarketCap error:', err);
         return false;
       }
     },
@@ -504,21 +590,20 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const deleteAlphaCall = useCallback(
     async (id: string): Promise<boolean> => {
       try {
-        const headers = await getAdminHeaders();
-        const res = await fetch(
-          `/api/alphas?id=${encodeURIComponent(id)}`,
-          {
-            method: 'DELETE',
-            headers,
-          }
-        );
+        const urlPath = `/api/alphas?id=${encodeURIComponent(id)}`;
+        const headers = await getAdminHeaders('DELETE', urlPath, '');
+        const res = await fetch(urlPath, {
+          method: 'DELETE',
+          headers,
+        });
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
           return true;
         }
         return false;
-      } catch {
+      } catch (err) {
+        console.error('[TrenchLabs] deleteAlphaCall error:', err);
         return false;
       }
     },
@@ -526,6 +611,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setDemoPreset = useCallback((preset: DemoPreset) => {
+    if (!DEMO_ENABLED && preset !== 'live' && preset !== 'disconnected') return;
     setDemoPresetState(preset);
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, preset);
@@ -541,6 +627,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setDemoPresetState('disconnected');
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'disconnected');
+      sessionStorage.removeItem(ACCESS_STORAGE_KEY);
     } catch {
       // ignore
     }
@@ -550,11 +637,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [wallet]);
 
   const refreshAll = useCallback(async () => {
-    if (demoPreset === 'live') {
-      await readSplBalance();
-    }
-    await fetchAlphasFromBackend(balance, connected, publicKeyBase58);
-  }, [demoPreset, readSplBalance, fetchAlphasFromBackend, balance, connected, publicKeyBase58]);
+    await fetchAlphasFromBackend(true);
+  }, [fetchAlphasFromBackend]);
 
   const value: GenesisContextValue = {
     connected,
@@ -576,7 +660,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     portfolio,
     apiLoading,
     apiError,
+    needsSignature,
     refreshAll,
+    requestUnlockSignature,
     createAlphaCall,
     togglePinCall,
     toggleTpHit,
@@ -593,6 +679,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     demoPreset,
     setDemoPreset,
     disconnectDemoOrWallet,
+    demoEnabled: DEMO_ENABLED,
   };
 
   return <GenesisContext.Provider value={value}>{children}</GenesisContext.Provider>;

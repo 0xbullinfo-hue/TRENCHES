@@ -788,21 +788,26 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'calls.json');
 
+let registryLockChain: Promise<unknown> = Promise.resolve();
+
+export function withRegistryLock<T>(fn: () => T | Promise<T>): Promise<T> {
+  const run = registryLockChain.then(fn, fn);
+  registryLockChain = run.catch(() => undefined);
+  return run;
+}
+
 export function loadCallsRegistry(): AlphaRecord[] {
   try {
-    if (fs.existsSync(DATA_FILE_PATH)) {
-      const raw = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    } else {
-      saveCallsRegistry(DEFAULT_REGISTRY);
+    if (!fs.existsSync(DATA_FILE_PATH)) {
+      return DEFAULT_REGISTRY;
     }
-  } catch {
-    // Fallback to in-memory default if filesystem is read-only (e.g. serverless edge)
+    const raw = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_REGISTRY;
+  } catch (err) {
+    console.error('[TrenchLabs] Error reading calls registry from disk:', err);
+    return DEFAULT_REGISTRY;
   }
-  return DEFAULT_REGISTRY;
 }
 
 export function saveCallsRegistry(records: AlphaRecord[]): { success: boolean; error?: string } {
@@ -811,11 +816,16 @@ export function saveCallsRegistry(records: AlphaRecord[]): { success: boolean; e
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(records, null, 2), 'utf-8');
+    const tmp = `${DATA_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(records, null, 2), 'utf-8');
+    if (fs.existsSync(DATA_FILE_PATH)) {
+      fs.unlinkSync(DATA_FILE_PATH);
+    }
+    fs.renameSync(tmp, DATA_FILE_PATH);
     return { success: true };
   } catch (err) {
     const message = (err as Error).message || 'Failed to write calls registry';
-    console.error('[TrenchLabs] Registry write failed:', message);
+    console.error('[TrenchLabs] Registry atomic write failed:', message);
     return { success: false, error: message };
   }
 }

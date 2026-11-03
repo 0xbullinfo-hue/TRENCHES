@@ -12,7 +12,8 @@
   }
   body {
     @apply bg-canvas text-ink font-sans antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    font-feature-settings: 'cv11', 'ss01', 'tnum';
+    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: #065F46;
@@ -25,16 +26,18 @@
 }
 
 @layer utilities {
-  .tnum {
+  .tnum,
+  [data-num],
+  .font-mono {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
 }
 
 @layer components {
-  /* Card shell: flat 1px hairline (#163A2D), zero glow, zero shadow */
+  /* Card shell: flat 1px hairline (#163A2D), 2px radius, zero glow, zero shadow */
   .card {
-    @apply bg-surface border border-toxic-border rounded-lg transition-colors duration-150 shadow-none;
+    @apply bg-surface border border-toxic-border rounded-sm transition-colors duration-150 shadow-none;
   }
   .card-hover:hover {
     @apply border-toxic;
@@ -47,7 +50,7 @@
   }
 
   .btn {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 font-sans text-xs font-bold uppercase tracking-[0.04em] transition-colors duration-150 shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-sm px-4 font-sans text-xs font-bold uppercase tracking-[0.04em] transition-colors duration-150 shadow-none disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-sm {
     @apply h-7 px-2.5 text-2xs;
@@ -63,22 +66,22 @@
   }
 
   .chip {
-    @apply inline-flex h-6 items-center rounded-md border border-toxic-border bg-surface-card px-2 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
+    @apply inline-flex h-6 items-center rounded-sm border border-toxic-border bg-surface-card px-2 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
   }
   .chip-active {
     @apply border-toxic bg-toxic-bg text-toxic hover:text-toxic-bright shadow-none;
   }
 
   .input {
-    @apply h-8 w-full rounded-md border border-toxic-border bg-surface-card px-2.5 font-mono text-xs text-ink placeholder:text-dim focus:border-toxic focus:outline-none shadow-none;
+    @apply h-8 w-full rounded-sm border border-toxic-border bg-surface-card px-2.5 font-mono text-xs text-ink placeholder:text-dim focus:border-toxic focus:outline-none shadow-none;
   }
 }
 
-/* ── Solana wallet-adapter overrides (flat 1px theme, zero glow) ─── */
+/* ── Solana wallet-adapter overrides (flat 1px theme, zero glow, 2px radius) ─── */
 .wallet-adapter-button {
   height: 32px !important;
   padding: 0 12px !important;
-  border-radius: 6px !important;
+  border-radius: 2px !important;
   font-family: var(--font-mono), monospace !important;
   font-size: 11px !important;
   font-weight: 700 !important;

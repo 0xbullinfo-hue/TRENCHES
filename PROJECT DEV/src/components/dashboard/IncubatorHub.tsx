@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AlphaItem, Chain } from '@/lib/types';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import {
@@ -103,24 +103,42 @@ export const IncubatorHub: React.FC = () => {
   const [evmSaved, setEvmSaved] = useState(false);
   const [tgKey, setTgKey] = useState<string | null>(null);
 
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const evmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
+    };
+  }, []);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2800);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2800);
   };
 
-  const handleCopyText = (
+  const handleCopyText = async (
     text: string,
     id: string,
     label?: string,
     e?: React.MouseEvent
   ) => {
     e?.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    if (label) {
-      showToast(`Copied ${label} CA: ${text}`);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      if (label) {
+        showToast(`Copied ${label} CA: ${text}`);
+      }
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 1800);
+    } catch {
+      // ignore clipboard error
     }
-    setTimeout(() => setCopiedId(null), 1800);
   };
 
   const handleAutoFillDexScreener = async () => {
@@ -216,9 +234,15 @@ export const IncubatorHub: React.FC = () => {
 
   const handleSaveEvm = (e: React.FormEvent) => {
     e.preventDefault();
-    setBoundEvmAddress(evmDraft.trim());
-    setEvmSaved(true);
-    setTimeout(() => setEvmSaved(false), 2000);
+    const ok = setBoundEvmAddress(evmDraft.trim());
+    if (ok) {
+      setEvmSaved(true);
+      if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
+      evmTimeoutRef.current = setTimeout(() => setEvmSaved(false), 2000);
+      showToast('EVM Address bound successfully.');
+    } else {
+      showToast('Invalid EVM address format: must be 0x followed by 40 hex characters.');
+    }
   };
 
   const handleGenerateTelegramKey = () => {

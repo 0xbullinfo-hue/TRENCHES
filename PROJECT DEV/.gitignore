@@ -29,3 +29,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local persistent state
+/data/calls.json
+/data/*.tmp
+

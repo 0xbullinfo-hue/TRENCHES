@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUpRight, Send } from 'lucide-react';
 
@@ -108,32 +109,25 @@ export const HeroTerminal: React.FC = () => {
           {/* Right Column (6 cols): Transparent Cutout Hero Rat Image with Toxic Beaker Green Glow Effect (Theme Emerald/Mint #34D399) */}
           <div className="lg:col-span-6 flex items-end justify-center">
             <div className="relative w-full flex items-end justify-center">
-              {/* Radioactive Beaker Toxic Glow Behind Hero Image */}
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 max-w-[480px] mx-auto rounded-full pointer-events-none"
-                style={{
-                  background:
-                    'radial-gradient(circle at 55% 55%, rgba(52, 211, 153, 0.48) 0%, rgba(110, 231, 183, 0.28) 35%, rgba(16, 185, 129, 0.12) 60%, transparent 75%)',
-                  filter: 'blur(55px)',
-                  transform: 'scale(0.98)',
-                }}
-              />
-              <img
+              <Image
                 src="/images/trenchlabs-hero-removebg.png"
                 alt="TrenchLabs Rat Scientist holding toxic green Erlenmeyer flask"
-                className="relative z-10 w-full h-auto max-h-[500px] object-contain object-bottom block select-none drop-shadow-[0_0_32px_rgba(52,211,153,0.55)] drop-shadow-[0_0_75px_rgba(52,211,153,0.28)]"
+                width={480}
+                height={500}
+                priority
+                unoptimized
+                className="relative z-10 w-full h-auto max-h-[500px] object-contain object-bottom block select-none"
               />
             </div>
           </div>
         </div>
 
-        {/* 4 Aligned Metric Cards (Matches Screenshot 2) */}
+        {/* 4 Aligned Metric Cards */}
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-6 rounded-2xl bg-surface border border-toxic-border hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
+              className="p-6 rounded bg-surface border border-toxic-border hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
             >
               <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 {m.label}

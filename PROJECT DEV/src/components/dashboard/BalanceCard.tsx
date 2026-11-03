@@ -30,14 +30,30 @@ export const BalanceCard: React.FC = () => {
 
   const [evmInput, setEvmInput] = useState<string>(boundEvmAddress);
   const [evmSaved, setEvmSaved] = useState<boolean>(false);
+  const [evmError, setEvmError] = useState<string | null>(null);
   const [portfolioOpen, setPortfolioOpen] = useState<boolean>(false);
+  const evmTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
+    };
+  }, []);
 
   const handleBindEvm = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = evmInput.trim();
-    setBoundEvmAddress(trimmed);
-    setEvmSaved(true);
-    setTimeout(() => setEvmSaved(false), 2000);
+    const ok = setBoundEvmAddress(trimmed);
+    if (ok) {
+      setEvmSaved(true);
+      setEvmError(null);
+      if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
+      evmTimeoutRef.current = setTimeout(() => setEvmSaved(false), 2000);
+    } else {
+      setEvmError('Invalid EVM address: must be 0x followed by 40 hex characters');
+      if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
+      evmTimeoutRef.current = setTimeout(() => setEvmError(null), 3500);
+    }
   };
 
   return (
@@ -151,6 +167,9 @@ export const BalanceCard: React.FC = () => {
                   )}
                 </button>
               </div>
+              {evmError && (
+                <div className="text-danger font-mono text-2xs">{evmError}</div>
+              )}
             </form>
 
             {/* Strict Capital Rule Notice: NO STAKING */}

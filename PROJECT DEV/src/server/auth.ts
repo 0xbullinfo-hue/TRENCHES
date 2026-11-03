@@ -3,12 +3,17 @@ import { PublicKey } from '@solana/web3.js';
 import { ADMIN_WALLET } from '@/lib/config';
 
 const ED25519_SPKI_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
-const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
+export const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface AdminAuthResult {
   authorized: boolean;
   error?: string;
-  isSimulatedDev?: boolean;
+}
+
+export interface WalletAuthResult {
+  ok: boolean;
+  wallet?: string;
+  error?: string;
 }
 
 /**
@@ -32,61 +37,73 @@ export function verifySolanaSignature(
 }
 
 /**
- * Validates admin request authorization for mutations (POST, PATCH, DELETE).
- * Enforces cryptographic ed25519 wallet signature verification in production.
+ * Proves the caller controls `x-wallet` by verifying an ed25519 signature over a short-lived message.
  */
-export function verifyAdminAuth(headers: Headers): AdminAuthResult {
-  const adminWallet = headers.get('x-admin-wallet')?.trim();
-  const timestampStr = headers.get('x-admin-timestamp')?.trim();
-  const signatureHex = headers.get('x-admin-signature')?.trim();
-  const isSimulated = headers.get('x-admin-simulated') === 'true';
+export function verifyWalletAuth(headers: Headers): WalletAuthResult {
+  const wallet = headers.get('x-wallet')?.trim();
+  const sig = headers.get('x-signature')?.trim();
+  const ts = Number(headers.get('x-timestamp'));
 
-  if (!adminWallet) {
-    return { authorized: false, error: 'Missing x-admin-wallet header.' };
+  if (!wallet || !sig || !Number.isFinite(ts)) {
+    return { ok: false, error: 'Missing x-wallet / x-timestamp / x-signature headers.' };
   }
 
-  if (adminWallet !== ADMIN_WALLET) {
-    return {
-      authorized: false,
-      error: `Address ${adminWallet} is not authorized as master admin.`,
-    };
+  if (Math.abs(Date.now() - ts) > MAX_TIMESTAMP_DRIFT_MS) {
+    return { ok: false, error: 'Signature expired or timestamp drift exceeded.' };
   }
 
-  // In non-production local development only, allow explicit preview simulation mode
-  if (process.env.NODE_ENV !== 'production' && isSimulated) {
-    return { authorized: true, isSimulatedDev: true };
+  if (!verifySolanaSignature(wallet, sig, `TrenchLabs Access: ${ts}`)) {
+    return { ok: false, error: 'Invalid wallet cryptographic signature.' };
   }
 
-  if (!timestampStr || !signatureHex) {
-    return {
-      authorized: false,
-      error: 'Cryptographic authorization required: missing timestamp or signature header.',
-    };
+  return { ok: true, wallet };
+}
+
+// In-memory signature replay cache (signature -> expiry timestamp)
+const seenSignatures = new Map<string, number>();
+
+/**
+ * Validates admin request authorization for mutations (POST, PATCH, DELETE).
+ * Cryptographically verifies that the request was signed by the ADMIN_WALLET,
+ * binds the signature to method + path + body hash, and enforces replay prevention.
+ */
+export async function verifyAdminAuth(req: Request, rawBody: string): Promise<AdminAuthResult> {
+  const h = req.headers;
+  const wallet = h.get('x-admin-wallet')?.trim();
+  const ts = Number(h.get('x-admin-timestamp'));
+  const sig = h.get('x-admin-signature')?.trim();
+
+  if (wallet !== ADMIN_WALLET) {
+    return { authorized: false, error: 'Not the authorized admin wallet.' };
   }
 
-  const timestamp = parseInt(timestampStr, 10);
-  if (Number.isNaN(timestamp)) {
-    return { authorized: false, error: 'Invalid x-admin-timestamp header.' };
+  if (!sig || !Number.isFinite(ts)) {
+    return { authorized: false, error: 'Missing cryptographic signature or timestamp header.' };
+  }
+
+  if (Math.abs(Date.now() - ts) > MAX_TIMESTAMP_DRIFT_MS) {
+    return { authorized: false, error: 'Admin signature expired.' };
+  }
+
+  const url = new URL(req.url);
+  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
+  const msg = ['TrenchLabs Admin', req.method, url.pathname + url.search, ts, bodyHash].join('|');
+
+  if (!verifySolanaSignature(wallet, sig, msg)) {
+    return { authorized: false, error: 'Invalid admin cryptographic signature.' };
+  }
+
+  if (seenSignatures.has(sig)) {
+    return { authorized: false, error: 'Signature replay detected.' };
   }
 
   const now = Date.now();
-  if (Math.abs(now - timestamp) > MAX_TIMESTAMP_DRIFT_MS) {
-    return {
-      authorized: false,
-      error: `Signature expired or clock drift exceeded (max 5 minutes). Request time: ${timestamp}, Server time: ${now}`,
-    };
-  }
+  seenSignatures.set(sig, now + MAX_TIMESTAMP_DRIFT_MS);
 
-  const expectedMessage = `TrenchLabs Admin Auth: ${timestamp}`;
-  const valid = verifySolanaSignature(adminWallet, signatureHex, expectedMessage);
-
-  if (!valid) {
-    return {
-      authorized: false,
-      error: 'Cryptographic signature verification failed for admin wallet.',
-    };
+  // Prune expired replay signatures
+  for (const [k, exp] of seenSignatures) {
+    if (exp < now) seenSignatures.delete(k);
   }
 
   return { authorized: true };
 }
-
