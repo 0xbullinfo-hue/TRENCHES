@@ -46,10 +46,10 @@ export interface AlphaRecord {
   summary: string;
   marketCap: string;
   marketCapUsd: number;
-  holderRewardsUsd: string;
-  holderRewardsRaw: number;
-  holderRewardsQuote: string;
-  holdersPaid: number;
+  holderRewardsUsd?: string;
+  holderRewardsRaw?: number;
+  holderRewardsQuote?: string;
+  holdersPaid?: number;
   volume24h: string;
   netInflow24h: string;
   change24hPct: number;
@@ -91,6 +91,197 @@ export function buildTakeProfits(
 }
 
 const DEFAULT_REGISTRY: AlphaRecord[] = [
+  {
+    id: 'bsc-lity',
+    serialTag: 'EXP01',
+    name: 'LITY Protocol',
+    ticker: '$LITY',
+    chain: 'BSC',
+    quoteToken: 'BNB',
+    status: 'LIVE',
+    statusLabel: 'PRIORITY CALL',
+    category: 'MOVERS',
+    allocationLabel: 'Allocation',
+    allocation: '25.0 BNB',
+    timer: { cycleMin: 120, phaseMin: 15 },
+    risk: 2,
+    riskRewardRatio: '1:5 R:R',
+    stopLoss: '-15% SL',
+    entryMarketCap: '$580K',
+    entryMarketCapUsd: 580000,
+    takeProfits: buildTakeProfits(580000, 7000000, [2, 5, 10]),
+    pinned: true,
+    pinnedAt: '2026-11-03T11:00:00Z',
+    minTier: 'LAB_MEMBER',
+    ca: '0xD7057e7C56B9C2d5f0a3E639D07610db31C949c8',
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com/bsc/0x91727e4485542612e9ed4293d1021414dbf5e588' }
+    ],
+    summary: 'Decentralized AI liquidity routing & bridge protocol on BSC. Alerted at $580K entry before a massive 12.1x peak run to $7.0M.',
+    marketCap: '$7.0M',
+    marketCapUsd: 7000000,
+    volume24h: '$3.45M',
+    netInflow24h: '+$420.0K',
+    change24hPct: 1106.9,
+    age: '1h',
+    ageMinutes: 60,
+    caller: '@TrenchLabsAdmin',
+    callerWinRate: '91.5% win',
+    deployedVia: 'https://trenchlabshq.com',
+    spotlightRank: 1,
+    sparkline: [20, 24, 28, 35, 42, 50, 61, 75, 82, 88, 92, 95, 97, 99, 100],
+    art: {
+      bgFrom: '#11161D',
+      bgTo: '#0A0E13',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'pill',
+      badgeText: 'BSC LIQUIDITY'
+    }
+  },
+  {
+    id: 'bsc-bc400',
+    serialTag: 'EXP02',
+    name: 'BITCOIN CULTIVATOR 400',
+    ticker: '$BC400',
+    chain: 'BSC',
+    quoteToken: 'BNB',
+    status: 'LIVE',
+    statusLabel: 'PRIORITY CALL',
+    category: 'MOVERS',
+    allocationLabel: 'Allocation',
+    allocation: '20.0 BNB',
+    timer: { cycleMin: 90, phaseMin: 10 },
+    risk: 3,
+    riskRewardRatio: '1:4 R:R',
+    stopLoss: '-20% SL',
+    entryMarketCap: '$880K',
+    entryMarketCapUsd: 880000,
+    takeProfits: buildTakeProfits(880000, 6200000, [2, 5, 7]),
+    pinned: true,
+    pinnedAt: '2026-11-03T10:45:00Z',
+    minTier: 'LAB_MEMBER',
+    ca: '0x61Fc93c7C070B32B1b1479B86056d8Ec1D7125BD',
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com/bsc/0xa02e8735cdc35aea44a770cb511513826e6c68c5' }
+    ],
+    summary: 'Bitcoin Cultivator 400 algorithmic BNB yield farming protocol. Dispatched at $880K entry, surging 7.0x to a $6.2M peak.',
+    marketCap: '$6.2M',
+    marketCapUsd: 6200000,
+    volume24h: '$2.18M',
+    netInflow24h: '+$280.0K',
+    change24hPct: 604.5,
+    age: '2h',
+    ageMinutes: 120,
+    caller: '@TrenchLabsAdmin',
+    callerWinRate: '88.0% win',
+    deployedVia: 'https://trenchlabshq.com',
+    spotlightRank: 2,
+    sparkline: [18, 22, 27, 34, 40, 48, 55, 63, 72, 79, 85, 91, 95, 98, 100],
+    art: {
+      bgFrom: '#161C24',
+      bgTo: '#0A0E13',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'stealth',
+      badgeText: 'BNB FARMING'
+    }
+  },
+  {
+    id: 'bsc-water',
+    serialTag: 'EXP03',
+    name: 'Clean Water',
+    ticker: '$WATER',
+    chain: 'BSC',
+    quoteToken: 'BNB',
+    status: 'LIVE',
+    statusLabel: 'PRIORITY CALL',
+    category: 'MOVERS',
+    allocationLabel: 'Allocation',
+    allocation: '10.0 BNB',
+    timer: { cycleMin: 60, phaseMin: 5 },
+    risk: 4,
+    riskRewardRatio: '1:10 R:R',
+    stopLoss: '-25% SL',
+    entryMarketCap: '$8.0K',
+    entryMarketCapUsd: 8000,
+    takeProfits: buildTakeProfits(8000, 120000, [2, 5, 10, 15]),
+    pinned: true,
+    pinnedAt: '2026-11-03T10:15:00Z',
+    minTier: 'LAB_MEMBER',
+    ca: '0x5056d8DFf13388813e4BA9B26375aef658E0044F',
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com/bsc/0xe8d2a16a9526ca7706c4a13e8b119416791c99b0' }
+    ],
+    summary: 'Clean Water Foundation charity impact token on BSC. Early micro-cap called at $8K market cap before surging 15x to $120K peak.',
+    marketCap: '$120K',
+    marketCapUsd: 120000,
+    volume24h: '$480.0K',
+    netInflow24h: '+$65.0K',
+    change24hPct: 1400.0,
+    age: '3h',
+    ageMinutes: 180,
+    caller: '@TrenchLabsAdmin',
+    callerWinRate: '94.0% win',
+    deployedVia: 'https://trenchlabshq.com',
+    spotlightRank: 3,
+    sparkline: [10, 15, 22, 30, 42, 55, 68, 77, 84, 89, 93, 96, 98, 100],
+    art: {
+      bgFrom: '#11161D',
+      bgTo: '#0A0E13',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'pill',
+      badgeText: 'MICRO-CAP'
+    }
+  },
+  {
+    id: 'bsc-azuki',
+    serialTag: 'EXP04',
+    name: 'AZUKI ANIME',
+    ticker: '$AZUKI',
+    chain: 'BSC',
+    quoteToken: 'BNB',
+    status: 'LIVE',
+    statusLabel: 'LIVE CALL',
+    category: 'MOVERS',
+    allocationLabel: 'Allocation',
+    allocation: '12.0 BNB',
+    timer: { cycleMin: 45, phaseMin: 5 },
+    risk: 3,
+    riskRewardRatio: '1:3 R:R',
+    stopLoss: '-20% SL',
+    entryMarketCap: '$21K',
+    entryMarketCapUsd: 21000,
+    takeProfits: buildTakeProfits(21000, 55000, [2, 2.5]),
+    pinned: false,
+    minTier: 'LAB_MEMBER',
+    ca: '0x5963dbDC6BB18f9F1AFc07C0Cb8EBF354dB24cbB',
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com/bsc/0x2d6025e3d98fa8d0406267dc5a06694371c93c12' }
+    ],
+    summary: 'Azuki Anime community culture token on BSC. Early breakout alerted at $21K market cap, hitting take-profit targets at $55K peak (2.6x).',
+    marketCap: '$55K',
+    marketCapUsd: 55000,
+    volume24h: '$320.0K',
+    netInflow24h: '+$42.0K',
+    change24hPct: 161.9,
+    age: '4h',
+    ageMinutes: 240,
+    caller: '@TrenchLabsAdmin',
+    callerWinRate: '86.5% win',
+    deployedVia: 'https://trenchlabshq.com',
+    spotlightRank: 4,
+    sparkline: [15, 20, 25, 30, 38, 45, 52, 60, 68, 75, 82, 88, 92, 96, 100],
+    art: {
+      bgFrom: '#161C24',
+      bgTo: '#0A0E13',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'stealth',
+      badgeText: 'ANIME BSC'
+    }
+  },
   {
     id: 'pill-trench',
     name: 'pill',

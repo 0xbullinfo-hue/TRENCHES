@@ -84,10 +84,10 @@ export interface AlphaItem {
   /** Current Market Cap (live or latest) */
   marketCap: string;
   marketCapUsd: number;
-  holderRewardsUsd: string;
-  holderRewardsRaw: number;
-  holderRewardsQuote: string;
-  holdersPaid: number;
+  holderRewardsUsd?: string;
+  holderRewardsRaw?: number;
+  holderRewardsQuote?: string;
+  holdersPaid?: number;
   volume24h: string;
   netInflow24h: string;
   change24hPct: number;
