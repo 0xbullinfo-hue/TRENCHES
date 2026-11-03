@@ -1,7 +1,7 @@
 import type { TierId } from './tiers';
 
-export type Chain = 'SOL' | 'BASE' | 'ETH' | 'BSC';
-export type QuoteToken = 'PUMP' | 'SOL' | 'ETH' | 'USDC' | 'WBTC' | 'ZEC' | 'BNB';
+export type Chain = 'SOL' | 'BSC' | 'ETH' | 'BASE' | 'ROBIN' | 'AVAX';
+export type QuoteToken = 'PUMP' | 'SOL' | 'ETH' | 'USDC' | 'WBTC' | 'ZEC' | 'BNB' | 'AVAX' | 'ROBIN';
 export type AlphaStatus = 'LIVE' | 'INCUBATING' | 'UPCOMING';
 export type AlphaCategory = 'MOVERS' | 'NEW' | 'HOLDER_REWARDS' | 'AI_AGENT' | 'STEALTH' | 'CHARITY';
 export type ArtMotif =
@@ -32,6 +32,17 @@ export interface AlphaArtTheme {
   badgeText?: string;
 }
 
+export interface TakeProfitTarget {
+  /** Multiplier label, e.g. '2x', '5x', '10x' */
+  label: string;
+  /** Numeric multiplier, e.g. 2, 5, 10 */
+  multiple: number;
+  /** Implied target Market Cap, e.g. '$1.59M' */
+  targetMc?: string;
+  /** Whether the target has been reached */
+  hit?: boolean;
+}
+
 /** Shape returned to the client by GET /api/alphas. */
 export interface AlphaItem {
   id: string;
@@ -47,8 +58,21 @@ export interface AlphaItem {
   allocation: string;
   /** ISO timestamp the timer counts down to (live drops). */
   endsAt: string | null;
-  /** Degen risk gauge, 1–5 beakers. */
+  /** Admin-rated risk level (1–5) */
   risk: number;
+  /** Calculated Risk:Reward ratio (e.g. '1:4 R:R') */
+  riskRewardRatio: string;
+  /** Downside stop-loss / invalidation note (e.g. '-25% SL') */
+  stopLoss: string;
+  /** Take profit multiplier targets (e.g. 2x, 5x, 10x) */
+  takeProfits: TakeProfitTarget[];
+  /** Whether Admin pinned this call to the priority section at the top of the dashboard */
+  pinned: boolean;
+  /** ISO timestamp when pinned (for ordering pinned priority calls) */
+  pinnedAt?: string | null;
+  /** Market Cap at the moment the call was posted */
+  entryMarketCap: string;
+  entryMarketCapUsd: number;
   minTier: TierId;
   minTierLabel: string;
   /** Minimum liquid $GENESIS balance required to unlock this alpha token */
@@ -57,7 +81,7 @@ export interface AlphaItem {
   ca: string | null;
   links: AlphaLink[];
   summary: string;
-  /** Rich Incubator Terminal metrics (matching reference views) */
+  /** Current Market Cap (live or latest) */
   marketCap: string;
   marketCapUsd: number;
   holderRewardsUsd: string;
@@ -115,6 +139,7 @@ export interface AlphasOk {
   allocationCap: number;
   balance: number;
   verified: boolean;
+  isAdmin: boolean;
   genesisMint: string;
   items: AlphaItem[];
   callers: SyndicateCaller[];
@@ -127,6 +152,7 @@ export interface AlphasErr {
   error:
     | 'BAD_REQUEST'
     | 'ACCESS_DENIED_ZERO_BALANCE'
+    | 'UNAUTHORIZED_ADMIN'
     | 'RPC_UNAVAILABLE'
     | 'DEMO_BALANCE_DISABLED';
   message: string;
@@ -134,3 +160,4 @@ export interface AlphasErr {
 }
 
 export type AlphasResponse = AlphasOk | AlphasErr;
+

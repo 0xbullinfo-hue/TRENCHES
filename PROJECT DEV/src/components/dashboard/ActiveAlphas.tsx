@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 
-const CHAIN_CHIPS: ('ALL' | Chain)[] = ['ALL', 'SOL', 'BASE', 'ETH', 'BSC'];
+const CHAIN_CHIPS: ('ALL' | Chain)[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
 
 const INITIAL_TIMERS: Record<string, number> = {
   'sol-trench': 1 * 3600 + 45 * 60 + 19, // 01h 45m

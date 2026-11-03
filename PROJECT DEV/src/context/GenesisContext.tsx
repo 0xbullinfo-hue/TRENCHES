@@ -11,7 +11,12 @@ import React, {
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
-import { GENESIS_MINT, MINT_CONFIGURED } from '@/lib/config';
+import {
+  ADMIN_WALLET,
+  GENESIS_MINT,
+  MINT_CONFIGURED,
+  isAdminWallet,
+} from '@/lib/config';
 import {
   MIN_GENESIS_REQUIRED,
   Tier,
@@ -27,17 +32,34 @@ import type {
   SyndicateCaller,
 } from '@/lib/types';
 
-export type DemoPreset = 'disconnected' | '0' | '1m' | 'live';
+export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
 
 const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string> = {
   '0': '8xK4ZeroBal1111111111111111111111111119Lm2',
   '1m': '8xK4LabMember1M111111111111111111111119Lm2',
+  admin: ADMIN_WALLET,
 };
 
 const DEMO_BALANCES: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, number> = {
   '0': 0,
   '1m': 1_000_000,
+  admin: 1_000_000,
 };
+
+export interface CreateCallPayload {
+  name: string;
+  ticker: string;
+  ca: string;
+  chain: Chain;
+  marketCap: string;
+  entryMarketCap?: string;
+  risk: number;
+  riskRewardRatio: string;
+  stopLoss: string;
+  takeProfitInput: string;
+  pinned: boolean;
+  summary?: string;
+}
 
 interface GenesisContextValue {
   connected: boolean;
@@ -54,6 +76,7 @@ interface GenesisContextValue {
   points: number;
   isZeroBalance: boolean;
   isUnlocked: boolean;
+  isAdmin: boolean;
 
   alphas: AlphaItem[];
   callers: SyndicateCaller[];
@@ -61,6 +84,12 @@ interface GenesisContextValue {
   apiLoading: boolean;
   apiError: string | null;
   refreshAll: () => Promise<void>;
+
+  createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
+  togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
+  toggleTpHit: (id: string, tpIndex: number) => Promise<boolean>;
+  updateCallMarketCap: (id: string, marketCap: string) => Promise<boolean>;
+  deleteAlphaCall: (id: string) => Promise<boolean>;
 
   watchlist: string[];
   toggleWatchlist: (tokenId: string) => void;
@@ -96,7 +125,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [boundEvmAddress, setBoundEvmAddressState] = useState<string>('');
-  const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'swordcat']);
+  const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
 
   useEffect(() => {
     try {
@@ -225,6 +254,11 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [connected, demoPreset, wallet.publicKey]);
 
+  const isAdmin = useMemo(
+    () => isAdminWallet(publicKeyBase58) || demoPreset === 'admin',
+    [publicKeyBase58, demoPreset]
+  );
+
   const shortAddress = useMemo(() => {
     if (!publicKeyBase58) return '';
     return `${publicKeyBase58.slice(0, 4)}...${publicKeyBase58.slice(-4)}`;
@@ -232,10 +266,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const balance = useMemo(() => {
     if (!connected) return 0;
-    if (demoPreset === 'live') return onChainBalance;
+    if (demoPreset === 'live') {
+      if (isAdmin && onChainBalance < MIN_GENESIS_REQUIRED) {
+        return MIN_GENESIS_REQUIRED;
+      }
+      return onChainBalance;
+    }
     if (demoPreset !== 'disconnected') return DEMO_BALANCES[demoPreset];
     return 0;
-  }, [connected, demoPreset, onChainBalance]);
+  }, [connected, demoPreset, onChainBalance, isAdmin]);
 
   const formattedBalance = useMemo(
     () => new Intl.NumberFormat('en-US').format(balance),
@@ -247,46 +286,191 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const capSol = useMemo(() => allocationCap(tier), [tier]);
   const points = useMemo(() => longevityPoints(balance), [balance]);
 
-  const isZeroBalance = connected && balance < MIN_GENESIS_REQUIRED;
-  const isUnlocked = connected && balance >= MIN_GENESIS_REQUIRED;
+  const isZeroBalance = connected && !isAdmin && balance < MIN_GENESIS_REQUIRED;
+  const isUnlocked = connected && (isAdmin || balance >= MIN_GENESIS_REQUIRED);
 
-  const fetchAlphasFromBackend = useCallback(async (bal: number, isConn: boolean) => {
-    if (!isConn) {
-      setAlphas([]);
-      setCallers([]);
-      setPortfolio(null);
-      setApiError(null);
-      return;
-    }
-
-    setApiLoading(true);
-    try {
-      const res = await fetch(`/api/alphas?balance=${encodeURIComponent(bal)}`, {
-        cache: 'no-store',
-      });
-      const data: AlphasResponse = await res.json();
-
-      if (!res.ok || !data.ok) {
+  const fetchAlphasFromBackend = useCallback(
+    async (bal: number, isConn: boolean, walletAddr: string | null) => {
+      if (!isConn) {
         setAlphas([]);
         setCallers([]);
         setPortfolio(null);
-        setApiError(!data.ok ? data.error : 'ACCESS_DENIED_ZERO_BALANCE');
-      } else {
-        setAlphas(data.items);
-        setCallers(data.callers ?? []);
-        setPortfolio(data.portfolio);
         setApiError(null);
+        return;
       }
-    } catch {
-      setApiError('RPC_UNAVAILABLE');
-    } finally {
-      setApiLoading(false);
-    }
-  }, []);
+
+      setApiLoading(true);
+      try {
+        const query = isAdminWallet(walletAddr)
+          ? `wallet=${encodeURIComponent(walletAddr!)}&balance=${encodeURIComponent(bal)}`
+          : `balance=${encodeURIComponent(bal)}`;
+
+        const res = await fetch(`/api/alphas?${query}`, {
+          cache: 'no-store',
+        });
+        const data: AlphasResponse = await res.json();
+
+        if (!res.ok || !data.ok) {
+          setAlphas([]);
+          setCallers([]);
+          setPortfolio(null);
+          setApiError(!data.ok ? data.error : 'ACCESS_DENIED_ZERO_BALANCE');
+        } else {
+          setAlphas(data.items);
+          setCallers(data.callers ?? []);
+          setPortfolio(data.portfolio);
+          setApiError(null);
+        }
+      } catch {
+        setApiError('RPC_UNAVAILABLE');
+      } finally {
+        setApiLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchAlphasFromBackend(balance, connected);
-  }, [balance, connected, fetchAlphasFromBackend]);
+    fetchAlphasFromBackend(balance, connected, publicKeyBase58);
+  }, [balance, connected, publicKeyBase58, fetchAlphasFromBackend]);
+
+  const createAlphaCall = useCallback(
+    async (payload: CreateCallPayload): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/alphas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
+          },
+          body: JSON.stringify({
+            ...payload,
+            adminWallet: publicKeyBase58 || ADMIN_WALLET,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [publicKeyBase58]
+  );
+
+  const togglePinCall = useCallback(
+    async (id: string, nextPinned: boolean): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
+          },
+          body: JSON.stringify({
+            id,
+            pinned: nextPinned,
+            adminWallet: publicKeyBase58 || ADMIN_WALLET,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [publicKeyBase58]
+  );
+
+  const toggleTpHit = useCallback(
+    async (id: string, tpIndex: number): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
+          },
+          body: JSON.stringify({
+            id,
+            toggleTpIndex: tpIndex,
+            adminWallet: publicKeyBase58 || ADMIN_WALLET,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [publicKeyBase58]
+  );
+
+  const updateCallMarketCap = useCallback(
+    async (id: string, marketCap: string): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
+          },
+          body: JSON.stringify({
+            id,
+            marketCap,
+            adminWallet: publicKeyBase58 || ADMIN_WALLET,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [publicKeyBase58]
+  );
+
+  const deleteAlphaCall = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        const res = await fetch(
+          `/api/alphas?id=${encodeURIComponent(id)}&adminWallet=${encodeURIComponent(
+            publicKeyBase58 || ADMIN_WALLET
+          )}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'x-admin-wallet': publicKeyBase58 || ADMIN_WALLET,
+            },
+          }
+        );
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [publicKeyBase58]
+  );
 
   const setDemoPreset = useCallback((preset: DemoPreset) => {
     setDemoPresetState(preset);
@@ -303,8 +487,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     if (demoPreset === 'live') {
       await readSplBalance();
     }
-    await fetchAlphasFromBackend(balance, connected);
-  }, [demoPreset, readSplBalance, fetchAlphasFromBackend, balance, connected]);
+    await fetchAlphasFromBackend(balance, connected, publicKeyBase58);
+  }, [demoPreset, readSplBalance, fetchAlphasFromBackend, balance, connected, publicKeyBase58]);
 
   const value: GenesisContextValue = {
     connected,
@@ -320,12 +504,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     points,
     isZeroBalance,
     isUnlocked,
+    isAdmin,
     alphas,
     callers,
     portfolio,
     apiLoading,
     apiError,
     refreshAll,
+    createAlphaCall,
+    togglePinCall,
+    toggleTpHit,
+    updateCallMarketCap,
+    deleteAlphaCall,
     watchlist,
     toggleWatchlist,
     recordAllocation,

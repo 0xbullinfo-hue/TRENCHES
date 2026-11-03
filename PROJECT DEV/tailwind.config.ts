@@ -64,9 +64,9 @@ const config: Config = {
         sm: "2px",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
-        display: ["var(--font-display)", "Impact", "Arial Narrow", "sans-serif"],
+        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+        display: ["Anton", "Impact", "Arial Narrow", "sans-serif"],
       },
       fontSize: {
         "2xs": ["10px", { lineHeight: "14px" }],

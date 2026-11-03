@@ -197,6 +197,24 @@ Query: `balance` (number, demo path) **or** `wallet` (base58, server-verified pa
   - Flat opaque dark surfaces: `canvas = #0A0E13`, `surface = #11161D`, `surface-card = #161C24`
   - Enforced `boxShadow: { none: "none", DEFAULT: "none", ... }` and removed 100% of `backdrop-blur-*`, `blur-*`, gradients, and SVG `feGaussianBlur` filters across the entire codebase.
 
+### M22 — Alpha Crypto Trade Calls Hub, Master Admin Desk (`FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e`), Multi-Chain Categorization (`SOL`, `BSC`, `ETH`, `BASE`, `ROBIN`, `AVAX`), Dual Risk Ratio, & Take Profit Multipliers ✅
+- **Master Admin Wallet (`src/lib/config.ts`, `src/context/GenesisContext.tsx`, `src/app/api/alphas/route.ts`):**
+  - Configured `ADMIN_WALLET = 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e'` with full access to `/dashboard` (bypasses the 1M `$GENESIS` gate) and full CRUD privileges (`POST`, `PATCH`, `DELETE` on `/api/alphas`) to publish, pin/unpin, mark TP hits, and delete calls.
+  - Added a 1-click **Preview Admin Desk** toggle on `/dashboard` for local testing alongside live wallet recognition when `FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e` connects.
+- **Persistent Call Storage (`data/calls.json` & `src/server/alphas-data.ts`):**
+  - Server-side persistent JSON storage (`data/calls.json`) so calls posted or pinned by Admin persist across refreshes and restarts.
+- **Every Trade Call Card Displays (`src/components/dashboard/IncubatorHub.tsx` & `AlphaInspectorModal.tsx`):**
+  1. **Token Name & Ticker**
+  2. **Contract Address (CA)** with 1-click Copy CA + external market links (DYOR / trade at your own risk)
+  3. **Current Market Cap** + **Entry Market Cap**
+  4. **Risk Ratio (Both):** Admin **Risk Level (`1–5`)** gauge AND calculated **Risk:Reward Ratio (`R:R`)** (e.g. `1:5 R:R`) + Stop-Loss (`-25% SL`)
+  5. **Take Profit Multipliers:** Multiplier badges (`2x`, `5x`, `10x`) with implied target Market Cap and hit checkmarks (`✓`).
+- **Blockchain Categorization:**
+  - Full chain filter bar supporting **`ALL`, `SOL`, `BSC`, `ETH`, `BASE`, `ROBIN` (Robinhood Chain), and `AVAX`**.
+- **Pinned Priority Calls Section:**
+  - Dedicated **PINNED PRIORITY CALLS** banner & grid at the top of `/dashboard` for calls pinned by the Admin.
+
+
 ---
 
 ## 7. Blockers & Fixes

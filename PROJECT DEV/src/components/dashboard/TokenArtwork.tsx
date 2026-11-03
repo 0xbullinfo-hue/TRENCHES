@@ -357,19 +357,17 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
         </div>
 
         {/* Dual Chain + Quote Token Badge */}
-        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface/95 border border-line font-mono text-[10px] font-bold text-white shrink-0">
+        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface border border-line font-mono text-[10px] font-bold text-white shrink-0">
           <span
             className={`w-2 h-2 rounded-full ${
-              chain === 'SOL'
+              chain === 'SOL' || chain === 'ROBIN'
                 ? 'bg-pump'
-                : chain === 'BASE'
+                : chain === 'BASE' || chain === 'ETH'
                 ? 'bg-pump-pill'
-                : chain === 'ETH'
-                ? 'bg-pump'
                 : 'bg-amber'
             }`}
           />
-          <span>{quoteToken}</span>
+          <span>{chain}</span>
         </div>
       </div>
     </div>

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import type {
   AlphaArtTheme,
   AlphaCategory,
@@ -8,11 +10,12 @@ import type {
   Portfolio,
   QuoteToken,
   SyndicateCaller,
+  TakeProfitTarget,
 } from '@/lib/types';
 import type { TierId } from '@/lib/tiers';
 import { TIERS } from '@/lib/tiers';
 
-interface AlphaRecord {
+export interface AlphaRecord {
   id: string;
   name: string;
   ticker: string;
@@ -24,7 +27,19 @@ interface AlphaRecord {
   allocationLabel: 'Allocation' | 'Pool';
   allocation: string;
   timer?: { cycleMin: number; phaseMin: number };
+  /** 1-5 Risk Level rating */
   risk: number;
+  /** Risk:Reward ratio string (e.g. '1:4 R:R') */
+  riskRewardRatio: string;
+  /** Stop-loss / downside invalidation (e.g. '-25% SL') */
+  stopLoss: string;
+  /** Multiplier targets (e.g. 2x, 5x, 10x) */
+  takeProfits: TakeProfitTarget[];
+  /** Whether pinned by Admin to top priority section */
+  pinned: boolean;
+  pinnedAt?: string | null;
+  entryMarketCap: string;
+  entryMarketCapUsd: number;
   minTier: TierId;
   ca: string;
   links: AlphaLink[];
@@ -48,7 +63,32 @@ interface AlphaRecord {
   art: AlphaArtTheme;
 }
 
-const REGISTRY: AlphaRecord[] = [
+export function formatCompactUsd(val: number): string {
+  if (!Number.isFinite(val) || val <= 0) return '$0';
+  if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(2)}B`;
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
+  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
+  return `$${val.toFixed(0)}`;
+}
+
+export function buildTakeProfits(
+  entryMcUsd: number,
+  currentMcUsd: number,
+  multipliers: number[] = [2, 5, 10]
+): TakeProfitTarget[] {
+  const baseMc = entryMcUsd > 0 ? entryMcUsd : currentMcUsd;
+  return multipliers.map((mult) => {
+    const targetUsd = baseMc * mult;
+    return {
+      label: `${mult}x`,
+      multiple: mult,
+      targetMc: baseMc > 0 ? formatCompactUsd(targetUsd) : undefined,
+      hit: baseMc > 0 && currentMcUsd >= targetUsd,
+    };
+  });
+}
+
+const DEFAULT_REGISTRY: AlphaRecord[] = [
   {
     id: 'pill-trench',
     name: 'pill',
@@ -56,12 +96,19 @@ const REGISTRY: AlphaRecord[] = [
     chain: 'SOL',
     quoteToken: 'PUMP',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'HOLDER_REWARDS',
     allocationLabel: 'Allocation',
     allocation: '15.0 SOL',
     timer: { cycleMin: 120, phaseMin: 0 },
     risk: 2,
+    riskRewardRatio: '1:5 R:R',
+    stopLoss: '-20% SL',
+    entryMarketCap: '$165K',
+    entryMarketCapUsd: 165_000,
+    takeProfits: buildTakeProfits(165_000, 796_000, [2, 5, 10]),
+    pinned: true,
+    pinnedAt: '2026-11-03T10:00:00Z',
     minTier: 'LAB_MEMBER',
     ca: 'PiLLq7cV1x9ZpK3mW2aYbF8dLs4uNe6rHj5tGo2pump',
     links: [
@@ -70,7 +117,7 @@ const REGISTRY: AlphaRecord[] = [
       { label: 'BullX', href: 'https://bullx.io/' },
     ],
     summary:
-      'Flagship TrenchLabs fee-router capsule. 100% of LP swap fees stream automatically to verified $GENESIS & $PILL holders every 60 slots.',
+      'Flagship TrenchLabs fee-router capsule. High-volume Solana trench runner with strong whale accumulation and clean liquidity.',
     marketCap: '$796K',
     marketCapUsd: 796_000,
     holderRewardsUsd: '$692,353',
@@ -80,9 +127,9 @@ const REGISTRY: AlphaRecord[] = [
     volume24h: '$1.84M',
     netInflow24h: '+$142.8K',
     change24hPct: 384.2,
-    age: '1mo',
-    ageMinutes: 43_200,
-    caller: '@SolLovingFork',
+    age: '2h',
+    ageMinutes: 120,
+    caller: '@TrenchLabsAdmin',
     callerWinRate: '84.2% win',
     deployedVia: 'https://trenchlabshq.com',
     spotlightRank: 1,
@@ -96,18 +143,77 @@ const REGISTRY: AlphaRecord[] = [
     },
   },
   {
+    id: 'robin-hoodlum',
+    name: 'Robinhood Alpha',
+    ticker: '$SHERWOOD',
+    chain: 'ROBIN',
+    quoteToken: 'ROBIN',
+    status: 'LIVE',
+    statusLabel: 'PRIORITY CALL',
+    category: 'MOVERS',
+    allocationLabel: 'Allocation',
+    allocation: '20.0 SOL',
+    timer: { cycleMin: 90, phaseMin: 10 },
+    risk: 3,
+    riskRewardRatio: '1:6 R:R',
+    stopLoss: '-25% SL',
+    entryMarketCap: '$220K',
+    entryMarketCapUsd: 220_000,
+    takeProfits: buildTakeProfits(220_000, 640_000, [2, 5, 10]),
+    pinned: true,
+    pinnedAt: '2026-11-03T09:45:00Z',
+    minTier: 'LAB_MEMBER',
+    ca: '0x77Robin92A48e5dB4850d24F2C15e0a0B8D992B9eRBN',
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com' },
+    ],
+    summary:
+      'First mover narrative play on Robinhood Chain (ROBIN). Early liquidity breakout spotted by Admin desk with 2x TP1 already cleared.',
+    marketCap: '$640K',
+    marketCapUsd: 640_000,
+    holderRewardsUsd: '$412,900',
+    holderRewardsRaw: 412_900,
+    holderRewardsQuote: '88.4K USDC',
+    holdersPaid: 14_210,
+    volume24h: '$1.92M',
+    netInflow24h: '+$195.0K',
+    change24hPct: 290.9,
+    age: '45m',
+    ageMinutes: 45,
+    caller: '@TrenchLabsAdmin',
+    callerWinRate: '88.0% win',
+    deployedVia: 'https://trenchlabshq.com',
+    spotlightRank: 2,
+    sparkline: [14, 19, 25, 31, 38, 44, 52, 49, 63, 71, 76, 82, 85, 90, 95, 100],
+    art: {
+      bgFrom: '#161C24',
+      bgTo: '#0A0E13',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'stealth',
+      badgeText: 'ROBIN CHAIN',
+    },
+  },
+  {
     id: 'baton-ai',
     name: 'baton',
     ticker: '$BATON',
     chain: 'SOL',
     quoteToken: 'PUMP',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'HOLDER_REWARDS',
     allocationLabel: 'Allocation',
     allocation: '12.0 SOL',
     timer: { cycleMin: 180, phaseMin: 25 },
     risk: 2,
+    riskRewardRatio: '1:4 R:R',
+    stopLoss: '-20% SL',
+    entryMarketCap: '$620K',
+    entryMarketCapUsd: 620_000,
+    takeProfits: buildTakeProfits(620_000, 3_500_000, [2, 5, 10]),
+    pinned: true,
+    pinnedAt: '2026-11-03T08:30:00Z',
     minTier: 'LAB_MEMBER',
     ca: 'BaTon9xK2mQ8pLw4tYc7nB3fH6jD1sV5uA9eZr8pump',
     links: [
@@ -116,7 +222,7 @@ const REGISTRY: AlphaRecord[] = [
     ],
     summary:
       'Relay baton protocol coordinating multi-wallet sniper protection and holder dividend splits across Solana trenches.',
-    marketCap: '$3.5M',
+    marketCap: '$3.50M',
     marketCapUsd: 3_500_000,
     holderRewardsUsd: '$591,806',
     holderRewardsRaw: 591_806,
@@ -125,12 +231,12 @@ const REGISTRY: AlphaRecord[] = [
     volume24h: '$2.41M',
     netInflow24h: '+$218.4K',
     change24hPct: 245.8,
-    age: '1mo',
-    ageMinutes: 41_000,
+    age: '3h',
+    ageMinutes: 180,
     caller: '@TenderIvyLord',
     callerWinRate: '77.8% win',
     deployedVia: 'https://rapidlaunch.io',
-    spotlightRank: 2,
+    spotlightRank: 3,
     sparkline: [24, 28, 26, 35, 39, 44, 41, 52, 57, 63, 60, 71, 78, 82, 88, 93],
     art: {
       bgFrom: '#231D15',
@@ -147,12 +253,18 @@ const REGISTRY: AlphaRecord[] = [
     chain: 'ETH',
     quoteToken: 'WBTC',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'HOLDER_REWARDS',
     allocationLabel: 'Allocation',
     allocation: '1.5 ETH',
     timer: { cycleMin: 240, phaseMin: 40 },
-    risk: 3,
+    risk: 2,
+    riskRewardRatio: '1:3.5 R:R',
+    stopLoss: '-15% SL',
+    entryMarketCap: '$2.90M',
+    entryMarketCapUsd: 2_900_000,
+    takeProfits: buildTakeProfits(2_900_000, 8_520_000, [2, 5]),
+    pinned: false,
     minTier: 'LAB_MEMBER',
     ca: '0x8fB32C18e5dB4850d24F2C15e0a0B8D992B9eA11',
     links: [
@@ -160,7 +272,7 @@ const REGISTRY: AlphaRecord[] = [
       { label: 'Etherscan', href: 'https://etherscan.io' },
     ],
     summary:
-      'Cross-chain WBTC-paired incubation distributing wrapped BTC rewards to verified Researcher & Lead Chemist $GENESIS holders.',
+      'Cross-chain WBTC-paired conviction setup on Ethereum mainnet with deep institutional pool depth and steady accumulation.',
     marketCap: '$8.52M',
     marketCapUsd: 8_520_000,
     holderRewardsUsd: '$281,485',
@@ -170,12 +282,12 @@ const REGISTRY: AlphaRecord[] = [
     volume24h: '$4.12M',
     netInflow24h: '+$312.0K',
     change24hPct: 192.4,
-    age: '1mo',
-    ageMinutes: 40_100,
+    age: '6h',
+    ageMinutes: 360,
     caller: '@ZebLobster1',
     callerWinRate: '79.4% win',
     deployedVia: 'https://j7tracker.io',
-    spotlightRank: 3,
+    spotlightRank: 4,
     sparkline: [30, 32, 35, 33, 45, 52, 49, 61, 66, 64, 74, 79, 85, 83, 91, 97],
     art: {
       bgFrom: '#2A190D',
@@ -192,12 +304,18 @@ const REGISTRY: AlphaRecord[] = [
     chain: 'SOL',
     quoteToken: 'SOL',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'MOVERS',
     allocationLabel: 'Allocation',
     allocation: '20.0 SOL',
     timer: { cycleMin: 90, phaseMin: 15 },
     risk: 3,
+    riskRewardRatio: '1:4 R:R',
+    stopLoss: '-25% SL',
+    entryMarketCap: '$440K',
+    entryMarketCapUsd: 440_000,
+    takeProfits: buildTakeProfits(440_000, 1_840_000, [2, 5, 10]),
+    pinned: false,
     minTier: 'LAB_MEMBER',
     ca: 'SwCat4vK8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZr9pump',
     links: [
@@ -205,7 +323,7 @@ const REGISTRY: AlphaRecord[] = [
       { label: 'Solscan', href: 'https://solscan.io' },
     ],
     summary:
-      'Cat wif tactical blade. High-velocity Solana meme incubation backed by Syndicate #01 market makers with automated SOL reflections.',
+      'Cat wif tactical blade. High-velocity Solana meme call backed by Syndicate #01 momentum traders.',
     marketCap: '$1.84M',
     marketCapUsd: 1_840_000,
     holderRewardsUsd: '$236,336',
@@ -215,12 +333,12 @@ const REGISTRY: AlphaRecord[] = [
     volume24h: '$1.19M',
     netInflow24h: '+$84.6K',
     change24hPct: 318.0,
-    age: '1mo',
-    ageMinutes: 39_500,
+    age: '4h',
+    ageMinutes: 240,
     caller: '@SugarySoreCreek',
     callerWinRate: '91.0% win',
     deployedVia: 'https://rapidlaunch.io',
-    spotlightRank: 4,
+    spotlightRank: 5,
     sparkline: [12, 19, 24, 22, 31, 38, 46, 44, 53, 61, 68, 72, 70, 81, 87, 94],
     art: {
       bgFrom: '#131C2B',
@@ -231,41 +349,46 @@ const REGISTRY: AlphaRecord[] = [
     },
   },
   {
-    id: 'jubjub-bird',
-    name: 'JubJub',
-    ticker: '$JUBJUB',
-    chain: 'SOL',
-    quoteToken: 'ZEC',
+    id: 'avax-blizzard',
+    name: 'Avalanche Rush',
+    ticker: '$BLIZZ',
+    chain: 'AVAX',
+    quoteToken: 'AVAX',
     status: 'LIVE',
-    statusLabel: 'LIVE',
-    category: 'STEALTH',
-    allocationLabel: 'Pool',
-    allocation: '40.0 SOL',
+    statusLabel: 'LIVE CALL',
+    category: 'NEW',
+    allocationLabel: 'Allocation',
+    allocation: '25.0 SOL',
     timer: { cycleMin: 60, phaseMin: 10 },
     risk: 4,
+    riskRewardRatio: '1:5 R:R',
+    stopLoss: '-30% SL',
+    entryMarketCap: '$310K',
+    entryMarketCapUsd: 310_000,
+    takeProfits: buildTakeProfits(310_000, 745_000, [2, 5, 10]),
+    pinned: false,
     minTier: 'LAB_MEMBER',
-    ca: 'JuBJub8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZr9tLpump',
+    ca: '0x49Avax72F4C74De56F88040C29322A53eE2c219888',
     links: [
-      { label: 'Photon', href: 'https://photon-sol.tinyastro.io/' },
-      { label: 'BullX', href: 'https://bullx.io/' },
+      { label: 'DexScreener', href: 'https://dexscreener.com/avalanche' },
+      { label: 'Snowtrace', href: 'https://snowtrace.io' },
     ],
     summary:
-      'Zero-knowledge curve experiment pairing ZEC privacy relays with Solana SPL liquidity. Lead Chemist 150k+ $GENESIS exclusive pool.',
-    marketCap: '$453K',
-    marketCapUsd: 453_000,
-    holderRewardsUsd: '$229,643',
-    holderRewardsRaw: 229_643,
-    holderRewardsQuote: '6,420 ZEC',
-    holdersPaid: 9_140,
-    volume24h: '$920K',
-    netInflow24h: '+$69.4K',
-    change24hPct: 512.4,
-    age: '1mo',
-    ageMinutes: 38_000,
-    caller: '@SolLovingFork',
+      'High-beta Avalanche C-Chain narrative breakout. Clean contract renounced, LP locked 12 months, targeting 5x continuation.',
+    marketCap: '$745K',
+    marketCapUsd: 745_000,
+    holderRewardsUsd: '$184,200',
+    holderRewardsRaw: 184_200,
+    holderRewardsQuote: '5,120 AVAX',
+    holdersPaid: 6_420,
+    volume24h: '$980K',
+    netInflow24h: '+$92.4K',
+    change24hPct: 240.3,
+    age: '35m',
+    ageMinutes: 35,
+    caller: '@TrenchLabsAdmin',
     callerWinRate: '84.2% win',
-    deployedVia: 'https://j7tracker.io',
-    spotlightRank: 5,
+    deployedVia: 'https://trenchlabshq.com',
     sparkline: [15, 18, 25, 31, 28, 39, 47, 55, 62, 59, 71, 77, 84, 89, 92, 99],
     art: {
       bgFrom: '#1F1B2C',
@@ -276,105 +399,29 @@ const REGISTRY: AlphaRecord[] = [
     },
   },
   {
-    id: 'catdog-coge',
-    name: 'catdog',
-    ticker: '$coge',
-    chain: 'SOL',
-    quoteToken: 'PUMP',
-    status: 'LIVE',
-    statusLabel: 'LIVE',
-    category: 'NEW',
-    allocationLabel: 'Allocation',
-    allocation: '5.0 SOL',
-    timer: { cycleMin: 45, phaseMin: 5 },
-    risk: 2,
-    minTier: 'LAB_MEMBER',
-    ca: 'CoGe7xK2mQ8pLw4tYc7nB3fH6jD1sV5uA9eZr8tpump',
-    links: [{ label: 'Pump.fun', href: 'https://pump.fun' }],
-    summary:
-      'Created on https://rapidlaunch.io — Dual-species trench mascot launch with zero team allocation and instant bonding curve graduation.',
-    marketCap: '$104.3K',
-    marketCapUsd: 104_300,
-    holderRewardsUsd: '$41,280',
-    holderRewardsRaw: 41_280,
-    holderRewardsQuote: '14.2M PUMP',
-    holdersPaid: 3_412,
-    volume24h: '$318K',
-    netInflow24h: '+$24.9K',
-    change24hPct: 164.5,
-    age: '4m',
-    ageMinutes: 4,
-    caller: '@epicsalmon',
-    callerWinRate: '71.5% win',
-    deployedVia: 'https://rapidlaunch.io',
-    sparkline: [20, 24, 22, 31, 37, 42, 39, 48, 54, 61, 58, 69, 74, 80, 86, 92],
-    art: {
-      bgFrom: '#161C24',
-      bgTo: '#11161D',
-      accent: '#4DFE15',
-      secondary: '#76FF32',
-      motif: 'catdog',
-    },
-  },
-  {
-    id: 'financial-intel',
-    name: 'Financial Intelligence',
-    ticker: '$Pohko',
-    chain: 'SOL',
-    quoteToken: 'PUMP',
-    status: 'LIVE',
-    statusLabel: 'LIVE',
-    category: 'AI_AGENT',
-    allocationLabel: 'Allocation',
-    allocation: '8.0 SOL',
-    timer: { cycleMin: 60, phaseMin: 12 },
-    risk: 2,
-    minTier: 'LAB_MEMBER',
-    ca: 'PoHko4vK8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZr9pump',
-    links: [{ label: 'Photon', href: 'https://photon-sol.tinyastro.io/' }],
-    summary:
-      'Deployed using https://j7tracker.io — Autonomous on-chain orderflow sniffer tracking smart-money whale wallets across Solana.',
-    marketCap: '$146.0K',
-    marketCapUsd: 146_000,
-    holderRewardsUsd: '$58,910',
-    holderRewardsRaw: 58_910,
-    holderRewardsQuote: '19.8M PUMP',
-    holdersPaid: 4_120,
-    volume24h: '$412K',
-    netInflow24h: '+$31.4K',
-    change24hPct: 218.9,
-    age: '13m',
-    ageMinutes: 13,
-    caller: '@ValleyTarD',
-    callerWinRate: '81.2% win',
-    deployedVia: 'https://j7tracker.io',
-    sparkline: [14, 19, 23, 21, 30, 34, 41, 49, 46, 57, 63, 71, 76, 82, 88, 95],
-    art: {
-      bgFrom: '#241B35',
-      bgTo: '#0E0A16',
-      accent: '#C084FC',
-      secondary: '#F3E8FF',
-      motif: 'anteater',
-    },
-  },
-  {
     id: 'just-stealth-it',
     name: 'Just Stealth It',
     ticker: '$STEALTH',
     chain: 'BASE',
     quoteToken: 'ETH',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'STEALTH',
     allocationLabel: 'Allocation',
     allocation: '15.0 SOL',
     timer: { cycleMin: 90, phaseMin: 20 },
     risk: 3,
+    riskRewardRatio: '1:4 R:R',
+    stopLoss: '-20% SL',
+    entryMarketCap: '$410K',
+    entryMarketCapUsd: 410_000,
+    takeProfits: buildTakeProfits(410_000, 1_260_000, [2, 5]),
+    pinned: false,
     minTier: 'LAB_MEMBER',
     ca: '0x71C92A48e5dB4850d24F2C15e0a0B8D992B9eF09',
     links: [{ label: 'DexScreener', href: 'https://dexscreener.com/base' }],
     summary:
-      'Stealth-launched Base L2 liquidity router with MEV-shielded entry pools for Researcher (50K+ $GENESIS) and Lead Chemist tiers.',
+      'Stealth-launched Base L2 liquidity router with MEV-shielded entry pools and strong Base smart-wallet inflows.',
     marketCap: '$1.26M',
     marketCapUsd: 1_260_000,
     holderRewardsUsd: '$112,400',
@@ -399,150 +446,32 @@ const REGISTRY: AlphaRecord[] = [
     },
   },
   {
-    id: 'baby-pump',
-    name: 'Baby Pump',
-    ticker: '$BABYPUMP',
-    chain: 'SOL',
-    quoteToken: 'PUMP',
-    status: 'LIVE',
-    statusLabel: 'LIVE',
-    category: 'MOVERS',
-    allocationLabel: 'Allocation',
-    allocation: '18.0 SOL',
-    timer: { cycleMin: 120, phaseMin: 30 },
-    risk: 2,
-    minTier: 'LAB_MEMBER',
-    ca: 'BaByPmp8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZr9tpump',
-    links: [
-      { label: 'Pump.fun', href: 'https://pump.fun' },
-      { label: 'BullX', href: 'https://bullx.io' },
-    ],
-    summary:
-      'BABY PUMP PAIRED TO PUMP — Auto-compounding micro-cap reward capsule feeding 4% reflection volume directly to verified trench holders.',
-    marketCap: '$425K',
-    marketCapUsd: 425_000,
-    holderRewardsUsd: '$94,120',
-    holderRewardsRaw: 94_120,
-    holderRewardsQuote: '28.4M PUMP',
-    holdersPaid: 8_210,
-    volume24h: '$670K',
-    netInflow24h: '+$48.7K',
-    change24hPct: 176.3,
-    age: '53m',
-    ageMinutes: 53,
-    caller: '@narc_alpha',
-    callerWinRate: '74.9% win',
-    deployedVia: 'https://rapidlaunch.io',
-    sparkline: [22, 20, 27, 33, 39, 44, 42, 51, 58, 62, 69, 73, 79, 83, 89, 94],
-    art: {
-      bgFrom: '#0F2922',
-      bgTo: '#07120F',
-      accent: '#34D399',
-      secondary: '#A7F3D0',
-      motif: 'babypump',
-    },
-  },
-  {
-    id: 'barron-trench',
-    name: 'Official Barron Trench',
-    ticker: '$BARRON',
-    chain: 'SOL',
-    quoteToken: 'SOL',
-    status: 'LIVE',
-    statusLabel: 'LIVE',
-    category: 'NEW',
-    allocationLabel: 'Pool',
-    allocation: '30.0 SOL',
-    timer: { cycleMin: 60, phaseMin: 5 },
-    risk: 4,
-    minTier: 'LAB_MEMBER',
-    ca: 'BaRRon4vK8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZrpump',
-    links: [{ label: 'Photon', href: 'https://photon-sol.tinyastro.io/' }],
-    summary:
-      'Deployed using https://j7tracker.io — High-momentum political meta alpha drop reserved for Lead Chemist (150K+ $GENESIS) syndicate wallets.',
-    marketCap: '$1.22M',
-    marketCapUsd: 1_220_000,
-    holderRewardsUsd: '$164,500',
-    holderRewardsRaw: 164_500,
-    holderRewardsQuote: '820 SOL',
-    holdersPaid: 11_300,
-    volume24h: '$1.95M',
-    netInflow24h: '+$154.0K',
-    change24hPct: 442.0,
-    age: '18m',
-    ageMinutes: 18,
-    caller: '@Eqm8nF',
-    callerWinRate: '88.3% win',
-    deployedVia: 'https://j7tracker.io',
-    sparkline: [11, 16, 24, 32, 41, 49, 56, 52, 64, 72, 78, 83, 88, 91, 95, 100],
-    art: {
-      bgFrom: '#1E2433',
-      bgTo: '#0B0E17',
-      accent: '#FACC15',
-      secondary: '#FEF08A',
-      motif: 'barron',
-    },
-  },
-  {
-    id: 'ape-in-pain',
-    name: 'apeinpain',
-    ticker: '$pain',
-    chain: 'BASE',
-    quoteToken: 'ETH',
-    status: 'INCUBATING',
-    statusLabel: 'INCUBATING',
-    category: 'CHARITY',
-    allocationLabel: 'Pool',
-    allocation: '25.0 SOL',
-    timer: { cycleMin: 180, phaseMin: 45 },
-    risk: 3,
-    minTier: 'LAB_MEMBER',
-    ca: '0x99A42b78D9f19C482591eF977cDca014Ac93bDe88',
-    links: [{ label: 'DexScreener', href: 'https://dexscreener.com/base' }],
-    summary:
-      'Cult trench recovery fund & high-conviction Base syndicate play. Pre-launch allocation pool open strictly to 150,000+ $GENESIS holders.',
-    marketCap: '$619K',
-    marketCapUsd: 619_000,
-    holderRewardsUsd: '$138,200',
-    holderRewardsRaw: 138_200,
-    holderRewardsQuote: '42.0 ETH',
-    holdersPaid: 7_450,
-    volume24h: '$740K',
-    netInflow24h: '+$59.1K',
-    change24hPct: 267.1,
-    age: '27m',
-    ageMinutes: 27,
-    caller: '@GyMJUz',
-    callerWinRate: '83.7% win',
-    deployedVia: 'https://trenchlabshq.com',
-    sparkline: [16, 21, 25, 29, 35, 42, 40, 49, 55, 63, 68, 74, 79, 85, 90, 96],
-    art: {
-      bgFrom: '#2B2118',
-      bgTo: '#120E0A',
-      accent: '#FB923C',
-      secondary: '#FFEDD5',
-      motif: 'ape',
-      badgeText: 'Syndicate Pick',
-    },
-  },
-  {
     id: 'otcity-desk',
     name: 'OTCity',
     ticker: '$OTCity',
     chain: 'BSC',
     quoteToken: 'BNB',
     status: 'LIVE',
-    statusLabel: 'LIVE',
+    statusLabel: 'LIVE CALL',
     category: 'AI_AGENT',
     allocationLabel: 'Pool',
     allocation: '50.0 SOL',
     timer: { cycleMin: 150, phaseMin: 10 },
     risk: 3,
+    riskRewardRatio: '1:4.5 R:R',
+    stopLoss: '-22% SL',
+    entryMarketCap: '$820K',
+    entryMarketCapUsd: 820_000,
+    takeProfits: buildTakeProfits(820_000, 2_780_000, [2, 5, 10]),
+    pinned: false,
     minTier: 'LAB_MEMBER',
     ca: '0x33bB72F4C74De56F88040C29322A53eE2c219213',
-    links: [{ label: 'BscScan', href: 'https://bscscan.com/' }],
+    links: [
+      { label: 'DexScreener', href: 'https://dexscreener.com/bsc' },
+      { label: 'BscScan', href: 'https://bscscan.com/' },
+    ],
     summary:
-      'OTCity turns all OTC desks into a live 3D terminal city. Cross-chain settlement token for whale block trades gated by Lead Chemist tier.',
+      'OTCity turns all OTC desks into a live 3D terminal city. Cross-chain BNB Chain settlement token for whale block trades.',
     marketCap: '$2.78M',
     marketCapUsd: 2_780_000,
     holderRewardsUsd: '$194,800',
@@ -566,18 +495,143 @@ const REGISTRY: AlphaRecord[] = [
       motif: 'otcity',
     },
   },
+  {
+    id: 'catdog-coge',
+    name: 'catdog',
+    ticker: '$coge',
+    chain: 'SOL',
+    quoteToken: 'PUMP',
+    status: 'LIVE',
+    statusLabel: 'NEW CALL',
+    category: 'NEW',
+    allocationLabel: 'Allocation',
+    allocation: '5.0 SOL',
+    timer: { cycleMin: 45, phaseMin: 5 },
+    risk: 4,
+    riskRewardRatio: '1:5 R:R',
+    stopLoss: '-30% SL',
+    entryMarketCap: '$68K',
+    entryMarketCapUsd: 68_000,
+    takeProfits: buildTakeProfits(68_000, 104_300, [2, 5, 10]),
+    pinned: false,
+    minTier: 'LAB_MEMBER',
+    ca: 'CoGe7xK2mQ8pLw4tYc7nB3fH6jD1sV5uA9eZr8tpump',
+    links: [{ label: 'Pump.fun', href: 'https://pump.fun' }],
+    summary:
+      'Dual-species trench mascot launch with zero team allocation and fresh bonding curve graduation.',
+    marketCap: '$104.3K',
+    marketCapUsd: 104_300,
+    holderRewardsUsd: '$41,280',
+    holderRewardsRaw: 41_280,
+    holderRewardsQuote: '14.2M PUMP',
+    holdersPaid: 3_412,
+    volume24h: '$318K',
+    netInflow24h: '+$24.9K',
+    change24hPct: 164.5,
+    age: '4m',
+    ageMinutes: 4,
+    caller: '@epicsalmon',
+    callerWinRate: '71.5% win',
+    deployedVia: 'https://rapidlaunch.io',
+    sparkline: [20, 24, 22, 31, 37, 42, 39, 48, 54, 61, 58, 69, 74, 80, 86, 92],
+    art: {
+      bgFrom: '#161C24',
+      bgTo: '#11161D',
+      accent: '#4DFE15',
+      secondary: '#76FF32',
+      motif: 'catdog',
+    },
+  },
+  {
+    id: 'barron-trench',
+    name: 'Official Barron Trench',
+    ticker: '$BARRON',
+    chain: 'SOL',
+    quoteToken: 'SOL',
+    status: 'LIVE',
+    statusLabel: 'DEGEN CALL',
+    category: 'NEW',
+    allocationLabel: 'Pool',
+    allocation: '30.0 SOL',
+    timer: { cycleMin: 60, phaseMin: 5 },
+    risk: 5,
+    riskRewardRatio: '1:8 R:R',
+    stopLoss: '-35% SL',
+    entryMarketCap: '$280K',
+    entryMarketCapUsd: 280_000,
+    takeProfits: buildTakeProfits(280_000, 1_220_000, [2, 5, 10]),
+    pinned: false,
+    minTier: 'LAB_MEMBER',
+    ca: 'BaRRon4vK8mQ2pLw7tYc3nB6fH1jD5sV4uA8eZrpump',
+    links: [{ label: 'Photon', href: 'https://photon-sol.tinyastro.io/' }],
+    summary:
+      'High-volatility meta trade call. Strictly size appropriately — 2x TP1 hit, trailing stop at entry.',
+    marketCap: '$1.22M',
+    marketCapUsd: 1_220_000,
+    holderRewardsUsd: '$164,500',
+    holderRewardsRaw: 164_500,
+    holderRewardsQuote: '820 SOL',
+    holdersPaid: 11_300,
+    volume24h: '$1.95M',
+    netInflow24h: '+$154.0K',
+    change24hPct: 442.0,
+    age: '18m',
+    ageMinutes: 18,
+    caller: '@Eqm8nF',
+    callerWinRate: '88.3% win',
+    deployedVia: 'https://j7tracker.io',
+    sparkline: [11, 16, 24, 32, 41, 49, 56, 52, 64, 72, 78, 83, 88, 91, 95, 100],
+    art: {
+      bgFrom: '#1E2433',
+      bgTo: '#0B0E17',
+      accent: '#FACC15',
+      secondary: '#FEF08A',
+      motif: 'barron',
+    },
+  },
 ];
+
+const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'calls.json');
+
+export function loadCallsRegistry(): AlphaRecord[] {
+  try {
+    if (fs.existsSync(DATA_FILE_PATH)) {
+      const raw = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } else {
+      saveCallsRegistry(DEFAULT_REGISTRY);
+    }
+  } catch {
+    // Fallback to in-memory default if filesystem is read-only (e.g. serverless edge)
+  }
+  return DEFAULT_REGISTRY;
+}
+
+export function saveCallsRegistry(records: AlphaRecord[]): void {
+  try {
+    const dir = path.dirname(DATA_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(records, null, 2), 'utf-8');
+  } catch {
+    // Ignore write errors in read-only environments
+  }
+}
 
 export const SYNDICATE_CALLERS: SyndicateCaller[] = [
   {
     rank: 1,
-    handle: '@SolLovingFork',
-    avatarBg: '#163020',
-    avatarText: 'SL',
-    winRate: '84.2% win',
-    pnl24h: '+$9,943.55',
-    pnl7d: '7d +$45,980.42',
-    callsCount: 38,
+    handle: '@TrenchLabsAdmin',
+    avatarBg: '#0E1A0C',
+    avatarText: 'TL',
+    winRate: '86.4% win',
+    pnl24h: '+$14,280.00',
+    pnl7d: '7d +$68,420.10',
+    callsCount: 44,
     topCallTicker: '$PILL',
     minTier: 'LAB_MEMBER',
   },
@@ -628,10 +682,23 @@ function nextBoundary(now: number, cycleMin: number, phaseMin: number): string {
   return new Date(t).toISOString();
 }
 
-/** Project registry onto a viewer's tier, masking anything above it. */
+/** Project registry onto a viewer's tier, masking anything above it, sorting pinned calls first. */
 export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
   const rank = TIERS[tier].rank;
-  return REGISTRY.map((r) => {
+  const registry = loadCallsRegistry();
+
+  const sorted = [...registry].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    if (a.pinned && b.pinned) {
+      const tA = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+      const tB = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+      if (tA !== tB) return tB - tA;
+    }
+    return a.ageMinutes - b.ageMinutes;
+  });
+
+  return sorted.map((r) => {
     const locked = TIERS[r.minTier].rank > rank;
     const minBalanceRequired = TIERS[r.minTier].min;
     return {
@@ -647,6 +714,16 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
       allocation: locked ? MASK : r.allocation,
       endsAt: r.timer ? nextBoundary(now, r.timer.cycleMin, r.timer.phaseMin) : null,
       risk: r.risk,
+      riskRewardRatio: r.riskRewardRatio || '1:4 R:R',
+      stopLoss: r.stopLoss || '-25% SL',
+      takeProfits:
+        r.takeProfits && r.takeProfits.length > 0
+          ? r.takeProfits
+          : buildTakeProfits(r.entryMarketCapUsd || r.marketCapUsd, r.marketCapUsd, [2, 5]),
+      pinned: Boolean(r.pinned),
+      pinnedAt: r.pinnedAt ?? null,
+      entryMarketCap: r.entryMarketCap || r.marketCap,
+      entryMarketCapUsd: r.entryMarketCapUsd || r.marketCapUsd,
       minTier: r.minTier,
       minTierLabel: TIERS[r.minTier].label,
       minBalanceRequired,
