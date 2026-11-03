@@ -316,8 +316,8 @@ export async function POST(req: NextRequest) {
       art: {
         bgFrom: '#161C24',
         bgTo: '#0A0E13',
-        accent: '#4DFE15',
-        secondary: '#76FF32',
+        accent: '#34D399',
+        secondary: '#6EE7B7',
         motif,
         badgeText: pinned ? 'PINNED CALL' : chain,
       },

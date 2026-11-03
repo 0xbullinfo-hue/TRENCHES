@@ -137,8 +137,8 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     art: {
       bgFrom: '#11161D',
       bgTo: '#0A0E13',
-      accent: '#4DFE15',
-      secondary: '#76FF32',
+      accent: '#34D399',
+      secondary: '#6EE7B7',
       motif: 'pill',
     },
   },
@@ -188,8 +188,8 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     art: {
       bgFrom: '#161C24',
       bgTo: '#0A0E13',
-      accent: '#4DFE15',
-      secondary: '#76FF32',
+      accent: '#34D399',
+      secondary: '#6EE7B7',
       motif: 'stealth',
       badgeText: 'ROBIN CHAIN',
     },
@@ -440,8 +440,8 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     art: {
       bgFrom: '#161C24',
       bgTo: '#0A0E13',
-      accent: '#4DFE15',
-      secondary: '#76FF32',
+      accent: '#34D399',
+      secondary: '#6EE7B7',
       motif: 'stealth',
     },
   },
@@ -537,8 +537,8 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     art: {
       bgFrom: '#161C24',
       bgTo: '#11161D',
-      accent: '#4DFE15',
-      secondary: '#76FF32',
+      accent: '#34D399',
+      secondary: '#6EE7B7',
       motif: 'catdog',
     },
   },
@@ -629,7 +629,7 @@ export const SYNDICATE_CALLERS: SyndicateCaller[] = [
   {
     rank: 1,
     handle: '@TrenchLabsAdmin',
-    avatarBg: '#0E1A0C',
+    avatarBg: '#0D281E',
     avatarText: 'TL',
     winRate: '86.4% win',
     pnl24h: '+$14,280.00',

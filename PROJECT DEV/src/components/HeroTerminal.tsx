@@ -6,27 +6,27 @@ import { ArrowUpRight, Send } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
-    label: 'ALPHA CALLS',
-    value: '1+',
-    sub: 'DISTRIBUTED ACROSS INCUBATED LAUNCHES',
+    label: 'ACCESS REQUIREMENT',
+    value: '1,000,000',
+    sub: '$GENESIS REQUIRED FOR MEMBER ACCESS',
     highlight: true,
   },
   {
-    label: 'AVG EARLY MULTIPLIER',
-    value: '34.8x',
-    sub: 'MEAN PEAK PROFIT FOR $GENESIS HOLDERS',
+    label: 'CALL DETAILS',
+    value: 'CA · RISK · TP',
+    sub: 'TRADE SETUP INFORMATION IN EACH CALL',
     highlight: true,
   },
   {
-    label: 'CHAINS MONITORED',
-    value: 'ALL CHAIN',
-    sub: 'TRENCHES HAVE NO CHAIN',
+    label: 'SUPPORTED NETWORKS',
+    value: '6 CHAINS',
+    sub: 'SOL · BNB · ETH · BASE · ROBIN · AVAX',
     highlight: false,
   },
   {
-    label: 'CURATION RATIO',
-    value: '< 2% OF APPLICANTS',
-    sub: 'PRIVATE SYNDICATE VETTED',
+    label: 'EXECUTION',
+    value: 'YOUR CHOICE',
+    sub: 'INFORMATION ONLY — YOU CONTROL EVERY TRADE',
     highlight: false,
   },
 ];
@@ -117,12 +117,12 @@ export const HeroTerminal: React.FC = () => {
           </div>
         </div>
 
-        {/* 4 Aligned Metric Cards (Hard Flat 1px Structure, Zero Glow) */}
+        {/* 4 Aligned Metric Cards (Matches Screenshot 2) */}
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-6 rounded-xl bg-surface border border-toxic-border hover:border-toxic transition-colors flex flex-col justify-between gap-2"
+              className="p-6 rounded-2xl bg-surface border border-toxic-border hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
             >
               <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 {m.label}

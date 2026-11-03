@@ -522,7 +522,7 @@ export const IncubatorHub: React.FC = () => {
                       type="checkbox"
                       checked={formPinned}
                       onChange={(e) => setFormPinned(e.target.checked)}
-                      className="accent-[#4DFE15] w-4 h-4 cursor-pointer"
+                      className="accent-[#34D399] w-4 h-4 cursor-pointer"
                     />
                     <Pin className="w-3.5 h-3.5 text-pump" />
                     <span>Pin as Priority Call</span>

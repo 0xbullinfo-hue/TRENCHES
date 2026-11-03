@@ -29,7 +29,7 @@ export const TerminalHeader: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
               <span className="font-sans font-extrabold tracking-tight text-base sm:text-xl text-white">
-                TRENCH<span className="text-toxic">LABS</span>HQ
+                Trench<span className="text-toxic">Labs</span>HQ
               </span>
               <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-toxic-bg border border-toxic-border font-mono text-[9px] font-bold text-toxic uppercase">
                 DASHBOARD
@@ -67,7 +67,7 @@ export const TerminalHeader: React.FC = () => {
             href="/#join-lab-section"
             className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
           >
-            Join The Lab
+            Join the Lab
           </Link>
         </nav>
 

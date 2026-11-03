@@ -42,8 +42,8 @@ function MotifGraphic({
         <svg viewBox="0 0 120 120" className="w-full h-full">
           <defs>
             <linearGradient id="pillGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#4DFE15" />
-              <stop offset="100%" stopColor="#22C55E" />
+              <stop offset="0%" stopColor="#34D399" />
+              <stop offset="100%" stopColor="#10B981" />
             </linearGradient>
           </defs>
           <g transform="rotate(-35 60 60)">
@@ -80,7 +80,7 @@ function MotifGraphic({
             />
             <rect x="46" y="38" width="28" height="12" fill="#11161D" />
             <rect x="46" y="68" width="28" height="12" fill="#11161D" />
-            <circle cx="60" cy="28" r="5" fill="#4DFE15" />
+            <circle cx="60" cy="28" r="5" fill="#34D399" />
           </g>
         </svg>
       );
@@ -134,7 +134,7 @@ function MotifGraphic({
             y1="96"
             x2="96"
             y2="22"
-            stroke="#4DFE15"
+            stroke="#34D399"
             strokeWidth="5"
             strokeLinecap="round"
           />
@@ -197,7 +197,7 @@ function MotifGraphic({
         <svg viewBox="0 0 120 120" className="w-full h-full">
           <path
             d="M78 24 C42 26 26 44 54 56 C82 68 68 88 28 94 C58 92 92 78 66 60 C42 44 58 32 88 26 Z"
-            fill="#4DFE15"
+            fill="#34D399"
           />
         </svg>
       );
@@ -216,14 +216,14 @@ function MotifGraphic({
               stroke="#064E3B"
               strokeWidth="4"
             />
-            <path d="M32 60 H88 V74 A28 28 0 0 1 32 74 Z" fill="#4DFE15" />
+            <path d="M32 60 H88 V74 A28 28 0 0 1 32 74 Z" fill="#34D399" />
             <circle cx="48" cy="44" r="4.5" fill="#0A0E13" />
             <circle cx="72" cy="44" r="4.5" fill="#0A0E13" />
             <circle
               cx="60"
               cy="53"
               r="6"
-              fill="#76FF32"
+              fill="#6EE7B7"
               stroke="#0A0E13"
               strokeWidth="2.5"
             />
@@ -238,7 +238,7 @@ function MotifGraphic({
           <text
             x="24"
             y="46"
-            fill="#4DFE15"
+            fill="#34D399"
             fontSize="16"
             fontWeight="900"
             fontFamily="monospace"
@@ -274,18 +274,18 @@ function MotifGraphic({
             height="58"
             rx="10"
             fill="#11161D"
-            stroke="#4DFE15"
+            stroke="#34D399"
             strokeWidth="4"
           />
-          <rect x="34" y="42" width="10" height="32" fill="#4DFE15" />
-          <rect x="48" y="32" width="12" height="42" fill="#76FF32" />
-          <rect x="64" y="38" width="10" height="36" fill="#4DFE15" />
-          <rect x="78" y="48" width="8" height="26" fill="#76FF32" />
+          <rect x="34" y="42" width="10" height="32" fill="#34D399" />
+          <rect x="48" y="32" width="12" height="42" fill="#6EE7B7" />
+          <rect x="64" y="38" width="10" height="36" fill="#34D399" />
+          <rect x="78" y="48" width="8" height="26" fill="#6EE7B7" />
           <text
             x="60"
             y="98"
             textAnchor="middle"
-            fill="#4DFE15"
+            fill="#34D399"
             fontSize="14"
             fontWeight="800"
             fontFamily="monospace"
@@ -346,7 +346,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
             <svg viewBox="0 0 86 32" className="w-24 h-8 overflow-visible ml-auto">
               <polyline
                 fill="none"
-                stroke="#4DFE15"
+                stroke="#34D399"
                 strokeWidth="2.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"

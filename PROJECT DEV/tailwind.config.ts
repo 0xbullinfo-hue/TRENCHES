@@ -14,29 +14,29 @@ const config: Config = {
         },
         "surface-card": "#161C24", // Flat nested card background
         toxic: {
-          DEFAULT: "#4DFE15", // Core toxic lime
-          bright: "#76FF32", // Hover active state
-          muted: "#245415", // Low-contrast flat borders
-          border: "#1C3D12", // Hairline resting border
-          bg: "#0E1A0C", // Flat dark-tinted badge fill (NO alpha blur)
+          DEFAULT: "#34D399",     // Vibrant mint/emerald green from screenshots
+          bright: "#6EE7B7",      // Hover active state
+          muted: "#10B981",       // Medium green
+          border: "#163A2D",      // Hairline resting border
+          bg: "#0D281E",          // Flat dark-tinted badge fill (NO alpha blur)
         },
-        // Alias tokens mapped to exact Hard Flat Toxic palette
+        // Alias tokens mapped to emerald/mint green palette
         pump: {
-          DEFAULT: "#4DFE15",
-          pill: "#76FF32",
-          dim: "#245415",
-          hover: "#76FF32",
-          border: "#1C3D12",
+          DEFAULT: "#34D399",
+          pill: "#6EE7B7",
+          dim: "#065F46",
+          hover: "#6EE7B7",
+          border: "#163A2D",
           glow: "transparent",
-          bg: "#0E1A0C",
+          bg: "#0D281E",
         },
         accent: {
-          DEFAULT: "#4DFE15",
-          hover: "#76FF32",
-          pill: "#76FF32",
+          DEFAULT: "#34D399",
+          hover: "#6EE7B7",
+          pill: "#6EE7B7",
           ink: "#0A0E13",
         },
-        line: "#1C3D12",
+        line: "#163A2D",
         ink: "#EAECEF",
         muted: "#848E9C",
         dim: "#8E9BAE",
@@ -56,8 +56,8 @@ const config: Config = {
         "pump-pill": "none",
       },
       borderColor: {
-        hairline: "#1C3D12",
-        "hairline-hover": "#245415",
+        hairline: "#163A2D",
+        "hairline-hover": "#10B981",
       },
       borderRadius: {
         DEFAULT: "2px",

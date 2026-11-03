@@ -84,10 +84,10 @@ export const MascotRat: React.FC<MascotRatProps> = ({
           strokeLinejoin="round"
         />
 
-        {/* Flat Toxic Lime Liquid (#4DFE15) */}
+        {/* Flat Mint/Emerald Green Liquid (#34D399) */}
         <path
           d="M40.5 45.5H51.5L54.2 51.2C54.8 52.5 53.8 53.8 52 53.8H40C38.2 53.8 37.2 52.5 37.8 51.2L40.5 45.5Z"
-          fill="#4DFE15"
+          fill="#34D399"
         />
       </svg>
     );

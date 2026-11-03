@@ -15,13 +15,13 @@
     font-feature-settings: 'cv11', 'ss01';
   }
   ::selection {
-    background: #245415;
+    background: #065F46;
     color: #eaecef;
   }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #0A0E13; }
-  ::-webkit-scrollbar-thumb { background: #1C3D12; }
-  ::-webkit-scrollbar-thumb:hover { background: #4DFE15; }
+  ::-webkit-scrollbar-thumb { background: #163A2D; }
+  ::-webkit-scrollbar-thumb:hover { background: #34D399; }
 }
 
 @layer utilities {
@@ -32,7 +32,7 @@
 }
 
 @layer components {
-  /* Card shell: flat 1px hairline (#1C3D12), zero glow, zero shadow */
+  /* Card shell: flat 1px hairline (#163A2D), zero glow, zero shadow */
   .card {
     @apply bg-surface border border-toxic-border rounded-lg transition-colors duration-150 shadow-none;
   }
@@ -74,7 +74,7 @@
   }
 }
 
-/* ── Solana wallet-adapter overrides (flat 1px toxic theme, zero glow) ─── */
+/* ── Solana wallet-adapter overrides (flat 1px theme, zero glow) ─── */
 .wallet-adapter-button {
   height: 32px !important;
   padding: 0 12px !important;
@@ -84,13 +84,13 @@
   font-weight: 700 !important;
   letter-spacing: 0.04em;
   line-height: 32px !important;
-  background: #4DFE15 !important;
+  background: #34D399 !important;
   color: #0A0E13 !important;
   box-shadow: none !important;
   transition: background-color 150ms;
 }
 .wallet-adapter-button:not([disabled]):hover {
-  background: #76FF32 !important;
+  background: #6EE7B7 !important;
 }
 .wallet-adapter-button-start-icon {
   width: 16px !important;
@@ -103,7 +103,7 @@
 }
 .wallet-adapter-dropdown-list {
   background: #11161D !important;
-  border: 1px solid #1C3D12;
+  border: 1px solid #163A2D;
   border-radius: 8px !important;
   box-shadow: none !important;
   padding: 4px !important;
@@ -119,11 +119,11 @@
 }
 .wallet-adapter-dropdown-list-item:not([disabled]):hover {
   background: #161C24 !important;
-  color: #4DFE15 !important;
+  color: #34D399 !important;
 }
 .wallet-adapter-modal-wrapper {
   background: #11161D !important;
-  border: 1px solid #1C3D12;
+  border: 1px solid #163A2D;
   border-radius: 12px !important;
   box-shadow: none !important;
   font-family: var(--font-inter), sans-serif !important;
@@ -144,7 +144,7 @@
 }
 .wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
   background: #161C24 !important;
-  color: #4DFE15 !important;
+  color: #34D399 !important;
 }
 .wallet-adapter-modal-list li:not(:first-of-type) {
   margin-top: 2px !important;
