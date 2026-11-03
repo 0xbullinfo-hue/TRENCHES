@@ -88,7 +88,6 @@ export const IncubatorHub: React.FC = () => {
   const [formCurrentMc, setFormCurrentMc] = useState('$250K');
   const [formEntryMc, setFormEntryMc] = useState('$250K');
   const [formRiskLevel, setFormRiskLevel] = useState<number>(3);
-  const [formRiskRatio, setFormRiskRatio] = useState('1:5 R:R');
   const [formStopLoss, setFormStopLoss] = useState('-25% SL');
   const [formTakeProfits, setFormTakeProfits] = useState('2x, 5x, 10x');
   const [formPinned, setFormPinned] = useState(true);
@@ -208,7 +207,6 @@ export const IncubatorHub: React.FC = () => {
       marketCap: formCurrentMc.trim() || '$250K',
       entryMarketCap: formEntryMc.trim() || formCurrentMc.trim() || '$250K',
       risk: formRiskLevel,
-      riskRewardRatio: formRiskRatio.trim() || '1:5 R:R',
       stopLoss: formStopLoss.trim() || '-25% SL',
       takeProfitInput: formTakeProfits.trim() || '2x, 5x, 10x',
       pinned: formPinned,
@@ -912,7 +910,7 @@ export const IncubatorHub: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
                 {/* Current Market Cap */}
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-3 space-y-1">
                   <label className="block font-sans text-[11px] font-bold text-muted uppercase">
                     Current MC *
                   </label>
@@ -929,7 +927,7 @@ export const IncubatorHub: React.FC = () => {
                 </div>
 
                 {/* Risk Level (1-5) */}
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-3 space-y-1">
                   <label className="block font-sans text-[11px] font-bold text-muted uppercase">
                     Risk Level (1–5)
                   </label>
@@ -944,20 +942,6 @@ export const IncubatorHub: React.FC = () => {
                     <option value={4}>4/5 (High Degen)</option>
                     <option value={5}>5/5 (Max Degen)</option>
                   </select>
-                </div>
-
-                {/* Risk:Reward Ratio */}
-                <div className="md:col-span-2 space-y-1">
-                  <label className="block font-sans text-[11px] font-bold text-muted uppercase">
-                    Risk:Reward (R:R)
-                  </label>
-                  <input
-                    type="text"
-                    value={formRiskRatio}
-                    onChange={(e) => setFormRiskRatio(e.target.value)}
-                    placeholder="1:5 R:R"
-                    className="w-full h-9 px-3 rounded bg-surface-card border border-line focus:border-pump font-mono text-xs text-pump focus:outline-none"
-                  />
                 </div>
 
                 {/* Stop Loss / Invalidation */}

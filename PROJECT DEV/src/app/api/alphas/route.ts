@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
         : parseShorthandUsd(entryMcStr) || currentMcUsd;
 
     const risk = Math.min(5, Math.max(1, Number(payload.risk) || 3));
-    const riskRewardRatio = String(payload.riskRewardRatio || '1:4 R:R').trim().slice(0, 32);
+    const riskRewardRatio = String(payload.riskRewardRatio || '').trim().slice(0, 32) || `Risk Lvl ${risk}/5`;
     const stopLoss = String(payload.stopLoss || '-25% SL').trim().slice(0, 32);
 
     const rawMultipliers: number[] = Array.isArray(payload.multipliers)

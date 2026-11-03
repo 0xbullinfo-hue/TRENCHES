@@ -56,7 +56,7 @@ export interface CreateCallPayload {
   marketCap: string;
   entryMarketCap?: string;
   risk: number;
-  riskRewardRatio: string;
+  riskRewardRatio?: string;
   stopLoss: string;
   takeProfitInput: string;
   pinned: boolean;
