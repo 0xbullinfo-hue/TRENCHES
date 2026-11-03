@@ -97,6 +97,8 @@ interface GenesisContextValue {
   toggleWatchlist: (tokenId: string) => void;
   recordAllocation: (ticker: string, chain: Chain, amountSol: string) => void;
 
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
   boundEvmAddress: string;
   setBoundEvmAddress: (addr: string) => void;
 
@@ -127,6 +129,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [boundEvmAddress, setBoundEvmAddressState] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
 
   useEffect(() => {
@@ -567,6 +570,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setCallOutcome,
     updateCallMarketCap,
     deleteAlphaCall,
+    searchQuery,
+    setSearchQuery,
     watchlist,
     toggleWatchlist,
     recordAllocation,

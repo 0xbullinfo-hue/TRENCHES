@@ -66,9 +66,10 @@ export const IncubatorHub: React.FC = () => {
     apiLoading,
     apiError,
     refreshAll,
+    searchQuery,
+    setSearchQuery,
   } = useGenesisBalance();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
   const [selectedChain, setSelectedChain] = useState<Chain | 'ALL'>('ALL');
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
@@ -1014,144 +1015,7 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 4. UNIFIED DASHBOARD CARD (Matches Screenshot: Status + Admin Preview + Search + Gate Token + Watchlist) */}
-      <div className="rounded-xl bg-surface border border-line overflow-hidden divide-y divide-line">
-        {/* Top Strip: Dashboard Status + Gate Contract + Admin Address + User Balance */}
-        <div className="px-4 py-3 bg-surface-card flex flex-col md:flex-row md:items-center justify-between gap-2.5 font-sans text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono font-black text-pump uppercase tracking-wider">
-              ALPHA TRADE CALLS DASHBOARD
-            </span>
-            <span className="text-dim">•</span>
-            <span className="text-muted">Gate Contract:</span>
-            <span className="font-mono text-pump font-bold">{GENESIS_MINT_SHORT}</span>
-            <span className="text-dim">•</span>
-            <span className="text-muted">Admin:</span>
-            <span className="font-mono text-white font-bold">{ADMIN_WALLET_SHORT}</span>
-          </div>
-
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <span className="px-2.5 py-1 rounded bg-surface border border-line text-pump font-bold text-xs">
-              {isAdmin ? 'Master Admin' : 'Lab Member (1M+ Verified)'}
-            </span>
-          </div>
-        </div>
-
-        {/* Middle Strip: Disclaimer + Admin Wallet & Preview Button */}
-        <div className="px-4 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 font-sans text-xs">
-          <div className="flex items-center gap-2 text-muted">
-            <AlertTriangle className="w-3.5 h-3.5 text-pump shrink-0" />
-            <span>
-              <strong className="text-white uppercase">ALPHA CALLS DISCLAIMER:</strong> Admin posts trade calls for verified{' '}
-              <strong className="text-pump">1,000,000+ $GENESIS</strong> holders. Users take all trades at their own risk (DYOR).
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 font-mono text-xs">
-            <span className="text-muted">Admin Wallet:</span>
-            <span className="px-2 py-0.5 rounded bg-surface-card border border-line text-white">
-              {ADMIN_WALLET_SHORT}
-            </span>
-
-          </div>
-        </div>
-
-        {/* Search & Gate Token Bar */}
-        <div className="p-3 sm:px-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search calls by token name, ticker, chain (SOL, ROBIN, BSC...), or CA..."
-              className="w-full h-9 pl-9 pr-10 rounded-md bg-surface-card border border-line focus:border-pump text-xs text-white placeholder:text-dim focus:outline-none font-sans"
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-surface-card text-[10px] font-mono text-pump">
-              ⌘K
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-card border border-line font-mono text-xs">
-              <ShieldCheck className="w-4 h-4 text-pump shrink-0" />
-              <span className="text-muted hidden sm:inline">GATE TOKEN:</span>
-              <span className="text-white font-bold">$GENESIS</span>
-              <span className="text-pump tnum">({GENESIS_MINT_SHORT})</span>
-              <button
-                type="button"
-                onClick={(e) => handleCopyText(GENESIS_MINT, 'header-mint', '$GENESIS', e)}
-                className="text-muted hover:text-pump cursor-pointer"
-                title={`Copy $GENESIS Mint: ${GENESIS_MINT}`}
-              >
-                {copiedId === 'header-mint' ? (
-                  <Check className="w-3.5 h-3.5 text-pump" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <a
-                href={SOLSCAN.token(GENESIS_MINT)}
-                target="_blank"
-                rel="noreferrer"
-                className="text-muted hover:text-pump"
-                title="View $GENESIS on Solscan"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Watchlist & Access Gate Bar */}
-        <div className="px-4 py-2 bg-surface-card flex items-center justify-between gap-2 font-sans text-xs text-muted">
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setActiveFilter(activeFilter === 'WATCHLIST' ? 'ALL' : 'WATCHLIST')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded transition-colors cursor-pointer ${
-                activeFilter === 'WATCHLIST'
-                  ? 'bg-surface text-pump font-bold border border-line'
-                  : 'hover:text-white'
-              }`}
-            >
-              <Star className="w-3.5 h-3.5 text-amber fill-amber" />
-              <span>Watchlist ({watchlist.length})</span>
-            </button>
-
-            <span className="text-dim">|</span>
-
-            {watchlist.length === 0 ? (
-              <span className="text-xs text-muted">
-                Star any trade call below to pin it to your personal watchlist.
-              </span>
-            ) : (
-              <div className="flex items-center gap-2">
-                {alphas
-                  .filter((a) => watchlist.includes(a.id))
-                  .map((w) => (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => setInspectedToken(w)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface hover:bg-surface-3 border border-line text-xs font-mono text-white cursor-pointer"
-                    >
-                      <span className="font-bold">{w.ticker}</span>
-                      <span className="text-pump">{w.marketCap}</span>
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2 font-sans text-xs shrink-0">
-            <span className="text-muted">Access Gate:</span>
-            <span className="text-pump font-bold">1,000,000 $GENESIS</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. PINNED PRIORITY CALLS SECTION (Admin-Pinned Calls for All Users) */}
+      {/* PINNED PRIORITY CALLS SECTION (Admin-Pinned Calls for All Users) */}
       {pinnedCalls.length > 0 && activeFilter === 'ALL' && (
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { MascotRat } from '@/components/MascotRat';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { ArrowUpRight, LogOut, Send, Wallet } from 'lucide-react';
+import { ArrowUpRight, LogOut, Search, Send, Wallet } from 'lucide-react';
 
 export const TerminalHeader: React.FC = () => {
   const { setVisible: openWalletModal } = useWalletModal();
@@ -16,6 +16,8 @@ export const TerminalHeader: React.FC = () => {
     tier,
     isUnlocked,
     disconnectDemoOrWallet,
+    searchQuery,
+    setSearchQuery,
   } = useGenesisBalance();
 
   return (
@@ -35,18 +37,29 @@ export const TerminalHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* Center: JOIN THE LAB Button (Replaces plain text link) */}
-        <div className="flex items-center">
+        {/* Center: JOIN THE LAB Button & Search Calls Input (Right side of JOIN THE LAB) */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <a
             href="https://t.me/TrenchLabsHQ"
             target="_blank"
             rel="noreferrer"
-            className="h-9 sm:h-10 px-4 sm:px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors shrink-0"
+            className="h-9 sm:h-10 px-3 sm:px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0"
           >
             <Send className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>JOIN THE LAB</span>
             <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
           </a>
+
+          <div className="relative w-36 sm:w-56 md:w-72 lg:w-80">
+            <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search calls (token, CA, chain)..."
+              className="w-full h-9 sm:h-10 pl-9 pr-3 rounded-lg bg-surface border border-toxic-border focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none font-sans"
+            />
+          </div>
         </div>
 
         {/* Right: Wallet & Disconnect (SOL wallet balance completely removed) */}
