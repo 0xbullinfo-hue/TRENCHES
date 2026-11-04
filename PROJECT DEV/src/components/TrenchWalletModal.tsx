@@ -12,6 +12,16 @@ interface TrenchWalletModalProps {
   onSelectWallet: (wallet: Wallet) => Promise<void>;
 }
 
+// Fallback entry for Trust Wallet when the extension is not yet detected in the browser
+const TRUST_WALLET_FALLBACK: Wallet = {
+  adapter: {
+    name: 'Trust Wallet',
+    url: 'https://trustwallet.com/browser-extension',
+    icon: 'https://trustwallet.com/assets/images/media/assets/TWT.png',
+  } as unknown as Wallet['adapter'],
+  readyState: WalletReadyState.NotDetected,
+};
+
 export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
   isOpen,
   onClose,
@@ -42,8 +52,17 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Check if Trust Wallet was auto-detected via the Solana Wallet Standard
+  const hasTrustWallet = wallets.some((w) =>
+    w.adapter.name.toLowerCase().includes('trust')
+  );
+
+  const allWallets = hasTrustWallet
+    ? wallets
+    : [...wallets, TRUST_WALLET_FALLBACK];
+
   // Prioritize installed/detected wallets at the top
-  const sortedWallets = [...wallets].sort((a, b) => {
+  const sortedWallets = [...allWallets].sort((a, b) => {
     const aInstalled = a.readyState === WalletReadyState.Installed || a.readyState === WalletReadyState.Loadable;
     const bInstalled = b.readyState === WalletReadyState.Installed || b.readyState === WalletReadyState.Loadable;
     if (aInstalled && !bInstalled) return -1;
@@ -151,3 +170,4 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
     </div>
   );
 };
+
