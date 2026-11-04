@@ -39,7 +39,8 @@ export function verifySolanaSignature(
 /**
  * Proves the caller controls `x-wallet` by verifying an ed25519 signature over a short-lived message.
  */
-export function verifyWalletAuth(headers: Headers): WalletAuthResult {
+export function verifyWalletAuth(req: Request): WalletAuthResult {
+  const headers = req.headers;
   const wallet = headers.get('x-wallet')?.trim();
   const sig = headers.get('x-signature')?.trim();
   const ts = Number(headers.get('x-timestamp'));
@@ -52,7 +53,9 @@ export function verifyWalletAuth(headers: Headers): WalletAuthResult {
     return { ok: false, error: 'Signature expired or timestamp drift exceeded.' };
   }
 
-  if (!verifySolanaSignature(wallet, sig, `TrenchLabs Access: ${ts}`)) {
+  // Bound to method + path so a captured signature cannot be replayed against any other endpoint.
+  const msg = ['TrenchLabs Access', req.method, new URL(req.url).pathname, ts].join('|');
+  if (!verifySolanaSignature(wallet, sig, msg)) {
     return { ok: false, error: 'Invalid wallet cryptographic signature.' };
   }
 

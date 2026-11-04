@@ -1,4 +1,6 @@
 import fs from 'fs';
+import crypto from 'crypto';
+import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
 import path from 'path';
 import type {
   AlphaArtTheme,
@@ -787,99 +789,133 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
 ];
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'calls.json');
+const KV_KEY = 'trench:calls:v1';
+const KV_LOCK_KEY = 'trench:calls:lock';
+
+/** Local-disk persistence is only allowed in dev, or explicitly on a single persistent server. */
+const FILE_PERSISTENCE_ALLOWED =
+  process.env.NODE_ENV !== 'production' || process.env.ALLOW_FILE_PERSISTENCE === 'true';
 
 let registryLockChain: Promise<unknown> = Promise.resolve();
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function withRegistryLock<T>(fn: () => T | Promise<T>): Promise<T> {
-  const run = registryLockChain.then(fn, fn);
-  registryLockChain = run.catch(() => undefined);
+/** Serialises read-modify-write cycles: in-process queue + distributed lock when KV is configured. */
+export function withRegistryLock<T>(fn: () => Promise<T> | T): Promise<T> {
+  const run = registryLockChain.then(async () => {
+    if (!KV_CONFIGURED) return fn();
+    const token = crypto.randomUUID();
+    let acquired = false;
+    for (let i = 0; i < 20 && !acquired; i++) {
+      acquired = await kvLock(KV_LOCK_KEY, token, 10);
+      if (!acquired) await sleep(150);
+    }
+    if (!acquired) throw new Error('Registry busy, retry shortly');
+    try {
+      return await fn();
+    } finally {
+      await kvUnlock(KV_LOCK_KEY, token).catch(() => undefined);
+    }
+  });
+  registryLockChain = run.then(
+    () => undefined,
+    () => undefined
+  );
   return run;
 }
 
-export function loadCallsRegistry(): AlphaRecord[] {
-  try {
-    if (!fs.existsSync(DATA_FILE_PATH)) {
-      return DEFAULT_REGISTRY;
-    }
-    const raw = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
+/**
+ * Loads the registry. Missing store => seed defaults. A read *failure* THROWS (never silently
+ * returns defaults), otherwise the next save would overwrite real data with seed data.
+ */
+export async function loadCallsRegistry(): Promise<AlphaRecord[]> {
+  if (KV_CONFIGURED) {
+    const raw = await kvGet(KV_KEY);
+    if (!raw) return DEFAULT_REGISTRY;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_REGISTRY;
-  } catch (err) {
-    console.error('[TrenchLabs] Error reading calls registry from disk:', err);
-    return DEFAULT_REGISTRY;
+    if (!Array.isArray(parsed)) throw new Error('Corrupt calls registry in KV');
+    return parsed as AlphaRecord[];
   }
+  if (!fs.existsSync(DATA_FILE_PATH)) return DEFAULT_REGISTRY;
+  const parsed = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf-8'));
+  if (!Array.isArray(parsed)) throw new Error('Corrupt calls registry file');
+  return parsed as AlphaRecord[];
 }
 
-export function saveCallsRegistry(records: AlphaRecord[]): { success: boolean; error?: string } {
+export async function saveCallsRegistry(
+  records: AlphaRecord[]
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const dir = path.dirname(DATA_FILE_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (KV_CONFIGURED) {
+      await kvSet(KV_KEY, JSON.stringify(records));
+      return { success: true };
     }
+    if (!FILE_PERSISTENCE_ALLOWED) {
+      return {
+        success: false,
+        error:
+          'Persistence not configured. Set UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or ALLOW_FILE_PERSISTENCE=true on a single persistent server).',
+      };
+    }
+    fs.mkdirSync(path.dirname(DATA_FILE_PATH), { recursive: true });
     const tmp = `${DATA_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(records, null, 2), 'utf-8');
-    if (fs.existsSync(DATA_FILE_PATH)) {
-      fs.unlinkSync(DATA_FILE_PATH);
-    }
-    fs.renameSync(tmp, DATA_FILE_PATH);
+    fs.renameSync(tmp, DATA_FILE_PATH); // atomic replace; no delete-then-rename gap
     return { success: true };
   } catch (err) {
     const message = (err as Error).message || 'Failed to write calls registry';
-    console.error('[TrenchLabs] Registry atomic write failed:', message);
+    console.error('[TrenchLabs] Registry write failed:', message);
     return { success: false, error: message };
   }
 }
 
-export const SYNDICATE_CALLERS: SyndicateCaller[] = [
-  {
-    rank: 1,
-    handle: '@TrenchLabsAdmin',
-    avatarBg: '#0D281E',
-    avatarText: 'TL',
-    winRate: '86.4% win',
-    pnl24h: '+$14,280.00',
-    pnl7d: '7d +$68,420.10',
-    callsCount: 44,
-    topCallTicker: '$PILL',
-    minTier: 'LAB_MEMBER',
-  },
-  {
-    rank: 2,
-    handle: '@TenderIvyLord',
-    avatarBg: '#132A38',
-    avatarText: 'TI',
-    winRate: '77.8% win',
-    pnl24h: '+$6,898.81',
-    pnl7d: '7d +$34,036.23',
-    callsCount: 29,
-    topCallTicker: '$BATON',
-    minTier: 'LAB_MEMBER',
-  },
-  {
-    rank: 3,
-    handle: '@ZebLobster1',
-    avatarBg: '#2D2112',
-    avatarText: 'ZL',
-    winRate: '79.4% win',
-    pnl24h: '+$5,797.90',
-    pnl7d: '7d +$28,211.42',
-    callsCount: 24,
-    topCallTicker: '$BTC',
-    minTier: 'LAB_MEMBER',
-  },
-  {
-    rank: 4,
-    handle: '@SugarySoreCreek',
-    avatarBg: '#261733',
-    avatarText: 'SS',
-    winRate: '91.0% win',
-    pnl24h: '+$4,905.98',
-    pnl7d: '7d +$22,840.10',
-    callsCount: 19,
-    topCallTicker: '$SWORDCAT',
-    minTier: 'LAB_MEMBER',
-  },
-];
+type ResolvedOutcome = 'PROFIT' | 'LOSS' | 'PENDING';
+
+function outcomeOf(r: AlphaRecord): ResolvedOutcome {
+  return (r.outcome as ResolvedOutcome) || (r.takeProfits?.some((t) => t.hit) ? 'PROFIT' : 'PENDING');
+}
+
+const MIN_CALLS_FOR_HIT_RATE = 5;
+
+/**
+ * Hit rate = calls that hit a take-profit (or were marked PROFIT) / ALL calls, with the raw counts shown.
+ * Pending and unresolved calls count against the rate, so it cannot be inflated by omitting losers.
+ */
+export function winRateLabel(records: AlphaRecord[]): string {
+  const total = records.length;
+  if (total < MIN_CALLS_FOR_HIT_RATE) return '—';
+  const wins = records.filter((r) => outcomeOf(r) === 'PROFIT').length;
+  return `${((wins / total) * 100).toFixed(0)}% (${wins}/${total} calls hit)`;
+}
+
+/** Caller leaderboard computed from the registry (no hard-coded PnL or win-rate figures). */
+export function buildCallers(registry: AlphaRecord[]): SyndicateCaller[] {
+  const groups = new Map<string, AlphaRecord[]>();
+  for (const r of registry) {
+    const k = r.caller || '@unknown';
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([handle, recs], i) => {
+      const best = [...recs].sort(
+        (a, b) =>
+          b.marketCapUsd / (b.entryMarketCapUsd || b.marketCapUsd || 1) -
+          a.marketCapUsd / (a.entryMarketCapUsd || a.marketCapUsd || 1)
+      )[0];
+      return {
+        rank: i + 1,
+        handle,
+        avatarBg: '#0D281E',
+        avatarText: handle.replace('@', '').slice(0, 2).toUpperCase(),
+        winRate: winRateLabel(recs),
+        pnl24h: '—',
+        pnl7d: '—',
+        callsCount: recs.length,
+        topCallTicker: best?.ticker ?? '—',
+        minTier: 'LAB_MEMBER' as TierId,
+      };
+    });
+}
 
 const MASK = '██.█ ███';
 
@@ -891,9 +927,17 @@ function nextBoundary(now: number, cycleMin: number, phaseMin: number): string {
 }
 
 /** Project registry onto a viewer's tier, masking anything above it, sorting pinned calls first. */
-export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
+export async function alphasForTier(
+  tier: TierId,
+  now = Date.now(),
+  preloaded?: AlphaRecord[]
+): Promise<AlphaItem[]> {
   const rank = TIERS[tier].rank;
-  const registry = loadCallsRegistry();
+  const registry = preloaded ?? (await loadCallsRegistry());
+  const winRateByCaller = new Map<string, string>();
+  for (const c of new Set(registry.map((r) => r.caller))) {
+    winRateByCaller.set(c, winRateLabel(registry.filter((r) => r.caller === c)));
+  }
 
   const sorted = [...registry].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
@@ -952,7 +996,7 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
       age: r.age,
       ageMinutes: r.ageMinutes,
       caller: r.caller,
-      callerWinRate: r.callerWinRate,
+      callerWinRate: winRateByCaller.get(r.caller) ?? '—',
       deployedVia: r.deployedVia,
       spotlightRank: r.spotlightRank,
       serialTag,
@@ -965,6 +1009,10 @@ export function alphasForTier(tier: TierId, now = Date.now()): AlphaItem[] {
 
 /** SAMPLE portfolio — illustrative benchmark cohort records. */
 export function samplePortfolio(): Portfolio {
+  if (process.env.NODE_ENV === 'production') {
+    // Never ship illustrative PnL / signatures to production users.
+    return { claimedCount: 0, totalRealizedPnl: '—', isSample: true, note: 'No verified claims yet', history: [] };
+  }
   return {
     claimedCount: 4,
     totalRealizedPnl: '+42.50 SOL',

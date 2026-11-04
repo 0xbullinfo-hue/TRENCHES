@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
@@ -25,7 +26,7 @@ export const TerminalHeader: React.FC = () => {
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark (Matches Landing Page) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <a
+          <Link
             href="/"
             className="flex items-center gap-2 sm:gap-3 shrink-0 group cursor-pointer"
             title="Go to TrenchLabs Landing Page"
@@ -34,7 +35,7 @@ export const TerminalHeader: React.FC = () => {
             <span className="font-sans font-extrabold tracking-tight text-lg sm:text-2xl text-white">
               Trench<span className="text-toxic">Labs</span>HQ
             </span>
-          </a>
+          </Link>
         </div>
 
         {/* Center: JOIN THE LAB Button & Search Calls Input (Right side of JOIN THE LAB) */}

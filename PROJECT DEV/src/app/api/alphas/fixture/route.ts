@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { alphasForTier, samplePortfolio, SYNDICATE_CALLERS } from '@/server/alphas-data';
+import { alphasForTier, buildCallers, loadCallsRegistry, samplePortfolio } from '@/server/alphas-data';
 import { GENESIS_MINT } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +19,8 @@ export async function GET() {
     verified: false,
     isAdmin: false,
     genesisMint: GENESIS_MINT,
-    items: alphasForTier('LAB_MEMBER'),
-    callers: SYNDICATE_CALLERS,
+    items: await alphasForTier('LAB_MEMBER'),
+    callers: buildCallers(await loadCallsRegistry()),
     portfolio: samplePortfolio(),
     serverTime: new Date().toISOString(),
   });

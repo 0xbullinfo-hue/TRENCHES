@@ -164,7 +164,9 @@ export interface AlphasErr {
     | 'ACCESS_DENIED_ZERO_BALANCE'
     | 'UNAUTHORIZED_ADMIN'
     | 'RPC_UNAVAILABLE'
-    | 'DEMO_BALANCE_DISABLED';
+    | 'DEMO_BALANCE_DISABLED'
+    | 'RATE_LIMITED'
+    | 'STORE_UNAVAILABLE';
   message: string;
   items: [];
 }

@@ -17,9 +17,10 @@ import {
   samplePortfolio,
   saveCallsRegistry,
   withRegistryLock,
-  SYNDICATE_CALLERS,
+  buildCallers,
 } from '@/server/alphas-data';
 import { verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
+import { clientIp, rateLimit } from '@/server/ratelimit';
 import { getMarketTelemetry } from '@/server/market-data';
 import type {
   AlphasErr,
@@ -117,8 +118,18 @@ function parseShorthandUsd(str: string): number {
   return num;
 }
 
+function tooMany(retryAfter: number) {
+  const body: AlphasErr = { ok: false, error: 'RATE_LIMITED', message: 'Too many requests. Slow down.', items: [] };
+  return NextResponse.json(body, { status: 429, headers: { ...NO_STORE, 'Retry-After': String(retryAfter) } });
+}
+
+const storeDown = () => err(502, 'STORE_UNAVAILABLE', 'Calls store unavailable. Retry shortly.');
+
 export async function GET(req: NextRequest) {
-  const auth = verifyWalletAuth(req.headers);
+  const ipLimit = await rateLimit(`get:ip:${clientIp(req)}`, 60, 60);
+  if (!ipLimit.ok) return tooMany(ipLimit.retryAfter);
+
+  const auth = verifyWalletAuth(req);
   if (!auth.ok) {
     return err(401, 'UNAUTHORIZED', auth.error || 'Cryptographic wallet signature authentication required.');
   }
@@ -127,6 +138,9 @@ export async function GET(req: NextRequest) {
   if (!isBase58Address(wallet)) {
     return err(400, 'BAD_REQUEST', 'Invalid base58 Solana wallet address');
   }
+
+  const walletLimit = await rateLimit(`get:wallet:${wallet}`, 20, 60);
+  if (!walletLimit.ok) return tooMany(walletLimit.retryAfter);
 
   const isAdmin = isAdminWallet(wallet);
   let balance = 0;
@@ -146,7 +160,13 @@ export async function GET(req: NextRequest) {
   }
 
   const tier = tierFor(Math.max(balance, isAdmin ? MIN_GENESIS_REQUIRED : 0));
-  const baseItems = alphasForTier(tier.id);
+  let registry;
+  try {
+    registry = await loadCallsRegistry();
+  } catch {
+    return storeDown();
+  }
+  const baseItems = await alphasForTier(tier.id, Date.now(), registry);
 
   // Wire live market telemetry into calls with CA
   const items = await Promise.all(
@@ -180,7 +200,7 @@ export async function GET(req: NextRequest) {
     isAdmin,
     genesisMint: GENESIS_MINT,
     items,
-    callers: SYNDICATE_CALLERS,
+    callers: buildCallers(registry),
     portfolio: samplePortfolio(),
     serverTime: new Date().toISOString(),
   };
@@ -191,6 +211,8 @@ export async function GET(req: NextRequest) {
 /** POST /api/alphas — Admin creates a new trade call (Cryptographically Verified, Request-Bound) */
 export async function POST(req: NextRequest) {
   try {
+    const adminLimit = await rateLimit(`admin:${clientIp(req)}`, 30, 60);
+    if (!adminLimit.ok) return tooMany(adminLimit.retryAfter);
     const raw = await req.text();
     const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
@@ -343,7 +365,7 @@ export async function POST(req: NextRequest) {
       spotlightRank: pinned ? 1 : undefined,
       serialTag:
         payload.serialTag ||
-        `EXP${String(loadCallsRegistry().length + 1).padStart(2, '0')}`,
+        `EXP${String((await loadCallsRegistry()).length + 1).padStart(2, '0')}`,
       sparkline: [],
       art: {
         bgFrom: '#161C24',
@@ -355,18 +377,18 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const saveRes = await withRegistryLock(() => {
-      const current = loadCallsRegistry();
+    const saveRes = await withRegistryLock(async () => {
+      const current = await loadCallsRegistry();
       const updated = [newRecord, ...current];
-      return saveCallsRegistry(updated);
+      return await saveCallsRegistry(updated);
     });
 
     if (!saveRes.success) {
-      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+      return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
     }
 
     return NextResponse.json(
-      { ok: true, items: alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('LAB_MEMBER') },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -377,6 +399,8 @@ export async function POST(req: NextRequest) {
 /** PATCH /api/alphas — Admin pins/unpins or updates a trade call (Cryptographically Verified, Request-Bound) */
 export async function PATCH(req: NextRequest) {
   try {
+    const adminLimit = await rateLimit(`admin:${clientIp(req)}`, 30, 60);
+    if (!adminLimit.ok) return tooMany(adminLimit.retryAfter);
     const raw = await req.text();
     const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
@@ -391,8 +415,8 @@ export async function PATCH(req: NextRequest) {
     const id = String(payload.id || '');
     if (!id) return err(400, 'BAD_REQUEST', 'Call id is required');
 
-    const saveRes = await withRegistryLock(() => {
-      const registry = loadCallsRegistry();
+    const saveRes = await withRegistryLock(async () => {
+      const registry = await loadCallsRegistry();
       const idx = registry.findIndex((r) => r.id === id);
       if (idx === -1) {
         throw new Error('Call not found');
@@ -439,15 +463,15 @@ export async function PATCH(req: NextRequest) {
       }
 
       registry[idx] = target;
-      return saveCallsRegistry(registry);
+      return await saveCallsRegistry(registry);
     });
 
     if (!saveRes.success) {
-      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+      return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
     }
 
     return NextResponse.json(
-      { ok: true, items: alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('LAB_MEMBER') },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -458,6 +482,8 @@ export async function PATCH(req: NextRequest) {
 /** DELETE /api/alphas — Admin deletes a trade call (Cryptographically Verified, Request-Bound) */
 export async function DELETE(req: NextRequest) {
   try {
+    const adminLimit = await rateLimit(`admin:${clientIp(req)}`, 30, 60);
+    if (!adminLimit.ok) return tooMany(adminLimit.retryAfter);
     const raw = await req.text();
     const auth = await verifyAdminAuth(req, raw);
     if (!auth.authorized) {
@@ -472,18 +498,18 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return err(400, 'BAD_REQUEST', 'Provide ?id=');
 
-    const saveRes = await withRegistryLock(() => {
-      const registry = loadCallsRegistry();
+    const saveRes = await withRegistryLock(async () => {
+      const registry = await loadCallsRegistry();
       const filtered = registry.filter((r) => r.id !== id);
-      return saveCallsRegistry(filtered);
+      return await saveCallsRegistry(filtered);
     });
 
     if (!saveRes.success) {
-      return err(500, 'BAD_REQUEST', `Persistence failed: ${saveRes.error}`);
+      return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
     }
 
     return NextResponse.json(
-      { ok: true, items: alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('LAB_MEMBER') },
       { headers: NO_STORE }
     );
   } catch (e) {

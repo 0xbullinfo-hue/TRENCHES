@@ -96,6 +96,14 @@ export const IncubatorHub: React.FC = () => {
   const [fetchingDex, setFetchingDex] = useState(false);
   const [submittingCall, setSubmittingCall] = useState(false);
 
+  const deskWinRate = useMemo(() => {
+    const n = alphas.length;
+    if (n < 5) return { label: '—', pct: 0 };
+    const wins = alphas.filter((a) => a.outcome === 'PROFIT').length;
+    const pct = (wins / n) * 100;
+    return { label: `${pct.toFixed(0)}% (${wins}/${n})`, pct: Math.round(pct) };
+  }, [alphas]);
+
   const nextSerialTag = `EXP${String(alphas.length + 1).padStart(2, '0')}`;
 
   const [evmDraft, setEvmDraft] = useState(boundEvmAddress);
@@ -732,14 +740,14 @@ export const IncubatorHub: React.FC = () => {
 
           <div className="p-5">
             <div className="flex items-center justify-between font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              <span>ADMIN DESK WIN RATE</span>
-              <span className="text-pump font-bold">2X+ HIT RATE</span>
+              <span>ADMIN DESK HIT RATE</span>
+              <span className="text-pump font-bold">ALL CALLS COUNTED</span>
             </div>
             <div className="font-sans text-2xl sm:text-3xl font-extrabold text-white mt-1 tnum">
-              86.4% <span className="text-pump text-sm font-mono">(2x / 5x TP)</span>
+              {deskWinRate.label}
             </div>
             <div className="w-full h-1.5 bg-canvas rounded-full overflow-hidden mt-2 border border-line">
-              <div className="h-full bg-pump w-[86%]" />
+              <div className="h-full bg-pump" style={{ width: `${deskWinRate.pct}%` }} />
             </div>
           </div>
         </div>

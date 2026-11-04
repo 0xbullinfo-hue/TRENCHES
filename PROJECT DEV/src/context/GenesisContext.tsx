@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
   ADMIN_WALLET,
   GENESIS_MINT,
@@ -31,6 +30,10 @@ import type {
   Portfolio,
   SyndicateCaller,
 } from '@/lib/types';
+
+// Derived locally so we don't depend on @solana/spl-token (bigint-buffer advisory).
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
 export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
 
@@ -235,7 +238,10 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       const mintKey = new PublicKey(GENESIS_MINT);
-      const ata = getAssociatedTokenAddressSync(mintKey, wallet.publicKey);
+      const [ata] = PublicKey.findProgramAddressSync(
+        [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mintKey.toBuffer()],
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
       setAtaAddress(ata.toBase58());
     } catch {
       setAtaAddress(null);
@@ -322,7 +328,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const ts = Date.now();
-        const msg = `TrenchLabs Access: ${ts}`;
+        const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
         const sig = await wallet.signMessage(new TextEncoder().encode(msg));
         const headers = {
           'x-wallet': addr,
