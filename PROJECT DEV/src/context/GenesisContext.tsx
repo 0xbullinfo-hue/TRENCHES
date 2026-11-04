@@ -10,7 +10,8 @@ import React, {
   useState,
 } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { TrenchWalletModal } from '@/components/TrenchWalletModal';
+import { WalletReadyState } from '@solana/wallet-adapter-base';
 import { PublicKey } from '@solana/web3.js';
 import {
   ADMIN_WALLET,
@@ -136,7 +137,7 @@ async function sha256Hex(str: string): Promise<string> {
 
 export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const wallet = useWallet();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   // In production, default strictly to 'disconnected'. In local development only, allow '1m'
   const [demoPreset, setDemoPresetState] = useState<DemoPreset>('disconnected');
@@ -163,14 +164,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
     } catch {}
 
-    try {
-      if (typeof wallet.select === 'function') {
-        wallet.select(null as any);
-      }
-    } catch {}
-
-    openWalletModal(true);
-  }, [wallet, openWalletModal]);
+    setIsWalletModalOpen(true);
+  }, []);
 
   const switchWallet = useCallback(async () => {
     try {
@@ -181,14 +176,32 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       console.warn('[TrenchLabs] Disconnect before switch warning:', e);
     }
 
-    try {
-      if (typeof wallet.select === 'function') {
-        wallet.select(null as any);
-      }
-    } catch {}
+    setIsWalletModalOpen(true);
+  }, [wallet]);
 
-    openWalletModal(true);
-  }, [wallet, openWalletModal]);
+  const handleSelectWallet = useCallback(
+    async (targetWallet: any) => {
+      setIsWalletModalOpen(false);
+      try {
+        if (targetWallet.readyState === WalletReadyState.NotDetected) {
+          window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+
+        wallet.select(targetWallet.adapter.name);
+        await targetWallet.adapter.connect();
+      } catch (err: any) {
+        if (
+          err?.name === 'WalletConnectionError' &&
+          (err?.message?.includes('User rejected') || err?.message?.includes('Window closed'))
+        ) {
+          return;
+        }
+        console.warn('[TrenchLabs] Direct connect error:', err);
+      }
+    },
+    [wallet]
+  );
 
   useEffect(() => {
     try {
@@ -803,7 +816,17 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     demoEnabled: DEMO_ENABLED,
   };
 
-  return <GenesisContext.Provider value={value}>{children}</GenesisContext.Provider>;
+  return (
+    <GenesisContext.Provider value={value}>
+      {children}
+      <TrenchWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        wallets={wallet.wallets}
+        onSelectWallet={handleSelectWallet}
+      />
+    </GenesisContext.Provider>
+  );
 }
 
 export function useGenesisBalance() {
