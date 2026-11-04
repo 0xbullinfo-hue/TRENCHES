@@ -114,7 +114,7 @@ interface GenesisContextValue {
 
   demoPreset: DemoPreset;
   setDemoPreset: (preset: DemoPreset) => void;
-  connectWallet: () => Promise<void>;
+  connectWallet: () => void;
   disconnectDemoOrWallet: () => Promise<void>;
   demoEnabled: boolean;
 }
@@ -155,37 +155,21 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const connectWallet = useCallback(async () => {
+  const connectWallet = useCallback(() => {
     setDemoPresetState('live');
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
     } catch {}
 
     if (wallet.wallet && !wallet.connected) {
-      try {
-        await wallet.connect();
-        return;
-      } catch (err) {
-        console.warn('[TrenchLabs] Direct connect retry, opening modal:', err);
-      }
+      wallet.connect().catch(() => {
+        openWalletModal(true);
+      });
+      return;
     }
-
-    try {
-      if (typeof wallet.select === 'function') {
-        wallet.select(null as any);
-      }
-    } catch {}
 
     openWalletModal(true);
   }, [wallet, openWalletModal]);
-
-  useEffect(() => {
-    if (wallet.wallet && !wallet.connected && !wallet.connecting && demoPreset !== 'disconnected') {
-      wallet.connect().catch((err) => {
-        console.warn('[TrenchLabs] auto-connect on wallet select:', err);
-      });
-    }
-  }, [wallet.wallet, wallet.connected, wallet.connecting, demoPreset, wallet]);
 
   useEffect(() => {
     try {
