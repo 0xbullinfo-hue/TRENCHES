@@ -3,30 +3,32 @@
 import React, { useEffect, useRef } from 'react';
 import type { Wallet } from '@solana/wallet-adapter-react';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
-import { ExternalLink, ShieldCheck, Wallet as WalletIcon, X } from 'lucide-react';
+import { AlertCircle, ExternalLink, Loader2, ShieldCheck, Wallet as WalletIcon, X } from 'lucide-react';
 
 interface TrenchWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: Wallet[];
   onSelectWallet: (wallet: Wallet) => Promise<void>;
+  connectingWalletName?: string | null;
+  connectError?: string | null;
 }
 
-// Fallback entry for Trust Wallet when the extension is not yet detected in the browser
-const TRUST_WALLET_FALLBACK: Wallet = {
-  adapter: {
-    name: 'Trust Wallet',
-    url: 'https://trustwallet.com/browser-extension',
-    icon: 'https://trustwallet.com/assets/images/media/assets/TWT.png',
-  } as unknown as Wallet['adapter'],
-  readyState: WalletReadyState.NotDetected,
-};
+function canonicalWalletKey(name: string): string {
+  const lower = name.trim().toLowerCase();
+  if (lower === 'trust' || lower === 'trust wallet' || lower === 'trustwallet') {
+    return 'trust-wallet';
+  }
+  return lower;
+}
 
 export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
   isOpen,
   onClose,
   wallets,
   onSelectWallet,
+  connectingWalletName = null,
+  connectError = null,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -52,19 +54,35 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Check if Trust Wallet was auto-detected via the Solana Wallet Standard
-  const hasTrustWallet = wallets.some((w) =>
-    w.adapter.name.toLowerCase().includes('trust')
-  );
-
-  const allWallets = hasTrustWallet
-    ? wallets
-    : [...wallets, TRUST_WALLET_FALLBACK];
+  // Deduplicate wallets by canonical key (e.g., 'Trust' from Wallet Standard vs 'Trust Wallet' adapter),
+  // preferring Installed/Loadable entries.
+  const dedupedMap = new Map<string, Wallet>();
+  for (const w of wallets) {
+    const key = canonicalWalletKey(w.adapter.name);
+    const existing = dedupedMap.get(key);
+    if (!existing) {
+      dedupedMap.set(key, w);
+    } else {
+      const existingInstalled =
+        existing.readyState === WalletReadyState.Installed ||
+        existing.readyState === WalletReadyState.Loadable;
+      const candidateInstalled =
+        w.readyState === WalletReadyState.Installed ||
+        w.readyState === WalletReadyState.Loadable;
+      if (candidateInstalled && !existingInstalled) {
+        dedupedMap.set(key, w);
+      }
+    }
+  }
 
   // Prioritize installed/detected wallets at the top
-  const sortedWallets = [...allWallets].sort((a, b) => {
-    const aInstalled = a.readyState === WalletReadyState.Installed || a.readyState === WalletReadyState.Loadable;
-    const bInstalled = b.readyState === WalletReadyState.Installed || b.readyState === WalletReadyState.Loadable;
+  const sortedWallets = Array.from(dedupedMap.values()).sort((a, b) => {
+    const aInstalled =
+      a.readyState === WalletReadyState.Installed ||
+      a.readyState === WalletReadyState.Loadable;
+    const bInstalled =
+      b.readyState === WalletReadyState.Installed ||
+      b.readyState === WalletReadyState.Loadable;
     if (aInstalled && !bInstalled) return -1;
     if (!aInstalled && bInstalled) return 1;
     return a.adapter.name.localeCompare(b.adapter.name);
@@ -103,6 +121,14 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
           </button>
         </div>
 
+        {/* Error Banner */}
+        {connectError && (
+          <div className="mx-5 mt-4 p-3 rounded-lg bg-danger/10 border border-danger/40 flex items-start gap-2.5 text-xs font-mono text-danger">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{connectError}</span>
+          </div>
+        )}
+
         {/* Wallet List */}
         <div className="p-5 space-y-2.5 max-h-[60vh] overflow-y-auto">
           {sortedWallets.length > 0 ? (
@@ -110,13 +136,15 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
               const isDetected =
                 w.readyState === WalletReadyState.Installed ||
                 w.readyState === WalletReadyState.Loadable;
+              const isConnectingThis = connectingWalletName === w.adapter.name;
 
               return (
                 <button
                   key={w.adapter.name}
                   type="button"
+                  disabled={Boolean(connectingWalletName)}
                   onClick={() => onSelectWallet(w)}
-                  className="w-full px-4 py-3 rounded-lg bg-surface-card hover:bg-surface border border-toxic-border hover:border-toxic flex items-center justify-between gap-3 transition-all group cursor-pointer text-left"
+                  className="w-full px-4 py-3 rounded-lg bg-surface-card hover:bg-surface border border-toxic-border hover:border-toxic disabled:opacity-60 flex items-center justify-between gap-3 transition-all group cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3">
                     {w.adapter.icon ? (
@@ -132,12 +160,17 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                       </div>
                     )}
                     <span className="font-mono text-xs font-bold text-white group-hover:text-toxic transition-colors">
-                      {w.adapter.name}
+                      {w.adapter.name === 'Trust' ? 'Trust Wallet' : w.adapter.name}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isDetected ? (
+                    {isConnectingThis ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40 inline-flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>CONNECTING</span>
+                      </span>
+                    ) : isDetected ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40">
                         DETECTED
                       </span>
@@ -170,4 +203,3 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
     </div>
   );
 };
-

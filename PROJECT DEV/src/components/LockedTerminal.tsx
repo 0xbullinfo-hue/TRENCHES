@@ -68,7 +68,7 @@ export const LockedTerminal: React.FC = () => {
               CONNECT WALLET TO VERIFY 1,000,000 $GENESIS
             </h3>
             <p className="font-sans text-sm text-muted max-w-lg mx-auto leading-relaxed">
-              Connect Phantom, Solflare, or Backpack to verify that your wallet holds at least{' '}
+              Connect Phantom, Solflare, Trust Wallet, or Backpack to verify that your wallet holds at least{' '}
               <strong className="text-pump-pill">1,000,000 $GENESIS</strong>. This unlocks full
               access to live trade calls, contract addresses, and incubator allocations.
             </p>

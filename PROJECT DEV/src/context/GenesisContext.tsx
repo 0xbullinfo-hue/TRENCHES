@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, type Wallet } from '@solana/wallet-adapter-react';
 import { TrenchWalletModal } from '@/components/TrenchWalletModal';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
 import { PublicKey } from '@solana/web3.js';
@@ -157,8 +157,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
+  const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
+  const prevPublicKeyRef = useRef<string | null>(null);
+
+  const [connectingWalletName, setConnectingWalletName] = useState<string | null>(null);
+  const [walletConnectError, setWalletConnectError] = useState<string | null>(null);
 
   const connectWallet = useCallback(() => {
+    setWalletConnectError(null);
+    setConnectingWalletName(null);
     queueMicrotask(() => setDemoPresetState('live'));
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
@@ -167,40 +174,103 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setIsWalletModalOpen(true);
   }, []);
 
-  const switchWallet = useCallback(async () => {
-    try {
-      if (wallet.connected || wallet.wallet) {
-        await wallet.disconnect();
-      }
-    } catch (e) {
-      console.warn('[TrenchLabs] Disconnect before switch warning:', e);
-    }
-
+  const switchWallet = useCallback(() => {
+    setWalletConnectError(null);
+    setConnectingWalletName(null);
     setIsWalletModalOpen(true);
-  }, [wallet]);
+  }, []);
 
   const handleSelectWallet = useCallback(
-    async (targetWallet: any) => {
-      setIsWalletModalOpen(false);
+    async (targetWallet: Wallet) => {
+      setWalletConnectError(null);
+
+      if (
+        targetWallet.readyState !== WalletReadyState.Installed &&
+        targetWallet.readyState !== WalletReadyState.Loadable
+      ) {
+        if (targetWallet.adapter.url) {
+          window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
+        }
+        return;
+      }
+
+      setConnectingWalletName(targetWallet.adapter.name);
+
       try {
-        if (targetWallet.readyState === WalletReadyState.NotDetected) {
+        const previousAdapter = wallet.wallet?.adapter;
+        const isSameAdapterReconnect = Boolean(
+          previousAdapter === targetWallet.adapter &&
+            targetWallet.adapter.connected &&
+            demoPreset === 'live'
+        );
+
+        // If user clicked the already-connected live wallet in Switch Wallet, disconnect first so they can switch accounts or re-authorize
+        if (isSameAdapterReconnect) {
+          try {
+            await targetWallet.adapter.disconnect();
+          } catch {
+            // ignore
+          }
+        }
+
+        // Trigger connect() directly within the user click gesture before React re-renders
+        await targetWallet.adapter.connect();
+
+        // Clear any previous wallet's cached auth headers
+        signCacheRef.current.clear();
+        try {
+          sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
+
+        // Select the wallet in WalletProvider so localStorage('walletName') and context adapter update
+        wallet.select(targetWallet.adapter.name);
+
+        // Ensure WalletProviderBase receives the 'connect' event after its useEffect([adapter]) attaches
+        const ensureSynced = () => {
+          if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
+            targetWallet.adapter.emit('connect', targetWallet.adapter.publicKey);
+          }
+        };
+        queueMicrotask(ensureSynced);
+        setTimeout(ensureSynced, 30);
+
+        setDemoPresetState('live');
+        try {
+          window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
+        } catch {
+          // ignore
+        }
+
+        setConnectingWalletName(null);
+        setIsWalletModalOpen(false);
+      } catch (err: unknown) {
+        setConnectingWalletName(null);
+        const errName = (err as { name?: string })?.name || '';
+        const errMsg = (err as { message?: string })?.message || '';
+
+        if (errName === 'WalletNotReadyError' && targetWallet.adapter.url) {
           window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
           return;
         }
 
-        wallet.select(targetWallet.adapter.name);
-        await targetWallet.adapter.connect();
-      } catch (err: any) {
-        if (
-          err?.name === 'WalletConnectionError' &&
-          (err?.message?.includes('User rejected') || err?.message?.includes('Window closed'))
-        ) {
+        const isUserDismissal =
+          errName === 'WalletWindowClosedError' ||
+          /user rejected|rejected the request|window closed|cancelled|canceled|denied/i.test(errMsg);
+
+        if (isUserDismissal) {
           return;
         }
-        console.warn('[TrenchLabs] Direct connect error:', err);
+
+        console.warn('[TrenchLabs] Wallet connect error:', err);
+        setWalletConnectError(
+          errMsg ||
+            `Could not connect to ${targetWallet.adapter.name}. Please unlock your wallet extension and try again.`
+        );
       }
     },
-    [wallet]
+    [wallet, demoPreset]
   );
 
   useEffect(() => {
@@ -277,6 +347,20 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // Synchronize WalletProviderBase if the selected adapter is already connected
+  // (e.g. when adapter.connect() resolves before WalletProviderBase attaches its useEffect listener)
+  useEffect(() => {
+    const activeAdapter = wallet.wallet?.adapter;
+    if (activeAdapter && activeAdapter.connected && activeAdapter.publicKey && !wallet.connected) {
+      const timer = setTimeout(() => {
+        if (activeAdapter.connected && activeAdapter.publicKey) {
+          activeAdapter.emit('connect', activeAdapter.publicKey);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [wallet.wallet, wallet.connected]);
+
   useEffect(() => {
     if (wallet.connected && wallet.publicKey) {
       queueMicrotask(() => setDemoPresetState('live'));
@@ -324,6 +408,25 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [connected, demoPreset, wallet.connected, wallet.publicKey]);
 
+  // Clear stale state immediately whenever the active wallet address changes
+  useEffect(() => {
+    if (prevPublicKeyRef.current !== publicKeyBase58) {
+      const hadPrevious = prevPublicKeyRef.current !== null;
+      prevPublicKeyRef.current = publicKeyBase58;
+      if (hadPrevious) {
+        requestGenerationRef.current += 1;
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        queueMicrotask(() => {
+          setOnChainBalance(0);
+          setAlphas([]);
+          setCallers([]);
+          setPortfolio(null);
+          setApiError(null);
+        });
+      }
+    }
+  }, [publicKeyBase58]);
+
   const isAdmin = useMemo(
     () => Boolean(connected && publicKeyBase58 && isAdminWallet(publicKeyBase58)),
     [connected, publicKeyBase58]
@@ -359,7 +462,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const points = useMemo(() => longevityPoints(balance), [balance]);
 
   const isZeroBalance = connected && !isAdmin && balance < MIN_GENESIS_REQUIRED;
-  const isUnlocked = connected && (isAdmin || balance >= MIN_GENESIS_REQUIRED);
+  const isUnlocked = connected && !needsSignature && (isAdmin || balance >= MIN_GENESIS_REQUIRED);
 
   /**
    * Patch 1: Request or retrieve cached ed25519 signature headers proving wallet ownership.
@@ -408,8 +511,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     },
     [wallet]
   );
-
-  const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
 
   const signRequestHeaders = useCallback(
     async (method: string, path: string): Promise<Record<string, string> | null> => {
@@ -475,6 +576,10 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       const headers = await getAccessHeaders(interactiveAuth);
       if (typeof generation === 'number' && generation !== requestGenerationRef.current) return;
       if (!headers) {
+        setOnChainBalance(0);
+        setAlphas([]);
+        setCallers([]);
+        setPortfolio(null);
         setNeedsSignature(true);
         return;
       }
@@ -748,6 +853,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
     requestGenerationRef.current += 1;
     if (abortControllerRef.current) abortControllerRef.current.abort();
+    signCacheRef.current.clear();
     setDemoPresetState('disconnected');
     setOnChainBalance(0);
     setAtaAddress(null);
@@ -821,9 +927,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       {children}
       <TrenchWalletModal
         isOpen={isWalletModalOpen}
-        onClose={() => setIsWalletModalOpen(false)}
+        onClose={() => {
+          setConnectingWalletName(null);
+          setWalletConnectError(null);
+          setIsWalletModalOpen(false);
+        }}
         wallets={wallet.wallets}
         onSelectWallet={handleSelectWallet}
+        connectingWalletName={connectingWalletName}
+        connectError={walletConnectError}
       />
     </GenesisContext.Provider>
   );
