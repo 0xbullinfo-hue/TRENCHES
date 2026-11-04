@@ -159,11 +159,58 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const requestGenerationRef = useRef(0);
   const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
   const prevPublicKeyRef = useRef<string | null>(null);
+  const pendingUnlockTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [connectingWalletName, setConnectingWalletName] = useState<string | null>(null);
   const [walletConnectError, setWalletConnectError] = useState<string | null>(null);
 
+  const clearPendingUnlockWatcher = useCallback(() => {
+    if (pendingUnlockTimerRef.current) {
+      clearInterval(pendingUnlockTimerRef.current);
+      pendingUnlockTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => clearPendingUnlockWatcher();
+  }, [clearPendingUnlockWatcher]);
+
+  const finalizeWalletConnection = useCallback(
+    (targetWallet: Wallet) => {
+      clearPendingUnlockWatcher();
+      signCacheRef.current.clear();
+      try {
+        sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+
+      wallet.select(targetWallet.adapter.name);
+
+      const ensureSynced = () => {
+        if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
+          targetWallet.adapter.emit('connect', targetWallet.adapter.publicKey);
+        }
+      };
+      queueMicrotask(ensureSynced);
+      setTimeout(ensureSynced, 30);
+
+      setDemoPresetState('live');
+      try {
+        window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
+      } catch {
+        // ignore
+      }
+
+      setWalletConnectError(null);
+      setConnectingWalletName(null);
+      setIsWalletModalOpen(false);
+    },
+    [wallet, clearPendingUnlockWatcher]
+  );
+
   const connectWallet = useCallback(() => {
+    clearPendingUnlockWatcher();
     setWalletConnectError(null);
     setConnectingWalletName(null);
     queueMicrotask(() => setDemoPresetState('live'));
@@ -172,16 +219,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     } catch {}
 
     setIsWalletModalOpen(true);
-  }, []);
+  }, [clearPendingUnlockWatcher]);
 
   const switchWallet = useCallback(() => {
+    clearPendingUnlockWatcher();
     setWalletConnectError(null);
     setConnectingWalletName(null);
     setIsWalletModalOpen(true);
-  }, []);
+  }, [clearPendingUnlockWatcher]);
 
   const handleSelectWallet = useCallback(
     async (targetWallet: Wallet) => {
+      clearPendingUnlockWatcher();
       setWalletConnectError(null);
 
       if (
@@ -215,36 +264,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
         // Trigger connect() directly within the user click gesture before React re-renders
         await targetWallet.adapter.connect();
-
-        // Clear any previous wallet's cached auth headers
-        signCacheRef.current.clear();
-        try {
-          sessionStorage.removeItem(ACCESS_STORAGE_KEY);
-        } catch {
-          // ignore
-        }
-
-        // Select the wallet in WalletProvider so localStorage('walletName') and context adapter update
-        wallet.select(targetWallet.adapter.name);
-
-        // Ensure WalletProviderBase receives the 'connect' event after its useEffect([adapter]) attaches
-        const ensureSynced = () => {
-          if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
-            targetWallet.adapter.emit('connect', targetWallet.adapter.publicKey);
-          }
-        };
-        queueMicrotask(ensureSynced);
-        setTimeout(ensureSynced, 30);
-
-        setDemoPresetState('live');
-        try {
-          window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
-        } catch {
-          // ignore
-        }
-
-        setConnectingWalletName(null);
-        setIsWalletModalOpen(false);
+        finalizeWalletConnection(targetWallet);
       } catch (err: unknown) {
         setConnectingWalletName(null);
         const errName = (err as { name?: string })?.name || '';
@@ -252,6 +272,51 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
         if (errName === 'WalletNotReadyError' && targetWallet.adapter.url) {
           window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+
+        // Handle Trust Wallet / extension 'INTERNAL_UnlockPopup already pending' state gracefully
+        if (/INTERNAL_UnlockPopup|already pending/i.test(errMsg)) {
+          setWalletConnectError(
+            'Trust Wallet has an unlock prompt waiting for your password. Click the Trust Wallet extension icon in the top-right of your browser (or check behind your browser window) to unlock it — connection will complete automatically once unlocked.'
+          );
+
+          const onAdapterConnect = () => {
+            if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
+              finalizeWalletConnection(targetWallet);
+            }
+          };
+          targetWallet.adapter.once('connect', onAdapterConnect);
+
+          pendingUnlockTimerRef.current = setInterval(async () => {
+            const stdAccounts = (
+              targetWallet.adapter as unknown as { wallet?: { accounts?: unknown[] } }
+            ).wallet?.accounts;
+            const winTrust = (
+              window as unknown as {
+                trustwallet?: { solana?: { isConnected?: boolean; publicKey?: unknown } };
+              }
+            ).trustwallet?.solana;
+
+            if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
+              finalizeWalletConnection(targetWallet);
+              return;
+            }
+
+            if (
+              (Array.isArray(stdAccounts) && stdAccounts.length > 0) ||
+              Boolean(winTrust?.isConnected && winTrust?.publicKey)
+            ) {
+              try {
+                await targetWallet.adapter.connect();
+                if (targetWallet.adapter.connected && targetWallet.adapter.publicKey) {
+                  finalizeWalletConnection(targetWallet);
+                }
+              } catch {
+                // still waiting for user unlock
+              }
+            }
+          }, 1000);
           return;
         }
 
@@ -270,7 +335,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         );
       }
     },
-    [wallet, demoPreset]
+    [wallet, demoPreset, clearPendingUnlockWatcher, finalizeWalletConnection]
   );
 
   useEffect(() => {
@@ -928,6 +993,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       <TrenchWalletModal
         isOpen={isWalletModalOpen}
         onClose={() => {
+          clearPendingUnlockWatcher();
           setConnectingWalletName(null);
           setWalletConnectError(null);
           setIsWalletModalOpen(false);

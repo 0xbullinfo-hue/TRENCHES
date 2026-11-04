@@ -36,7 +36,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <SafeConnectionProvider endpoint={SOLANA_RPC} config={{ commitment: 'confirmed' }}>
       <WalletProvider
         wallets={wallets}
-        autoConnect
+        autoConnect={false}
         onError={(err) => {
           console.error('[TrenchLabs Wallet Error]:', err?.message || err);
         }}
