@@ -25,6 +25,7 @@ export const LockedTerminal: React.FC = () => {
     demoEnabled,
     needsSignature,
     requestUnlockSignature,
+    connectWallet,
     apiLoading,
   } = useGenesisBalance();
   const [copied, setCopied] = useState(false);
@@ -92,10 +93,7 @@ export const LockedTerminal: React.FC = () => {
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => {
-                setDemoPreset('live');
-                openWalletModal(true);
-              }}
+              onClick={connectWallet}
               className="h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Wallet className="w-4 h-4" />

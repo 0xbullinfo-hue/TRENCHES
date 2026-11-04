@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
@@ -11,13 +10,11 @@ import { ArrowUpRight, LogOut, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const router = useRouter();
-  const { setVisible: openWalletModal } = useWalletModal();
-  const { connected, shortAddress, setDemoPreset, disconnectDemoOrWallet } = useGenesisBalance();
+  const { connected, shortAddress, connectWallet, disconnectDemoOrWallet } = useGenesisBalance();
 
   const handleConnectClick = () => {
     if (!connected) {
-      setDemoPreset('live');
-      openWalletModal(true);
+      connectWallet();
     } else {
       router.push('/dashboard');
     }

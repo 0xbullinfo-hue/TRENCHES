@@ -152,10 +152,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (!isAdmin && balance < MIN_GENESIS_REQUIRED) {
-    return err(
-      403,
-      'ACCESS_DENIED_ZERO_BALANCE',
-      `Access restricted. Holding at least 1,000,000 $GENESIS (${GENESIS_MINT}) is required.`
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'ACCESS_DENIED_ZERO_BALANCE',
+        message: `Access restricted. Holding at least 1,000,000 $GENESIS (${GENESIS_MINT}) is required.`,
+        balance,
+        items: [],
+      },
+      { status: 403, headers: NO_STORE }
     );
   }
 

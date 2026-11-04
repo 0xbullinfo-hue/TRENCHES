@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PublicKey } from '@solana/web3.js';
 import {
   ADMIN_WALLET,
@@ -111,6 +112,7 @@ interface GenesisContextValue {
 
   demoPreset: DemoPreset;
   setDemoPreset: (preset: DemoPreset) => void;
+  connectWallet: () => Promise<void>;
   disconnectDemoOrWallet: () => Promise<void>;
   demoEnabled: boolean;
 }
@@ -131,6 +133,7 @@ async function sha256Hex(str: string): Promise<string> {
 
 export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const wallet = useWallet();
+  const { setVisible: openWalletModal } = useWalletModal();
 
   // In production, default strictly to 'disconnected'. In local development only, allow '1m'
   const [demoPreset, setDemoPresetState] = useState<DemoPreset>('disconnected');
@@ -149,6 +152,38 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const connectWallet = useCallback(async () => {
+    setDemoPresetState('live');
+    try {
+      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
+    } catch {}
+
+    if (wallet.wallet && !wallet.connected) {
+      try {
+        await wallet.connect();
+        return;
+      } catch (err) {
+        console.warn('[TrenchLabs] Direct connect retry, opening modal:', err);
+      }
+    }
+
+    try {
+      if (typeof wallet.select === 'function') {
+        wallet.select(null as any);
+      }
+    } catch {}
+
+    openWalletModal(true);
+  }, [wallet, openWalletModal]);
+
+  useEffect(() => {
+    if (wallet.wallet && !wallet.connected && !wallet.connecting && demoPreset !== 'disconnected') {
+      wallet.connect().catch((err) => {
+        console.warn('[TrenchLabs] auto-connect on wallet select:', err);
+      });
+    }
+  }, [wallet.wallet, wallet.connected, wallet.connecting, demoPreset, wallet]);
 
   useEffect(() => {
     try {
@@ -232,10 +267,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // ignore
       }
-    } else if (!wallet.connected && !wallet.connecting) {
-      setDemoPresetState((prev) => (prev === 'live' ? 'disconnected' : prev));
     }
-  }, [wallet.connected, wallet.connecting, wallet.publicKey]);
+  }, [wallet.connected, wallet.publicKey]);
 
   // Compute ATA address for display without issuing client-side RPC token queries
   useEffect(() => {
@@ -256,21 +289,22 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [wallet.publicKey]);
 
   const connected = useMemo(() => {
+    if (wallet.connected && !!wallet.publicKey) return true;
     if (demoPreset === 'disconnected') return false;
-    if (demoPreset === 'live') return wallet.connected && !!wallet.publicKey;
+    if (demoPreset === 'live') return false;
     return DEMO_ENABLED;
   }, [demoPreset, wallet.connected, wallet.publicKey]);
 
   const publicKeyBase58 = useMemo(() => {
-    if (!connected) return null;
-    if (demoPreset === 'live' && wallet.publicKey) {
+    if (wallet.connected && wallet.publicKey) {
       return wallet.publicKey.toBase58();
     }
+    if (!connected) return null;
     if (DEMO_ENABLED && demoPreset !== 'disconnected' && demoPreset !== 'live') {
       return DEMO_WALLETS[demoPreset];
     }
     return null;
-  }, [connected, demoPreset, wallet.publicKey]);
+  }, [connected, demoPreset, wallet.connected, wallet.publicKey]);
 
   const isAdmin = useMemo(
     () => Boolean(connected && publicKeyBase58 && isAdminWallet(publicKeyBase58)),
@@ -283,18 +317,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [publicKeyBase58]);
 
   const balance = useMemo(() => {
-    if (!connected) return 0;
-    if (demoPreset === 'live') {
+    if (wallet.connected && wallet.publicKey) {
       if (isAdmin && onChainBalance < MIN_GENESIS_REQUIRED) {
         return MIN_GENESIS_REQUIRED;
       }
       return onChainBalance;
     }
-    if (DEMO_ENABLED && demoPreset !== 'disconnected') {
+    if (!connected) return 0;
+    if (DEMO_ENABLED && demoPreset !== 'disconnected' && demoPreset !== 'live') {
       return DEMO_BALANCES[demoPreset];
     }
     return 0;
-  }, [connected, demoPreset, onChainBalance, isAdmin]);
+  }, [connected, demoPreset, onChainBalance, isAdmin, wallet.connected, wallet.publicKey]);
 
   const formattedBalance = useMemo(
     () => new Intl.NumberFormat('en-US').format(balance),
@@ -393,7 +427,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       const headers = await getAccessHeaders(interactiveAuth);
       if (!headers) {
         setNeedsSignature(true);
-        setApiError('SIGNATURE_REQUIRED');
         return;
       }
       setNeedsSignature(false);
@@ -414,6 +447,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         const data: AlphasResponse = await res.json();
 
         if (!res.ok || !data.ok) {
+          if (typeof data.balance === 'number') {
+            setOnChainBalance(data.balance);
+          }
           setAlphas([]);
           setCallers([]);
           setPortfolio(null);
@@ -710,6 +746,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setBoundEvmAddress,
     demoPreset,
     setDemoPreset,
+    connectWallet,
     disconnectDemoOrWallet,
     demoEnabled: DEMO_ENABLED,
   };

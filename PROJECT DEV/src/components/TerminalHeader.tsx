@@ -14,7 +14,7 @@ export const TerminalHeader: React.FC = () => {
     connected,
     shortAddress,
     tier,
-    setDemoPreset,
+    connectWallet,
     disconnectDemoOrWallet,
     searchQuery,
     setSearchQuery,
@@ -23,11 +23,6 @@ export const TerminalHeader: React.FC = () => {
   const handleDisconnect = async (e: React.MouseEvent) => {
     e.preventDefault();
     await disconnectDemoOrWallet();
-  };
-
-  const handleConnect = () => {
-    setDemoPreset('live');
-    openWalletModal(true);
   };
 
   return (
@@ -102,7 +97,7 @@ export const TerminalHeader: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={handleConnect}
+              onClick={connectWallet}
               className="h-9 sm:h-11 px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-pointer shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />

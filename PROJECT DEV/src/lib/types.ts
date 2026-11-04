@@ -168,6 +168,7 @@ export interface AlphasErr {
     | 'RATE_LIMITED'
     | 'STORE_UNAVAILABLE';
   message: string;
+  balance?: number;
   items: [];
 }
 
