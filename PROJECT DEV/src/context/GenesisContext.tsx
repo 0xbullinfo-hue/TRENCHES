@@ -115,6 +115,7 @@ interface GenesisContextValue {
   demoPreset: DemoPreset;
   setDemoPreset: (preset: DemoPreset) => void;
   connectWallet: () => void;
+  switchWallet: () => void | Promise<void>;
   disconnectDemoOrWallet: () => Promise<void>;
   demoEnabled: boolean;
 }
@@ -161,12 +162,29 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
     } catch {}
 
-    if (wallet.wallet && !wallet.connected) {
-      wallet.connect().catch(() => {
-        openWalletModal(true);
-      });
-      return;
+    try {
+      if (typeof wallet.select === 'function') {
+        wallet.select(null as any);
+      }
+    } catch {}
+
+    openWalletModal(true);
+  }, [wallet, openWalletModal]);
+
+  const switchWallet = useCallback(async () => {
+    try {
+      if (wallet.connected || wallet.wallet) {
+        await wallet.disconnect();
+      }
+    } catch (e) {
+      console.warn('[TrenchLabs] Disconnect before switch warning:', e);
     }
+
+    try {
+      if (typeof wallet.select === 'function') {
+        wallet.select(null as any);
+      }
+    } catch {}
 
     openWalletModal(true);
   }, [wallet, openWalletModal]);
@@ -764,6 +782,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     demoPreset,
     setDemoPreset,
     connectWallet,
+    switchWallet,
     disconnectDemoOrWallet,
     demoEnabled: DEMO_ENABLED,
   };

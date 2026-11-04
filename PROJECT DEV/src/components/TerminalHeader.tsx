@@ -2,19 +2,18 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { ArrowUpRight, LogOut, Search, Send, Wallet } from 'lucide-react';
 
 export const TerminalHeader: React.FC = () => {
-  const { setVisible: openWalletModal } = useWalletModal();
   const {
     connected,
     shortAddress,
     tier,
     connectWallet,
+    switchWallet,
     disconnectDemoOrWallet,
     searchQuery,
     setSearchQuery,
@@ -73,7 +72,7 @@ export const TerminalHeader: React.FC = () => {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={() => openWalletModal(true)}
+                onClick={switchWallet}
                 className="h-9 sm:h-10 px-2.5 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic font-mono text-[11px] sm:text-xs text-white flex items-center gap-1.5 sm:gap-2 transition-colors tnum cursor-pointer"
                 title="Switch Solana Wallet"
               >

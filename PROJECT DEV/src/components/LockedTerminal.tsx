@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { BUY_LINKS, GENESIS_MINT, SOLSCAN } from '@/lib/config';
 import {
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 
 export const LockedTerminal: React.FC = () => {
-  const { setVisible: openWalletModal } = useWalletModal();
   const {
     connected,
     shortAddress,
@@ -26,6 +24,7 @@ export const LockedTerminal: React.FC = () => {
     needsSignature,
     requestUnlockSignature,
     connectWallet,
+    switchWallet,
     apiLoading,
   } = useGenesisBalance();
   const [copied, setCopied] = useState(false);
@@ -240,7 +239,7 @@ export const LockedTerminal: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => openWalletModal(true)}
+              onClick={switchWallet}
               className="h-11 px-4 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5 text-pump" />
