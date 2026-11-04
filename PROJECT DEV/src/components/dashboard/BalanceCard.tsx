@@ -35,6 +35,15 @@ export const BalanceCard: React.FC = () => {
   const evmTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
+    if (!portfolioOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPortfolioOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [portfolioOpen]);
+
+  React.useEffect(() => {
     return () => {
       if (evmTimeoutRef.current) clearTimeout(evmTimeoutRef.current);
     };

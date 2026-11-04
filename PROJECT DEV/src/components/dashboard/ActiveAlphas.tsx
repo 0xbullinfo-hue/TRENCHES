@@ -52,6 +52,15 @@ export const ActiveAlphas: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const copyTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [activeModalItem, setActiveModalItem] = useState<AlphaItem | null>(null);
+
+  useEffect(() => {
+    if (!activeModalItem) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveModalItem(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeModalItem]);
   const [claimedIds, setClaimedIds] = useState<Record<string, boolean>>({});
   const [timers, setTimers] = useState<Record<string, number>>(INITIAL_TIMERS);
 

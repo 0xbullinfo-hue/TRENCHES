@@ -1,6 +1,12 @@
 import { GENESIS_MINT, MINT_CONFIGURED, SOLANA_RPC } from '@/lib/config';
 
-const SERVER_RPC = process.env.SOLANA_RPC || SOLANA_RPC;
+const RPC_ENDPOINTS: string[] = (
+  process.env.SOLANA_RPC_FALLBACKS
+    ? process.env.SOLANA_RPC_FALLBACKS.split(',')
+    : [process.env.SOLANA_RPC || SOLANA_RPC, 'https://api.mainnet-beta.solana.com']
+)
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 // In-memory 30s cache for on-chain balances to prevent RPC hammering and DoS (shared by API + Telegram fan-out)
 const balanceCache = new Map<string, { v: number; t: number }>();
@@ -8,32 +14,44 @@ const BALANCE_TTL_MS = 30_000;
 
 async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<number> {
   if (!MINT_CONFIGURED) return 0;
-  const res = await fetch(SERVER_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
-    signal,
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'getTokenAccountsByOwner',
-      params: [
-        owner,
-        { mint: GENESIS_MINT },
-        { encoding: 'jsonParsed', commitment: 'confirmed' },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`RPC returned ${res.status}`);
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message ?? 'Solana RPC error');
-  const accounts: Array<{
-    account: { data: { parsed: { info: { tokenAmount: { uiAmount: number | null } } } } };
-  }> = json.result?.value ?? [];
-  return accounts.reduce(
-    (sum, a) => sum + (a.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0),
-    0
-  );
+  let lastError: Error | null = null;
+
+  for (const endpoint of RPC_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        signal,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTokenAccountsByOwner',
+          params: [
+            owner,
+            { mint: GENESIS_MINT },
+            { encoding: 'jsonParsed', commitment: 'confirmed' },
+          ],
+        }),
+      });
+      if (!res.ok) throw new Error(`RPC returned ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message ?? 'Solana RPC error');
+      const accounts: Array<{
+        account: { data: { parsed: { info: { tokenAmount: { uiAmount: number | null } } } } };
+      }> = json.result?.value ?? [];
+      return accounts.reduce(
+        (sum, a) => sum + (a.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0),
+        0
+      );
+    } catch (err) {
+      lastError = err as Error;
+      if (signal?.aborted) throw err;
+      // Continue to next available fallback RPC
+    }
+  }
+
+  throw lastError ?? new Error('All Solana RPC endpoints failed');
 }
 
 export async function readGenesisBalanceCached(owner: string): Promise<number> {

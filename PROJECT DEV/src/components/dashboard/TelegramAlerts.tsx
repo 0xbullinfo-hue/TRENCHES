@@ -16,8 +16,10 @@ export function TelegramAlerts() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollGenRef = useRef(0);
 
   const stopPolling = () => {
+    pollGenRef.current += 1;
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
   };
@@ -51,19 +53,27 @@ export function TelegramAlerts() {
     setStatus('working');
     setMessage(null);
     try {
+      const currentGen = ++pollGenRef.current;
+      const targetWallet = publicKeyBase58;
       const { url } = await call('POST');
+      if (pollGenRef.current !== currentGen || targetWallet !== publicKeyBase58) return;
       if (!url) throw new Error('No link returned.');
       window.open(url, '_blank', 'noopener,noreferrer');
       setStatus('waiting');
       let tries = 0;
       pollRef.current = setInterval(async () => {
+        if (pollGenRef.current !== currentGen || targetWallet !== publicKeyBase58) {
+          stopPolling();
+          return;
+        }
         tries += 1;
         try {
           const { linked } = await call('GET');
+          if (pollGenRef.current !== currentGen || targetWallet !== publicKeyBase58) return;
           if (linked) {
             stopPolling();
             try {
-              localStorage.setItem(hintKey(publicKeyBase58), 'true');
+              localStorage.setItem(hintKey(targetWallet), 'true');
             } catch {
               /* ignore */
             }
@@ -74,8 +84,10 @@ export function TelegramAlerts() {
         }
         if (tries >= 40) {
           stopPolling();
-          setStatus('idle');
-          setMessage('Link not completed. Tap again and press Start in Telegram.');
+          if (pollGenRef.current === currentGen && targetWallet === publicKeyBase58) {
+            setStatus('idle');
+            setMessage('Link not completed. Tap again and press Start in Telegram.');
+          }
         }
       }, 3_000);
     } catch (e) {

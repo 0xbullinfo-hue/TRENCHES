@@ -11,6 +11,8 @@ import {
   kvHSet,
   kvSet,
   kvSetEx,
+  kvLock,
+  kvUnlock,
 } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import type { AlphaRecord } from '@/server/alphas-data';
@@ -87,16 +89,29 @@ export async function completeLink(code: string, chatId: string | number): Promi
   const wallet = await kvGetDel(codeKey(code));
   if (!wallet) return null;
 
-  // One chat <-> one wallet, in both directions (no stale mappings).
-  const prevWallet = await kvGet(chatKey(chatId));
-  if (prevWallet && prevWallet !== wallet) await kvHDel(SUBS_KEY, prevWallet);
-  const subs = await kvHGetAll(SUBS_KEY);
-  const prevChat = subs[wallet];
-  if (prevChat && String(prevChat) !== String(chatId)) await kvDel(chatKey(prevChat));
+  // Use a distributed lock on the wallet during mapping assignment to avoid races
+  const lockKey = `lock:link:${wallet}`;
+  const token = Math.random().toString(36).slice(2);
+  let locked = false;
+  if (KV_CONFIGURED) {
+    locked = await kvLock(lockKey, token, 10);
+  }
+  try {
+    // One chat <-> one wallet, in both directions (no stale mappings).
+    const prevWallet = await kvGet(chatKey(chatId));
+    if (prevWallet && prevWallet !== wallet) await kvHDel(SUBS_KEY, prevWallet);
+    const subs = await kvHGetAll(SUBS_KEY);
+    const prevChat = subs[wallet];
+    if (prevChat && String(prevChat) !== String(chatId)) await kvDel(chatKey(prevChat));
 
-  await kvHSet(SUBS_KEY, wallet, String(chatId));
-  await kvSet(chatKey(chatId), wallet);
-  return wallet;
+    await kvHSet(SUBS_KEY, wallet, String(chatId));
+    await kvSet(chatKey(chatId), wallet);
+    return wallet;
+  } finally {
+    if (locked) {
+      await kvUnlock(lockKey, token).catch(() => {});
+    }
+  }
 }
 
 // ---------- fan-out ----------

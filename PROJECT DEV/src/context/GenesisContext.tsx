@@ -155,6 +155,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const requestGenerationRef = useRef(0);
 
   const connectWallet = useCallback(() => {
     setDemoPresetState('live');
@@ -426,7 +427,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const fetchAlphasFromBackend = useCallback(
-    async (interactiveAuth = false) => {
+    async (interactiveAuth = false, generation?: number) => {
       if (!connected) {
         setAlphas([]);
         setCallers([]);
@@ -459,6 +460,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
       // Live connected wallet: acquire cryptographic authorization headers
       const headers = await getAccessHeaders(interactiveAuth);
+      if (typeof generation === 'number' && generation !== requestGenerationRef.current) return;
       if (!headers) {
         setNeedsSignature(true);
         return;
@@ -479,6 +481,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           signal: controller.signal,
         });
         const data: AlphasResponse = await res.json();
+        if (typeof generation === 'number' && generation !== requestGenerationRef.current) return;
 
         if (!res.ok || !data.ok) {
           if (typeof data.balance === 'number') {
@@ -498,21 +501,31 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
-          setApiError((err as Error).message || 'Solana RPC network unavailable');
+          if (typeof generation !== 'number' || generation === requestGenerationRef.current) {
+            setApiError((err as Error).message || 'Solana RPC network unavailable');
+          }
         }
       } finally {
-        setApiLoading(false);
+        if (typeof generation !== 'number' || generation === requestGenerationRef.current) {
+          setApiLoading(false);
+        }
       }
     },
     [connected, demoPreset, getAccessHeaders]
   );
 
   const requestUnlockSignature = useCallback(async () => {
-    await fetchAlphasFromBackend(true);
+    const gen = ++requestGenerationRef.current;
+    await fetchAlphasFromBackend(true, gen);
   }, [fetchAlphasFromBackend]);
 
   useEffect(() => {
-    fetchAlphasFromBackend(false);
+    const gen = ++requestGenerationRef.current;
+    fetchAlphasFromBackend(false, gen);
+    return () => {
+      requestGenerationRef.current += 1;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, [fetchAlphasFromBackend]);
 
   /**
@@ -720,6 +733,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
 
+    requestGenerationRef.current += 1;
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     setDemoPresetState('disconnected');
     setOnChainBalance(0);
     setAtaAddress(null);
@@ -739,7 +754,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [wallet]);
 
   const refreshAll = useCallback(async () => {
-    await fetchAlphasFromBackend(true);
+    const gen = ++requestGenerationRef.current;
+    await fetchAlphasFromBackend(true, gen);
   }, [fetchAlphasFromBackend]);
 
   const value: GenesisContextValue = {

@@ -14,6 +14,9 @@ export interface RateResult {
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<RateResult> {
   const now = Date.now();
   const bucket = Math.floor(now / (windowSec * 1000));
+  if (process.env.NODE_ENV === 'production' && !KV_CONFIGURED) {
+    console.warn('[TrenchLabs Ratelimit] Warning: UPSTASH_REDIS_REST_URL not configured. Rate limiting is running in per-instance memory fallback mode.');
+  }
   const retryAfter = Math.max(1, Math.ceil(((bucket + 1) * windowSec * 1000 - now) / 1000));
 
   if (KV_CONFIGURED) {

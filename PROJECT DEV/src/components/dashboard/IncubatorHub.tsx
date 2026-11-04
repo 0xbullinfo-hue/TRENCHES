@@ -334,7 +334,7 @@ export const IncubatorHub: React.FC = () => {
             setInspectedToken(coin);
           }
         }}
-        className={`group relative rounded-xl bg-surface flex flex-col justify-between cursor-pointer transition-colors p-4 focus:outline-none ${
+        className={`group relative rounded-xl bg-surface flex flex-col justify-between cursor-pointer transition-colors p-4 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
           isPinned ? 'border-2 border-pump' : 'border border-line hover:border-pump'
         }`}
       >

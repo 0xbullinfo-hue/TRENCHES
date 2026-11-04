@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { PublicKey } from '@solana/web3.js';
 import { ADMIN_WALLET } from '@/lib/config';
+import { KV_CONFIGURED, kvLock } from './kv';
 
 const ED25519_SPKI_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 export const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
@@ -96,16 +97,29 @@ export async function verifyAdminAuth(req: Request, rawBody: string): Promise<Ad
     return { authorized: false, error: 'Invalid admin cryptographic signature.' };
   }
 
-  if (seenSignatures.has(sig)) {
-    return { authorized: false, error: 'Signature replay detected.' };
+  const replayId = crypto.createHash('sha256').update(sig).digest('hex');
+  const ttlSeconds = Math.ceil(MAX_TIMESTAMP_DRIFT_MS / 1000);
+
+  if (process.env.NODE_ENV === 'production' && !KV_CONFIGURED) {
+    return { authorized: false, error: 'Shared replay protection is unavailable.' };
   }
 
-  const now = Date.now();
-  seenSignatures.set(sig, now + MAX_TIMESTAMP_DRIFT_MS);
-
-  // Prune expired replay signatures
-  for (const [k, exp] of seenSignatures) {
-    if (exp < now) seenSignatures.delete(k);
+  if (KV_CONFIGURED) {
+    // Shared atomic lock across serverless instances
+    const firstUse = await kvLock(`admin-replay:${replayId}`, 'used', ttlSeconds);
+    if (!firstUse) {
+      return { authorized: false, error: 'Signature replay detected.' };
+    }
+  } else {
+    // Development-only process fallback
+    if (seenSignatures.has(sig)) {
+      return { authorized: false, error: 'Signature replay detected.' };
+    }
+    const now = Date.now();
+    seenSignatures.set(sig, now + MAX_TIMESTAMP_DRIFT_MS);
+    for (const [k, exp] of seenSignatures) {
+      if (exp < now) seenSignatures.delete(k);
+    }
   }
 
   return { authorized: true };
