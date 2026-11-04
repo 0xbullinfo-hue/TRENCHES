@@ -28,12 +28,14 @@ export function TelegramAlerts() {
 
   useEffect(() => {
     stopPolling();
-    setMessage(null);
-    try {
-      setStatus(publicKeyBase58 && localStorage.getItem(hintKey(publicKeyBase58)) === 'true' ? 'linked' : 'idle');
-    } catch {
-      setStatus('idle');
-    }
+    queueMicrotask(() => {
+      setMessage(null);
+      try {
+        setStatus(publicKeyBase58 && localStorage.getItem(hintKey(publicKeyBase58)) === 'true' ? 'linked' : 'idle');
+      } catch {
+        setStatus('idle');
+      }
+    });
   }, [publicKeyBase58]);
 
   const call = useCallback(

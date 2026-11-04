@@ -35,3 +35,4 @@ test('Rate limit calculation logic', async () => {
   assert.equal(resAfterWindow.ok, true, 'Request in new window must be allowed');
   assert.equal(resAfterWindow.count, 1);
 });
+

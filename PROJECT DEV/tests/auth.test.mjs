@@ -35,4 +35,23 @@ test('Ed25519 signature binding and replay prevention logic', async () => {
   assert.equal(seenSignatures.has(sigHex), false, 'First use must not be detected as replay');
   seenSignatures.set(sigHex, Date.now() + 300_000);
   assert.equal(seenSignatures.has(sigHex), true, 'Second use must be detected as signature replay');
+
+  // 5. Distributed KV replay protection simulation across two independent instances
+  const sharedKVStore = new Map();
+  async function mockKvLock(key, token, ttlSec) {
+    if (sharedKVStore.has(key)) return false; // NX fail
+    sharedKVStore.set(key, token);
+    return true;
+  }
+
+  const replayId = crypto.createHash('sha256').update(sigHex).digest('hex');
+  const lockKey = `admin-replay:${replayId}`;
+
+  // Instance A receives the request
+  const instanceAFirstUse = await mockKvLock(lockKey, 'used', 300);
+  assert.equal(instanceAFirstUse, true, 'Instance A must acquire lock and process');
+
+  // Instance B receives the same request (replay)
+  const instanceBReplay = await mockKvLock(lockKey, 'used', 300);
+  assert.equal(instanceBReplay, false, 'Instance B must reject replay on shared store');
 });

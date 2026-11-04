@@ -30,3 +30,4 @@ test('Telegram message formatting and escaping', () => {
   assert.equal(formatted.includes('TP1 &lt;2x&gt;'), true, 'Take profit tags must be escaped');
   assert.equal(formatted.includes('TokenContract123'), true, 'CA must be intact');
 });
+

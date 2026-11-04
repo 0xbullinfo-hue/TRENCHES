@@ -158,7 +158,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const requestGenerationRef = useRef(0);
 
   const connectWallet = useCallback(() => {
-    setDemoPresetState('live');
+    queueMicrotask(() => setDemoPresetState('live'));
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
     } catch {}
@@ -194,14 +194,14 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     try {
       if (DEMO_ENABLED) {
         const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
-        if (savedPreset && savedPreset !== 'live') setDemoPresetState(savedPreset);
+        if (savedPreset && savedPreset !== 'live') queueMicrotask(() => setDemoPresetState(savedPreset));
       }
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
-      if (savedEvm) setBoundEvmAddressState(savedEvm);
+      if (savedEvm) queueMicrotask(() => setBoundEvmAddressState(savedEvm));
       const savedWatch = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
       if (savedWatch) {
         const parsed = JSON.parse(savedWatch);
-        if (Array.isArray(parsed)) setWatchlist(parsed);
+        if (Array.isArray(parsed)) queueMicrotask(() => setWatchlist(parsed));
       }
     } catch {
       // ignore storage errors
@@ -266,7 +266,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (wallet.connected && wallet.publicKey) {
-      setDemoPresetState('live');
+      queueMicrotask(() => setDemoPresetState('live'));
       try {
         window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
       } catch {
@@ -278,7 +278,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   // Compute ATA address for display without issuing client-side RPC token queries
   useEffect(() => {
     if (!wallet.publicKey) {
-      setAtaAddress(null);
+      queueMicrotask(() => setAtaAddress(null));
       return;
     }
     try {
@@ -287,9 +287,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mintKey.toBuffer()],
         ASSOCIATED_TOKEN_PROGRAM_ID
       );
-      setAtaAddress(ata.toBase58());
+      queueMicrotask(() => setAtaAddress(ata.toBase58()));
     } catch {
-      setAtaAddress(null);
+      queueMicrotask(() => setAtaAddress(null));
     }
   }, [wallet.publicKey]);
 
@@ -521,7 +521,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const gen = ++requestGenerationRef.current;
-    fetchAlphasFromBackend(false, gen);
+    queueMicrotask(() => { fetchAlphasFromBackend(false, gen); });
     return () => {
       requestGenerationRef.current += 1;
       if (abortControllerRef.current) abortControllerRef.current.abort();
