@@ -56,3 +56,31 @@ export async function kvUnlock(key: string, token: string): Promise<void> {
     token,
   ]);
 }
+
+export async function kvSetEx(key: string, value: string, ttlSec: number): Promise<void> {
+  await cmd(['SET', key, value, 'EX', ttlSec]);
+}
+
+/** Atomic read-and-delete (one-time codes). */
+export async function kvGetDel(key: string): Promise<string | null> {
+  return ((await cmd(['GETDEL', key])) as string | null) ?? null;
+}
+
+export async function kvDel(key: string): Promise<void> {
+  await cmd(['DEL', key]);
+}
+
+export async function kvHSet(key: string, field: string, value: string): Promise<void> {
+  await cmd(['HSET', key, field, value]);
+}
+
+export async function kvHDel(key: string, field: string): Promise<void> {
+  await cmd(['HDEL', key, field]);
+}
+
+export async function kvHGetAll(key: string): Promise<Record<string, string>> {
+  const flat = ((await cmd(['HGETALL', key])) as string[] | null) ?? [];
+  const out: Record<string, string> = {};
+  for (let i = 0; i + 1 < flat.length; i += 2) out[flat[i]] = flat[i + 1];
+  return out;
+}

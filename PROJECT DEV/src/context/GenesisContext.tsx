@@ -93,6 +93,8 @@ interface GenesisContextValue {
   needsSignature: boolean;
   refreshAll: () => Promise<void>;
   requestUnlockSignature: () => Promise<void>;
+  /** Wallet-signed headers for an arbitrary API call (message bound to method + path). Cached ~4 min. */
+  signRequestHeaders: (method: string, path: string) => Promise<Record<string, string> | null>;
 
   createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
@@ -383,6 +385,36 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // ignore cache write failure
         }
+        return headers;
+      } catch {
+        return null;
+      }
+    },
+    [wallet]
+  );
+
+  const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
+
+  const signRequestHeaders = useCallback(
+    async (method: string, path: string): Promise<Record<string, string> | null> => {
+      if (!wallet.publicKey || !wallet.signMessage) return null;
+      const addr = wallet.publicKey.toBase58();
+      const key = `${addr}|${method}|${path}`;
+      const hit = signCacheRef.current.get(key);
+      if (hit && Date.now() - hit.ts < 4 * 60_000) return hit.headers;
+      try {
+        const ts = Date.now();
+        const sig = await wallet.signMessage(
+          new TextEncoder().encode(`TrenchLabs Access|${method}|${path}|${ts}`)
+        );
+        const headers = {
+          'x-wallet': addr,
+          'x-timestamp': String(ts),
+          'x-signature': Array.from(sig)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join(''),
+        };
+        signCacheRef.current.set(key, { ts, headers });
         return headers;
       } catch {
         return null;
@@ -714,6 +746,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     shortAddress,
     ataAddress,
     genesisMint: GENESIS_MINT,
+    signRequestHeaders,
     balance,
     formattedBalance,
     tier,

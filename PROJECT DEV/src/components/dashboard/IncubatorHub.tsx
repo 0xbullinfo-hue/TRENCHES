@@ -13,6 +13,8 @@ import {
   SOLSCAN,
 } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
+import { SinceCallChip } from './SinceCallChip';
+import { TelegramAlerts } from './TelegramAlerts';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import {
   AlertTriangle,
@@ -108,7 +110,6 @@ export const IncubatorHub: React.FC = () => {
 
   const [evmDraft, setEvmDraft] = useState(boundEvmAddress);
   const [evmSaved, setEvmSaved] = useState(false);
-  const [tgKey, setTgKey] = useState<string | null>(null);
 
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -249,11 +250,6 @@ export const IncubatorHub: React.FC = () => {
     } else {
       showToast('Invalid EVM address format: must be 0x followed by 40 hex characters.');
     }
-  };
-
-  const handleGenerateTelegramKey = () => {
-    const suffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setTgKey(`TL-LAB-1M-${suffix}`);
   };
 
   const pinnedCalls = useMemo(
@@ -455,6 +451,9 @@ export const IncubatorHub: React.FC = () => {
               </div>
               <div className="text-[11px] text-pump">
                 Entry {coin.entryMarketCap}
+              </div>
+              <div className="mt-1">
+                <SinceCallChip current={coin.marketCapUsd} entry={coin.entryMarketCapUsd} />
               </div>
             </div>
           </div>
@@ -1329,6 +1328,9 @@ export const IncubatorHub: React.FC = () => {
                         <div className="text-xs text-pump">
                           Entry {token.entryMarketCap}
                         </div>
+                        <div className="mt-1">
+                          <SinceCallChip current={token.marketCapUsd} entry={token.entryMarketCapUsd} />
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center font-mono text-xs">
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-card border border-line">
@@ -1479,14 +1481,14 @@ export const IncubatorHub: React.FC = () => {
       <div className="rounded-xl bg-surface border border-line p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
         <div className="lg:col-span-7 space-y-1.5">
           <h3 className="font-sans text-base font-extrabold text-white">
-            Multi-Chain Wallet Binding &amp; Private Telegram Signal Key
+            Multi-Chain Wallet Binding &amp; Telegram Call Alerts
           </h3>
           <p className="font-sans text-sm text-muted leading-relaxed">
             Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
             is verified with{' '}
             <strong className="text-pump">{formattedBalance} $GENESIS</strong>.
-            Optionally save a local EVM address for multi-chain notifications or generate
-            a simulated Telegram signal key (stored in local browser storage).
+            Optionally save a local EVM address for multi-chain notifications, and get
+            every new call pushed to Telegram.
           </p>
         </div>
 
@@ -1527,32 +1529,7 @@ export const IncubatorHub: React.FC = () => {
             </div>
           )}
 
-          {tgKey ? (
-            <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-surface-card border border-line font-mono text-xs">
-              <span className="text-pump font-bold tnum">{tgKey}</span>
-              <button
-                type="button"
-                onClick={(e) => handleCopyText(tgKey, 'tg-key', 'Telegram Key', e)}
-                className="text-white hover:text-pump font-bold inline-flex items-center gap-1 cursor-pointer"
-              >
-                {copiedId === 'tg-key' ? (
-                  <Check className="w-3.5 h-3.5 text-pump" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>{copiedId === 'tg-key' ? 'COPIED' : 'COPY KEY'}</span>
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleGenerateTelegramKey}
-              className="w-full h-9 rounded bg-surface-card hover:bg-pump hover:text-canvas border border-line font-sans text-xs font-bold text-pump flex items-center justify-center gap-2 cursor-pointer transition-colors"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Generate Private Syndicate Telegram Key</span>
-            </button>
-          )}
+          <TelegramAlerts />
         </div>
       </div>
 
