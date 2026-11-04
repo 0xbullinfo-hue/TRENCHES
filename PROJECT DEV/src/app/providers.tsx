@@ -37,6 +37,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <WalletProvider
         wallets={wallets}
         autoConnect={false}
+        localStorageKey="trenchlabs_wallet"
         onError={(err) => {
           console.error('[TrenchLabs Wallet Error]:', err?.message || err);
         }}

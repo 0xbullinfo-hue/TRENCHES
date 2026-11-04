@@ -160,6 +160,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
   const prevPublicKeyRef = useRef<string | null>(null);
   const pendingUnlockTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchAlphasRef = useRef<(interactiveAuth?: boolean, gen?: number) => Promise<void>>(async () => {});
 
   const [connectingWalletName, setConnectingWalletName] = useState<string | null>(null);
   const [walletConnectError, setWalletConnectError] = useState<string | null>(null);
@@ -176,7 +177,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [clearPendingUnlockWatcher]);
 
   const finalizeWalletConnection = useCallback(
-    (targetWallet: Wallet) => {
+    async (targetWallet: Wallet) => {
       clearPendingUnlockWatcher();
       signCacheRef.current.clear();
       try {
@@ -205,6 +206,41 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       setWalletConnectError(null);
       setConnectingWalletName(null);
       setIsWalletModalOpen(false);
+
+      // Immediately prompt for cryptographic ownership signature during the active connection flow
+      const activeSignMessage =
+        typeof (targetWallet.adapter as any).signMessage === 'function'
+          ? (targetWallet.adapter as any).signMessage.bind(targetWallet.adapter)
+          : wallet.signMessage;
+
+      if (activeSignMessage && targetWallet.adapter.publicKey) {
+        try {
+          const addr = targetWallet.adapter.publicKey.toBase58();
+          const ts = Date.now();
+          const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
+          const sigBytes = await activeSignMessage(new TextEncoder().encode(msg));
+          const sigHex = Array.from(sigBytes)
+            .map((b) => (b as number).toString(16).padStart(2, '0'))
+            .join('');
+          const headers = {
+            'x-wallet': addr,
+            'x-timestamp': String(ts),
+            'x-signature': sigHex,
+          };
+          sessionStorage.setItem(
+            ACCESS_STORAGE_KEY,
+            JSON.stringify({ wallet: addr, ts, headers })
+          );
+          setNeedsSignature(false);
+          const gen = ++requestGenerationRef.current;
+          await fetchAlphasRef.current(true, gen);
+        } catch (signErr) {
+          console.warn('[TrenchLabs] Initial signature prompt deferred or rejected:', signErr);
+          setNeedsSignature(true);
+        }
+      } else {
+        setNeedsSignature(true);
+      }
     },
     [wallet, clearPendingUnlockWatcher]
   );
@@ -340,8 +376,17 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      if (DEMO_ENABLED) {
-        const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
+      const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
+      if (savedPreset === 'disconnected') {
+        queueMicrotask(() => {
+          if (typeof wallet.select === 'function') {
+            wallet.select(null as any);
+          }
+        });
+        window.localStorage.removeItem('walletName');
+        window.localStorage.removeItem('trenchlabs_wallet');
+        sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+      } else if (DEMO_ENABLED) {
         if (savedPreset && savedPreset !== 'live') queueMicrotask(() => setDemoPresetState(savedPreset));
       }
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
@@ -354,7 +399,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore storage errors
     }
-  }, []);
+  }, [wallet]);
 
   const setBoundEvmAddress = useCallback((addr: string): boolean => {
     const trimmed = addr.trim();
@@ -534,10 +579,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
    */
   const getAccessHeaders = useCallback(
     async (interactive = false): Promise<Record<string, string> | null> => {
-      if (!wallet.publicKey || !wallet.signMessage) {
+      const activeAdapter = wallet.wallet?.adapter;
+      const pubKey = wallet.publicKey || activeAdapter?.publicKey;
+      if (!pubKey) {
         return null;
       }
-      const addr = wallet.publicKey.toBase58();
+      const addr = pubKey.toBase58();
 
       try {
         const cached = JSON.parse(sessionStorage.getItem(ACCESS_STORAGE_KEY) || 'null');
@@ -553,15 +600,25 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
+      const activeSignMessage =
+        wallet.signMessage ||
+        (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+          ? (activeAdapter as any).signMessage.bind(activeAdapter)
+          : null);
+
+      if (!activeSignMessage) {
+        return null;
+      }
+
       try {
         const ts = Date.now();
         const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
-        const sig = await wallet.signMessage(new TextEncoder().encode(msg));
+        const sig = await activeSignMessage(new TextEncoder().encode(msg));
         const headers = {
           'x-wallet': addr,
           'x-timestamp': String(ts),
           'x-signature': Array.from(sig)
-            .map((b) => b.toString(16).padStart(2, '0'))
+            .map((b) => (b as number).toString(16).padStart(2, '0'))
             .join(''),
         };
         try {
@@ -579,21 +636,32 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const signRequestHeaders = useCallback(
     async (method: string, path: string): Promise<Record<string, string> | null> => {
-      if (!wallet.publicKey || !wallet.signMessage) return null;
-      const addr = wallet.publicKey.toBase58();
+      const activeAdapter = wallet.wallet?.adapter;
+      const pubKey = wallet.publicKey || activeAdapter?.publicKey;
+      if (!pubKey) return null;
+      const addr = pubKey.toBase58();
       const key = `${addr}|${method}|${path}`;
       const hit = signCacheRef.current.get(key);
       if (hit && Date.now() - hit.ts < 4 * 60_000) return hit.headers;
+
+      const activeSignMessage =
+        wallet.signMessage ||
+        (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+          ? (activeAdapter as any).signMessage.bind(activeAdapter)
+          : null);
+
+      if (!activeSignMessage) return null;
+
       try {
         const ts = Date.now();
-        const sig = await wallet.signMessage(
+        const sig = await activeSignMessage(
           new TextEncoder().encode(`TrenchLabs Access|${method}|${path}|${ts}`)
         );
         const headers = {
           'x-wallet': addr,
           'x-timestamp': String(ts),
           'x-signature': Array.from(sig)
-            .map((b) => b.toString(16).padStart(2, '0'))
+            .map((b) => (b as number).toString(16).padStart(2, '0'))
             .join(''),
         };
         signCacheRef.current.set(key, { ts, headers });
@@ -697,10 +765,53 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     [connected, demoPreset, getAccessHeaders]
   );
 
-  const requestUnlockSignature = useCallback(async () => {
-    const gen = ++requestGenerationRef.current;
-    await fetchAlphasFromBackend(true, gen);
+  useEffect(() => {
+    fetchAlphasRef.current = fetchAlphasFromBackend;
   }, [fetchAlphasFromBackend]);
+
+  const requestUnlockSignature = useCallback(async () => {
+    const activeAdapter = wallet.wallet?.adapter;
+    const pubKey = wallet.publicKey || activeAdapter?.publicKey;
+    if (!pubKey) {
+      console.warn('[TrenchLabs] Cannot sign: no active wallet public key');
+      return;
+    }
+    const addr = pubKey.toBase58();
+
+    const activeSignMessage =
+      wallet.signMessage ||
+      (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+        ? (activeAdapter as any).signMessage.bind(activeAdapter)
+        : null);
+
+    if (!activeSignMessage) {
+      console.warn('[TrenchLabs] Active wallet does not support message signing');
+      return;
+    }
+
+    try {
+      setApiLoading(true);
+      const ts = Date.now();
+      const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
+      const sigBytes = await activeSignMessage(new TextEncoder().encode(msg));
+      const sigHex = Array.from(sigBytes)
+        .map((b) => (b as number).toString(16).padStart(2, '0'))
+        .join('');
+      const headers = {
+        'x-wallet': addr,
+        'x-timestamp': String(ts),
+        'x-signature': sigHex,
+      };
+      sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
+      setNeedsSignature(false);
+      const gen = ++requestGenerationRef.current;
+      await fetchAlphasFromBackend(true, gen);
+    } catch (err) {
+      console.warn('[TrenchLabs] Sign to unlock error:', err);
+    } finally {
+      setApiLoading(false);
+    }
+  }, [wallet, fetchAlphasFromBackend]);
 
   useEffect(() => {
     const gen = ++requestGenerationRef.current;
@@ -716,24 +827,32 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
    */
   const getAdminHeaders = useCallback(
     async (method: string, urlPath: string, bodyStr: string): Promise<Record<string, string>> => {
-      const adminAddr = (wallet.publicKey ? wallet.publicKey.toBase58() : '') || ADMIN_WALLET;
+      const activeAdapter = wallet.wallet?.adapter;
+      const pubKey = wallet.publicKey || activeAdapter?.publicKey;
+      const adminAddr = (pubKey ? pubKey.toBase58() : '') || ADMIN_WALLET;
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'x-admin-wallet': adminAddr,
       };
 
+      const activeSignMessage =
+        wallet.signMessage ||
+        (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+          ? (activeAdapter as any).signMessage.bind(activeAdapter)
+          : null);
+
       if (
-        wallet.connected &&
-        wallet.publicKey &&
-        wallet.signMessage &&
-        wallet.publicKey.toBase58() === ADMIN_WALLET
+        (wallet.connected || activeAdapter?.connected) &&
+        pubKey &&
+        activeSignMessage &&
+        pubKey.toBase58() === ADMIN_WALLET
       ) {
         const ts = Date.now();
         const bodyHash = await sha256Hex(bodyStr);
         const message = ['TrenchLabs Admin', method, urlPath, ts, bodyHash].join('|');
-        const sigBytes = await wallet.signMessage(new TextEncoder().encode(message));
+        const sigBytes = await activeSignMessage(new TextEncoder().encode(message));
         const sigHex = Array.from(sigBytes)
-          .map((b) => b.toString(16).padStart(2, '0'))
+          .map((b) => (b as number).toString(16).padStart(2, '0'))
           .join('');
 
         headers['x-admin-timestamp'] = String(ts);
@@ -931,6 +1050,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'disconnected');
       window.localStorage.removeItem('walletName');
+      window.localStorage.removeItem('trenchlabs_wallet');
       sessionStorage.removeItem(ACCESS_STORAGE_KEY);
     } catch {
       // ignore
