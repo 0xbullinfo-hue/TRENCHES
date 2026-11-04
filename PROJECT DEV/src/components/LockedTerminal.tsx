@@ -92,7 +92,10 @@ export const LockedTerminal: React.FC = () => {
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => openWalletModal(true)}
+              onClick={() => {
+                setDemoPreset('live');
+                openWalletModal(true);
+              }}
               className="h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Wallet className="w-4 h-4" />

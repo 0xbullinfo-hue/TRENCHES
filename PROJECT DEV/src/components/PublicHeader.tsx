@@ -7,19 +7,25 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, Wallet } from 'lucide-react';
+import { ArrowUpRight, LogOut, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const router = useRouter();
   const { setVisible: openWalletModal } = useWalletModal();
-  const { connected, shortAddress } = useGenesisBalance();
+  const { connected, shortAddress, setDemoPreset, disconnectDemoOrWallet } = useGenesisBalance();
 
   const handleConnectClick = () => {
     if (!connected) {
+      setDemoPreset('live');
       openWalletModal(true);
     } else {
       router.push('/dashboard');
     }
+  };
+
+  const handleDisconnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    await disconnectDemoOrWallet();
   };
 
   return (
@@ -61,7 +67,7 @@ export const PublicHeader: React.FC = () => {
           </a>
         </nav>
 
-        {/* Right: CONNECT Button */}
+        {/* Right: CONNECT Button & Disconnect */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
@@ -71,6 +77,17 @@ export const PublicHeader: React.FC = () => {
             <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
             <span>{connected ? `DASHBOARD (${shortAddress})` : 'CONNECT WALLET'}</span>
           </button>
+          {connected && (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border text-muted hover:text-danger flex items-center justify-center transition-colors cursor-pointer"
+              title="Disconnect Wallet"
+              aria-label="Disconnect Wallet"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>

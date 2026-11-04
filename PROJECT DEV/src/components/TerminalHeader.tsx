@@ -13,13 +13,22 @@ export const TerminalHeader: React.FC = () => {
   const {
     connected,
     shortAddress,
-    formattedBalance,
     tier,
-    isUnlocked,
+    setDemoPreset,
     disconnectDemoOrWallet,
     searchQuery,
     setSearchQuery,
   } = useGenesisBalance();
+
+  const handleDisconnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    await disconnectDemoOrWallet();
+  };
+
+  const handleConnect = () => {
+    setDemoPreset('live');
+    openWalletModal(true);
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border overflow-hidden">
@@ -82,7 +91,7 @@ export const TerminalHeader: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={disconnectDemoOrWallet}
+                onClick={handleDisconnect}
                 className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border text-muted hover:text-danger flex items-center justify-center transition-colors cursor-pointer"
                 title="Disconnect Wallet"
                 aria-label="Disconnect Wallet"
@@ -93,7 +102,7 @@ export const TerminalHeader: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={() => openWalletModal(true)}
+              onClick={handleConnect}
               className="h-9 sm:h-11 px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-pointer shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />

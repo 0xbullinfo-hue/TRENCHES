@@ -111,7 +111,7 @@ interface GenesisContextValue {
 
   demoPreset: DemoPreset;
   setDemoPreset: (preset: DemoPreset) => void;
-  disconnectDemoOrWallet: () => void;
+  disconnectDemoOrWallet: () => Promise<void>;
   demoEnabled: boolean;
 }
 
@@ -133,7 +133,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const wallet = useWallet();
 
   // In production, default strictly to 'disconnected'. In local development only, allow '1m'
-  const [demoPreset, setDemoPresetState] = useState<DemoPreset>(DEMO_ENABLED ? '1m' : 'disconnected');
+  const [demoPreset, setDemoPresetState] = useState<DemoPreset>('disconnected');
   const [onChainBalance, setOnChainBalance] = useState<number>(0);
   const [ataAddress, setAtaAddress] = useState<string | null>(null);
 
@@ -154,7 +154,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     try {
       if (DEMO_ENABLED) {
         const savedPreset = window.localStorage.getItem(DEMO_PRESET_STORAGE_KEY) as DemoPreset | null;
-        if (savedPreset) setDemoPresetState(savedPreset);
+        if (savedPreset && savedPreset !== 'live') setDemoPresetState(savedPreset);
       }
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
       if (savedEvm) setBoundEvmAddressState(savedEvm);
@@ -227,8 +227,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (wallet.connected && wallet.publicKey) {
       setDemoPresetState('live');
+      try {
+        window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
+      } catch {
+        // ignore
+      }
+    } else if (!wallet.connected && !wallet.connecting) {
+      setDemoPresetState((prev) => (prev === 'live' ? 'disconnected' : prev));
     }
-  }, [wallet.connected, wallet.publicKey]);
+  }, [wallet.connected, wallet.connecting, wallet.publicKey]);
 
   // Compute ATA address for display without issuing client-side RPC token queries
   useEffect(() => {
@@ -626,19 +633,38 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const disconnectDemoOrWallet = useCallback(() => {
-    if (wallet.connected) {
-      wallet.disconnect().catch(() => {});
-    }
-    setDemoPresetState('disconnected');
+  const disconnectDemoOrWallet = useCallback(async () => {
     try {
-      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'disconnected');
-      sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+      if (wallet.connected || wallet.wallet) {
+        await wallet.disconnect();
+      }
+    } catch (e) {
+      console.warn('[TrenchLabs] Wallet disconnect warning:', e);
+    }
+
+    try {
+      if (typeof wallet.select === 'function') {
+        wallet.select(null as any);
+      }
     } catch {
       // ignore
     }
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
+
+    setDemoPresetState('disconnected');
+    setOnChainBalance(0);
+    setAtaAddress(null);
+    setAlphas([]);
+    setCallers([]);
+    setPortfolio(null);
+    setApiError(null);
+    setNeedsSignature(false);
+
+    try {
+      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'disconnected');
+      window.localStorage.removeItem('walletName');
+      sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+    } catch {
+      // ignore
     }
   }, [wallet]);
 

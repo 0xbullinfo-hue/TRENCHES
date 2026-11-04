@@ -1,25 +1,12 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React from 'react';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { IncubatorHub } from '@/components/dashboard/IncubatorHub';
 import { useGenesisBalance } from '@/context/GenesisContext';
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { connected, isUnlocked } = useGenesisBalance();
-
-  useEffect(() => {
-    if (!connected) {
-      router.replace('/');
-    }
-  }, [connected, router]);
-
-  // If not connected, redirect to landing immediately (never show dashboard)
-  if (!connected) {
-    return null;
-  }
+  const { isUnlocked } = useGenesisBalance();
 
   return (
     <section id="terminal" className="flex-1 py-6 bg-canvas">
@@ -35,4 +22,3 @@ export default function DashboardPage() {
     </section>
   );
 }
-
