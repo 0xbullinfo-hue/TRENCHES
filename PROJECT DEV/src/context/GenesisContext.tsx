@@ -177,7 +177,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [clearPendingUnlockWatcher]);
 
   const finalizeWalletConnection = useCallback(
-    async (targetWallet: Wallet) => {
+    (targetWallet: Wallet) => {
       clearPendingUnlockWatcher();
       signCacheRef.current.clear();
       try {
@@ -206,41 +206,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       setWalletConnectError(null);
       setConnectingWalletName(null);
       setIsWalletModalOpen(false);
-
-      // Immediately prompt for cryptographic ownership signature during the active connection flow
-      const activeSignMessage =
-        typeof (targetWallet.adapter as any).signMessage === 'function'
-          ? (targetWallet.adapter as any).signMessage.bind(targetWallet.adapter)
-          : wallet.signMessage;
-
-      if (activeSignMessage && targetWallet.adapter.publicKey) {
-        try {
-          const addr = targetWallet.adapter.publicKey.toBase58();
-          const ts = Date.now();
-          const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
-          const sigBytes = await activeSignMessage(new TextEncoder().encode(msg));
-          const sigHex = Array.from(sigBytes)
-            .map((b) => (b as number).toString(16).padStart(2, '0'))
-            .join('');
-          const headers = {
-            'x-wallet': addr,
-            'x-timestamp': String(ts),
-            'x-signature': sigHex,
-          };
-          sessionStorage.setItem(
-            ACCESS_STORAGE_KEY,
-            JSON.stringify({ wallet: addr, ts, headers })
-          );
-          setNeedsSignature(false);
-          const gen = ++requestGenerationRef.current;
-          await fetchAlphasRef.current(true, gen);
-        } catch (signErr) {
-          console.warn('[TrenchLabs] Initial signature prompt deferred or rejected:', signErr);
-          setNeedsSignature(true);
-        }
-      } else {
-        setNeedsSignature(true);
-      }
+      setNeedsSignature(true);
     },
     [wallet, clearPendingUnlockWatcher]
   );
@@ -806,8 +772,13 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       setNeedsSignature(false);
       const gen = ++requestGenerationRef.current;
       await fetchAlphasFromBackend(true, gen);
-    } catch (err) {
+    } catch (err: unknown) {
+      const errMsg = (err as { message?: string })?.message || '';
+      if (/user rejected|window closed|cancelled|canceled|denied/i.test(errMsg)) {
+        return;
+      }
       console.warn('[TrenchLabs] Sign to unlock error:', err);
+      setApiError(errMsg || 'Failed to sign message. Please unlock your wallet and try again.');
     } finally {
       setApiLoading(false);
     }

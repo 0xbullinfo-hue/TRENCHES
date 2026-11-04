@@ -26,6 +26,7 @@ export const LockedTerminal: React.FC = () => {
     connectWallet,
     switchWallet,
     apiLoading,
+    apiError,
   } = useGenesisBalance();
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -89,6 +90,12 @@ export const LockedTerminal: React.FC = () => {
             </button>
           </div>
 
+          {apiError && (
+            <div className="p-3 rounded bg-danger/10 border border-danger/40 text-danger text-xs font-mono text-center max-w-md mx-auto">
+              {apiError}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               type="button"
@@ -141,6 +148,12 @@ export const LockedTerminal: React.FC = () => {
               on-chain transaction and costs zero gas.
             </p>
           </div>
+
+          {apiError && (
+            <div className="p-3 rounded bg-danger/10 border border-danger/40 text-danger text-xs font-mono text-center max-w-md mx-auto">
+              {apiError}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
