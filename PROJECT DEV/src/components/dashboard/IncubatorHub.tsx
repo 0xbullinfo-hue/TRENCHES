@@ -16,6 +16,8 @@ import { TokenArtwork } from './TokenArtwork';
 import { SinceCallChip } from './SinceCallChip';
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
+import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
+import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import {
   AlertTriangle,
@@ -49,6 +51,7 @@ const ALL_CHAINS: (Chain | 'ALL')[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBI
 export const IncubatorHub: React.FC = () => {
   const {
     connected,
+    isUnlocked,
     publicKeyBase58,
     shortAddress,
     formattedBalance,
@@ -753,6 +756,16 @@ export const IncubatorHub: React.FC = () => {
         </div>
       </div>
 
+      {/* 3. STAKE CARD (Moved below the Welcome to Lab card) */}
+      <DashboardStakingCard />
+
+      {/* 4. ALPHA TRADE CALLS: Full feed for verified users, locked terminal for unverified */}
+      {!isUnlocked ? (
+        <div className="pt-2">
+          <LockedTerminal />
+        </div>
+      ) : (
+        <>
       {/* 1. ADMIN COMMAND DESK (Visible when connected as FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e or Admin Mode) */}
       {isAdmin && (
         <div className="rounded-xl bg-surface border-2 border-pump overflow-hidden">
@@ -1544,6 +1557,8 @@ export const IncubatorHub: React.FC = () => {
           <TelegramAlerts />
         </div>
       </div>
+      </>
+      )}
 
       <AlphaInspectorModal
         token={inspectedToken}

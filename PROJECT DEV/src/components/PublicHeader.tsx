@@ -53,12 +53,6 @@ export const PublicHeader: React.FC = () => {
           >
             Experiments
           </a>
-          <Link
-            href="/ledger"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
-          >
-            Ledger
-          </Link>
           <a
             href={SOCIAL_LINKS.telegram}
             target="_blank"

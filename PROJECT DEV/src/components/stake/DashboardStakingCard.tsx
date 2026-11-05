@@ -85,57 +85,80 @@ export function DashboardStakingCard() {
     return Math.min(100, Math.max(0, Math.round(((90 - daysLeft) / 90) * 100)));
   }, [statusData]);
 
-  // 1. Free Tier / Not Connected: Compact link to tier section (§4)
+  // 1. Free Tier / Not Connected: Compact banner (slightly wider than disclaimer, button left, text right)
   if (!connected || (isFreeTier && !hasActiveStake)) {
     return (
-      <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs font-sans text-muted">
+      <div className="rounded-xl bg-surface border border-line p-4 sm:p-5 -mx-1 sm:-mx-2 lg:-mx-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all">
+        {/* LEFT: Button */}
+        <div className="shrink-0 order-2 sm:order-1">
+          <Link
+            href="/#choose-your-access"
+            className="h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic/40 hover:border-toxic text-toxic hover:text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Upgrade to Member to stake →</span>
+          </Link>
+        </div>
+
+        {/* RIGHT: Text */}
+        <div className="flex items-center sm:justify-end gap-2 text-xs font-sans text-muted order-1 sm:order-2 sm:text-right">
           <Sparkles className="w-4 h-4 text-toxic shrink-0" />
           <span>Hold $20 in $GENESIS to unlock Member tier before staking for Pro.</span>
         </div>
-        <Link
-          href="/#choose-your-access"
-          className="text-xs font-bold uppercase tracking-wider text-toxic hover:text-white inline-flex items-center gap-1 shrink-0 transition-colors"
-        >
-          <span>Upgrade to Member to stake →</span>
-        </Link>
       </div>
     );
   }
 
-  // 2. Pro Tier: Collapsed status pill, expands to show details (§4)
+  // 2. Pro Tier: Active status card (slightly wider than disclaimer, button left, text right)
   if (isPro && hasActiveStake) {
     const daysLeft = statusData?.stake?.days_remaining ?? 90;
 
     return (
-      <div className="rounded-lg bg-neutral-900 border border-neutral-800 transition-colors">
-        {/* Collapsed Header / Pill */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="w-full p-4 sm:px-6 flex items-center justify-between text-left cursor-pointer hover:bg-neutral-800/40 transition-colors rounded-lg"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-base select-none">💎</span>
-            <span className="font-sans text-sm font-bold text-white uppercase tracking-wider">
-              Pro active
-            </span>
-            <span className="text-muted text-xs font-mono">
-              · {daysLeft} days remaining
-            </span>
+      <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-4 sm:p-5 -mx-1 sm:-mx-2 lg:-mx-3 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* LEFT: Action Buttons (Streamflow removed from button text) */}
+          <div className="shrink-0 flex items-center gap-2.5 order-2 sm:order-1">
+            <a
+              href={streamflowUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+            >
+              <span>STAKE ADDITIONAL</span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="h-11 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span>Details</span>
+              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
           </div>
 
-          <div className="p-1 rounded bg-neutral-800 text-muted hover:text-white">
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          {/* RIGHT: Text Status */}
+          <div className="space-y-1 sm:text-right order-1 sm:order-2">
+            <div className="flex flex-wrap items-center sm:justify-end gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
+                💎 PRO MEMBERSHIP ACTIVE
+              </span>
+              <span className="text-muted text-xs font-mono">
+                ({daysLeft} days remaining)
+              </span>
+            </div>
+            <p className="font-sans text-xs text-muted">
+              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS) • Powered by Streamflow.
+            </p>
           </div>
-        </button>
+        </div>
 
-        {/* Expanded Details */}
+        {/* Expanded Progress / Details */}
         {expanded && (
-          <div className="p-4 sm:p-6 pt-0 space-y-4 border-t border-neutral-800/60 font-sans text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+          <div className="pt-4 mt-4 border-t border-line space-y-3 font-sans text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <span className="text-muted uppercase text-2xs block mb-0.5">Staked</span>
+                <span className="text-muted uppercase text-2xs block mb-0.5">Staked Amount</span>
                 <span className="text-white font-bold text-sm tnum">
                   {formatUsd(Number(statusData?.stake?.amount_usd || 250))}
                 </span>{' '}
@@ -144,7 +167,7 @@ export function DashboardStakingCard() {
                 </span>
               </div>
 
-              <div>
+              <div className="sm:text-right">
                 <span className="text-muted uppercase text-2xs block mb-0.5">Locked until</span>
                 <span className="text-white font-medium text-xs">
                   {statusData?.stake?.unlocks_at ? new Date(statusData.stake.unlocks_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '90 days'}{' '}
@@ -153,41 +176,18 @@ export function DashboardStakingCard() {
               </div>
             </div>
 
-            {/* Progress Bar (8px height, rounded-full) */}
+            {/* Progress Bar */}
             <div className="space-y-1">
               <div className="flex justify-between text-2xs font-mono text-muted">
                 <span>Lock Duration</span>
                 <span>{progressPct}% elapsed</span>
               </div>
-              <div className="w-full h-2 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
+              <div className="w-full h-2 bg-canvas rounded-full overflow-hidden border border-line">
                 <div
                   className="h-full bg-toxic rounded-full transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <a
-                href={streamflowUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-xs uppercase tracking-wider text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
-              >
-                <span>Stake additional on Streamflow</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </a>
-
-              <a
-                href={streamflowUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted hover:text-white inline-flex items-center gap-1 font-mono text-xs transition-colors"
-              >
-                <span>View on Streamflow</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </a>
             </div>
           </div>
         )}
@@ -195,47 +195,61 @@ export function DashboardStakingCard() {
     );
   }
 
-  // 3. Member Tier: Clean Staking Card with Streamflow platform button
+  // 3. Member Tier: Prominent Staking Card (slightly wider than disclaimer, button on the left, text on the right)
   const title = isPartialStake
     ? `Stake $${gapToPro.toFixed(0)} more to unlock Pro`
     : 'Upgrade to Pro';
   const subtitle = isPartialStake
-    ? `You currently have ${formatUsd(currentStakedUsd)} staked. Complete your stake on Streamflow to reach the $250 requirement.`
-    : 'Stake $250 of $GENESIS for 90 days on Streamflow to unlock real-time signals, push alerts, and full terminal access.';
+    ? `You currently have ${formatUsd(currentStakedUsd)} staked. Complete your stake to reach the $250 requirement.`
+    : 'Stake $250 of $GENESIS for 90 days to unlock real-time signals, push alerts, and full terminal access.';
 
   return (
-    <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-6 sm:p-8 space-y-5">
-      {/* Title & Subtitle */}
-      <div className="space-y-1">
-        <h3 className="font-sans text-lg sm:text-xl font-semibold text-white tracking-tight">
-          {title}
-        </h3>
-        <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed max-w-2xl">
-          {subtitle}
-        </p>
-      </div>
+    <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 -mx-1 sm:-mx-2 lg:-mx-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6">
+        {/* LEFT: Stake Button (Streamflow removed from button text) */}
+        <div className="shrink-0 order-2 sm:order-1">
+          <a
+            href={streamflowUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto h-12 px-7 sm:px-8 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+          >
+            <span>STAKE $GENESIS</span>
+            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+          </a>
+        </div>
 
-      {/* Lock Line */}
-      <div className="flex items-center gap-2 font-sans text-xs text-muted">
-        <Lock className="w-3.5 h-3.5 text-toxic shrink-0" />
-        <span>90-day lock · Unlocks {unlockDateStr}</span>
-      </div>
+        {/* RIGHT: Text (Title, Subtitle, Lock details) */}
+        <div className="flex-1 space-y-1 sm:text-right order-1 sm:order-2">
+          <div className="flex flex-wrap items-center sm:justify-end gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
+              <Sparkles className="w-3 h-3" />
+              <span>PRO TIER ACCESS</span>
+            </span>
+            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              {title}
+            </h3>
+          </div>
 
-      {/* Direct Stake Button to Streamflow Platform */}
-      <div className="pt-2">
-        <a
-          href={streamflowUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full sm:w-auto h-12 px-6 rounded-md bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-        >
-          <span>Stake $GENESIS on Streamflow</span>
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-        </a>
+          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed max-w-2xl sm:ml-auto">
+            {subtitle}
+          </p>
+
+          <div className="flex flex-wrap items-center sm:justify-end gap-3 font-sans text-xs text-muted pt-1">
+            <span className="inline-flex items-center gap-1.5 text-toxic font-medium">
+              <Lock className="w-3.5 h-3.5 text-toxic shrink-0" />
+              <span>90-day lock · Unlocks {unlockDateStr}</span>
+            </span>
+            <span className="text-dim">•</span>
+            <span className="text-muted">
+              Powered by Streamflow.
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Non-negotiable Disclaimer per §4 and AC 28 */}
-      <p className="font-sans text-xs text-muted leading-relaxed pt-1">
+      <p className="font-sans text-2xs text-dim text-center sm:text-right pt-3 border-t border-line/40 mt-3">
         Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. Powered by Streamflow.
       </p>
     </div>
