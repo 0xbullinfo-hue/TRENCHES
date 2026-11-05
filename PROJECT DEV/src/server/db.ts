@@ -45,11 +45,32 @@ export interface TelegramMemberRow {
   last_synced_at: string; // timestamptz ISO
 }
 
+export interface LedgerEntryRow {
+  id: string; // uuid primary key
+  ticker: string; // text not null
+  chain: string; // text not null ('solana' | 'ethereum' | 'base' | 'bsc' | 'other')
+  contract_address: string; // text not null
+  multiplier: string; // numeric(10,4) string, e.g. "3.4000"
+  entry_price?: string | null;
+  exit_price?: string | null;
+  proof_url?: string | null;
+  notes?: string | null;
+  closed_at: string; // timestamptz ISO
+  posted_by: string; // admin wallet address
+  posted_at: string; // timestamptz ISO default now()
+  updated_at?: string | null; // timestamptz
+}
+
+export interface LedgerEntryWithEdited extends LedgerEntryRow {
+  edited: boolean;
+}
+
 interface TrenchDatabaseSchema {
   tier_thresholds: TierThresholdRow[];
   stakes: StakeRow[];
   verification_sessions: VerificationSessionRow[];
   telegram_members: TelegramMemberRow[];
+  ledger_entries: LedgerEntryRow[];
 }
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
@@ -110,6 +131,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
     stakes: [],
     verification_sessions: [],
     telegram_members: [],
+    ledger_entries: [],
   };
 }
 
@@ -150,7 +172,9 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
       return initial;
     }
     try {
-      return JSON.parse(raw) as TrenchDatabaseSchema;
+      const parsed = JSON.parse(raw) as TrenchDatabaseSchema;
+      if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
+      return parsed;
     } catch {
       return buildInitialSeed();
     }
@@ -160,6 +184,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
     try {
       const parsed = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf-8'));
       if (parsed && Array.isArray(parsed.tier_thresholds)) {
+        if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
         inMemoryDb = parsed;
         return inMemoryDb;
       }
@@ -522,4 +547,138 @@ export async function resolveTier(walletAddress: string): Promise<'free' | 'memb
 
   return 'free';
 }
+
+// -------------------------------------------------------------
+// Database Operations: Ledger Entries (§1, §2, §3)
+// -------------------------------------------------------------
+
+export async function createLedgerEntry(params: {
+  ticker: string;
+  chain: string;
+  contract_address: string;
+  multiplier: string;
+  entry_price?: string | null;
+  exit_price?: string | null;
+  proof_url?: string | null;
+  notes?: string | null;
+  closed_at: string;
+  posted_by: string;
+}): Promise<LedgerEntryRow> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.ledger_entries)) db.ledger_entries = [];
+
+    const now = new Date().toISOString();
+    const entry: LedgerEntryRow = {
+      id: crypto.randomUUID(),
+      ticker: params.ticker.toUpperCase().replace(/^\$/, ''),
+      chain: params.chain.toLowerCase(),
+      contract_address: params.contract_address.trim(),
+      multiplier: Number(params.multiplier).toFixed(4),
+      entry_price: params.entry_price?.trim() || null,
+      exit_price: params.exit_price?.trim() || null,
+      proof_url: params.proof_url?.trim() || null,
+      notes: params.notes?.trim() || null,
+      closed_at: new Date(params.closed_at).toISOString(),
+      posted_by: params.posted_by,
+      posted_at: now,
+      updated_at: null,
+    };
+
+    db.ledger_entries.unshift(entry);
+    await saveDb(db);
+    return entry;
+  });
+}
+
+export async function getLedgerEntries(options?: {
+  chain?: string;
+  sort?: 'newest' | 'multi';
+  limit?: number;
+  offset?: number;
+}): Promise<{ entries: LedgerEntryWithEdited[]; total: number; has_more: boolean }> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    let list = [...(db.ledger_entries || [])];
+
+    if (options?.chain && options.chain.toLowerCase() !== 'all') {
+      const c = options.chain.toLowerCase();
+      list = list.filter((e) => e.chain.toLowerCase() === c);
+    }
+
+    if (options?.sort === 'multi') {
+      list.sort((a, b) => Number(b.multiplier) - Number(a.multiplier));
+    } else {
+      list.sort((a, b) => new Date(b.closed_at).getTime() - new Date(a.closed_at).getTime());
+    }
+
+    const total = list.length;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const limit = Math.max(1, options?.limit ?? 12);
+    const slice = list.slice(offset, offset + limit);
+    const has_more = offset + limit < total;
+
+    const entries: LedgerEntryWithEdited[] = slice.map((e) => ({
+      ...e,
+      edited: !!e.updated_at && new Date(e.updated_at).getTime() > new Date(e.posted_at).getTime(),
+    }));
+
+    return { entries, total, has_more };
+  });
+}
+
+export async function getLedgerEntryById(id: string): Promise<LedgerEntryWithEdited | null> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const found = (db.ledger_entries || []).find((e) => e.id === id);
+    if (!found) return null;
+    return {
+      ...found,
+      edited: !!found.updated_at && new Date(found.updated_at).getTime() > new Date(found.posted_at).getTime(),
+    };
+  });
+}
+
+export async function updateLedgerEntry(
+  id: string,
+  updates: Partial<Pick<LedgerEntryRow, 'ticker' | 'chain' | 'contract_address' | 'multiplier' | 'entry_price' | 'exit_price' | 'proof_url' | 'notes' | 'closed_at'>>
+): Promise<LedgerEntryWithEdited | null> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const entry = (db.ledger_entries || []).find((e) => e.id === id);
+    if (!entry) return null;
+
+    if (updates.ticker !== undefined) entry.ticker = updates.ticker.toUpperCase().replace(/^\$/, '');
+    if (updates.chain !== undefined) entry.chain = updates.chain.toLowerCase();
+    if (updates.contract_address !== undefined) entry.contract_address = updates.contract_address.trim();
+    if (updates.multiplier !== undefined) entry.multiplier = Number(updates.multiplier).toFixed(4);
+    if (updates.entry_price !== undefined) entry.entry_price = updates.entry_price?.trim() || null;
+    if (updates.exit_price !== undefined) entry.exit_price = updates.exit_price?.trim() || null;
+    if (updates.proof_url !== undefined) entry.proof_url = updates.proof_url?.trim() || null;
+    if (updates.notes !== undefined) entry.notes = updates.notes?.trim() || null;
+    if (updates.closed_at !== undefined) entry.closed_at = new Date(updates.closed_at).toISOString();
+
+    entry.updated_at = new Date().toISOString();
+    await saveDb(db);
+
+    return {
+      ...entry,
+      edited: true,
+    };
+  });
+}
+
+export async function deleteLedgerEntry(id: string): Promise<boolean> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const initialLen = (db.ledger_entries || []).length;
+    db.ledger_entries = (db.ledger_entries || []).filter((e) => e.id !== id);
+    if (db.ledger_entries.length < initialLen) {
+      await saveDb(db);
+      return true;
+    }
+    return false;
+  });
+}
+
 
