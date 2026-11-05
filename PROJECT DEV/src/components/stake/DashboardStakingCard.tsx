@@ -202,8 +202,8 @@ export function DashboardStakingCard() {
     : 'Buy $250 worth of $GENESIS and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.';
 
   return (
-    <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6">
+    <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-4 sm:p-5 transition-all duration-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
         {/* LEFT: Stake Button (Proportional & cleanly aligned) */}
         <div className="shrink-0 order-2 sm:order-1">
           <a
@@ -217,8 +217,8 @@ export function DashboardStakingCard() {
           </a>
         </div>
 
-        {/* RIGHT: Text (Title, Subtitle, Lock details) */}
-        <div className="flex-1 space-y-1.5 sm:text-right order-1 sm:order-2">
+        {/* RIGHT: Text (Title, 2-line Subtitle) */}
+        <div className="flex-1 space-y-1 sm:text-right order-1 sm:order-2">
           <div className="flex flex-wrap items-center sm:justify-end gap-2">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
               <Sparkles className="w-3 h-3" />
@@ -229,14 +229,15 @@ export function DashboardStakingCard() {
             </h3>
           </div>
 
-          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed max-w-2xl sm:ml-auto">
-            {subtitle}
+          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed sm:ml-auto">
+            <span className="sm:block">Buy $250 worth of $GENESIS and Stake for 90 days</span>
+            <span className="sm:block">to unlock real-time signals, push alerts, and full terminal access.</span>
           </p>
         </div>
       </div>
 
       {/* Non-negotiable Disclaimer per §4 and AC 28 */}
-      <p className="font-sans text-2xs text-dim text-center sm:text-right pt-3 border-t border-line/40 mt-3">
+      <p className="font-sans text-2xs text-dim text-center sm:text-right pt-2.5 border-t border-line/40 mt-3">
         Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Streamflow.
       </p>
     </div>
