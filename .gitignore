@@ -33,3 +33,11 @@ next-env.d.ts
 **/data/calls.json
 **/data/*.tmp
 
+
+# Telegram bot local Python artifacts
+telegram-bot/.env
+telegram-bot/.venv/
+telegram-bot/__pycache__/
+telegram-bot/**/__pycache__/
+telegram-bot/.pytest_cache/
+telegram-bot/.coverage
