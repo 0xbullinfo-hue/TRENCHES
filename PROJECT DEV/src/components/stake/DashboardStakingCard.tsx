@@ -309,15 +309,9 @@ export function DashboardStakingCard({
       <div className="rounded-xl bg-surface border border-line p-5 sm:p-6 transition-all flex flex-col justify-between h-full">
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-card text-muted border border-line font-sans text-xs font-bold uppercase">
-                <Sparkles className="w-3 h-3 text-toxic" />
-                <span>MEMBER REQUIREMENT</span>
-              </span>
-              <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
-                Staking — $GENESIS
-              </span>
-            </div>
+            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              Staking — $GENESIS
+            </h3>
             <div className="flex items-center gap-2">
               <span className="text-2xs font-mono text-muted uppercase">
                 $20 $GENESIS
@@ -341,39 +335,32 @@ export function DashboardStakingCard({
             error={poolsError}
             onRetry={loadPools}
           />
+        </div>
 
+        <div className="pt-5 mt-auto space-y-3">
+          {/* On top of buttons */}
           <div className="space-y-1.5">
-            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+            <h4 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
               HOLD $GENESIS TO UNLOCK STAKING
-            </h3>
+            </h4>
 
             <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
               Hold at least $20 in $GENESIS to unlock Member tier access before staking for Pro 90-day locks.
             </p>
           </div>
-        </div>
 
-        <div className="pt-5 mt-auto space-y-3">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div>
             <Link
               href="/#choose-your-access"
               className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic/40 hover:border-toxic text-toxic hover:text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Upgrade to Member to stake →</span>
             </Link>
-
-            <a
-              href={stakePointPoolUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <span>Stake on StakePoint →</span>
-            </a>
           </div>
 
+          {/* Powered by Streamflow. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-            Powered by Streamflow.
+            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
           </p>
         </div>
       </div>
@@ -399,14 +386,9 @@ export function DashboardStakingCard({
       <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-colors flex flex-col justify-between h-full">
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
-                💎 PRO MEMBERSHIP ACTIVE
-              </span>
-              <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
-                Staking — $GENESIS
-              </span>
-            </div>
+            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              Staking — $GENESIS
+            </h3>
             <div className="flex items-center gap-2">
               <span className="text-muted text-xs font-mono">
                 ({daysLeft} days remaining)
@@ -430,19 +412,20 @@ export function DashboardStakingCard({
             error={poolsError}
             onRetry={loadPools}
           />
-
-          <div className="space-y-1.5">
-            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-              PRO STAKE LOCK ACTIVE
-            </h3>
-
-            <p className="font-sans text-xs sm:text-muted leading-relaxed">
-              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS) • Powered by Streamflow.
-            </p>
-          </div>
         </div>
 
         <div className="pt-5 mt-auto space-y-3">
+          {/* On top of buttons */}
+          <div className="space-y-1.5">
+            <h4 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
+              PRO STAKE LOCK ACTIVE
+            </h4>
+
+            <p className="font-sans text-xs sm:text-muted leading-relaxed">
+              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS)
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2.5">
             <a
               href={streamflowUrl}
@@ -452,15 +435,6 @@ export function DashboardStakingCard({
             >
               <span>STAKE ADDITIONAL</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-            </a>
-
-            <a
-              href={stakePointPoolUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <span>Stake on StakePoint →</span>
             </a>
 
             <button
@@ -489,8 +463,9 @@ export function DashboardStakingCard({
             </div>
           )}
 
+          {/* Powered by Streamflow. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Streamflow.
+            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
           </p>
         </div>
       </div>
@@ -520,15 +495,9 @@ export function DashboardStakingCard({
     <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
-              <Sparkles className="w-3 h-3" />
-              <span>PRO TIER ACCESS</span>
-            </span>
-            <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
-              Staking — $GENESIS
-            </span>
-          </div>
+          <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+            Staking — $GENESIS
+          </h3>
           <div className="flex items-center gap-2">
             <span className="text-2xs font-mono text-muted uppercase">
               90-DAY LOCK
@@ -552,20 +521,21 @@ export function DashboardStakingCard({
           error={poolsError}
           onRetry={loadPools}
         />
+      </div>
 
+      <div className="pt-5 mt-auto space-y-3">
+        {/* On top of the buttons */}
         <div className="space-y-1.5">
-          <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+          <h4 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
             {title}
-          </h3>
+          </h4>
 
           <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
             {subtitle}
           </p>
         </div>
-      </div>
 
-      <div className="pt-5 mt-auto space-y-3">
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div>
           <a
             href={streamflowUrl}
             target="_blank"
@@ -574,15 +544,6 @@ export function DashboardStakingCard({
           >
             <span>STAKE $GENESIS</span>
             <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-          </a>
-
-          <a
-            href={stakePointPoolUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-          >
-            <span>Stake on StakePoint →</span>
           </a>
         </div>
 
@@ -599,9 +560,9 @@ export function DashboardStakingCard({
           </div>
         )}
 
-        {/* Non-negotiable Disclaimer per §4 and AC 28 */}
+        {/* Powered by Streamflow. */}
         <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-          Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Streamflow.
+          Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
         </p>
       </div>
     </div>
