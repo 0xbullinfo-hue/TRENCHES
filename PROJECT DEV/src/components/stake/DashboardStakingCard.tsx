@@ -3,10 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { useStreamflowStake } from '@/lib/stake/streamflow';
-import { cleanNumericInput, formatTokenDisplay, formatUsd, getUnlockDate } from '@/lib/stake/format';
-import { TOKEN_DECIMALS } from '@/lib/config';
-import { ArrowUpRight, ChevronDown, ChevronUp, Lock, Loader2, Sparkles } from 'lucide-react';
+import { formatTokenDisplay, formatUsd, getUnlockDate } from '@/lib/stake/format';
+import { ArrowUpRight, ChevronDown, ChevronUp, Lock, Sparkles } from 'lucide-react';
 
 interface StakeStatusResponse {
   wallet: string;
@@ -33,18 +31,10 @@ interface StakeStatusResponse {
 }
 
 export function DashboardStakingCard() {
-  const { connected, tier, refreshAll } = useGenesisBalance();
-  const { stake: streamflowStake } = useStreamflowStake();
+  const { connected, tier } = useGenesisBalance();
 
   const [statusData, setStatusData] = useState<StakeStatusResponse | null>(null);
   const [expanded, setExpanded] = useState(false);
-
-  // Form states for Member
-  const [usdInput, setUsdInput] = useState('250');
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [showTopupForm, setShowTopupForm] = useState(false);
 
   const refreshStakeStatus = useCallback(async () => {
     try {
@@ -52,9 +42,6 @@ export function DashboardStakingCard() {
       if (res.ok) {
         const json = await res.json();
         setStatusData(json);
-        if (json.gap_to_pro_usd > 0) {
-          setUsdInput(json.gap_to_pro_usd.toString());
-        }
       }
     } catch {
       // ignore
@@ -69,9 +56,6 @@ export function DashboardStakingCard() {
       .then((json) => {
         if (!active || !json) return;
         setStatusData(json);
-        if (json.gap_to_pro_usd > 0) {
-          setUsdInput(json.gap_to_pro_usd.toString());
-        }
       })
       .catch(() => undefined);
     return () => {
@@ -79,11 +63,6 @@ export function DashboardStakingCard() {
     };
   }, [connected]);
 
-  // Derived calculations
-  const genesisPrice = statusData?.thresholds?.pro?.genesis_usd_price || 0.0000164;
-  const numUsd = Number(cleanNumericInput(usdInput)) || 0;
-  const equivalentTokens = genesisPrice > 0 ? numUsd / genesisPrice : 0;
-  const rawBigInt = BigInt(Math.floor(equivalentTokens * Math.pow(10, TOKEN_DECIMALS)));
   const unlockDateStr = useMemo(() => getUnlockDate(90), []);
 
   const isPro = statusData?.current_tier === 'pro';
@@ -93,6 +72,12 @@ export function DashboardStakingCard() {
   const currentStakedUsd = statusData?.stake?.amount_usd ?? 0;
   const isPartialStake = currentStakedUsd > 0 && gapToPro > 0;
 
+  // Streamflow pool link
+  const poolAddr = process.env.NEXT_PUBLIC_STREAMFLOW_POOL_ADDRESS || '';
+  const streamflowUrl = poolAddr
+    ? `https://app.streamflow.finance/stake/${poolAddr}`
+    : 'https://app.streamflow.finance';
+
   // Progress percentage for Pro
   const progressPct = useMemo(() => {
     if (!statusData?.stake?.staked_at || !statusData?.stake?.unlocks_at) return 0;
@@ -100,13 +85,8 @@ export function DashboardStakingCard() {
     return Math.min(100, Math.max(0, Math.round(((90 - daysLeft) / 90) * 100)));
   }, [statusData]);
 
-  // 1. Not connected: do not render (§4)
-  if (!connected) {
-    return null;
-  }
-
-  // 2. Free Tier: Compact link to tier section (§4)
-  if (isFreeTier && !hasActiveStake) {
+  // 1. Free Tier / Not Connected: Compact link to tier section (§4)
+  if (!connected || (isFreeTier && !hasActiveStake)) {
     return (
       <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs font-sans text-muted">
@@ -123,13 +103,9 @@ export function DashboardStakingCard() {
     );
   }
 
-  // 3. Pro Tier: Collapsed status pill, expands to show details (§4)
-  if (isPro && hasActiveStake && !showTopupForm) {
+  // 2. Pro Tier: Collapsed status pill, expands to show details (§4)
+  if (isPro && hasActiveStake) {
     const daysLeft = statusData?.stake?.days_remaining ?? 90;
-    const poolAddr = process.env.NEXT_PUBLIC_STREAMFLOW_POOL_ADDRESS || '';
-    const streamflowUrl = poolAddr
-      ? `https://app.streamflow.finance/stake/${poolAddr}`
-      : 'https://app.streamflow.finance';
 
     return (
       <div className="rounded-lg bg-neutral-900 border border-neutral-800 transition-colors">
@@ -154,7 +130,7 @@ export function DashboardStakingCard() {
           </div>
         </button>
 
-        {/* Expanded Details (§4) */}
+        {/* Expanded Details */}
         {expanded && (
           <div className="p-4 sm:p-6 pt-0 space-y-4 border-t border-neutral-800/60 font-sans text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
@@ -193,18 +169,20 @@ export function DashboardStakingCard() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTopupForm(true)}
-                className="font-bold text-xs uppercase tracking-wider text-toxic hover:underline cursor-pointer"
+              <a
+                href={streamflowUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-xs uppercase tracking-wider text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
               >
-                Stake additional →
-              </button>
+                <span>Stake additional on Streamflow</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
 
               <a
                 href={streamflowUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="text-muted hover:text-white inline-flex items-center gap-1 font-mono text-xs transition-colors"
               >
                 <span>View on Streamflow</span>
@@ -217,63 +195,16 @@ export function DashboardStakingCard() {
     );
   }
 
-  // 4. Member Tier: Prominent Expanded Form (§4)
+  // 3. Member Tier: Clean Staking Card with Streamflow platform button
   const title = isPartialStake
     ? `Stake $${gapToPro.toFixed(0)} more to unlock Pro`
     : 'Upgrade to Pro';
   const subtitle = isPartialStake
-    ? `You currently have ${formatUsd(currentStakedUsd)} staked. Complete your stake to reach the $250 requirement.`
-    : 'Stake $250 of $GENESIS for 90 days to unlock real-time signals, push alerts, and full terminal access.';
-
-  const handleStakeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    if (numUsd < (isPartialStake ? gapToPro : 250)) {
-      setErrorMsg(`Minimum stake is $${isPartialStake ? gapToPro : 250}`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      // 1. Trigger Streamflow stake transaction
-      const { signature } = await streamflowStake(rawBigInt, 90);
-
-      // 2. Confirm on server
-      const confirmRes = await fetch('/api/stake/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tx_signature: signature,
-          amount_raw: rawBigInt.toString(),
-          lock_days: 90,
-        }),
-      });
-
-      if (!confirmRes.ok) {
-        const errData = await confirmRes.json().catch(() => ({}));
-        throw new Error(errData.message || 'We could not verify the stake on-chain.');
-      }
-
-      setSuccessMsg('Stake confirmed. Pro access unlocked.');
-      setShowTopupForm(false);
-      await refreshStakeStatus();
-      await refreshAll();
-    } catch (err: unknown) {
-      const msg = (err as Error).message || 'Transaction failed';
-      if (msg.includes('User rejected') || msg.includes('cancelled')) {
-        setErrorMsg('Transaction cancelled.');
-      } else {
-        setErrorMsg(msg);
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    ? `You currently have ${formatUsd(currentStakedUsd)} staked. Complete your stake on Streamflow to reach the $250 requirement.`
+    : 'Stake $250 of $GENESIS for 90 days on Streamflow to unlock real-time signals, push alerts, and full terminal access.';
 
   return (
-    <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-6 sm:p-8 space-y-6">
+    <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-6 sm:p-8 space-y-5">
       {/* Title & Subtitle */}
       <div className="space-y-1">
         <h3 className="font-sans text-lg sm:text-xl font-semibold text-white tracking-tight">
@@ -284,81 +215,27 @@ export function DashboardStakingCard() {
         </p>
       </div>
 
-      {/* Inner Card (Amount Input, Equivalent, Lock, Button) */}
-      <div className="rounded-lg bg-neutral-950 border border-neutral-800 p-5 sm:p-6 space-y-5">
-        <div>
-          <label className="block font-sans text-xs font-bold uppercase tracking-wider text-muted mb-2">
-            Amount to stake
-          </label>
+      {/* Lock Line */}
+      <div className="flex items-center gap-2 font-sans text-xs text-muted">
+        <Lock className="w-3.5 h-3.5 text-toxic shrink-0" />
+        <span>90-day lock · Unlocks {unlockDateStr}</span>
+      </div>
 
-          <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-white select-none">
-              $
-            </span>
-            <input
-              type="number"
-              min={isPartialStake ? gapToPro : 250}
-              step="1"
-              value={usdInput}
-              onChange={(e) => setUsdInput(e.target.value)}
-              disabled={submitting}
-              className="w-full h-11 pl-8 pr-16 rounded-md bg-neutral-900 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic tnum"
-            />
-            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs text-muted select-none">
-              USD
-            </span>
-          </div>
-
-          {/* Live Token Equivalent */}
-          <div className="font-mono text-xs text-toxic font-semibold pt-2 tnum">
-            ≈ {formatTokenDisplay(equivalentTokens)} $GENESIS
-          </div>
-
-          {isPartialStake && (
-            <div className="font-sans text-xs text-muted pt-1">
-              New total: <strong className="text-white tnum">${(currentStakedUsd + numUsd).toFixed(2)}</strong>
-            </div>
-          )}
-        </div>
-
-        {/* Lock Line */}
-        <div className="flex items-center gap-2 font-sans text-xs text-muted pt-1">
-          <Lock className="w-3.5 h-3.5 text-toxic shrink-0" />
-          <span>90-day lock · Unlocks {unlockDateStr}</span>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-sans text-xs font-bold">
-            {successMsg}
-          </div>
-        )}
-
-        {/* Stake Button */}
-        <button
-          type="button"
-          onClick={handleStakeSubmit}
-          disabled={submitting || numUsd < (isPartialStake ? gapToPro : 250)}
-          className="w-full h-12 rounded-md bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+      {/* Direct Stake Button to Streamflow Platform */}
+      <div className="pt-2">
+        <a
+          href={streamflowUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full sm:w-auto h-12 px-6 rounded-md bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Confirming Stake...</span>
-            </>
-          ) : (
-            <span>Stake $GENESIS</span>
-          )}
-        </button>
+          <span>Stake $GENESIS on Streamflow</span>
+          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+        </a>
       </div>
 
       {/* Non-negotiable Disclaimer per §4 and AC 28 */}
-      <p className="font-sans text-xs text-muted leading-relaxed">
+      <p className="font-sans text-xs text-muted leading-relaxed pt-1">
         Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. Powered by Streamflow.
       </p>
     </div>
