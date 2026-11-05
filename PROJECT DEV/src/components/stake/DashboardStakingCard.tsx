@@ -217,8 +217,8 @@ export function DashboardStakingCard() {
           </a>
         </div>
 
-        {/* RIGHT: Text (Title, 2-line Subtitle) */}
-        <div className="flex-1 space-y-1 sm:text-right order-1 sm:order-2">
+        {/* RIGHT: Text (Title, 1-line Subtitle) */}
+        <div className="flex-1 space-y-1 sm:text-right order-1 sm:order-2 min-w-0">
           <div className="flex flex-wrap items-center sm:justify-end gap-2">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
               <Sparkles className="w-3 h-3" />
@@ -229,9 +229,8 @@ export function DashboardStakingCard() {
             </h3>
           </div>
 
-          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed sm:ml-auto">
-            <span className="sm:block">Buy $250 worth of $GENESIS and Stake for 90 days</span>
-            <span className="sm:block">to unlock real-time signals, push alerts, and full terminal access.</span>
+          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed sm:whitespace-nowrap sm:ml-auto">
+            Buy $250 worth of $GENESIS and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.
           </p>
         </div>
       </div>
