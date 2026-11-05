@@ -699,8 +699,8 @@ export const IncubatorHub: React.FC = () => {
           </div>
         </div>
 
-        {/* 4-Column KPI Stat Box (Supported Blockchains: 2 lines, 3 per line) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line">
+        {/* 3-Column KPI Stat Box (Supported Blockchains: 2 lines, 3 per line) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line">
           <div className="p-5">
             <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
               ACTIVE ALPHA CALLS
@@ -724,20 +724,6 @@ export const IncubatorHub: React.FC = () => {
             </div>
             <div className="font-sans text-[11px] text-muted mt-1">
               Includes Robinhood Chain (ROBIN)
-            </div>
-          </div>
-
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              LAB ACCESS PASS
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
-              1,000,000
-            </div>
-            <div className="font-sans text-xs text-white mt-1 flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded bg-surface border border-line text-pump font-bold">
-                $GENESIS REQUIRED
-              </span>
             </div>
           </div>
 
