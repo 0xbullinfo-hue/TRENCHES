@@ -6,10 +6,16 @@ import { ShieldCheck } from 'lucide-react';
 
 export const revalidate = 60;
 
-export default async function PublicLedgerPage() {
+export default async function PublicLedgerPage(props: {
+  searchParams?: Promise<{ chain?: string; sort?: 'newest' | 'multi' }>;
+}) {
+  const params = await props.searchParams;
+  const chain = params?.chain || 'all';
+  const sort = params?.sort || 'newest';
+
   const { entries, total, has_more } = await getLedgerEntries({
-    chain: 'all',
-    sort: 'newest',
+    chain,
+    sort,
     limit: 12,
     offset: 0,
   });
@@ -52,6 +58,8 @@ export default async function PublicLedgerPage() {
             initialEntries={entries}
             initialTotal={total}
             initialHasMore={has_more}
+            initialChain={chain}
+            initialSort={sort}
             isDashboardEmbed={false}
           />
         </Suspense>

@@ -41,8 +41,15 @@ export const TerminalHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* Center: JOIN THE LAB Button & Search Calls Input (Right side of JOIN THE LAB) */}
+        {/* Center: LEDGER Link, JOIN THE LAB Button & Search Calls Input */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/ledger"
+            className="h-9 sm:h-10 px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
+          >
+            <span>Ledger</span>
+          </Link>
+
           <a
             href={SOCIAL_LINKS.telegram}
             target="_blank"

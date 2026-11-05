@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { LedgerCard, LedgerCardData } from './LedgerCard';
 import { LedgerCardSkeleton } from './LedgerCardSkeleton';
 import { LEDGER_CHAINS } from '@/lib/ledger/format';
@@ -12,6 +12,8 @@ interface LedgerGridProps {
   initialEntries?: LedgerCardData[];
   initialTotal?: number;
   initialHasMore?: boolean;
+  initialChain?: string;
+  initialSort?: 'newest' | 'multi';
   isDashboardEmbed?: boolean;
 }
 
@@ -19,13 +21,18 @@ export function LedgerGrid({
   initialEntries = [],
   initialTotal = 0,
   initialHasMore = false,
+  initialChain = 'all',
+  initialSort = 'newest',
   isDashboardEmbed = false,
 }: LedgerGridProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const currentChain = searchParams.get('chain') || 'all';
-  const currentSort = searchParams.get('sort') || 'newest';
+  const [currentChain, setCurrentChain] = useState<string>(
+    searchParams.get('chain') || initialChain
+  );
+  const [currentSort, setCurrentSort] = useState<'newest' | 'multi'>(
+    ((searchParams.get('sort') as 'newest' | 'multi') || initialSort)
+  );
 
   const [entries, setEntries] = useState<LedgerCardData[]>(initialEntries);
   const [total, setTotal] = useState(initialTotal);
@@ -56,7 +63,7 @@ export function LedgerGrid({
         }
         setTotal(data.total);
         setHasMore(data.has_more);
-      } catch (err) {
+      } catch {
         setError("Couldn't load the ledger.");
       } finally {
         setLoading(false);
@@ -66,43 +73,26 @@ export function LedgerGrid({
     [isDashboardEmbed]
   );
 
-  // Sync when query params change on /ledger
-  useEffect(() => {
-    if (isDashboardEmbed) return;
-    let active = true;
-    const limit = 12;
-    fetch(
-      `/api/ledger?chain=${encodeURIComponent(currentChain)}&sort=${encodeURIComponent(
-        currentSort
-      )}&limit=${limit}&offset=0`
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!active || !data) return;
-        setEntries(data.entries);
-        setTotal(data.total);
-        setHasMore(data.has_more);
-      })
-      .catch(() => {
-        if (active) setError("Couldn't load the ledger.");
-      });
-    return () => {
-      active = false;
-    };
-  }, [currentChain, currentSort, isDashboardEmbed]);
-
   const handleFilterChain = (chain: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (chain === 'all') params.delete('chain');
-    else params.set('chain', chain);
-    router.push(`/ledger?${params.toString()}`);
+    setCurrentChain(chain);
+    fetchLedger(chain, currentSort, 0, false);
+    if (typeof window !== 'undefined' && !isDashboardEmbed) {
+      const url = new URL(window.location.href);
+      if (chain === 'all') url.searchParams.delete('chain');
+      else url.searchParams.set('chain', chain);
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
   };
 
-  const handleFilterSort = (sort: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (sort === 'newest') params.delete('sort');
-    else params.set('sort', sort);
-    router.push(`/ledger?${params.toString()}`);
+  const handleFilterSort = (sort: 'newest' | 'multi') => {
+    setCurrentSort(sort);
+    fetchLedger(currentChain, sort, 0, false);
+    if (typeof window !== 'undefined' && !isDashboardEmbed) {
+      const url = new URL(window.location.href);
+      if (sort === 'newest') url.searchParams.delete('sort');
+      else url.searchParams.set('sort', sort);
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
   };
 
   const handleLoadMore = () => {
@@ -112,52 +102,60 @@ export function LedgerGrid({
 
   return (
     <div className="space-y-6">
-      {/* Filters & Header Bar (Only on full /ledger page) */}
-      {!isDashboardEmbed && (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
-          {/* Chain Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2">
+      {/* Filters Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+        {/* Chain Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleFilterChain('all')}
+            className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              currentChain === 'all'
+                ? 'bg-neutral-100 text-neutral-900 font-extrabold'
+                : 'bg-neutral-900 border border-neutral-800 text-muted hover:text-white'
+            }`}
+          >
+            All
+          </button>
+          {LEDGER_CHAINS.map((c) => (
             <button
+              key={c.value}
               type="button"
-              onClick={() => handleFilterChain('all')}
+              onClick={() => handleFilterChain(c.value)}
               className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                currentChain === 'all'
+                currentChain === c.value
                   ? 'bg-neutral-100 text-neutral-900 font-extrabold'
                   : 'bg-neutral-900 border border-neutral-800 text-muted hover:text-white'
               }`}
             >
-              All
+              {c.label}
             </button>
-            {LEDGER_CHAINS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => handleFilterChain(c.value)}
-                className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                  currentChain === c.value
-                    ? 'bg-neutral-100 text-neutral-900 font-extrabold'
-                    : 'bg-neutral-900 border border-neutral-800 text-muted hover:text-white'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+          ))}
+        </div>
 
-          {/* Sort Selector */}
+        {/* Sort Selector (Only on full /ledger page) */}
+        {!isDashboardEmbed ? (
           <div className="flex items-center gap-2">
             <span className="font-sans text-xs font-bold uppercase tracking-wider text-muted">Sort:</span>
             <select
               value={currentSort}
-              onChange={(e) => handleFilterSort(e.target.value)}
-              className="h-8 px-2.5 rounded-md bg-neutral-900 border border-neutral-800 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pump cursor-pointer"
+              onChange={(e) => handleFilterSort(e.target.value as 'newest' | 'multi')}
+              className="h-8 px-2.5 rounded-md bg-neutral-900 border border-neutral-800 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic cursor-pointer"
             >
               <option value="newest">Newest ▾</option>
               <option value="multi">Highest multiple ▾</option>
             </select>
           </div>
-        </div>
-      )}
+        ) : (
+          <Link
+            href="/ledger"
+            className="font-mono text-xs text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors self-start md:self-auto"
+          >
+            <span>View full ledger</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+      </div>
 
       {/* Error state with retry */}
       {error && (
@@ -182,11 +180,13 @@ export function LedgerGrid({
           <LedgerCardSkeleton />
         </div>
       ) : entries.length === 0 ? (
-        /* Empty State (§3, AC 14) */
+        /* Empty State */
         <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-12 text-center space-y-3">
           <FolderOpen className="w-8 h-8 text-muted mx-auto stroke-[1.5]" />
           <p className="font-sans text-sm text-muted">
-            Ledger entries will appear here as calls close.
+            {currentChain !== 'all'
+              ? `No ${currentChain.toUpperCase()} ledger entries recorded yet.`
+              : 'Ledger entries will appear here as calls close.'}
           </p>
         </div>
       ) : (
@@ -197,18 +197,18 @@ export function LedgerGrid({
         </div>
       )}
 
-      {/* Load More Button (Only on /ledger, infinite scroll click) */}
+      {/* Load More Button (Only on full /ledger page) */}
       {!isDashboardEmbed && hasMore && (
-        <div className="text-center pt-4">
+        <div className="pt-6 text-center">
           <button
             type="button"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="h-11 px-8 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+            className="h-11 px-8 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
           >
             {loadingMore ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-pump" />
+                <Loader2 className="w-4 h-4 animate-spin text-toxic" />
                 <span>Loading more...</span>
               </>
             ) : (
@@ -218,18 +218,15 @@ export function LedgerGrid({
         </div>
       )}
 
-      {/* Dashboard Embed: View full ledger link */}
-      {isDashboardEmbed && (
-        <div className="flex items-center justify-between pt-2">
-          <span className="font-sans text-xs text-muted">
-            Showing latest {entries.length} closed trade results
-          </span>
+      {/* Dashboard Embed Footer Link */}
+      {isDashboardEmbed && entries.length > 0 && (
+        <div className="pt-2 flex justify-end">
           <Link
             href="/ledger"
-            className="font-sans text-xs font-bold uppercase tracking-wider text-pump hover:text-white inline-flex items-center gap-1 transition-colors"
+            className="font-mono text-xs text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
           >
-            <span>View full ledger</span>
-            <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>View full ledger ({total} calls)</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       )}
