@@ -16,7 +16,11 @@ import { TokenArtwork } from './TokenArtwork';
 import { SinceCallChip } from './SinceCallChip';
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
-import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
+import {
+  DashboardStakingCard,
+  TelegramVerificationCard,
+} from '@/components/stake/DashboardStakingCard';
+import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import {
@@ -650,100 +654,115 @@ export const IncubatorHub: React.FC = () => {
         </p>
       </div>
 
-      {/* 3. WELCOME TO THE LAB CARD */}
-      <div className="relative rounded-xl border border-line bg-surface p-5 sm:p-6 overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-          <div className="space-y-1.5 max-w-3xl">
-            <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 rounded-full bg-surface-card border border-line flex items-center justify-center text-pump">
-                <Flame className="w-4 h-4" />
-              </span>
-              <h1 className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Welcome To The Lab
-              </h1>
+      {/* 2-Column Hero & Staking Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-stretch">
+        {/* LEFT COLUMN: Welcome Card (top) + Telegram Alerts Card (bottom) */}
+        <div className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 justify-between">
+          {/* WELCOME TO THE LAB CARD */}
+          <div className="relative rounded-xl border border-line bg-surface p-5 sm:p-6 overflow-hidden flex flex-col justify-between h-full">
+            <div className="space-y-4 mb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-full bg-surface-card border border-line flex items-center justify-center text-pump">
+                    <Flame className="w-4 h-4" />
+                  </span>
+                  <h1 className="font-sans text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+                    Welcome To The Lab
+                  </h1>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
+                    className="px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {copiedId === 'hero-gen-ca' ? (
+                      <Check className="w-3.5 h-3.5 text-pump" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-pump" />
+                    )}
+                    <span>
+                      {copiedId === 'hero-gen-ca' ? 'Copied CA' : 'Copy $GENESIS CA'}
+                    </span>
+                  </button>
+
+                  <a
+                    href={BUY_LINKS.pump}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-1.5 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 transition-all"
+                  >
+                    <span>Buy $GENESIS</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
+                Exclusive multi-chain trade calls for verified{' '}
+                <span className="text-pump font-bold">1,000,000+ $GENESIS</span> holders
+                across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
+                Every card displays live Market Cap, dual Risk Ratio, and Take Profit multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
+              </p>
             </div>
-            <p className="font-sans text-sm text-muted leading-relaxed">
-              Exclusive multi-chain trade calls for verified{' '}
-              <span className="text-pump font-bold">1,000,000+ $GENESIS</span> holders
-              across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
-              Every card displays live Market Cap, dual Risk Ratio, and Take Profit
-              multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
-            </p>
+
+            {/* 3-Column KPI Stat Box */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line mt-auto">
+              <div className="p-4 sm:p-5">
+                <div className="font-sans text-2xs sm:text-xs text-muted uppercase tracking-wider font-bold">
+                  ACTIVE ALPHA CALLS
+                </div>
+                <div className="font-sans text-xl sm:text-2xl font-extrabold text-pump mt-1 tnum">
+                  {alphas.length} CALLS
+                </div>
+                <div className="font-sans text-2xs sm:text-xs text-muted mt-1 truncate">
+                  {pinnedCalls.length} Pinned • 6 Chains
+                </div>
+              </div>
+
+              {/* Supported Blockchains */}
+              <div className="p-4 sm:p-5">
+                <div className="font-sans text-2xs sm:text-xs text-muted uppercase tracking-wider font-bold">
+                  SUPPORTED BLOCKCHAINS
+                </div>
+                <div className="font-mono text-xs sm:text-sm font-extrabold text-white mt-1.5 space-y-0.5">
+                  <div>SOL • BSC • ETH</div>
+                  <div className="text-pump">BASE • ROBIN • AVAX</div>
+                </div>
+                <div className="font-sans text-[10px] sm:text-[11px] text-muted mt-1">
+                  Includes Robinhood Chain
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                <div className="flex items-center justify-between font-sans text-2xs sm:text-xs text-muted uppercase tracking-wider font-bold">
+                  <span>ADMIN HIT RATE</span>
+                  <span className="text-pump font-bold">COUNTED</span>
+                </div>
+                <div className="font-sans text-xl sm:text-2xl font-extrabold text-white mt-1 tnum">
+                  {deskWinRate.label}
+                </div>
+                <div className="w-full h-1.5 bg-canvas rounded-full overflow-hidden mt-2 border border-line">
+                  <div className="h-full bg-pump" style={{ width: `${deskWinRate.pct}%` }} />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
-              className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              {copiedId === 'hero-gen-ca' ? (
-                <Check className="w-3.5 h-3.5 text-pump" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-pump" />
-              )}
-              <span>
-                {copiedId === 'hero-gen-ca' ? 'Copied $GENESIS CA' : 'Copy $GENESIS CA'}
-              </span>
-            </button>
-
-            <a
-              href={BUY_LINKS.pump}
-              target="_blank"
-              rel="noreferrer"
-              className="px-5 py-2 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 transition-all"
-            >
-              <span>Buy $GENESIS on Pump.fun</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
+          {/* TELEGRAM GET VERIFIED CARD */}
+          <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
         </div>
 
-        {/* 3-Column KPI Stat Box (Supported Blockchains: 2 lines, 3 per line) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 rounded-xl bg-surface-card border border-line divide-y sm:divide-y-0 sm:divide-x divide-line">
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              ACTIVE ALPHA CALLS
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-pump mt-1 tnum">
-              {alphas.length} CALLS
-            </div>
-            <div className="font-sans text-xs text-muted mt-1">
-              {pinnedCalls.length} Pinned Priority • 6 Chains
-            </div>
-          </div>
+        {/* RIGHT COLUMN (Area marked yellow): StakePoint Live Data (top) + Staking Action Card (bottom - Area marked red) */}
+        <div className="lg:col-span-5 flex flex-col gap-5 sm:gap-6 justify-between">
+          {/* 1. TOP: StakePoint Live Data Card (Area marked yellow) */}
+          <StakePointCardClient />
 
-          {/* Supported Blockchains in 2 lines, 3 per line */}
-          <div className="p-5">
-            <div className="font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              SUPPORTED BLOCKCHAINS
-            </div>
-            <div className="font-mono text-sm sm:text-base font-extrabold text-white mt-1.5 space-y-0.5">
-              <div>SOL • BSC • ETH</div>
-              <div className="text-pump">BASE • ROBIN • AVAX</div>
-            </div>
-            <div className="font-sans text-[11px] text-muted mt-1">
-              Includes Robinhood Chain (ROBIN)
-            </div>
-          </div>
-
-          <div className="p-5">
-            <div className="flex items-center justify-between font-sans text-xs text-muted uppercase tracking-wider font-bold">
-              <span>ADMIN DESK HIT RATE</span>
-              <span className="text-pump font-bold">ALL CALLS COUNTED</span>
-            </div>
-            <div className="font-sans text-2xl sm:text-3xl font-extrabold text-white mt-1 tnum">
-              {deskWinRate.label}
-            </div>
-            <div className="w-full h-1.5 bg-canvas rounded-full overflow-hidden mt-2 border border-line">
-              <div className="h-full bg-pump" style={{ width: `${deskWinRate.pct}%` }} />
-            </div>
-          </div>
+          {/* 2. BOTTOM: The Stake Card (Area marked red) */}
+          <DashboardStakingCard showTelegram={false} />
         </div>
       </div>
-
-      {/* 3. STAKE CARD (Moved below the Welcome to Lab card) */}
-      <DashboardStakingCard />
 
       {/* 4. ALPHA TRADE CALLS: Full feed for verified users, locked terminal for unverified */}
       {!isUnlocked ? (
