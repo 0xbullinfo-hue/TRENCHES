@@ -75,6 +75,7 @@ export function LedgerGrid({
 
   useEffect(() => {
     if (entries.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchLedger(currentChain, currentSort, 0, false);
     }
   }, [fetchLedger, currentChain, currentSort, entries.length]);
