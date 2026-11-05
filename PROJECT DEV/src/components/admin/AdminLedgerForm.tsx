@@ -237,30 +237,30 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
             </div>
           </div>
 
-          {/* Entry & Exit Price (Optional) */}
+          {/* Entry & Exit Market Cap (Optional) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-neutral-800/40">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Entry Price <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
+                Entry Market Cap <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
               </label>
               <input
                 type="text"
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
-                placeholder="$0.0001"
+                placeholder="$100K"
                 className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Exit Price <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
+                Exit Market Cap <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
               </label>
               <input
                 type="text"
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
-                placeholder="$0.00034"
+                placeholder="$340K"
                 className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
               />
             </div>

@@ -91,3 +91,48 @@ export function formatLedgerDate(isoString: string): string {
   }
 }
 
+export function formatMarketCap(value?: string | null): string {
+  if (!value || !value.trim()) return '—';
+  const raw = value.trim();
+
+  // If already formatted like $100K, 150k, $2.5M, 1.2M, $500B
+  if (/[kmb]/i.test(raw)) {
+    const clean = raw.replace(/^\$/, '').trim();
+    return `$${clean.toUpperCase()}`;
+  }
+
+  // Parse pure number (e.g. 0.0001, 150000, $0.0001)
+  const num = parseFloat(raw.replace(/[^0-9.-]+/g, ''));
+  if (!Number.isFinite(num) || num <= 0) {
+    return raw;
+  }
+
+  // If it's a huge number >= 1,000,000,000
+  if (num >= 1_000_000_000) {
+    return `$${(num / 1_000_000_000).toFixed(2).replace(/\.00$/, '')}B`;
+  }
+  // If >= 1,000,000
+  if (num >= 1_000_000) {
+    return `$${(num / 1_000_000).toFixed(2).replace(/\.00$/, '')}M`;
+  }
+  // If >= 1,000
+  if (num >= 1_000) {
+    return `$${(num / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  }
+
+  // If entered as token unit price (e.g. 0.0001, 0.045, etc.), convert to standard 1B meme token supply Market Cap
+  const standardMc = num * 1_000_000_000;
+  if (standardMc >= 1_000_000_000) {
+    return `$${(standardMc / 1_000_000_000).toFixed(2).replace(/\.00$/, '')}B`;
+  }
+  if (standardMc >= 1_000_000) {
+    return `$${(standardMc / 1_000_000).toFixed(2).replace(/\.00$/, '')}M`;
+  }
+  if (standardMc >= 1_000) {
+    return `$${(standardMc / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  }
+
+  return `$${standardMc.toFixed(0)}`;
+}
+
+

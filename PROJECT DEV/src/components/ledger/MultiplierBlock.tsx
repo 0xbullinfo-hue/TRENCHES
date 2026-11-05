@@ -10,16 +10,16 @@ export function MultiplierBlock({ multiplier }: MultiplierBlockProps) {
   const isPositiveReturn = num >= 1.0;
 
   return (
-    <div className="h-24 flex flex-col justify-center rounded-md bg-neutral-950 p-4 border border-neutral-800/80">
+    <div className="h-20 flex flex-col justify-center rounded-lg bg-surface p-3.5 border border-toxic-border/40">
       <div
-        className={`font-sans text-3xl sm:text-4xl font-extrabold tracking-tight tnum ${
-          isPositiveReturn ? 'text-emerald-400' : 'text-neutral-400'
+        className={`font-sans text-2xl sm:text-3xl font-black tracking-tight tnum ${
+          isPositiveReturn ? 'text-toxic' : 'text-muted'
         }`}
       >
         {formatMultiplier(num)}
       </div>
       <div className="font-sans text-[10px] font-bold text-muted uppercase tracking-wider mt-0.5">
-        multiplier
+        Multiplier
       </div>
     </div>
   );

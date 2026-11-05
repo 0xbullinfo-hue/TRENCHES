@@ -1,7 +1,13 @@
 import React from 'react';
 import { MultiplierBlock } from './MultiplierBlock';
 import { CopyableCA } from './CopyableCA';
-import { formatChainLabel, formatLedgerDate, formatTicker } from '@/lib/ledger/format';
+import {
+  formatChainLabel,
+  formatLedgerDate,
+  formatMarketCap,
+  formatMultiplier,
+  formatTicker,
+} from '@/lib/ledger/format';
 import { ArrowUpRight } from 'lucide-react';
 
 export interface LedgerCardData {
@@ -20,66 +26,97 @@ export interface LedgerCardData {
   edited?: boolean;
 }
 
-export function LedgerCard({ entry }: { entry: LedgerCardData }) {
-  const hasPricing = Boolean(entry.entry_price || entry.exit_price);
-
+function XIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
-    <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-5 flex flex-col justify-between transition-transform duration-150 hover:-translate-y-0.5 hover:border-neutral-700 shadow-sm min-h-[320px]">
-      <div>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function getXShareUrl(entry: LedgerCardData): string {
+  const ticker = formatTicker(entry.ticker);
+  const mult = formatMultiplier(entry.multiplier);
+  const entryMc = formatMarketCap(entry.entry_price);
+  const exitMc = formatMarketCap(entry.exit_price);
+  const chain = formatChainLabel(entry.chain);
+
+  let text = `🚨 CLOSED CALL: ${ticker} achieved ${mult} on ${chain}!\n\n`;
+  if (entryMc !== '—' && exitMc !== '—') {
+    text += `📊 Entry MC: ${entryMc} ➔ Exit MC: ${exitMc}\n`;
+  }
+  text += `🎯 CA: ${entry.contract_address}\n\n`;
+  text += `Curated via @TrenchLabsHQ incubator 🧪`;
+
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent('https://trenchlabshq.com')}`;
+}
+
+export function LedgerCard({ entry }: { entry: LedgerCardData }) {
+  return (
+    <div className="relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-all duration-150 bg-surface-card border border-toxic-border hover:border-toxic shadow-sm min-h-[350px]">
+      <div className="space-y-4">
         {/* Top Header: Ticker, Chain Pill, and Closed Badge */}
-        <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-sans text-lg font-semibold text-white tracking-tight truncate">
+            <span className="font-sans text-base font-bold text-white tracking-tight truncate">
               {formatTicker(entry.ticker)}
             </span>
-            <span className="font-sans text-[11px] font-medium text-muted bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800/80 shrink-0">
+            <span className="font-sans text-[10px] font-bold text-muted bg-surface px-2 py-0.5 rounded border border-toxic-border/40 shrink-0 uppercase tracking-wider">
               {formatChainLabel(entry.chain)}
             </span>
           </div>
 
-          <span className="font-sans text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none">
+          <span className="font-sans text-[10px] font-bold text-toxic bg-toxic/15 border border-toxic/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none">
             CLOSED
           </span>
         </div>
 
         {/* Multiplier Hero Block */}
-        <div className="mb-4">
+        <div>
           <MultiplierBlock multiplier={entry.multiplier} />
         </div>
 
-        {/* Entry / Exit Row: Only rendered if present (No placeholders per §3) */}
-        {hasPricing && (
-          <div className="flex items-center gap-4 mb-3 font-mono text-xs">
-            {entry.entry_price && (
-              <div>
-                <span className="text-muted text-[10px] uppercase block">Entry</span>
-                <span className="text-white font-medium tnum">{entry.entry_price}</span>
-              </div>
-            )}
-            {entry.exit_price && (
-              <div>
-                <span className="text-muted text-[10px] uppercase block">Exit</span>
-                <span className="text-white font-medium tnum">{entry.exit_price}</span>
-              </div>
-            )}
+        {/* Entry & Exit in Market Caps (Not Price) */}
+        <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-surface border border-toxic-border/40">
+          <div>
+            <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">
+              Entry MC
+            </span>
+            <span className="text-white font-mono text-xs sm:text-sm font-semibold tnum">
+              {formatMarketCap(entry.entry_price)}
+            </span>
           </div>
-        )}
+          <div>
+            <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">
+              Exit MC
+            </span>
+            <span className="text-toxic font-mono text-xs sm:text-sm font-bold tnum">
+              {formatMarketCap(entry.exit_price)}
+            </span>
+          </div>
+        </div>
 
         {/* Contract Address */}
-        <div className="mb-3">
+        <div>
           <CopyableCA address={entry.contract_address} />
         </div>
 
-        {/* Notes (if present) */}
-        {entry.notes && (
-          <p className="font-sans text-xs text-muted/90 italic leading-relaxed mb-4 line-clamp-3">
-            &ldquo;{entry.notes}&rdquo;
-          </p>
-        )}
+        {/* Share to X Button */}
+        <div>
+          <a
+            href={getXShareUrl(entry)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full h-10 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer group"
+          >
+            <XIcon className="w-3.5 h-3.5 text-toxic group-hover:scale-110 transition-transform" />
+            <span>Share to X</span>
+          </a>
+        </div>
       </div>
 
       {/* Non-negotiable Footer Honesty Disclosure */}
-      <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-2 font-mono text-[11px] text-muted">
+      <div className="pt-4 mt-4 border-t border-toxic-border/30 flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
         <div className="flex items-center gap-1.5 truncate">
           <span className="truncate">
             Recorded by the TrenchLabs team · {formatLedgerDate(entry.closed_at)}
@@ -96,7 +133,7 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
             href={entry.proof_url}
             target="_blank"
             rel="noreferrer"
-            className="text-pump hover:text-white inline-flex items-center gap-0.5 shrink-0 transition-colors font-sans text-xs font-semibold"
+            className="text-toxic hover:text-white inline-flex items-center gap-0.5 shrink-0 transition-colors font-sans text-xs font-semibold"
           >
             <span>Proof</span>
             <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
@@ -106,4 +143,3 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
     </div>
   );
 }
-

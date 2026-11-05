@@ -1,40 +1,110 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { LedgerGrid } from './LedgerGrid';
 import { LedgerCardSkeleton } from './LedgerCardSkeleton';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, ArrowUpRight, ChevronUp, BarChart3 } from 'lucide-react';
 
 export function DashboardLedgerEmbed() {
-  return (
-    <section id="ledger-embed" className="pt-8 border-t border-neutral-800/80">
-      <div className="mb-6 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-2xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase font-bold flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3" />
-            <span>Closed Calls Showcase</span>
-          </span>
-        </div>
-        <h2 className="font-sans text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
-          Recent Call Performance Ledger
-        </h2>
-        <p className="font-sans text-xs sm:text-sm text-muted">
-          Latest verified trade outcomes recorded by the TrenchLabs team.
-        </p>
-      </div>
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#ledger-embed') {
+      return true;
+    }
+    return false;
+  });
 
-      <Suspense
-        fallback={
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-            <LedgerCardSkeleton />
-            <LedgerCardSkeleton />
-            <LedgerCardSkeleton />
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#ledger-embed') {
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  return (
+    <section id="ledger-embed" className="pt-8 border-t border-toxic-border/30">
+      {/* Closed State: Sleek banner with View Full Ledger button */}
+      {!isOpen ? (
+        <div className="rounded-xl bg-surface-card border border-toxic-border hover:border-toxic p-6 sm:p-7 transition-all duration-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-2xs font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 uppercase font-bold flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Closed Calls Showcase</span>
+                </span>
+                <span className="text-2xs font-mono text-muted uppercase">
+                  Verified Multipliers
+                </span>
+              </div>
+              <h2 className="font-sans text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
+                Recent Call Performance Ledger
+              </h2>
+              <p className="font-sans text-xs sm:text-sm text-muted max-w-2xl">
+                Verified trade outcomes, multipliers achieved, and contract addresses recorded by the TrenchLabs team.
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsOpen(true)}
+                className="w-full sm:w-auto h-12 px-7 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+              >
+                <span>View full ledger</span>
+                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
-        }
-      >
-        <LedgerGrid isDashboardEmbed={true} />
-      </Suspense>
+        </div>
+      ) : (
+        /* Open / Expanded State: Revealing the full max-4 cards grid */
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-toxic-border/30">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-2xs font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 uppercase font-bold flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Closed Calls Showcase</span>
+                </span>
+              </div>
+              <h2 className="font-sans text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-toxic" />
+                <span>Recent Call Performance Ledger</span>
+              </h2>
+              <p className="font-sans text-xs sm:text-sm text-muted">
+                Latest verified trade outcomes recorded by the TrenchLabs team.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-elevated border border-toxic-border/40 hover:border-toxic text-muted hover:text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ChevronUp className="w-4 h-4" />
+                <span>Hide Ledger</span>
+              </button>
+            </div>
+          </div>
+
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
+                <LedgerCardSkeleton />
+                <LedgerCardSkeleton />
+                <LedgerCardSkeleton />
+                <LedgerCardSkeleton />
+              </div>
+            }
+          >
+            <LedgerGrid isDashboardEmbed={true} />
+          </Suspense>
+        </div>
+      )}
     </section>
   );
 }
-

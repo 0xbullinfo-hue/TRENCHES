@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { LedgerCard, LedgerCardData } from './LedgerCard';
@@ -43,7 +43,7 @@ export function LedgerGrid({
 
   const fetchLedger = useCallback(
     async (chainVal: string, sortVal: string, offset = 0, append = false) => {
-      const limit = isDashboardEmbed ? 6 : 12;
+      const limit = isDashboardEmbed ? 8 : 12;
       if (append) setLoadingMore(true);
       else setLoading(true);
       setError(null);
@@ -72,6 +72,12 @@ export function LedgerGrid({
     },
     [isDashboardEmbed]
   );
+
+  useEffect(() => {
+    if (entries.length === 0) {
+      fetchLedger(currentChain, currentSort, 0, false);
+    }
+  }, [fetchLedger, currentChain, currentSort, entries.length]);
 
   const handleFilterChain = (chain: string) => {
     setCurrentChain(chain);
@@ -103,7 +109,7 @@ export function LedgerGrid({
   return (
     <div className="space-y-6">
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-toxic-border/30">
         {/* Chain Filter Pills */}
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -111,8 +117,8 @@ export function LedgerGrid({
             onClick={() => handleFilterChain('all')}
             className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
               currentChain === 'all'
-                ? 'bg-neutral-100 text-neutral-900 font-extrabold'
-                : 'bg-neutral-900 border border-neutral-800 text-muted hover:text-white'
+                ? 'bg-toxic text-canvas font-black shadow-sm'
+                : 'bg-surface border border-toxic-border/40 text-muted hover:text-white hover:border-toxic'
             }`}
           >
             All
@@ -124,8 +130,8 @@ export function LedgerGrid({
               onClick={() => handleFilterChain(c.value)}
               className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                 currentChain === c.value
-                  ? 'bg-neutral-100 text-neutral-900 font-extrabold'
-                  : 'bg-neutral-900 border border-neutral-800 text-muted hover:text-white'
+                  ? 'bg-toxic text-canvas font-black shadow-sm'
+                  : 'bg-surface border border-toxic-border/40 text-muted hover:text-white hover:border-toxic'
               }`}
             >
               {c.label}
@@ -140,7 +146,7 @@ export function LedgerGrid({
             <select
               value={currentSort}
               onChange={(e) => handleFilterSort(e.target.value as 'newest' | 'multi')}
-              className="h-8 px-2.5 rounded-md bg-neutral-900 border border-neutral-800 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic cursor-pointer"
+              className="h-8 px-2.5 rounded-md bg-surface border border-toxic-border/40 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic cursor-pointer"
             >
               <option value="newest">Newest ▾</option>
               <option value="multi">Highest multiple ▾</option>
@@ -172,16 +178,17 @@ export function LedgerGrid({
         </div>
       )}
 
-      {/* Grid Content */}
+      {/* Grid Content: Max 4 cards per row, same theme and size as tier cards */}
       {loading && entries.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
+          <LedgerCardSkeleton />
           <LedgerCardSkeleton />
           <LedgerCardSkeleton />
           <LedgerCardSkeleton />
         </div>
       ) : entries.length === 0 ? (
         /* Empty State */
-        <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-12 text-center space-y-3">
+        <div className="rounded-xl bg-surface border border-toxic-border/40 p-12 text-center space-y-3">
           <FolderOpen className="w-8 h-8 text-muted mx-auto stroke-[1.5]" />
           <p className="font-sans text-sm text-muted">
             {currentChain !== 'all'
@@ -190,7 +197,7 @@ export function LedgerGrid({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
           {entries.map((entry) => (
             <LedgerCard key={entry.id} entry={entry} />
           ))}
@@ -204,7 +211,7 @@ export function LedgerGrid({
             type="button"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="h-11 px-8 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            className="h-11 px-8 rounded-lg bg-surface hover:bg-surface-elevated border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
           >
             {loadingMore ? (
               <>
