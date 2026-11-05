@@ -8,7 +8,7 @@ import { ArrowUpRight, Send } from 'lucide-react';
 const TRUST_METRICS = [
   {
     label: 'ACCESS REQUIREMENT',
-    value: '1,000,000',
+    value: 'HOLD OR STAKE',
     sub: '$GENESIS REQUIRED FOR MEMBER ACCESS',
     highlight: true,
   },

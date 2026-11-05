@@ -111,7 +111,7 @@ export async function TierSection() {
         {/* Section Header */}
         <div className="pb-6 border-b border-toxic-border">
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
-            ACCESS REQUIREMENT
+            MEMBERSHIP REQUIREMENT
           </span>
           <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
             Choose your access
@@ -133,13 +133,10 @@ export async function TierSection() {
 
               <div className="space-y-2">
                 <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-                  ACCESS REQUIREMENT
+                  REQUIRED WALLET BALANCE
                 </div>
-                <div className="font-sans text-3xl sm:text-4xl font-black text-toxic tracking-tight uppercase">
-                  HOLD OR STAKE
-                </div>
-                <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-                  $GENESIS REQUIRED FOR MEMBER ACCESS
+                <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
+                  <span className="text-toxic font-extrabold">$GENESIS</span>
                 </div>
                 <p className="font-sans text-sm text-muted leading-relaxed pt-1">
                   Hold at least <strong className="text-toxic">$20 $GENESIS</strong> from contract{' '}
