@@ -133,7 +133,7 @@ export const HeroTerminal: React.FC = () => {
                 {m.label}
               </div>
               <div
-                className={`font-sans text-3xl sm:text-4xl font-extrabold tnum tracking-tight ${
+                className={`font-sans text-2xl sm:text-3xl lg:text-2xl xl:text-3xl font-extrabold tnum tracking-tight ${
                   m.highlight ? 'text-toxic' : 'text-white'
                 }`}
               >
