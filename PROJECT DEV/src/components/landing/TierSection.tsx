@@ -92,7 +92,7 @@ export async function TierSection() {
   ];
 
   const memberFeatures = [
-    'Open calls (15m delayed)',
+    'Open calls (Limited)',
     'Member Telegram group',
     'Incubator dashboard access',
   ];
