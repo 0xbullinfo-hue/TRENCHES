@@ -111,7 +111,7 @@ export async function TierSection() {
         {/* Section Header */}
         <div className="pb-6 border-b border-toxic-border">
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
-            MEMBERSHIP REQUIREMENT
+            ACCESS REQUIREMENT
           </span>
           <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
             Choose your access
@@ -128,12 +128,12 @@ export async function TierSection() {
             <div className="lg:col-span-4 space-y-6 lg:pr-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-sans text-xs font-extrabold uppercase tracking-wider">
                 <FlaskConical className="w-4 h-4" />
-                <span>OFFICIAL LAB PASS</span>
+                <span>HOLD OR STAKE</span>
               </div>
 
               <div className="space-y-2">
                 <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-                  REQUIRED WALLET BALANCE
+                  $GENESIS REQUIRED FOR MEMBER ACCESS
                 </div>
                 <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
                   <span className="text-toxic font-extrabold">$GENESIS</span>
