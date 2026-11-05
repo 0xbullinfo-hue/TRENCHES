@@ -1,6 +1,27 @@
 import React from 'react';
 import { TierCard } from './TierCard';
 import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
+import { GENESIS_MINT } from '@/lib/config';
+import { ShieldCheck } from 'lucide-react';
+
+const LAB_BENEFITS = [
+  {
+    title: 'Multi-Chain Trade Calls',
+    body: 'Browse admin-posted calls across supported networks, filter by chain, and review the details before making your own decision.',
+  },
+  {
+    title: 'Contract Address & Market Links',
+    body: 'Copy the contract address shared in each post and open available external market links. Always verify the address and token independently.',
+  },
+  {
+    title: 'Wallet-Balance Access',
+    body: `Hold at least $20 $GENESIS from contract ${GENESIS_MINT} in your wallet to enter the incubator dashboard.`,
+  },
+  {
+    title: 'Risk & Target Details',
+    body: 'Review the market-cap snapshot, risk ratio, and take-profit targets entered with each call. Calls are informational and can lose value.',
+  },
+];
 
 export function formatTokenAmountDisplay(rawString: string, decimals = TOKEN_DECIMALS): string {
   try {
@@ -152,6 +173,26 @@ export async function TierSection() {
             emphasized={true}
             badge="Recommended"
           />
+        </div>
+
+        {/* 4 Benefit Sub-Cards for the Tier Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+          {LAB_BENEFITS.map((benefit) => (
+            <div
+              key={benefit.title}
+              className="p-6 rounded-2xl bg-surface-card border border-toxic-border hover:border-toxic transition-colors space-y-2.5"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-toxic shrink-0" />
+                <h3 className="font-sans text-sm font-bold text-white">
+                  {benefit.title}
+                </h3>
+              </div>
+              <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
+                {benefit.body}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Footnote */}

@@ -39,3 +39,4 @@ export function getUnlockDate(lockDays = 90, fromDate = new Date()): string {
     year: 'numeric',
   });
 }
+

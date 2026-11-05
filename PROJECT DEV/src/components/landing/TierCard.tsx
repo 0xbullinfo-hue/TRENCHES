@@ -19,10 +19,10 @@ export function TierCard({
 
   return (
     <div
-      className={`relative rounded-lg h-full flex flex-col justify-between p-8 sm:p-12 transition-colors ${
+      className={`relative rounded-2xl h-full flex flex-col justify-between p-6 sm:p-8 lg:p-10 transition-colors ${
         emphasized
-          ? 'bg-surface border-2 border-toxic shadow-sm'
-          : 'bg-surface border border-toxic-border/60 shadow-sm'
+          ? 'bg-surface-card border-2 border-toxic hover:border-toxic-bright shadow-sm'
+          : 'bg-surface-card border border-toxic-border hover:border-toxic shadow-sm'
       }`}
     >
       {/* Top Header & Badge */}
