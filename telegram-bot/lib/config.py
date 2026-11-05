@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import Field, SecretStr, field_validator
@@ -19,12 +20,14 @@ class Settings(BaseSettings):
     genesis_mint: str = Field(validation_alias="GENESIS_MINT")
     genesis_decimals: int = Field(validation_alias="GENESIS_DECIMALS")
     join_url: str = Field(validation_alias="JOIN_URL")
+    buy_url: str = Field("https://trenchlabs.xyz/buy", validation_alias="BUY_URL")
+    public_ledger_url: str = Field("https://trenchlabs.xyz/results", validation_alias="PUBLIC_LEDGER_URL")
     internal_secret: SecretStr = Field(validation_alias="INTERNAL_SECRET")
     database_url: SecretStr = Field(validation_alias="DATABASE_URL")
     bootstrap_owner_id: int = Field(validation_alias="BOOTSTRAP_OWNER_ID")
 
-    member_usd_threshold: float = Field(20, validation_alias="MEMBER_USD_THRESHOLD")
-    pro_usd_threshold: float = Field(250, validation_alias="PRO_USD_THRESHOLD")
+    member_usd_threshold: Decimal = Field(Decimal("20"), validation_alias="MEMBER_USD_THRESHOLD")
+    pro_usd_threshold: Decimal = Field(Decimal("250"), validation_alias="PRO_USD_THRESHOLD")
     pro_lock_days: int = Field(90, validation_alias="PRO_LOCK_DAYS")
     member_delay_minutes: int = Field(15, validation_alias="MEMBER_DELAY_MINUTES")
     recalc_interval_hours: int = Field(6, validation_alias="RECALC_INTERVAL_HOURS")

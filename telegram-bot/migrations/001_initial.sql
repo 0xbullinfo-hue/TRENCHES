@@ -68,13 +68,3 @@ CREATE TABLE IF NOT EXISTS verify_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ix_verify_events_created_at_desc ON verify_events(created_at DESC);
-
--- Shared with the platform's staking flow and stored in the same database.
-CREATE TABLE IF NOT EXISTS stakes (
-    id BIGSERIAL PRIMARY KEY,
-    wallet_address TEXT NOT NULL,
-    status TEXT NOT NULL,
-    unlocks_at TIMESTAMPTZ NOT NULL,
-    stake_usd NUMERIC NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_stakes_wallet_active_unlocks ON stakes(wallet_address, status, unlocks_at);
