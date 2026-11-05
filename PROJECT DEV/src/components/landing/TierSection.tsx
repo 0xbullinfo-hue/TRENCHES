@@ -128,15 +128,18 @@ export async function TierSection() {
             <div className="lg:col-span-4 space-y-6 lg:pr-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-sans text-xs font-extrabold uppercase tracking-wider">
                 <FlaskConical className="w-4 h-4" />
-                <span>HOLD OR STAKE</span>
+                <span>OFFICIAL LAB PASS</span>
               </div>
 
               <div className="space-y-2">
                 <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-                  $GENESIS REQUIRED FOR MEMBER ACCESS
+                  ACCESS REQUIREMENT
                 </div>
-                <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
-                  <span className="text-toxic font-extrabold">$GENESIS</span>
+                <div className="font-sans text-3xl sm:text-4xl font-black text-toxic tracking-tight uppercase">
+                  HOLD OR STAKE
+                </div>
+                <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+                  $GENESIS REQUIRED FOR MEMBER ACCESS
                 </div>
                 <p className="font-sans text-sm text-muted leading-relaxed pt-1">
                   Hold at least <strong className="text-toxic">$20 $GENESIS</strong> from contract{' '}
