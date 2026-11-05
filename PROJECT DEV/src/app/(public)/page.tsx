@@ -1,8 +1,7 @@
-'use client';
-
 import React from 'react';
 import { HeroTerminal } from '@/components/HeroTerminal';
 import { PipelineGrid } from '@/components/PipelineGrid';
+import { TierSection } from '@/components/landing/TierSection';
 import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
 import {
   ArrowUpRight,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 
 const LAB_BENEFITS = [
+
   {
     title: 'Multi-Chain Trade Calls',
     body: 'Browse admin-posted calls across supported networks, filter by chain, and review the details before making your own decision.',
@@ -35,6 +35,9 @@ export default function LandingPage() {
     <div className="flex flex-col bg-canvas">
       {/* 1. Hero Section */}
       <HeroTerminal />
+
+      {/* Feature A — Choose your access Tier Section (§5) */}
+      <TierSection />
 
       {/* 2. Incubator Pipeline Section (Past Early-Access Tokens & X Profits Earned) */}
       <PipelineGrid />

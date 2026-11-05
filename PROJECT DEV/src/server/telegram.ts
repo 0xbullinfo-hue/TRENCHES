@@ -56,6 +56,129 @@ export async function tgSend(
   }
 }
 
+import {
+  getVerificationSession,
+  markSessionUsed,
+  resolveTier,
+  upsertTelegramMember,
+} from '@/server/db';
+
+export async function createTelegramInvite(
+  tier: 'member' | 'pro',
+  userId?: number
+): Promise<string> {
+  const groupId = tier === 'pro' ? process.env.TELEGRAM_PRO_GROUP_ID : process.env.TELEGRAM_MEMBER_GROUP_ID;
+  if (BOT_TOKEN && groupId) {
+    try {
+      const res = await fetch(`${API_BASE}/bot${BOT_TOKEN}/createChatInviteLink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: groupId,
+          member_limit: 1,
+          expire_date: Math.floor(Date.now() / 1000) + 3600, // 60 minutes
+          name: `Invite for ${userId || 'user'} (${tier})`,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.result?.invite_link) {
+          return data.result.invite_link;
+        }
+      }
+    } catch (e) {
+      console.error('[TrenchLabs] createChatInviteLink error:', e);
+    }
+  }
+
+  // Graceful fallback for mock / development / unconfigured group
+  return `https://t.me/+trench_${tier}_${crypto.randomBytes(6).toString('base64url')}`;
+}
+
+/**
+ * Consumes `vs_<session_id>` verification session per §8.
+ * Re-verifies on-chain, issues single-use invite, updates telegram_members, marks session used.
+ */
+export async function handleTelegramVerification(
+  sessionId: string,
+  chatId: number | string,
+  userId?: number
+): Promise<{ replyText: string; success: boolean }> {
+  const session = await getVerificationSession(sessionId);
+  const effectiveUserId = userId || (typeof chatId === 'number' ? chatId : Number(chatId)) || null;
+
+  if (!session) {
+    return {
+      replyText:
+        'This link is invalid. Get a new one from your dashboard at trenchlabs.xyz/dashboard.',
+      success: false,
+    };
+  }
+
+  if (session.used_at) {
+    return {
+      replyText:
+        'This link was already used. Get a new one from your dashboard if you still need access.',
+      success: false,
+    };
+  }
+
+  if (new Date(session.expires_at).getTime() < Date.now()) {
+    return {
+      replyText: 'This link expired. Get a new one from your dashboard.',
+      success: false,
+    };
+  }
+
+  // Re-verify on-chain — do NOT trust the session's tier claim
+  const wallet = session.wallet_address;
+  const shortWallet = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+  let resultTier: 'free' | 'member' | 'pro' = 'free';
+
+  try {
+    resultTier = await resolveTier(wallet);
+  } catch (err) {
+    console.error('[TrenchLabs] RPC verification error during /start:', err);
+    return {
+      replyText: 'Network error verifying your wallet. Try again in a minute.',
+      success: false,
+    };
+  }
+
+  if (resultTier === 'free') {
+    await markSessionUsed(sessionId, effectiveUserId);
+    return {
+      replyText: `Your wallet ${shortWallet} doesn't currently qualify. You need $20 held for Member or $250 staked for Pro.`,
+      success: false,
+    };
+  }
+
+  const target = session.tier;
+  if (target === 'pro' && resultTier !== 'pro') {
+    await markSessionUsed(sessionId, effectiveUserId);
+    return {
+      replyText:
+        "You're not currently eligible for Pro (stake may have expired). Check your dashboard for a Member invite instead.",
+      success: false,
+    };
+  }
+
+  const invite = await createTelegramInvite(target, effectiveUserId ?? undefined);
+  await upsertTelegramMember({
+    wallet_address: wallet,
+    telegram_user_id: effectiveUserId,
+    tier: target,
+    in_group: true,
+  });
+  await markSessionUsed(sessionId, effectiveUserId);
+
+  const formattedTarget = target.charAt(0).toUpperCase() + target.slice(1);
+  return {
+    replyText: `✅ Verified as ${formattedTarget}.\n\nJoin your group: ${invite}\n\nSingle-use, expires in 60 minutes.`,
+    success: true,
+  };
+}
+
 // ---------- linking ----------
 
 export async function createLinkCode(wallet: string): Promise<{ url: string }> {

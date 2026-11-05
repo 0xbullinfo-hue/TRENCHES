@@ -15,6 +15,7 @@ import {
 import { TokenArtwork } from './TokenArtwork';
 import { SinceCallChip } from './SinceCallChip';
 import { TelegramAlerts } from './TelegramAlerts';
+import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import {
   AlertTriangle,
@@ -1528,6 +1529,17 @@ export const IncubatorHub: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* Telegram Access Card (§7.3) */}
+          <div className="rounded-lg bg-surface border border-toxic-border/60 p-5 shadow-sm space-y-3">
+            <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+              TELEGRAM ACCESS
+            </div>
+            <p className="font-sans text-xs text-muted leading-relaxed">
+              Verify your wallet in Telegram to join your exclusive group and receive signals.
+            </p>
+            <TelegramConnectButton />
+          </div>
 
           <TelegramAlerts />
         </div>

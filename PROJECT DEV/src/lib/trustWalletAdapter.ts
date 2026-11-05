@@ -365,3 +365,4 @@ export class TrustWalletAdapter extends BaseMessageSignerWalletAdapter {
     }
   }
 }
+

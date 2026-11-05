@@ -589,6 +589,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         };
         try {
           sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
+          fetch('/api/auth/session', { method: 'POST', headers }).catch(() => {});
         } catch {
           // ignore cache write failure
         }
@@ -991,6 +992,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const disconnectDemoOrWallet = useCallback(async () => {
     try {
+      fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
       if (wallet.connected || wallet.wallet) {
         await wallet.disconnect();
       }

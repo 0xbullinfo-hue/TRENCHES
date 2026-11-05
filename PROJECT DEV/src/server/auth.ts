@@ -2,9 +2,16 @@ import crypto from 'crypto';
 import { PublicKey } from '@solana/web3.js';
 import { ADMIN_WALLET } from '@/lib/config';
 import { KV_CONFIGURED, kvLock } from './kv';
+import { resolveTier } from './db';
 
 const ED25519_SPKI_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 export const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
+
+export const SESSION_COOKIE_NAME = 'trench_session';
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  process.env.TELEGRAM_WEBHOOK_SECRET ||
+  'trenchlabs-session-secret-key-32ch';
 
 export interface AdminAuthResult {
   authorized: boolean;
@@ -15,6 +22,72 @@ export interface WalletAuthResult {
   ok: boolean;
   wallet?: string;
   error?: string;
+}
+
+export interface AuthSession {
+  wallet: string;
+  tier: 'free' | 'member' | 'pro';
+}
+
+export function signSession(wallet: string, maxAgeSec = 7 * 24 * 3600): string {
+  const exp = Math.floor(Date.now() / 1000) + maxAgeSec;
+  const payload = `${wallet}|${exp}`;
+  const hmac = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}.${hmac}`;
+}
+
+export function verifySessionToken(token: string): { wallet: string } | null {
+  if (!token) return null;
+  const lastDot = token.lastIndexOf('.');
+  if (lastDot === -1) return null;
+  const payload = token.slice(0, lastDot);
+  const sig = token.slice(lastDot + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  if (sig !== expected) return null;
+
+  const [wallet, expStr] = payload.split('|');
+  const exp = Number(expStr);
+  if (!wallet || !Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+  return { wallet };
+}
+
+export function parseCookieHeader(cookieHeader?: string | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!cookieHeader) return out;
+  const parts = cookieHeader.split(';');
+  for (const part of parts) {
+    const [k, v] = part.trim().split('=');
+    if (k && v) out[k] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+/**
+ * Validates authenticated request session from cookie or cryptographic headers.
+ */
+export async function getAuthSession(req: Request): Promise<AuthSession | null> {
+  // 1. Try session cookie first
+  const cookieHeader = req.headers.get('cookie');
+  const cookies = parseCookieHeader(cookieHeader);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (token) {
+    const verified = verifySessionToken(token);
+    if (verified?.wallet) {
+      const tier = await resolveTier(verified.wallet);
+      return { wallet: verified.wallet, tier };
+    }
+  }
+
+  // 2. Fallback to cryptographic headers if provided
+  const walletAuth = verifyWalletAuth(req);
+  if (walletAuth.ok && walletAuth.wallet) {
+    const tier = await resolveTier(walletAuth.wallet);
+    return { wallet: walletAuth.wallet, tier };
+  }
+
+  return null;
 }
 
 /**

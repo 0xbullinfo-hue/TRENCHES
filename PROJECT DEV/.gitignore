@@ -32,4 +32,5 @@ next-env.d.ts
 
 # local persistent state
 /data/calls.json
+/data/db.json
 /data/*.tmp

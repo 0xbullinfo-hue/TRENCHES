@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   WEBHOOK_SECRET,
   completeLink,
+  handleTelegramVerification,
   telegramConfigured,
   tgSend,
   timingSafeEqualStr,
@@ -10,7 +11,8 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const START_RE = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{8,64})$/;
+const START_VS_RE = /^\/start(?:@\w+)?\s+vs_([A-Za-z0-9_-]+)$/;
+const START_LEGACY_RE = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{8,64})$/;
 
 /** Telegram -> us. Authenticated with the secret token we registered via setWebhook. */
 export async function POST(req: NextRequest) {
@@ -28,11 +30,18 @@ export async function POST(req: NextRequest) {
   try {
     if (msg?.chat?.type === 'private' && typeof msg.text === 'string') {
       const chatId = msg.chat.id as number;
+      const userId = msg.from?.id as number | undefined;
       const text = msg.text.trim();
-      const start = START_RE.exec(text);
 
-      if (start) {
-        const wallet = await completeLink(start[1], chatId);
+      const startVs = START_VS_RE.exec(text);
+      const startLegacy = !startVs ? START_LEGACY_RE.exec(text) : null;
+
+      if (startVs) {
+        const sessionId = startVs[1];
+        const res = await handleTelegramVerification(sessionId, chatId, userId);
+        await tgSend(chatId, res.replyText);
+      } else if (startLegacy) {
+        const wallet = await completeLink(startLegacy[1], chatId);
         await tgSend(
           chatId,
           wallet
@@ -43,7 +52,10 @@ export async function POST(req: NextRequest) {
         const removed = await unlinkChat(chatId);
         await tgSend(chatId, removed ? 'Alerts turned off.' : 'No alerts were linked to this chat.');
       } else {
-        await tgSend(chatId, 'Open the TrenchLabs dashboard and tap "Get alerts" to link this chat. /stop turns alerts off.');
+        await tgSend(
+          chatId,
+          'Welcome to TrenchLabsHQ!\n\nConnect your wallet at trenchlabs.xyz/dashboard to verify and receive your group invite.'
+        );
       }
     }
   } catch (e) {
@@ -51,3 +63,4 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true });
 }
+

@@ -102,3 +102,4 @@ test('Wallet connect modal deduplication, event synchronization, and account-swi
     'Terminal must unlock once signature is verified and balance meets threshold'
   );
 });
+
