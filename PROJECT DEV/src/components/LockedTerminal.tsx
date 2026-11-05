@@ -19,8 +19,6 @@ export const LockedTerminal: React.FC = () => {
     connected,
     shortAddress,
     formattedBalance,
-    setDemoPreset,
-    demoEnabled,
     needsSignature,
     requestUnlockSignature,
     connectWallet,
@@ -96,25 +94,15 @@ export const LockedTerminal: React.FC = () => {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <div className="max-w-md mx-auto pt-2">
             <button
               type="button"
               onClick={connectWallet}
-              className="h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors"
+              className="w-full h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
             >
               <Wallet className="w-4 h-4" />
               <span>Connect Solana Wallet</span>
             </button>
-
-            {demoEnabled && (
-              <button
-                type="button"
-                onClick={() => setDemoPreset('1m')}
-                className="h-11 px-5 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-sm font-bold text-white cursor-pointer transition-colors"
-              >
-                <span>Preview 1M $GENESIS Member</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -259,16 +247,6 @@ export const LockedTerminal: React.FC = () => {
               <span>Switch Wallet</span>
             </button>
           </div>
-
-          {demoEnabled && (
-            <button
-              type="button"
-              onClick={() => setDemoPreset('1m')}
-              className="font-sans text-xs text-pump font-bold hover:underline cursor-pointer"
-            >
-              Preview 1M $GENESIS Member →
-            </button>
-          )}
         </div>
       </div>
     </div>
