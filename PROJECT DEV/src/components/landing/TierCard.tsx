@@ -19,62 +19,62 @@ export function TierCard({
 
   return (
     <div
-      className={`relative rounded-2xl h-full flex flex-col justify-between p-6 sm:p-8 lg:p-10 transition-colors ${
+      className={`relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-colors bg-surface-card ${
         emphasized
-          ? 'bg-surface-card border-2 border-toxic hover:border-toxic-bright shadow-sm'
-          : 'bg-surface-card border border-toxic-border hover:border-toxic shadow-sm'
+          ? 'border border-toxic hover:border-toxic-bright shadow-sm'
+          : 'border border-toxic-border hover:border-toxic shadow-sm'
       }`}
     >
       {/* Top Header & Badge */}
       <div>
-        <div className="flex items-center justify-between min-h-[28px] mb-4">
-          <span className="font-sans text-xs font-black uppercase tracking-widest text-muted">
+        <div className="flex items-center justify-between min-h-[24px] mb-3">
+          <span className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
             {name}
           </span>
           {badge && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-toxic/15 text-toxic border border-toxic/30">
-              ★ {badge}
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-toxic/15 text-toxic border border-toxic/30 uppercase tracking-wide">
+              {badge}
             </span>
           )}
         </div>
 
         {/* Price & Subtitle */}
-        <div className="space-y-1 mb-6">
-          <div className="font-sans text-3xl sm:text-4xl font-extrabold text-white tracking-tight tnum">
+        <div className="space-y-1 mb-4">
+          <div className="font-sans text-2xl font-black text-white tracking-tight tnum">
             {priceLabel}
           </div>
-          <div className="font-sans text-sm text-muted font-medium">{subtitle}</div>
+          <div className="font-sans text-xs text-muted font-medium">{subtitle}</div>
           {thresholdLabel && (
-            <div className="font-mono text-xs text-toxic font-semibold pt-1 tnum">
+            <div className="font-mono text-[11px] text-toxic font-semibold pt-0.5 tnum">
               {thresholdLabel}
             </div>
           )}
         </div>
 
-        {/* Feature List (✓ checkmarks, 16px gap) */}
-        <ul className="space-y-4 pt-6 border-t border-toxic-border/30">
+        {/* Feature List */}
+        <ul className="space-y-2.5 pt-4 border-t border-toxic-border/30">
           {features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <span className="text-toxic font-bold select-none leading-tight">✓</span>
-              <span className="font-sans text-sm text-ink/90 leading-snug">{feature}</span>
+            <li key={idx} className="flex items-start gap-2">
+              <span className="text-toxic font-bold text-xs select-none leading-none pt-0.5">✓</span>
+              <span className="font-sans text-xs text-ink/90 leading-tight">{feature}</span>
             </li>
           ))}
         </ul>
       </div>
 
       {/* CTA Button */}
-      <div className="pt-8 mt-auto">
+      <div className="pt-6 mt-auto">
         {ctaDisabled ? (
           <div className="relative group">
             <button
               disabled
               title={ctaTooltip || 'Community link coming soon'}
-              className="w-full h-11 px-6 rounded-md border border-toxic-border/40 text-muted cursor-not-allowed font-sans text-sm font-bold flex items-center justify-center select-none"
+              className="w-full h-10 px-4 rounded-lg border border-toxic-border/40 text-muted cursor-not-allowed font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center select-none"
             >
               {ctaLabel}
             </button>
             {ctaTooltip && (
-              <span className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-xs text-white bg-[#141b24] border border-toxic-border/40 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-[11px] text-white bg-[#141b24] border border-toxic-border/40 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
                 {ctaTooltip}
               </span>
             )}
@@ -84,7 +84,7 @@ export function TierCard({
             href={ctaHref}
             target="_blank"
             rel="noreferrer"
-            className={`w-full h-11 px-6 rounded-md font-sans text-sm font-bold flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
               emphasized
                 ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
                 : 'border border-toxic text-toxic hover:bg-toxic/10'
@@ -95,7 +95,7 @@ export function TierCard({
         ) : (
           <Link
             href={ctaHref}
-            className={`w-full h-11 px-6 rounded-md font-sans text-sm font-bold flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
               emphasized
                 ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
                 : 'border border-toxic text-toxic hover:bg-toxic/10'
@@ -108,4 +108,3 @@ export function TierCard({
     </div>
   );
 }
-

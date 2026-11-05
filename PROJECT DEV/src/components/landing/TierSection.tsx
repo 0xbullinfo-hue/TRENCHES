@@ -1,27 +1,12 @@
 import React from 'react';
 import { TierCard } from './TierCard';
 import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
-import { GENESIS_MINT } from '@/lib/config';
-import { ShieldCheck } from 'lucide-react';
-
-const LAB_BENEFITS = [
-  {
-    title: 'Multi-Chain Trade Calls',
-    body: 'Browse admin-posted calls across supported networks, filter by chain, and review the details before making your own decision.',
-  },
-  {
-    title: 'Contract Address & Market Links',
-    body: 'Copy the contract address shared in each post and open available external market links. Always verify the address and token independently.',
-  },
-  {
-    title: 'Wallet-Balance Access',
-    body: `Hold at least $20 $GENESIS from contract ${GENESIS_MINT} in your wallet to enter the incubator dashboard.`,
-  },
-  {
-    title: 'Risk & Target Details',
-    body: 'Review the market-cap snapshot, risk ratio, and take-profit targets entered with each call. Calls are informational and can lose value.',
-  },
-];
+import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
+import {
+  ArrowUpRight,
+  FlaskConical,
+  Send,
+} from 'lucide-react';
 
 export function formatTokenAmountDisplay(rawString: string, decimals = TOKEN_DECIMALS): string {
   try {
@@ -101,103 +86,136 @@ export async function TierSection() {
   const freeCtaDisabled = !communityUrl;
 
   const freeFeatures = [
-    'Closed calls + full P&L ledger',
+    'Closed calls + P&L ledger',
     'Public results channel',
     'Education content',
   ];
 
   const memberFeatures = [
-    'Open calls, 15-minute delayed',
+    'Open calls (15m delayed)',
     'Member Telegram group',
-    'Community discussion',
+    'Incubator dashboard access',
   ];
 
   const proFeatures = [
     'Everything in Member',
-    'Real-time signals in Telegram',
+    'Real-time Telegram signals',
     'Push alerts on TP/SL hits',
     'Analyst commentary',
-    'Early calls (before Member delayed tier)',
+    'Early call execution',
   ];
 
   return (
-    <section id="choose-your-access" className="bg-canvas py-16 sm:py-24 border-t border-toxic-border/20">
-      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+    <section id="choose-your-access" className="bg-canvas py-16">
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-3">
+        <div className="pb-6 border-b border-toxic-border">
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
-            ACCESS TIERS
+            MEMBERSHIP REQUIREMENT
           </span>
-          <h2 className="font-sans text-3xl sm:text-4xl font-extrabold uppercase tracking-tight text-white">
+          <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
             Choose your access
           </h2>
-          <p className="font-sans text-sm sm:text-base text-muted">
-            Select the tier that fits your trading conviction. Upgrade or stake anytime.
+          <p className="font-sans text-sm sm:text-base text-muted mt-1.5 max-w-2xl">
+            Hold $GENESIS in your wallet or stake for 90 days to unlock incubator signals and real-time alpha.
           </p>
         </div>
 
-        {/* 3-Column Tier Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
-          {/* FREE */}
-          <TierCard
-            name="Free"
-            priceLabel="$0"
-            subtitle="Watch and learn"
-            features={freeFeatures}
-            ctaLabel="Join Community"
-            ctaHref={communityUrl || '#'}
-            ctaDisabled={freeCtaDisabled}
-            ctaTooltip={freeCtaDisabled ? 'Community link coming soon' : undefined}
-          />
-
-          {/* MEMBER */}
-          <TierCard
-            name="Member"
-            priceLabel="~$20 held"
-            subtitle="Follow in real time"
-            thresholdLabel={`≈ ${memberTokenFormatted}`}
-            features={memberFeatures}
-            ctaLabel="Get Member →"
-            ctaHref="/dashboard"
-          />
-
-          {/* PRO (Emphasized) */}
-          <TierCard
-            name="Pro"
-            priceLabel="~$250 staked"
-            subtitle="90-day lock · Real-time alpha"
-            thresholdLabel={`≈ ${proTokenFormatted}`}
-            features={proFeatures}
-            ctaLabel="Stake for Pro →"
-            ctaHref="/dashboard/stake"
-            emphasized={true}
-            badge="Recommended"
-          />
-        </div>
-
-        {/* 4 Benefit Sub-Cards for the Tier Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-          {LAB_BENEFITS.map((benefit) => (
-            <div
-              key={benefit.title}
-              className="p-6 rounded-2xl bg-surface-card border border-toxic-border hover:border-toxic transition-colors space-y-2.5"
-            >
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-toxic shrink-0" />
-                <h3 className="font-sans text-sm font-bold text-white">
-                  {benefit.title}
-                </h3>
+        {/* Unified Single Card (Same outer structure as the Join the Lab card) */}
+        <div className="rounded-2xl bg-surface border border-toxic-border p-6 sm:p-8 lg:p-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column (4 cols): $GENESIS Intro Text & Buy Actions */}
+            <div className="lg:col-span-4 space-y-6 lg:pr-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-sans text-xs font-extrabold uppercase tracking-wider">
+                <FlaskConical className="w-4 h-4" />
+                <span>OFFICIAL LAB PASS</span>
               </div>
-              <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-                {benefit.body}
-              </p>
+
+              <div className="space-y-2">
+                <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+                  REQUIRED WALLET BALANCE
+                </div>
+                <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
+                  <span className="text-toxic font-extrabold">$GENESIS</span>
+                </div>
+                <p className="font-sans text-sm text-muted leading-relaxed pt-1">
+                  Hold at least <strong className="text-toxic">$20 $GENESIS</strong> from contract{' '}
+                  <span className="font-mono text-xs text-white break-all">
+                    {GENESIS_MINT}
+                  </span>{' '}
+                  in your wallet to enter the incubator dashboard.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-3">
+                <a
+                  href={BUY_LINKS.pump}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full h-12 px-6 rounded-xl bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <span>BUY $GENESIS ON PUMP.FUN</span>
+                  <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                </a>
+
+                <a
+                  href={communityUrl || SOCIAL_LINKS.telegram}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full h-11 px-6 rounded-xl bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Send className="w-4 h-4 text-toxic" />
+                  <span>JOIN TELEGRAM</span>
+                  <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2.5]" />
+                </a>
+              </div>
             </div>
-          ))}
+
+            {/* Right Column (8 cols): 3 Simple Tier Cards */}
+            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-4 h-full items-stretch">
+              {/* FREE */}
+              <TierCard
+                name="Free"
+                priceLabel="$0"
+                subtitle="Watch and learn"
+                features={freeFeatures}
+                ctaLabel="Join Community"
+                ctaHref={communityUrl || '#'}
+                ctaDisabled={freeCtaDisabled}
+                ctaTooltip={freeCtaDisabled ? 'Community link coming soon' : undefined}
+              />
+
+              {/* MEMBER */}
+              <TierCard
+                name="Member"
+                priceLabel="~$20 held"
+                subtitle="Follow in real time"
+                thresholdLabel={`≈ ${memberTokenFormatted}`}
+                features={memberFeatures}
+                ctaLabel="Get Member →"
+                ctaHref="/dashboard"
+              />
+
+              {/* PRO */}
+              <TierCard
+                name="Pro"
+                priceLabel="~$250 staked"
+                subtitle="90-day lock · Real-time alpha"
+                thresholdLabel={`≈ ${proTokenFormatted}`}
+                features={proFeatures}
+                ctaLabel="Stake for Pro →"
+                ctaHref="/dashboard/stake"
+                emphasized={true}
+                badge="Recommended"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footnote */}
         {showFootnote && recalculatedAt && (
-          <p className="text-center font-sans text-xs text-muted/80 max-w-xl mx-auto pt-4 leading-relaxed">
+          <p className="text-center font-sans text-xs text-muted/80 max-w-xl mx-auto pt-2 leading-relaxed">
             Thresholds are USD-denominated, recalculated weekly from a 7-day TWAP. Last updated{' '}
             {formatDate(recalculatedAt)}.
           </p>
@@ -206,4 +224,3 @@ export async function TierSection() {
     </section>
   );
 }
-
