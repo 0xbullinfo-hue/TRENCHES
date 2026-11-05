@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { formatTokenDisplay, formatUsd, getUnlockDate } from '@/lib/stake/format';
-import { ArrowUpRight, ChevronDown, ChevronUp, Lock, Sparkles } from 'lucide-react';
+import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
+import { ArrowUpRight, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 interface StakeStatusResponse {
   wallet: string;
@@ -62,8 +62,6 @@ export function DashboardStakingCard() {
       active = false;
     };
   }, [connected]);
-
-  const unlockDateStr = useMemo(() => getUnlockDate(90), []);
 
   const isPro = statusData?.current_tier === 'pro';
   const hasActiveStake = statusData?.stake?.status === 'active';
@@ -234,17 +232,6 @@ export function DashboardStakingCard() {
           <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed max-w-2xl sm:ml-auto">
             {subtitle}
           </p>
-
-          <div className="flex flex-wrap items-center sm:justify-end gap-2 font-sans text-xs text-muted pt-1">
-            <span className="inline-flex items-center gap-1.5 text-toxic font-medium">
-              <Lock className="w-3.5 h-3.5 text-toxic shrink-0" />
-              <span>90-day lock · Unlocks {unlockDateStr}</span>
-            </span>
-            <span className="text-dim">•</span>
-            <span className="text-muted">
-              Powered by Streamflow.
-            </span>
-          </div>
         </div>
       </div>
 
