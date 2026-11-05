@@ -53,3 +53,4 @@ export function CopyableCA({ address }: CopyableCAProps) {
     </div>
   );
 }
+

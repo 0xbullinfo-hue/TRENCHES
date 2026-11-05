@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { useStreamflowStake } from '@/lib/stake/streamflow';
 import { cleanNumericInput, formatTokenDisplay, formatUsd, getUnlockDate } from '@/lib/stake/format';
-import { TOKEN_DECIMALS } from '@/server/db';
+import { TOKEN_DECIMALS } from '@/lib/config';
 import { ArrowUpRight, ChevronDown, ChevronUp, Lock, Loader2, Sparkles } from 'lucide-react';
 
 interface StakeStatusResponse {
@@ -100,8 +100,13 @@ export function DashboardStakingCard() {
     return Math.min(100, Math.max(0, Math.round(((90 - daysLeft) / 90) * 100)));
   }, [statusData]);
 
-  // 1. Free Tier / Unconnected: Compact link to tier section (§4)
-  if (!connected || (isFreeTier && !hasActiveStake)) {
+  // 1. Not connected: do not render (§4)
+  if (!connected) {
+    return null;
+  }
+
+  // 2. Free Tier: Compact link to tier section (§4)
+  if (isFreeTier && !hasActiveStake) {
     return (
       <div className="rounded-lg bg-neutral-900 border border-neutral-800 p-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs font-sans text-muted">

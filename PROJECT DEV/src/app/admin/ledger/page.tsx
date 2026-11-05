@@ -22,3 +22,4 @@ export default async function AdminLedgerPage() {
 
   return <AdminLedgerTable initialEntries={entries} />;
 }
+

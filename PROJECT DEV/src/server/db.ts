@@ -3,7 +3,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
-import { ADMIN_WALLET, isAdminWallet } from '@/lib/config';
+import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
+
+export { TOKEN_DECIMALS, TOKEN_SYMBOL };
 
 export interface TierThresholdRow {
   id: string; // uuid pk
@@ -77,8 +79,16 @@ const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
 const DB_KV_KEY = 'trench:db:tables';
 const DB_LOCK_KEY = 'trench:lock:db';
 
-export const TOKEN_DECIMALS = 9;
-export const TOKEN_SYMBOL = 'GENESIS';
+function safeRandomUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 /** Placeholder TWAP price until weekly TWAP cron is integrated */
 export const PLACEHOLDER_TWAP_PRICE = 0.0000164;
@@ -108,7 +118,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
   return {
     tier_thresholds: [
       {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         tier: 'member',
         usd_target: 20,
         token_amount: memberRaw,
@@ -118,7 +128,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
         created_at: now,
       },
       {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         tier: 'pro',
         usd_target: 250,
         token_amount: proRaw,
@@ -143,7 +153,7 @@ let dbLockChain = Promise.resolve();
 async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = dbLockChain.then(async () => {
     if (!KV_CONFIGURED) return fn();
-    const token = crypto.randomUUID();
+    const token = safeRandomUUID();
     let acquired = false;
     for (let i = 0; i < 20 && !acquired; i++) {
       acquired = await kvLock(DB_LOCK_KEY, token, 10);
@@ -367,7 +377,7 @@ export async function createStake(params: {
     const unlock = new Date(now.getTime() + params.lock_days * 24 * 60 * 60 * 1000);
 
     const newStake: StakeRow = {
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       wallet_address: params.wallet_address,
       amount_raw: params.amount_raw,
       staked_at: now.toISOString(),
@@ -570,7 +580,7 @@ export async function createLedgerEntry(params: {
 
     const now = new Date().toISOString();
     const entry: LedgerEntryRow = {
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       ticker: params.ticker.toUpperCase().replace(/^\$/, ''),
       chain: params.chain.toLowerCase(),
       contract_address: params.contract_address.trim(),

@@ -106,3 +106,4 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
     </div>
   );
 }
+

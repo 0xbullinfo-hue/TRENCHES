@@ -19,6 +19,9 @@ export const GENESIS_MINT_SHORT = `${GENESIS_MINT.slice(0, 6)}...${GENESIS_MINT.
 
 export const MINT_CONFIGURED = Boolean(GENESIS_MINT && GENESIS_MINT.length >= 32);
 
+export const TOKEN_DECIMALS = 9;
+export const TOKEN_SYMBOL = 'GENESIS';
+
 export const SOLSCAN = {
   account: (a: string) => `https://solscan.io/account/${a}`,
   tx: (sig: string) => `https://solscan.io/tx/${sig}`,

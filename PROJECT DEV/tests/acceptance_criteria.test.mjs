@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 const BASE_URL = 'http://127.0.0.1:3000';
 const TEST_WALLET = 'TestWallet11111111111111111111111111111111111';

@@ -30,3 +30,4 @@ export default async function AdminEditLedgerPage({
 
   return <AdminLedgerForm initialData={entry} isEdit={true} />;
 }
+

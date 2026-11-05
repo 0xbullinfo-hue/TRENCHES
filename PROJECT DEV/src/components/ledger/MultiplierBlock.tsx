@@ -24,3 +24,4 @@ export function MultiplierBlock({ multiplier }: MultiplierBlockProps) {
     </div>
   );
 }
+

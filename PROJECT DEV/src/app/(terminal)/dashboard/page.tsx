@@ -13,16 +13,18 @@ export default function DashboardPage() {
   return (
     <section id="terminal" className="flex-1 py-6 bg-canvas">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Feature 3 — Dashboard Staking Card (§4) */}
-        <DashboardStakingCard />
-
         {!isUnlocked ? (
           <div className="py-8">
             <LockedTerminal />
           </div>
         ) : (
-          /* Main Incubator Terminal Alpha Calls */
-          <IncubatorHub />
+          <>
+            {/* Feature 3 — Dashboard Staking Card (§4) */}
+            <DashboardStakingCard />
+
+            {/* Main Incubator Terminal Alpha Calls */}
+            <IncubatorHub />
+          </>
         )}
 
         {/* Feature 2 — Public Ledger Card Grid Embed (§3) */}

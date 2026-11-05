@@ -216,3 +216,4 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
     </div>
   );
 }
+

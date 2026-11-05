@@ -118,3 +118,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'internal_error', message: 'Failed to create ledger entry' }, { status: 500 });
   }
 }
+
