@@ -20,7 +20,6 @@ import {
   DashboardStakingCard,
   TelegramVerificationCard,
 } from '@/components/stake/DashboardStakingCard';
-import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import {
@@ -754,12 +753,8 @@ export const IncubatorHub: React.FC = () => {
           <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
         </div>
 
-        {/* RIGHT COLUMN (Area marked yellow): StakePoint Live Data (top) + Staking Action Card (bottom - Area marked red) */}
-        <div className="lg:col-span-5 flex flex-col gap-5 sm:gap-6 justify-between">
-          {/* 1. TOP: StakePoint Live Data Card (Area marked yellow) */}
-          <StakePointCardClient />
-
-          {/* 2. BOTTOM: The Stake Card (Area marked red) */}
+        {/* RIGHT COLUMN: Combined Staking & Upgrade Card */}
+        <div className="lg:col-span-5 flex flex-col h-full">
           <DashboardStakingCard showTelegram={false} />
         </div>
       </div>

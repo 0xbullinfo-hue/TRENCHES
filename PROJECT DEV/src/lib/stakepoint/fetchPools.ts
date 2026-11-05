@@ -85,3 +85,4 @@ export async function fetchGenesisPools(): Promise<StakePointPool[]> {
   const data = await res.json();
   return normalizePools(data);
 }
+

@@ -33,3 +33,4 @@ export type RawStakePointPool = {
   status?: string;
   [key: string]: unknown;
 };
+

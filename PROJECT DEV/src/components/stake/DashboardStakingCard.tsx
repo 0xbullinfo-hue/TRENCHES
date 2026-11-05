@@ -4,7 +4,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
-import { ArrowUpRight, ChevronDown, ChevronUp, Send, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { StakePointPool } from '@/lib/stakepoint/types';
+import { formatTvlDisplay, formatLockPeriodDisplay } from '@/components/staking/StakePointCard';
 
 interface StakeStatusResponse {
   wallet: string;
@@ -110,6 +112,110 @@ export function TelegramVerificationCard({
   );
 }
 
+function StakePointLiveSection({
+  pools,
+  loading,
+  error,
+  onRetry,
+}: {
+  pools: StakePointPool[] | null;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-2 animate-pulse">
+        <div className="h-3 w-28 bg-surface rounded" />
+        <div className="h-7 w-24 bg-surface rounded" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-surface-card border border-danger/30 p-3 flex items-center justify-between text-xs">
+        <span className="text-muted">Couldn&apos;t load staking data.</span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-pump hover:text-pump-hover underline font-bold cursor-pointer inline-flex items-center gap-1"
+        >
+          <RefreshCw className="w-3 h-3" />
+          <span>[Retry]</span>
+        </button>
+      </div>
+    );
+  }
+
+  if (!pools || pools.length === 0) {
+    return (
+      <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-1">
+        <div className="font-sans text-xs font-bold text-white">
+          No staking pool is currently active for $GENESIS.
+        </div>
+        <div className="font-sans text-2xs text-muted">
+          Check back soon or follow us for updates.
+        </div>
+      </div>
+    );
+  }
+
+  const pool = pools[0];
+  const aprValue = pool.apr;
+  const aprIsPositive = aprValue !== null && aprValue > 0;
+  const tvl = formatTvlDisplay(pool.tvl);
+  const lock = formatLockPeriodDisplay(pool.lockPeriod);
+
+  return (
+    <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+          LIVE STAKEPOINT APR
+        </span>
+        {pool.status && (
+          <span className="font-sans text-[11px] font-bold text-pump uppercase">
+            ● {pool.status}
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${
+          aprIsPositive ? 'text-pump' : 'text-muted'
+        }`}
+      >
+        {aprValue !== null ? `${aprValue.toFixed(1)}%` : '0.0%'}
+      </div>
+
+      {(tvl || lock) && (
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-line/60">
+          {tvl && (
+            <div>
+              <span className="block font-sans text-2xs uppercase text-muted font-bold tracking-wider">
+                TVL
+              </span>
+              <span className="font-sans text-xs sm:text-sm font-semibold text-white tnum">
+                {tvl}
+              </span>
+            </div>
+          )}
+          {lock && (
+            <div>
+              <span className="block font-sans text-2xs uppercase text-muted font-bold tracking-wider">
+                Lock Period
+              </span>
+              <span className="font-sans text-xs sm:text-sm font-semibold text-white">
+                {lock}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DashboardStakingCard({
   showTelegram = true,
 }: {
@@ -119,6 +225,34 @@ export function DashboardStakingCard({
 
   const [statusData, setStatusData] = useState<StakeStatusResponse | null>(null);
   const [expanded, setExpanded] = useState(false);
+
+  // Live StakePoint API pools
+  const [pools, setPools] = useState<StakePointPool[] | null>(null);
+  const [poolsLoading, setPoolsLoading] = useState(true);
+  const [poolsError, setPoolsError] = useState(false);
+
+  const loadPools = useCallback(async () => {
+    try {
+      setPoolsLoading(true);
+      setPoolsError(false);
+      const res = await fetch('/api/stakepoint/pools');
+      if (res.ok) {
+        const json = await res.json();
+        setPools(json.pools || []);
+      } else {
+        setPoolsError(true);
+      }
+    } catch {
+      setPoolsError(true);
+    } finally {
+      setPoolsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPools();
+  }, [loadPools]);
 
   const refreshStakeStatus = useCallback(async () => {
     try {
@@ -160,6 +294,8 @@ export function DashboardStakingCard({
     ? `https://app.streamflow.finance/stake/${poolAddr}`
     : 'https://app.streamflow.finance';
 
+  const stakePointPoolUrl = pools?.[0]?.poolUrl || 'https://stakepoint.app/pools';
+
   // Progress percentage for Pro
   const progressPct = useMemo(() => {
     if (!statusData?.stake?.staked_at || !statusData?.stake?.unlocks_at) return 0;
@@ -167,38 +303,73 @@ export function DashboardStakingCard({
     return Math.min(100, Math.max(0, Math.round(((90 - daysLeft) / 90) * 100)));
   }, [statusData]);
 
-  // 1. Free Tier / Not Connected: Split 2-column grid
+  // 1. Free Tier / Not Connected: Combined Staking & Requirement Card
   if (!connected || (isFreeTier && !hasActiveStake)) {
     const freeCard = (
       <div className="rounded-xl bg-surface border border-line p-5 sm:p-6 transition-all flex flex-col justify-between h-full">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-card text-muted border border-line font-sans text-xs font-bold uppercase">
-              <Sparkles className="w-3 h-3 text-toxic" />
-              <span>MEMBER REQUIREMENT</span>
-            </span>
-            <span className="text-2xs font-mono text-muted uppercase">
-              $20 $GENESIS
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-card text-muted border border-line font-sans text-xs font-bold uppercase">
+                <Sparkles className="w-3 h-3 text-toxic" />
+                <span>MEMBER REQUIREMENT</span>
+              </span>
+              <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
+                Staking — $GENESIS
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xs font-mono text-muted uppercase">
+                $20 $GENESIS
+              </span>
+              <a
+                href={stakePointPoolUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted hover:text-pump transition-colors"
+                title="Open Pool on StakePoint"
+              >
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            </div>
           </div>
 
-          <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-            HOLD $GENESIS TO UNLOCK STAKING
-          </h3>
+          {/* Live StakePoint Pool Data */}
+          <StakePointLiveSection
+            pools={pools}
+            loading={poolsLoading}
+            error={poolsError}
+            onRetry={loadPools}
+          />
 
-          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-            Hold at least $20 in $GENESIS to unlock Member tier access before staking for Pro 90-day locks.
-          </p>
+          <div className="space-y-1.5">
+            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              HOLD $GENESIS TO UNLOCK STAKING
+            </h3>
+
+            <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
+              Hold at least $20 in $GENESIS to unlock Member tier access before staking for Pro 90-day locks.
+            </p>
+          </div>
         </div>
 
         <div className="pt-5 mt-auto space-y-3">
-          <div>
+          <div className="flex flex-wrap items-center gap-2.5">
             <Link
               href="/#choose-your-access"
               className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic/40 hover:border-toxic text-toxic hover:text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Upgrade to Member to stake →</span>
             </Link>
+
+            <a
+              href={stakePointPoolUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <span>Stake on StakePoint →</span>
+            </a>
           </div>
 
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
@@ -220,33 +391,59 @@ export function DashboardStakingCard({
     );
   }
 
-  // 2. Pro Tier: Split 2-column grid with Active Status on right
+  // 2. Pro Tier: Combined Active Status & Live Staking Card
   if (isPro && hasActiveStake) {
     const daysLeft = statusData?.stake?.days_remaining ?? 90;
 
     const proCard = (
       <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-colors flex flex-col justify-between h-full">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
-              💎 PRO MEMBERSHIP ACTIVE
-            </span>
-            <span className="text-muted text-xs font-mono">
-              ({daysLeft} days remaining)
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
+                💎 PRO MEMBERSHIP ACTIVE
+              </span>
+              <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
+                Staking — $GENESIS
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted text-xs font-mono">
+                ({daysLeft} days remaining)
+              </span>
+              <a
+                href={stakePointPoolUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted hover:text-pump transition-colors"
+                title="Open Pool on StakePoint"
+              >
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            </div>
           </div>
 
-          <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-            PRO STAKE LOCK ACTIVE
-          </h3>
+          {/* Live StakePoint Pool Data */}
+          <StakePointLiveSection
+            pools={pools}
+            loading={poolsLoading}
+            error={poolsError}
+            onRetry={loadPools}
+          />
 
-          <p className="font-sans text-xs sm:text-muted leading-relaxed">
-            {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS) • Powered by Streamflow.
-          </p>
+          <div className="space-y-1.5">
+            <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              PRO STAKE LOCK ACTIVE
+            </h3>
+
+            <p className="font-sans text-xs sm:text-muted leading-relaxed">
+              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS) • Powered by Streamflow.
+            </p>
+          </div>
         </div>
 
         <div className="pt-5 mt-auto space-y-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <a
               href={streamflowUrl}
               target="_blank"
@@ -255,6 +452,15 @@ export function DashboardStakingCard({
             >
               <span>STAKE ADDITIONAL</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            </a>
+
+            <a
+              href={stakePointPoolUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <span>Stake on StakePoint →</span>
             </a>
 
             <button
@@ -302,7 +508,7 @@ export function DashboardStakingCard({
     );
   }
 
-  // 3. Member Tier: Split 2-column grid (Telegram on Left, Stake on Right)
+  // 3. Member Tier: Combined Upgrade to Pro & Live Staking Card
   const title = isPartialStake
     ? `Stake $${gapToPro.toFixed(0)} more to unlock Pro`
     : 'Upgrade to Pro';
@@ -312,28 +518,54 @@ export function DashboardStakingCard({
 
   const memberCard = (
     <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
-            <Sparkles className="w-3 h-3" />
-            <span>PRO TIER ACCESS</span>
-          </span>
-          <span className="text-2xs font-mono text-muted uppercase">
-            90-DAY LOCK
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
+              <Sparkles className="w-3 h-3" />
+              <span>PRO TIER ACCESS</span>
+            </span>
+            <span className="font-sans text-xs font-extrabold text-white uppercase tracking-tight hidden sm:inline">
+              Staking — $GENESIS
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xs font-mono text-muted uppercase">
+              90-DAY LOCK
+            </span>
+            <a
+              href={stakePointPoolUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted hover:text-pump transition-colors"
+              title="Open Pool on StakePoint"
+            >
+              <ArrowUpRight className="w-4 h-4" />
+            </a>
+          </div>
         </div>
 
-        <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-          {title}
-        </h3>
+        {/* Live StakePoint Pool Data */}
+        <StakePointLiveSection
+          pools={pools}
+          loading={poolsLoading}
+          error={poolsError}
+          onRetry={loadPools}
+        />
 
-        <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-          {subtitle}
-        </p>
+        <div className="space-y-1.5">
+          <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+            {title}
+          </h3>
+
+          <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
+            {subtitle}
+          </p>
+        </div>
       </div>
 
       <div className="pt-5 mt-auto space-y-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-2.5">
           <a
             href={streamflowUrl}
             target="_blank"
@@ -343,7 +575,29 @@ export function DashboardStakingCard({
             <span>STAKE $GENESIS</span>
             <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
           </a>
+
+          <a
+            href={stakePointPoolUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <span>Stake on StakePoint →</span>
+          </a>
         </div>
+
+        {pools && pools.length > 1 && (
+          <div className="pt-1.5 border-t border-line/40">
+            <a
+              href="https://stakepoint.app/pools"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-bold text-pump hover:text-pump-hover inline-flex items-center gap-1 transition-colors"
+            >
+              <span>View all pools →</span>
+            </a>
+          </div>
+        )}
 
         {/* Non-negotiable Disclaimer per §4 and AC 28 */}
         <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
