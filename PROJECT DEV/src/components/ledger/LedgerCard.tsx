@@ -138,11 +138,7 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
       <div className="pt-4 mt-4 border-t border-toxic-border/30 flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
         <div className="flex items-center gap-1.5 truncate">
           <span className="truncate">
-            {entry.verification_status === 'ONCHAIN_VERIFIED'
-              ? 'On-chain verified'
-              : entry.verification_status === 'EVIDENCE_SUPPLIED' || entry.proof_url
-              ? 'Evidence attached'
-              : 'Reported by TrenchLabs'} · {formatLedgerDate(entry.closed_at)}
+            Recorded by the TrenchLabs team · {formatLedgerDate(entry.closed_at)}
           </span>
           {entry.edited && (
             <span className="text-[9px] uppercase font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.2 rounded shrink-0">

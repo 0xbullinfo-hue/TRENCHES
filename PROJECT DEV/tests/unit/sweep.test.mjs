@@ -21,3 +21,4 @@ test('Telegram Sweep: Skips members when tier is unknown (never evicts on RPC fa
   const member = (db.telegram_members || []).find((m) => m.wallet_address === testWallet);
   assert.equal(member?.in_group, true, 'Member must NOT be evicted on RPC failure or unknown tier');
 });
+
