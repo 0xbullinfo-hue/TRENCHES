@@ -129,6 +129,20 @@ export async function PATCH(
     }
   }
 
+  if (body.verification_status !== undefined) {
+    if (typeof body.verification_status === 'string') {
+      const vs = body.verification_status.trim().toUpperCase();
+      if (['REPORTED', 'EVIDENCE_SUPPLIED', 'ONCHAIN_VERIFIED'].includes(vs)) {
+        updates.verification_status = vs as 'REPORTED' | 'EVIDENCE_SUPPLIED' | 'ONCHAIN_VERIFIED';
+      } else {
+        return NextResponse.json(
+          { error: 'validation_error', message: 'verification_status must be REPORTED, EVIDENCE_SUPPLIED, or ONCHAIN_VERIFIED' },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
   if (body.notes !== undefined) {
     if (typeof body.notes === 'string' && body.notes.trim()) {
       const n = body.notes.trim();

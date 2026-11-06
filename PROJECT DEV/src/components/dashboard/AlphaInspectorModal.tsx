@@ -65,6 +65,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     deleteAlphaCall,
   } = useGenesisBalance();
   const [copiedCa, setCopiedCa] = useState(false);
+  const [copyCaError, setCopyCaError] = useState(false);
   const copyTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
@@ -89,10 +90,13 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     try {
       await navigator.clipboard.writeText(token.ca);
       setCopiedCa(true);
+      setCopyCaError(false);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopiedCa(false), 1800);
     } catch {
-      // clipboard write failed
+      setCopyCaError(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopyCaError(false), 2500);
     }
   };
 
@@ -304,6 +308,9 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <button
                   type="button"
                   onClick={async () => {
+                    if (!window.confirm(`Are you sure you want to delete alpha call ${token.ticker}? This action cannot be undone.`)) {
+                      return;
+                    }
                     await deleteAlphaCall(token.id);
                     onClose();
                   }}
@@ -377,14 +384,14 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyCa}
-                    className="px-3 py-1 rounded bg-pump hover:bg-pump-hover text-canvas font-sans font-extrabold text-xs inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    className={`px-3 py-1 rounded ${copyCaError ? 'bg-danger text-white' : 'bg-pump hover:bg-pump-hover text-canvas'} font-sans font-extrabold text-xs inline-flex items-center gap-1.5 shrink-0 cursor-pointer`}
                   >
                     {copiedCa ? (
                       <Check className="w-3.5 h-3.5" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
-                    <span>{copiedCa ? 'CA COPIED ✓' : 'COPY CA'}</span>
+                    <span>{copyCaError ? 'COPY FAILED' : copiedCa ? 'CA COPIED ✓' : 'COPY CA'}</span>
                   </button>
                 </div>
               </div>

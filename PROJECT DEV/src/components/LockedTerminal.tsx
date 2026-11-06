@@ -27,6 +27,7 @@ export const LockedTerminal: React.FC = () => {
     apiError,
   } = useGenesisBalance();
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -39,10 +40,13 @@ export const LockedTerminal: React.FC = () => {
     try {
       await navigator.clipboard.writeText(GENESIS_MINT);
       setCopied(true);
+      setCopyError(false);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard access denied
+      setCopyError(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopyError(false), 2500);
     }
   };
 
@@ -81,10 +85,10 @@ export const LockedTerminal: React.FC = () => {
             <button
               type="button"
               onClick={copyContract}
-              className="text-pump hover:text-pump-pill font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+              className={`${copyError ? 'text-danger' : 'text-pump hover:text-pump-pill'} font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer`}
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'COPIED' : 'COPY'}</span>
+              <span>{copyError ? 'FAILED' : copied ? 'COPIED' : 'COPY'}</span>
             </button>
           </div>
 
@@ -208,9 +212,12 @@ export const LockedTerminal: React.FC = () => {
               <button
                 type="button"
                 onClick={copyContract}
-                className="text-muted hover:text-white cursor-pointer"
+                className="text-muted hover:text-white cursor-pointer inline-flex items-center gap-1"
+                title="Copy token contract"
               >
-                {copied ? (
+                {copyError ? (
+                  <span className="text-2xs text-danger font-bold">Failed</span>
+                ) : copied ? (
                   <Check className="w-3.5 h-3.5 text-pump" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />

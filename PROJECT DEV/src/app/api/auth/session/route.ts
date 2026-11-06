@@ -8,7 +8,7 @@ import {
   verifySolanaSignature,
   MAX_TIMESTAMP_DRIFT_MS,
 } from '@/server/auth';
-import { resolveTier } from '@/server/db';
+import { resolveWalletEntitlement } from '@/server/entitlements';
 import { KV_CONFIGURED, kvLock } from '@/server/kv';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 
@@ -19,10 +19,12 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
+  const entitlement = await resolveWalletEntitlement(session.wallet);
   return NextResponse.json({
     authenticated: true,
     wallet: session.wallet,
-    tier: session.tier,
+    tier: entitlement.tier,
+    entitlement,
   });
 }
 
@@ -77,12 +79,13 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: 'Sessions are not configured' }, { status: 503 });
   }
-  const tier = await resolveTier(wallet);
+  const entitlement = await resolveWalletEntitlement(wallet);
 
   const res = NextResponse.json({
     ok: true,
     wallet,
-    tier,
+    tier: entitlement.tier,
+    entitlement,
   });
 
   res.cookies.set({

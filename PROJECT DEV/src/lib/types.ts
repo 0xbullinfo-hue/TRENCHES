@@ -2,7 +2,7 @@ import type { TierId } from './tiers';
 
 export type Chain = 'SOL' | 'BSC' | 'ETH' | 'BASE' | 'ROBIN' | 'AVAX';
 export type QuoteToken = 'PUMP' | 'SOL' | 'ETH' | 'USDC' | 'WBTC' | 'ZEC' | 'BNB' | 'AVAX' | 'ROBIN';
-export type AlphaStatus = 'LIVE' | 'INCUBATING' | 'UPCOMING';
+export type AlphaStatus = 'LIVE' | 'INCUBATING' | 'UPCOMING' | 'CLOSED';
 export type AlphaCategory = 'MOVERS' | 'NEW' | 'HOLDER_REWARDS' | 'AI_AGENT' | 'STEALTH' | 'CHARITY';
 export type ArtMotif =
   | 'pill'
@@ -103,8 +103,8 @@ export interface AlphaItem {
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
   sparkline: number[];
   art: AlphaArtTheme;
-  marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE';
-  dataFreshness?: 'LIVE' | 'CACHED' | 'FIXTURE';
+  marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE' | 'FALLBACK' | 'RECORDED' | 'UNAVAILABLE';
+  dataFreshness?: 'LIVE' | 'CACHED' | 'FALLBACK' | 'FIXTURE' | 'UNAVAILABLE';
   lastPriceUpdated?: string;
 }
 

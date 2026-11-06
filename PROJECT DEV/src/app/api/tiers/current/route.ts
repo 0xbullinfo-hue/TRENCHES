@@ -1,37 +1,49 @@
 import { NextResponse } from 'next/server';
-import {
-  getTierThresholds,
-  TOKEN_DECIMALS,
-  TOKEN_SYMBOL,
-} from '@/server/db';
+import { getGenesisPrice } from '@/server/price';
+import { MEMBER_USD_THRESHOLD, PRO_STAKE_USD_THRESHOLD, PRO_STAKE_MIN_LOCK_DAYS } from '@/server/entitlements';
+import { TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
+function computeRawAmount(usdTarget: number, priceUsd: number): string {
+  if (priceUsd <= 0) return '0';
+  const tokens = usdTarget / priceUsd;
+  const rawBigInt = BigInt(Math.floor(tokens * Math.pow(10, TOKEN_DECIMALS)));
+  return rawBigInt.toString();
+}
+
 export async function GET() {
   try {
-    const { member, pro, stale } = await getTierThresholds();
+    const priceResult = await getGenesisPrice();
+    const priceUsd = priceResult.priceUsd;
+    const now = new Date();
+    const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const memberRaw = computeRawAmount(MEMBER_USD_THRESHOLD, priceUsd);
+    const proRaw = computeRawAmount(PRO_STAKE_USD_THRESHOLD, priceUsd);
 
     const responseData = {
       member: {
-        usd_target: member.usd_target,
-        token_amount: member.token_amount,
+        usd_target: MEMBER_USD_THRESHOLD,
+        token_amount: memberRaw,
         token_symbol: TOKEN_SYMBOL,
         token_decimals: TOKEN_DECIMALS,
-        genesis_usd_price: member.twap_price_usd,
-        valid_until: member.valid_until,
+        genesis_usd_price: priceUsd,
+        valid_until: validUntil,
       },
       pro: {
-        usd_target: pro.usd_target,
-        token_amount: pro.token_amount,
+        usd_target: PRO_STAKE_USD_THRESHOLD,
+        token_amount: proRaw,
         token_symbol: TOKEN_SYMBOL,
         token_decimals: TOKEN_DECIMALS,
-        genesis_usd_price: pro.twap_price_usd,
-        lock_days: 90,
-        valid_until: pro.valid_until,
+        genesis_usd_price: priceUsd,
+        lock_days: PRO_STAKE_MIN_LOCK_DAYS,
+        valid_until: validUntil,
       },
-      twap_source: 'placeholder',
-      recalculated_at: member.valid_from,
-      stale,
+      price_source: priceResult.source,
+      is_fresh: priceResult.isFresh,
+      recalculated_at: priceResult.timestamp,
+      stale: !priceResult.isFresh,
     };
 
     return NextResponse.json(responseData, {
@@ -42,7 +54,6 @@ export async function GET() {
     });
   } catch (err) {
     console.error('[TrenchLabs API] /api/tiers/current error:', err);
-    // Never 500 per §4
     return NextResponse.json(
       {
         member: {
@@ -62,7 +73,8 @@ export async function GET() {
           lock_days: 90,
           valid_until: new Date(Date.now() + 7 * 86400000).toISOString(),
         },
-        twap_source: 'placeholder',
+        price_source: 'fallback',
+        is_fresh: false,
         recalculated_at: new Date().toISOString(),
         stale: true,
       },

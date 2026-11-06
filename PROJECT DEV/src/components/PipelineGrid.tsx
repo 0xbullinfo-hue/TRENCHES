@@ -98,12 +98,19 @@ const PAST_INCUBATIONS: PastIncubationToken[] = [
 
 export const PipelineGrid: React.FC = () => {
   const [copiedCa, setCopiedCa] = useState<string | null>(null);
+  const [copyFailedCa, setCopyFailedCa] = useState<string | null>(null);
 
-  const handleCopyCa = (ca: string, e: React.MouseEvent) => {
+  const handleCopyCa = async (ca: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(ca);
-    setCopiedCa(ca);
-    setTimeout(() => setCopiedCa(null), 2000);
+    try {
+      await navigator.clipboard.writeText(ca);
+      setCopiedCa(ca);
+      setCopyFailedCa(null);
+      setTimeout(() => setCopiedCa(null), 2000);
+    } catch {
+      setCopyFailedCa(ca);
+      setTimeout(() => setCopyFailedCa(null), 2500);
+    }
   };
 
   return (
@@ -187,7 +194,9 @@ export const PipelineGrid: React.FC = () => {
                         className="text-toxic hover:text-toxic-bright font-sans text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
                         title="Copy Contract Address"
                       >
-                        {isCopied ? (
+                        {copyFailedCa === token.contractAddress ? (
+                          <span className="text-rose-400 font-bold">FAILED</span>
+                        ) : isCopied ? (
                           <>
                             <Check className="w-3 h-3 text-toxic-bright" />
                             <span className="text-toxic-bright">COPIED</span>

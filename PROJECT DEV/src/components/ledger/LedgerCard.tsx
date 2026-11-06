@@ -8,7 +8,7 @@ import {
   formatMultiplier,
   formatTicker,
 } from '@/lib/ledger/format';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Link as LinkIcon, HelpCircle } from 'lucide-react';
 
 export interface LedgerCardData {
   id: string;
@@ -19,6 +19,7 @@ export interface LedgerCardData {
   entry_price?: string | null;
   exit_price?: string | null;
   proof_url?: string | null;
+  verification_status?: 'REPORTED' | 'EVIDENCE_SUPPLIED' | 'ONCHAIN_VERIFIED';
   notes?: string | null;
   closed_at: string;
   posted_at: string;
@@ -55,7 +56,7 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
   return (
     <div className="relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-all duration-150 bg-surface-card border border-toxic-border hover:border-toxic shadow-sm min-h-[350px]">
       <div className="space-y-4">
-        {/* Top Header: Ticker, Chain Pill, and Closed Badge */}
+        {/* Top Header: Ticker, Chain Pill, and Closed / Verification Badge */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-sans text-base font-bold text-white tracking-tight truncate">
@@ -66,9 +67,27 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
             </span>
           </div>
 
-          <span className="font-sans text-[10px] font-bold text-toxic bg-toxic/15 border border-toxic/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none">
-            CLOSED
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {entry.verification_status === 'ONCHAIN_VERIFIED' ? (
+              <span className="font-sans text-[10px] font-bold text-toxic bg-toxic/15 border border-toxic/40 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none flex items-center gap-1" title="Independently validated on-chain">
+                <CheckCircle2 className="w-2.5 h-2.5" />
+                Verified
+              </span>
+            ) : entry.verification_status === 'EVIDENCE_SUPPLIED' || entry.proof_url ? (
+              <span className="font-sans text-[10px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none flex items-center gap-1" title="Evidence link attached">
+                <LinkIcon className="w-2.5 h-2.5" />
+                Evidence
+              </span>
+            ) : (
+              <span className="font-sans text-[10px] font-bold text-zinc-400 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none flex items-center gap-1" title="Self-reported by team">
+                <HelpCircle className="w-2.5 h-2.5" />
+                Reported
+              </span>
+            )}
+            <span className="font-sans text-[10px] font-bold text-toxic bg-toxic/15 border border-toxic/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 select-none">
+              CLOSED
+            </span>
+          </div>
         </div>
 
         {/* Multiplier Hero Block */}
@@ -119,7 +138,11 @@ export function LedgerCard({ entry }: { entry: LedgerCardData }) {
       <div className="pt-4 mt-4 border-t border-toxic-border/30 flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
         <div className="flex items-center gap-1.5 truncate">
           <span className="truncate">
-            Recorded by the TrenchLabs team · {formatLedgerDate(entry.closed_at)}
+            {entry.verification_status === 'ONCHAIN_VERIFIED'
+              ? 'On-chain verified'
+              : entry.verification_status === 'EVIDENCE_SUPPLIED' || entry.proof_url
+              ? 'Evidence attached'
+              : 'Reported by TrenchLabs'} · {formatLedgerDate(entry.closed_at)}
           </span>
           {entry.edited && (
             <span className="text-[9px] uppercase font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.2 rounded shrink-0">

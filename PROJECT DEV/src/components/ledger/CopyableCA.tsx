@@ -10,15 +10,18 @@ interface CopyableCAProps {
 
 export function CopyableCA({ address }: CopyableCAProps) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(address);
       setCopied(true);
+      setCopyError(false);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      // ignore clipboard error
+      setCopyError(true);
+      setTimeout(() => setCopyError(false), 2500);
     }
   };
 
@@ -38,18 +41,23 @@ export function CopyableCA({ address }: CopyableCAProps) {
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="text-muted hover:text-toxic shrink-0 p-1 rounded transition-colors cursor-pointer"
-        title="Copy full address"
-      >
-        {copied ? (
-          <Check className="w-3.5 h-3.5 text-toxic" />
-        ) : (
-          <Copy className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-1 shrink-0">
+        {copyError && (
+          <span className="text-2xs text-rose-400 font-sans font-bold">Copy failed</span>
         )}
-      </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="text-muted hover:text-toxic shrink-0 p-1 rounded transition-colors cursor-pointer"
+          title="Copy full address"
+        >
+          {copied ? (
+            <Check className="w-3.5 h-3.5 text-toxic" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

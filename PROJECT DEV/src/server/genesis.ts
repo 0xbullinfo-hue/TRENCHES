@@ -21,8 +21,10 @@ function warnIfPublicRpc(): void {
 const balanceCache = new Map<string, { v: number; t: number }>();
 const BALANCE_TTL_MS = 30_000;
 
-async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<number> {
-  if (!MINT_CONFIGURED) return 0;
+const rawBalanceCache = new Map<string, { raw: bigint; t: number }>();
+
+async function readGenesisRawBalance(owner: string, signal?: AbortSignal): Promise<{ floatVal: number; rawVal: bigint }> {
+  if (!MINT_CONFIGURED) return { floatVal: 0, rawVal: BigInt(0) };
   let lastError: Error | null = null;
 
   warnIfPublicRpc();
@@ -49,12 +51,34 @@ async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<
       const json = await res.json();
       if (json.error) throw new Error(json.error.message ?? 'Solana RPC error');
       const accounts: Array<{
-        account: { data: { parsed: { info: { tokenAmount: { uiAmount: number | null } } } } };
+        account: {
+          data: {
+            parsed: {
+              info: {
+                tokenAmount: {
+                  uiAmount: number | null;
+                  amount: string;
+                };
+              };
+            };
+          };
+        };
       }> = json.result?.value ?? [];
-      return accounts.reduce(
-        (sum, a) => sum + (a.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0),
-        0
-      );
+
+      let floatSum = 0;
+      let rawSum = BigInt(0);
+
+      for (const a of accounts) {
+        const info = a.account.data.parsed?.info?.tokenAmount;
+        if (info) {
+          floatSum += info.uiAmount ?? 0;
+          if (info.amount && /^\d+$/.test(info.amount)) {
+            rawSum += BigInt(info.amount);
+          }
+        }
+      }
+
+      return { floatVal: floatSum, rawVal: rawSum };
     } catch (err) {
       lastError = err as Error;
       if (signal?.aborted) throw err;
@@ -65,6 +89,23 @@ async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<
   throw lastError ?? new Error('All Solana RPC endpoints failed');
 }
 
+export async function readGenesisRawBalanceCached(owner: string): Promise<bigint> {
+  const hit = rawBalanceCache.get(owner);
+  if (hit && Date.now() - hit.t < BALANCE_TTL_MS) return hit.raw;
+  if (rawBalanceCache.size > 5_000) rawBalanceCache.clear();
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5_000);
+  try {
+    const { floatVal, rawVal } = await readGenesisRawBalance(owner, ctrl.signal);
+    rawBalanceCache.set(owner, { raw: rawVal, t: Date.now() });
+    balanceCache.set(owner, { v: floatVal, t: Date.now() });
+    return rawVal;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function readGenesisBalanceCached(owner: string): Promise<number> {
   const hit = balanceCache.get(owner);
   if (hit && Date.now() - hit.t < BALANCE_TTL_MS) return hit.v;
@@ -73,9 +114,10 @@ export async function readGenesisBalanceCached(owner: string): Promise<number> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5_000);
   try {
-    const v = await readGenesisBalance(owner, ctrl.signal);
-    balanceCache.set(owner, { v, t: Date.now() });
-    return v;
+    const { floatVal, rawVal } = await readGenesisRawBalance(owner, ctrl.signal);
+    rawBalanceCache.set(owner, { raw: rawVal, t: Date.now() });
+    balanceCache.set(owner, { v: floatVal, t: Date.now() });
+    return floatVal;
   } finally {
     clearTimeout(timer);
   }

@@ -82,8 +82,8 @@ export async function TierSection() {
     }
   }
 
-  const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim();
-  const freeCtaDisabled = !communityUrl;
+  const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
+  const freeCtaDisabled = false;
 
   const freeFeatures = [
     'Closed calls + P&L ledger',

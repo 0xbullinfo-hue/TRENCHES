@@ -152,7 +152,7 @@ export const IncubatorHub: React.FC = () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 1800);
     } catch {
-      // ignore clipboard error
+      showToast('Failed to copy to clipboard. Please select and copy manually.');
     }
   };
 
@@ -403,6 +403,9 @@ export const IncubatorHub: React.FC = () => {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!window.confirm(`Are you sure you want to delete alpha call ${coin.ticker}?`)) {
+                      return;
+                    }
                     deleteAlphaCall(coin.id);
                     showToast(`Deleted call ${coin.ticker}`);
                   }}

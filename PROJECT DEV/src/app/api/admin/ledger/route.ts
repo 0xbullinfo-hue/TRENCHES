@@ -86,6 +86,19 @@ export async function POST(req: Request) {
     proofUrl = p;
   }
 
+  let verificationStatus: 'REPORTED' | 'EVIDENCE_SUPPLIED' | 'ONCHAIN_VERIFIED' | undefined = undefined;
+  if (typeof body.verification_status === 'string') {
+    const vs = body.verification_status.trim().toUpperCase();
+    if (['REPORTED', 'EVIDENCE_SUPPLIED', 'ONCHAIN_VERIFIED'].includes(vs)) {
+      verificationStatus = vs as 'REPORTED' | 'EVIDENCE_SUPPLIED' | 'ONCHAIN_VERIFIED';
+    } else {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'verification_status must be REPORTED, EVIDENCE_SUPPLIED, or ONCHAIN_VERIFIED' },
+        { status: 400 }
+      );
+    }
+  }
+
   let notes: string | null = null;
   if (typeof body.notes === 'string' && body.notes.trim()) {
     const n = body.notes.trim();
@@ -107,6 +120,7 @@ export async function POST(req: Request) {
       entry_price: entryPrice,
       exit_price: exitPrice,
       proof_url: proofUrl,
+      verification_status: verificationStatus,
       notes,
       closed_at: closedAtDate.toISOString(),
       posted_by: session.wallet,

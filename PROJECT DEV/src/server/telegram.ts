@@ -504,6 +504,125 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
   return result;
 }
 
+export function formatTpTriggeredMessage(r: AlphaRecord, targetLabel: string, currentMcStr: string): string {
+  const lines = [
+    `🎯 <b>TAKE-PROFIT HIT — ${esc(r.ticker)} (${targetLabel})</b>`,
+    `Current MC: <b>${esc(currentMcStr)}</b> (Entry: ${esc(r.entryMarketCap)})`,
+    `Chain: ${esc(r.chain)}`,
+    r.ca ? `CA: <code>${esc(r.ca)}</code>` : '',
+    '<i>Target hit. Protect capital & manage risk.</i>',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+export function formatSlTriggeredMessage(r: AlphaRecord, currentMcStr: string): string {
+  const lines = [
+    `🛑 <b>STOP-LOSS TRIGGERED — ${esc(r.ticker)}</b>`,
+    `Current MC: <b>${esc(currentMcStr)}</b> (Stop-Loss: ${esc(r.stopLoss)})`,
+    `Chain: ${esc(r.chain)}`,
+    r.ca ? `CA: <code>${esc(r.ca)}</code>` : '',
+    '<i>Invalidation condition reached. Position closed.</i>',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+export async function notifyTpTriggered(
+  r: AlphaRecord,
+  targetLabel: string,
+  currentMcStr: string,
+  budgetMs = 50_000
+): Promise<FanoutResult> {
+  const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
+  if (!telegramConfigured()) return result;
+
+  const started = Date.now();
+  const subs = Object.entries(await kvHGetAll(SUBS_KEY));
+  const text = formatTpTriggeredMessage(r, targetLabel, currentMcStr);
+  const keyboard = { inline_keyboard: [[{ text: 'View on Terminal', url: `${SITE_URL}/dashboard` }]] };
+  const BATCH = 20;
+
+  for (let i = 0; i < subs.length; i += BATCH) {
+    if (Date.now() - started > budgetMs) {
+      result.deferred = subs.length - i;
+      break;
+    }
+    await Promise.all(
+      subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
+        try {
+          if (!isAdminWallet(wallet)) {
+            const tier = await resolveTier(wallet);
+            if (tier === 'free') {
+              result.skipped++;
+              return;
+            }
+          }
+          const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+          if (res.ok) {
+            result.sent++;
+          } else if (classifySendFailure(res.status, res.description) === 'blocked') {
+            await unlinkWallet(wallet);
+            result.removed++;
+          } else {
+            result.skipped++;
+          }
+        } catch {
+          result.skipped++;
+        }
+      })
+    );
+    if (i + BATCH < subs.length) await sleep(1_100);
+  }
+  return result;
+}
+
+export async function notifySlTriggered(
+  r: AlphaRecord,
+  currentMcStr: string,
+  budgetMs = 50_000
+): Promise<FanoutResult> {
+  const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
+  if (!telegramConfigured()) return result;
+
+  const started = Date.now();
+  const subs = Object.entries(await kvHGetAll(SUBS_KEY));
+  const text = formatSlTriggeredMessage(r, currentMcStr);
+  const keyboard = { inline_keyboard: [[{ text: 'View on Terminal', url: `${SITE_URL}/dashboard` }]] };
+  const BATCH = 20;
+
+  for (let i = 0; i < subs.length; i += BATCH) {
+    if (Date.now() - started > budgetMs) {
+      result.deferred = subs.length - i;
+      break;
+    }
+    await Promise.all(
+      subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
+        try {
+          if (!isAdminWallet(wallet)) {
+            const tier = await resolveTier(wallet);
+            if (tier === 'free') {
+              result.skipped++;
+              return;
+            }
+          }
+          const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+          if (res.ok) {
+            result.sent++;
+          } else if (classifySendFailure(res.status, res.description) === 'blocked') {
+            await unlinkWallet(wallet);
+            result.removed++;
+          } else {
+            result.skipped++;
+          }
+        } catch {
+          result.skipped++;
+        }
+      })
+    );
+    if (i + BATCH < subs.length) await sleep(1_100);
+  }
+  return result;
+}
+
 export function timingSafeEqualStr(a: string, b: string): boolean {
   const ha = crypto.createHash('sha256').update(a).digest();
   const hb = crypto.createHash('sha256').update(b).digest();

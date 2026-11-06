@@ -189,8 +189,11 @@ export async function POST(req: NextRequest) {
     const rawTicker = String(payload.ticker || '').trim().slice(0, 16);
     const ticker = rawTicker.startsWith('$') ? rawTicker : `$${rawTicker}`;
     const ca = String(payload.ca || '').trim();
-    const chainRaw = String(payload.chain || 'SOL').toUpperCase() as Chain;
-    const chain = VALID_CHAINS.includes(chainRaw) ? chainRaw : 'SOL';
+    const chainRaw = String(payload.chain || '').toUpperCase() as Chain;
+    if (!VALID_CHAINS.includes(chainRaw)) {
+      return err(400, 'BAD_REQUEST', `Unsupported chain: ${payload.chain || 'unspecified'}. Supported chains: ${VALID_CHAINS.join(', ')}`);
+    }
+    const chain = chainRaw;
 
     if (!name || !rawTicker || !ca) {
       return err(400, 'BAD_REQUEST', 'Token Name, Ticker, and Contract Address (CA) are required.');
@@ -221,9 +224,17 @@ export async function POST(req: NextRequest) {
         ? Number(payload.entryMarketCapUsd)
         : parseShorthandUsd(entryMcStr) || currentMcUsd;
 
+    if (currentMcUsd <= 0 || entryMcUsd <= 0) {
+      return err(400, 'BAD_REQUEST', 'Market Cap and Entry Market Cap must be positive numbers');
+    }
+
     const risk = Math.min(5, Math.max(1, Number(payload.risk) || 3));
     const riskRewardRatio = String(payload.riskRewardRatio || '').trim().slice(0, 32) || `Risk Lvl ${risk}/5`;
     const stopLoss = String(payload.stopLoss || '-25% SL').trim().slice(0, 32);
+
+    if (stopLoss.startsWith('+') || /^\+?\d+%\s*TP/i.test(stopLoss)) {
+      return err(400, 'BAD_REQUEST', 'Stop loss cannot be a positive percentage target');
+    }
 
     const rawMultipliers: number[] = Array.isArray(payload.multipliers)
       ? payload.multipliers.map((m: unknown) => Number(m)).filter((n: number) => n > 0)

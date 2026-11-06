@@ -47,6 +47,8 @@ export interface TelegramMemberRow {
   last_synced_at: string; // timestamptz ISO
 }
 
+export type LedgerVerificationStatus = 'REPORTED' | 'EVIDENCE_SUPPLIED' | 'ONCHAIN_VERIFIED';
+
 export interface LedgerEntryRow {
   id: string; // uuid primary key
   ticker: string; // text not null
@@ -56,6 +58,7 @@ export interface LedgerEntryRow {
   entry_price?: string | null;
   exit_price?: string | null;
   proof_url?: string | null;
+  verification_status?: LedgerVerificationStatus;
   notes?: string | null;
   closed_at: string; // timestamptz ISO
   posted_by: string; // admin wallet address
@@ -65,6 +68,15 @@ export interface LedgerEntryRow {
 
 export interface LedgerEntryWithEdited extends LedgerEntryRow {
   edited: boolean;
+  verification_status: LedgerVerificationStatus;
+}
+
+export interface AuditLogRow {
+  id: string;
+  action: string;
+  wallet_address?: string | null;
+  details: Record<string, unknown>;
+  timestamp: string;
 }
 
 interface TrenchDatabaseSchema {
@@ -73,6 +85,7 @@ interface TrenchDatabaseSchema {
   verification_sessions: VerificationSessionRow[];
   telegram_members: TelegramMemberRow[];
   ledger_entries: LedgerEntryRow[];
+  audit_logs: AuditLogRow[];
 }
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
@@ -155,6 +168,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
     verification_sessions: [],
     telegram_members: [],
     ledger_entries: [],
+    audit_logs: [],
   };
 }
 
@@ -202,6 +216,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
       if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
       if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
       if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
+      if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
       return parsed;
     } catch (err) {
       console.error('[TrenchLabs DB] Stored database is unreadable:', err);
@@ -218,6 +233,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
         if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
         if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
         if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
+        if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
         inMemoryDb = parsed;
         return inMemoryDb;
       }
@@ -654,6 +670,7 @@ export async function createLedgerEntry(params: {
   entry_price?: string | null;
   exit_price?: string | null;
   proof_url?: string | null;
+  verification_status?: LedgerVerificationStatus;
   notes?: string | null;
   closed_at: string;
   posted_by: string;
@@ -663,6 +680,9 @@ export async function createLedgerEntry(params: {
     if (!Array.isArray(db.ledger_entries)) db.ledger_entries = [];
 
     const now = new Date().toISOString();
+    const verificationStatus: LedgerVerificationStatus =
+      params.verification_status || (params.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED');
+
     const entry: LedgerEntryRow = {
       id: safeRandomUUID(),
       ticker: params.ticker.toUpperCase().replace(/^\$/, ''),
@@ -672,6 +692,7 @@ export async function createLedgerEntry(params: {
       entry_price: params.entry_price?.trim() || null,
       exit_price: params.exit_price?.trim() || null,
       proof_url: params.proof_url?.trim() || null,
+      verification_status: verificationStatus,
       notes: params.notes?.trim() || null,
       closed_at: new Date(params.closed_at).toISOString(),
       posted_by: params.posted_by,
@@ -714,6 +735,8 @@ export async function getLedgerEntries(options?: {
 
     const entries: LedgerEntryWithEdited[] = slice.map((e) => ({
       ...e,
+      verification_status:
+        e.verification_status || (e.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED'),
       edited: !!e.updated_at && new Date(e.updated_at).getTime() > new Date(e.posted_at).getTime(),
     }));
 
@@ -728,6 +751,8 @@ export async function getLedgerEntryById(id: string): Promise<LedgerEntryWithEdi
     if (!found) return null;
     return {
       ...found,
+      verification_status:
+        found.verification_status || (found.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED'),
       edited: !!found.updated_at && new Date(found.updated_at).getTime() > new Date(found.posted_at).getTime(),
     };
   });
@@ -735,7 +760,7 @@ export async function getLedgerEntryById(id: string): Promise<LedgerEntryWithEdi
 
 export async function updateLedgerEntry(
   id: string,
-  updates: Partial<Pick<LedgerEntryRow, 'ticker' | 'chain' | 'contract_address' | 'multiplier' | 'entry_price' | 'exit_price' | 'proof_url' | 'notes' | 'closed_at'>>
+  updates: Partial<Pick<LedgerEntryRow, 'ticker' | 'chain' | 'contract_address' | 'multiplier' | 'entry_price' | 'exit_price' | 'proof_url' | 'verification_status' | 'notes' | 'closed_at'>>
 ): Promise<LedgerEntryWithEdited | null> {
   return withDbLock(async () => {
     const db = await loadDb();
@@ -749,6 +774,7 @@ export async function updateLedgerEntry(
     if (updates.entry_price !== undefined) entry.entry_price = updates.entry_price?.trim() || null;
     if (updates.exit_price !== undefined) entry.exit_price = updates.exit_price?.trim() || null;
     if (updates.proof_url !== undefined) entry.proof_url = updates.proof_url?.trim() || null;
+    if (updates.verification_status !== undefined) entry.verification_status = updates.verification_status;
     if (updates.notes !== undefined) entry.notes = updates.notes?.trim() || null;
     if (updates.closed_at !== undefined) entry.closed_at = new Date(updates.closed_at).toISOString();
 
@@ -757,6 +783,8 @@ export async function updateLedgerEntry(
 
     return {
       ...entry,
+      verification_status:
+        entry.verification_status || (entry.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED'),
       edited: true,
     };
   });
@@ -772,6 +800,32 @@ export async function deleteLedgerEntry(id: string): Promise<boolean> {
       return true;
     }
     return false;
+  });
+}
+
+// -------------------------------------------------------------
+// Database Operations: Audit Logs
+// -------------------------------------------------------------
+
+export async function recordAuditLog(
+  action: string,
+  walletAddress: string | null,
+  details: Record<string, unknown>
+): Promise<void> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.audit_logs)) db.audit_logs = [];
+    db.audit_logs.unshift({
+      id: safeRandomUUID(),
+      action,
+      wallet_address: walletAddress,
+      details,
+      timestamp: new Date().toISOString(),
+    });
+    if (db.audit_logs.length > 1000) {
+      db.audit_logs = db.audit_logs.slice(0, 1000);
+    }
+    await saveDb(db);
   });
 }
 
