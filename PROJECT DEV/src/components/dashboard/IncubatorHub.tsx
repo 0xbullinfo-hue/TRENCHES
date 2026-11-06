@@ -700,7 +700,7 @@ export const IncubatorHub: React.FC = () => {
 
               <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
                 Exclusive multi-chain trade calls for verified{' '}
-                <span className="text-pump font-bold">1,000,000+ $GENESIS</span> holders
+                <span className="text-pump font-bold">$GENESIS</span> holders
                 across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
                 Every card displays live Market Cap, dual Risk Ratio, and Take Profit multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
               </p>

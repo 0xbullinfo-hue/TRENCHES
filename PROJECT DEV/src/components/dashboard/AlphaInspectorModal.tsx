@@ -123,7 +123,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {token.locked ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-amber">
                 <Lock className="w-3 h-3" />
-                <span>1,000,000 $GENESIS REQUIRED</span>
+                <span>~$20 $GENESIS REQUIRED</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-pump">
@@ -323,14 +323,14 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <Lock className="w-5 h-5 text-amber shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-sans text-sm font-bold text-white">
-                    Requires 1,000,000 $GENESIS in Login Wallet
+                    Requires ~$20 $GENESIS in Login Wallet
                   </div>
                   <p className="font-sans text-xs text-muted leading-relaxed">
                     Your current balance is{' '}
                     <strong className="text-white">{formattedBalance} $GENESIS</strong>.
-                    Hold at least <strong className="text-amber">1,000,000 $GENESIS</strong>{' '}
+                    Hold at least <strong className="text-amber">~$20 worth of $GENESIS</strong>{' '}
                     from contract <span className="font-mono text-white">{GENESIS_MINT}</span>{' '}
-                    to unmask this Contract Address (CA) and open market links.
+                    (or stake $250 on StakePoint) to unmask this Contract Address (CA) and open market links.
                   </p>
                 </div>
               </div>

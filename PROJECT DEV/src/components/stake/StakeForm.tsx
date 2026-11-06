@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { PublicKey } from '@solana/web3.js';
 import { cleanNumericInput, formatTokenDisplay, getUnlockDate } from '@/lib/stake/format';
-import { useStakeTransaction } from '@/lib/stake/useStakeTransaction';
 
 interface StakeFormProps {
   walletPublicKey: PublicKey | null;
@@ -14,7 +13,7 @@ interface StakeFormProps {
   onStakeSuccess: () => void;
 }
 
-type ButtonState = 'idle' | 'wallet_confirm' | 'tx_confirm' | 'error' | 'cancelled';
+type ButtonState = 'idle' | 'verifying' | 'error' | 'success';
 
 export function StakeForm({
   walletPublicKey,
@@ -24,10 +23,10 @@ export function StakeForm({
   onStakeSuccess,
 }: StakeFormProps) {
   const [amountStr, setAmountStr] = useState<string>(initialAmountUsd.toFixed(2));
+  const [txSignature, setTxSignature] = useState<string>('');
+  const [isVerifyingSignature, setIsVerifyingSignature] = useState<boolean>(false);
   const [buttonState, setButtonState] = useState<ButtonState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const { stake } = useStakeTransaction();
 
   const numericAmount = parseFloat(amountStr) || 0;
   const tokenPrice = genesisPriceUsd > 0 ? genesisPriceUsd : 0.0000164;
@@ -41,19 +40,12 @@ export function StakeForm({
   const isAboveBalance = walletBalanceTokens > 0 && numericAmount > walletBalanceUsd;
   const isWalletConnected = Boolean(walletPublicKey);
 
-  let validationError: string | null = null;
-  if (!isWalletConnected) {
-    validationError = 'Connect wallet to stake';
-  } else if (isBelowMinimum) {
-    validationError = 'Minimum stake is $250';
-  } else if (isAboveBalance) {
-    validationError = 'Insufficient $GENESIS balance';
-  }
-
-  const isFormDisabled = buttonState === 'wallet_confirm' || buttonState === 'tx_confirm';
-  const isButtonDisabled = !isWalletConnected || isBelowMinimum || isAboveBalance || isFormDisabled;
-
   const unlockDateFormatted = useMemo(() => getUnlockDate(90), []);
+
+  const stakepointUrl =
+    process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID
+      ? `https://stakepoint.app/pool/${process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID}`
+      : 'https://stakepoint.app/pools';
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = cleanNumericInput(e.target.value);
@@ -68,154 +60,161 @@ export function StakeForm({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleVerifyTx = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isButtonDisabled || !walletPublicKey) return;
+    if (!txSignature.trim()) {
+      setErrorMessage('Please enter your StakePoint transaction signature');
+      return;
+    }
 
     setErrorMessage(null);
-    setButtonState('wallet_confirm');
+    setIsVerifyingSignature(true);
+    setButtonState('verifying');
 
     try {
-      // Step a: "Confirming in wallet..."
-      // Step b & c: Call stubbed stake handler
-      const rawTokens = BigInt(Math.floor(equivalentTokens * 1e9));
-
-      const timer = setTimeout(() => {
-        setButtonState('tx_confirm');
-      }, 1000);
-
-      await stake({
-        wallet: walletPublicKey,
-        amountRaw: rawTokens,
-        lockDays: 90,
+      const rawTokens = BigInt(Math.floor(equivalentTokens * 1e9)).toString();
+      const res = await fetch('/api/stake/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tx_signature: txSignature.trim(),
+          amount_raw: rawTokens,
+          lock_days: 90,
+        }),
       });
 
-      clearTimeout(timer);
-      setButtonState('idle');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Transaction verification failed');
+      }
+
+      setButtonState('success');
       onStakeSuccess();
     } catch (err: unknown) {
-      const msg = (err as Error)?.message || '';
-      if (/cancel|reject/i.test(msg)) {
-        setButtonState('cancelled');
-        setErrorMessage('Transaction cancelled.');
-      } else {
-        setButtonState('error');
-        setErrorMessage('Transaction failed — please try again.');
-      }
-      setTimeout(() => {
-        setButtonState('idle');
-      }, 3000);
+      setButtonState('error');
+      setErrorMessage((err as Error)?.message || 'Failed to verify transaction. Ensure the transaction is confirmed on Solana.');
+    } finally {
+      setIsVerifyingSignature(false);
     }
   };
 
-  // Button label determination
-  let buttonLabel = 'Stake $GENESIS';
-  if (buttonState === 'wallet_confirm') {
-    buttonLabel = 'Confirming in wallet...';
-  } else if (buttonState === 'tx_confirm') {
-    buttonLabel = 'Confirming transaction...';
-  } else if (buttonState === 'cancelled') {
-    buttonLabel = 'Transaction cancelled';
-  } else if (buttonState === 'error') {
-    buttonLabel = 'Transaction failed';
-  }
-
   return (
-    <div className="rounded-lg bg-surface border border-toxic-border/60 p-6 sm:p-8 shadow-sm space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Amount Input */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="stake-amount"
-              className="block font-sans text-xs font-bold uppercase tracking-wider text-muted"
-            >
-              AMOUNT TO STAKE
-            </label>
-            {walletBalanceTokens > 0 && !isFormDisabled && (
-              <button
-                type="button"
-                onClick={handleMaxClick}
-                className="font-sans text-xs text-toxic hover:text-toxic-bright font-bold uppercase tracking-wider cursor-pointer transition-colors"
-              >
-                MAX ({formatTokenDisplay(walletBalanceTokens)} $GENESIS)
-              </button>
-            )}
-          </div>
-
-          <div className="relative rounded-md border border-toxic-border/80 bg-canvas/60 focus-within:border-toxic focus-within:ring-1 focus-within:ring-toxic transition-all">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted font-sans text-xl">
-              $
-            </div>
-            <input
-              id="stake-amount"
-              type="text"
-              inputMode="decimal"
-              value={amountStr}
-              onChange={handleInputChange}
-              disabled={isFormDisabled}
-              placeholder="250.00"
-              className="w-full h-12 pl-8 pr-16 bg-transparent text-white font-sans text-xl font-semibold placeholder:text-muted/40 focus:outline-none tnum disabled:opacity-50"
-            />
-            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-muted font-sans text-xs font-bold uppercase tracking-wider">
-              USD
-            </div>
-          </div>
-
-          {/* Dynamic GENESIS Equivalent */}
-          <div className="flex items-center justify-between text-xs font-sans">
-            <span className="font-mono text-toxic tnum">
-              ≈ {formatTokenDisplay(equivalentTokens)} $GENESIS
-            </span>
-            {validationError && (
-              <span className="text-danger font-medium">{validationError}</span>
-            )}
-          </div>
+    <div className="rounded-xl bg-surface border border-toxic/40 p-6 sm:p-8 shadow-sm space-y-6">
+      <div className="flex items-center justify-between pb-4 border-b border-line">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-toxic" />
+          <h2 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+            Stake on StakePoint
+          </h2>
         </div>
+        <span className="text-2xs font-mono text-toxic font-bold bg-toxic/10 border border-toxic/30 px-2.5 py-0.5 rounded-full uppercase">
+          90-Day Lock
+        </span>
+      </div>
 
-        {/* Lock Period Info */}
-        <div className="pt-4 border-t border-toxic-border/30 space-y-2">
-          <div className="flex items-center justify-between text-sm font-sans">
-            <span className="inline-flex items-center gap-1.5 text-muted">
-              <Lock className="w-3.5 h-3.5 text-toxic" />
-              Lock period
-            </span>
-            <span className="text-white font-semibold">90 days</span>
-          </div>
-
-          <div className="flex items-center justify-between text-sm font-sans">
-            <span className="text-muted">Unlocks</span>
-            <span className="text-white font-semibold tnum">{unlockDateFormatted}</span>
-          </div>
-        </div>
-
-        {/* Stake Button */}
-        <div className="space-y-3">
+      {/* Target Amount */}
+      <div className="space-y-2">
+        <label htmlFor="usd-amount" className="block font-sans text-xs font-bold text-muted uppercase">
+          Stake Amount (USD)
+        </label>
+        <div className="relative flex items-center">
+          <span className="absolute left-4 font-mono text-lg font-bold text-muted">$</span>
+          <input
+            id="usd-amount"
+            type="text"
+            inputMode="decimal"
+            value={amountStr}
+            onChange={handleInputChange}
+            placeholder="250.00"
+            className="w-full h-12 pl-8 pr-16 rounded-lg bg-surface-card border border-line focus:border-toxic font-mono text-lg text-white font-bold transition-colors outline-none"
+          />
           <button
-            type="submit"
-            disabled={isButtonDisabled}
-            className={`w-full h-12 rounded-md font-sans text-base font-bold flex items-center justify-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
-              isButtonDisabled
-                ? 'bg-[#1e2732] text-muted/50 cursor-not-allowed border border-transparent'
-                : 'bg-toxic hover:bg-toxic-bright text-canvas font-black cursor-pointer shadow-sm'
-            }`}
+            type="button"
+            onClick={handleMaxClick}
+            className="absolute right-3 px-2.5 py-1 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-toxic cursor-pointer uppercase transition-colors"
           >
-            {buttonLabel}
+            Max
           </button>
+        </div>
 
-          {errorMessage && (
-            <p className="text-center font-sans text-xs text-danger font-medium">
-              {errorMessage}
-            </p>
+        <div className="flex items-center justify-between text-2xs font-mono pt-1 text-muted">
+          <span>≈ {formatTokenDisplay(equivalentTokens)} $GENESIS</span>
+          {walletBalanceTokens > 0 && (
+            <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $GENESIS</span>
           )}
+        </div>
+      </div>
 
-          {/* Static Disclaimer */}
-          <p className="text-center font-sans text-xs text-muted/70 leading-relaxed">
-            Minimum: $250 staked for 90 days. Your stake is locked and cannot be withdrawn until unlock.
+      {/* Lock Duration Info */}
+      <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2 font-sans text-xs">
+        <div className="flex justify-between items-center text-muted">
+          <span>Lock Period</span>
+          <span className="font-mono text-white font-bold">90 Days</span>
+        </div>
+        <div className="flex justify-between items-center text-muted">
+          <span>Unlock Date</span>
+          <span className="font-mono text-white font-bold">{unlockDateFormatted}</span>
+        </div>
+        <div className="flex justify-between items-center text-muted">
+          <span>Primary Staking Tool</span>
+          <span className="font-mono text-toxic font-bold">StakePoint</span>
+        </div>
+      </div>
+
+      {/* Primary CTA: Stake on StakePoint */}
+      <div className="space-y-3">
+        <a
+          href={stakepointUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+        >
+          <span>Stake $GENESIS on StakePoint →</span>
+          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+        </a>
+        <p className="text-center font-sans text-2xs text-muted">
+          Opens the official $GENESIS pool on StakePoint. Lock for 90 days to qualify for Pro.
+        </p>
+      </div>
+
+      {/* Manual Signature Verification Form */}
+      <form onSubmit={handleVerifyTx} className="pt-4 border-t border-line space-y-3">
+        <div className="space-y-1.5">
+          <label htmlFor="tx-sig" className="block font-sans text-xs font-bold text-white uppercase">
+            Already Staked? Verify Transaction
+          </label>
+          <p className="font-sans text-2xs text-muted">
+            Paste your Solana transaction signature from StakePoint to immediately activate Pro status.
           </p>
         </div>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            id="tx-sig"
+            type="text"
+            value={txSignature}
+            onChange={(e) => setTxSignature(e.target.value)}
+            placeholder="Paste transaction signature..."
+            className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-line focus:border-toxic font-mono text-xs text-white outline-none"
+          />
+          <button
+            type="submit"
+            disabled={isVerifyingSignature || !txSignature.trim()}
+            className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-3 border border-toxic/50 hover:border-toxic text-toxic font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
+          >
+            {isVerifyingSignature ? 'Verifying...' : 'Verify Stake'}
+          </button>
+        </div>
+
+        {errorMessage && (
+          <p className="font-sans text-2xs text-danger pt-1">{errorMessage}</p>
+        )}
       </form>
+
+      {/* Disclaimer */}
+      <p className="font-sans text-2xs text-dim text-center leading-relaxed">
+        Your $GENESIS is locked for 90 days in the StakePoint contract. • Powered by StakePoint
+      </p>
     </div>
   );
 }
-

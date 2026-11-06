@@ -288,13 +288,11 @@ export function DashboardStakingCard({
   const currentStakedUsd = statusData?.stake?.amount_usd ?? 0;
   const isPartialStake = currentStakedUsd > 0 && gapToPro > 0;
 
-  // Streamflow pool link
-  const poolAddr = process.env.NEXT_PUBLIC_STREAMFLOW_POOL_ADDRESS || '';
-  const streamflowUrl = poolAddr
-    ? `https://app.streamflow.finance/stake/${poolAddr}`
-    : 'https://app.streamflow.finance';
-
-  const stakePointPoolUrl = pools?.[0]?.poolUrl || 'https://stakepoint.app/pools';
+  // StakePoint pool link
+  const stakePointPoolUrl =
+    process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID
+      ? `https://stakepoint.app/pool/${process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID}`
+      : pools?.[0]?.poolUrl || 'https://stakepoint.app/pools';
 
   // Progress percentage for Pro
   const progressPct = useMemo(() => {
@@ -358,9 +356,9 @@ export function DashboardStakingCard({
             </Link>
           </div>
 
-          {/* Powered by Streamflow. */}
+          {/* Powered by StakePoint. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
+            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
       </div>
@@ -428,7 +426,7 @@ export function DashboardStakingCard({
 
           <div className="flex flex-wrap items-center gap-2.5">
             <a
-              href={streamflowUrl}
+              href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
@@ -463,9 +461,9 @@ export function DashboardStakingCard({
             </div>
           )}
 
-          {/* Powered by Streamflow. */}
+          {/* Powered by StakePoint. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
+            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
       </div>
@@ -537,7 +535,7 @@ export function DashboardStakingCard({
 
         <div>
           <a
-            href={streamflowUrl}
+            href={stakePointPoolUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
@@ -560,9 +558,9 @@ export function DashboardStakingCard({
           </div>
         )}
 
-        {/* Powered by Streamflow. */}
+        {/* Powered by StakePoint. */}
         <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
-          Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by Stakepoint
+          Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
         </p>
       </div>
     </div>

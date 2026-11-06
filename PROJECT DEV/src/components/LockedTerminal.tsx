@@ -166,7 +166,7 @@ export const LockedTerminal: React.FC = () => {
           <ShieldAlert className="w-4 h-4" />
           <span>INSUFFICIENT $GENESIS BALANCE</span>
         </div>
-        <span>1,000,000 $GENESIS REQUIRED</span>
+        <span>~$20 $GENESIS REQUIRED</span>
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
@@ -177,14 +177,14 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="space-y-1">
             <h3 className="font-sans text-lg sm:text-xl font-extrabold uppercase tracking-tight text-white">
-              HOLD 1,000,000 $GENESIS TO ENTER THE LAB
+              HOLD ~$20 WORTH OF $GENESIS TO ENTER THE LAB
             </h3>
             <p className="font-sans text-sm text-muted leading-relaxed">
               Your wallet currently holds{' '}
               <strong className="text-danger tnum">{formattedBalance} $GENESIS</strong>. All
               users must hold at least{' '}
-              <strong className="text-pump-pill">1,000,000 $GENESIS</strong> in their login
-              wallet to unlock the incubator dashboard.
+              <strong className="text-pump-pill">~$20 worth of $GENESIS</strong> in their login
+              wallet (or stake $250 on StakePoint) to unlock the incubator dashboard.
             </p>
           </div>
         </div>
@@ -221,7 +221,7 @@ export const LockedTerminal: React.FC = () => {
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-muted">Required Balance</span>
             <span className="font-mono text-pump font-bold tnum">
-              1,000,000 $GENESIS
+              ~$20 $GENESIS (or Stake $250)
             </span>
           </div>
         </div>

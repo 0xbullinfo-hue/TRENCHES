@@ -26,7 +26,7 @@ export interface StakeRow {
   unlocks_at: string; // timestamptz ISO
   status: 'active' | 'expired' | 'withdrawn';
   tx_signature: string | null; // unique
-  staking_provider: string; // default 'streamflow_stub'
+  staking_provider: string; // default 'stakepoint'
 }
 
 export interface VerificationSessionRow {
@@ -409,7 +409,7 @@ export async function createStake(params: {
       unlocks_at: unlock.toISOString(),
       status: 'active',
       tx_signature: params.tx_signature,
-      staking_provider: params.staking_provider || 'streamflow_stub',
+      staking_provider: params.staking_provider || 'stakepoint',
     };
 
     db.stakes.push(newStake);

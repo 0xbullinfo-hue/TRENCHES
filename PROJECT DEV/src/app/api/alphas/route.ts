@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { tierFor, allocationCap, MIN_GENESIS_REQUIRED } from '@/lib/tiers';
+import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
+import { resolveTier } from '@/server/db';
 import {
   ADMIN_WALLET,
   GENESIS_MINT,
@@ -101,12 +102,13 @@ export async function GET(req: NextRequest) {
     return err(502, 'RPC_UNAVAILABLE', 'Solana RPC unavailable. Retry shortly.');
   }
 
-  if (!isAdmin && balance < MIN_GENESIS_REQUIRED) {
+  const userTier = await resolveTier(wallet);
+  if (!isAdmin && userTier === 'free') {
     return NextResponse.json(
       {
         ok: false,
         error: 'ACCESS_DENIED_ZERO_BALANCE',
-        message: `Access restricted. Holding at least 1,000,000 $GENESIS (${GENESIS_MINT}) is required.`,
+        message: `Access restricted. Holding at least $20 worth of $GENESIS (${GENESIS_MINT}) or staking $250 on StakePoint is required.`,
         balance,
         items: [],
       },
@@ -114,7 +116,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const tier = tierFor(Math.max(balance, isAdmin ? MIN_GENESIS_REQUIRED : 0));
+  const effectiveBalance = Math.max(
+    balance,
+    isAdmin ? calculateRequiredTokens(MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE) : 0
+  );
+  const tier = tierFor(effectiveBalance);
   let registry;
   try {
     registry = await loadCallsRegistry();

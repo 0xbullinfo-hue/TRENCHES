@@ -22,7 +22,7 @@ function seedStakeDirect(walletAddress, amountRaw = '1200000000000000') {
       unlocks_at: new Date(Date.now() + 90 * 86400 * 1000).toISOString(),
       status: 'active',
       tx_signature: `sig_mem_${Date.now()}_${Math.random()}`,
-      staking_provider: 'streamflow',
+      staking_provider: 'stakepoint',
     });
     fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8');
   }
@@ -218,9 +218,9 @@ test('AC 9, 10, 11, 12, 13, 16, 18: Public GET /api/ledger, cache headers, filte
   assert.ok(dashboardHtml.includes('View full ledger'), 'Dashboard embed must have View full ledger link');
 });
 
-test('AC 28: Dashboard staking card carries "Powered by Streamflow."', () => {
+test('AC 28: Dashboard staking card carries "Powered by StakePoint."', () => {
   const cardSrc = fs.readFileSync(path.join(process.cwd(), 'src/components/stake/DashboardStakingCard.tsx'), 'utf8');
-  assert.ok(cardSrc.includes('Powered by Streamflow.'), 'Dashboard staking card must include Powered by Streamflow.');
+  assert.ok(cardSrc.includes('Powered by StakePoint'), 'Dashboard staking card must include Powered by StakePoint');
 });
 
 test('AC 24: Non-pro user attempting to create pro session returns 403 not_eligible', async () => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MIN_GENESIS_REQUIRED } from '@/lib/tiers';
 import { isAdminWallet, isBase58Address } from '@/lib/config';
+import { resolveTier } from '@/server/db';
 import { verifyWalletAuth } from '@/server/auth';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { rateLimit } from '@/server/ratelimit';
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
   if (a instanceof NextResponse) return a;
   try {
     if (!isAdminWallet(a.wallet)) {
-      const bal = await readGenesisBalanceCached(a.wallet);
-      if (bal < MIN_GENESIS_REQUIRED) {
-        return fail(403, 'ACCESS_DENIED_ZERO_BALANCE', 'Holding 1,000,000 $GENESIS is required for alerts.');
+      const userTier = await resolveTier(a.wallet);
+      if (userTier === 'free') {
+        return fail(403, 'ACCESS_DENIED_ZERO_BALANCE', 'Holding at least $20 worth of $GENESIS or staking $250 on StakePoint is required for alerts.');
       }
     }
     const { url } = await createLinkCode(a.wallet);

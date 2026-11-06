@@ -19,7 +19,9 @@ import {
   isAdminWallet,
 } from '@/lib/config';
 import {
-  MIN_GENESIS_REQUIRED,
+  MEMBER_USD_TARGET,
+  calculateRequiredTokens,
+  DEFAULT_GENESIS_USD_PRICE,
   Tier,
   allocationCap,
   longevityPoints,
@@ -47,10 +49,12 @@ const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string>
   admin: ADMIN_WALLET,
 };
 
+const DEFAULT_MEMBER_TOKENS = calculateRequiredTokens(MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE);
+
 const DEMO_BALANCES: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, number> = {
   '0': 0,
-  '1m': 1_000_000,
-  admin: 1_000_000,
+  '1m': DEFAULT_MEMBER_TOKENS,
+  admin: DEFAULT_MEMBER_TOKENS,
 };
 
 export interface CreateCallPayload {
@@ -515,8 +519,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const balance = useMemo(() => {
     if (wallet.connected && wallet.publicKey) {
-      if (isAdmin && onChainBalance < MIN_GENESIS_REQUIRED) {
-        return MIN_GENESIS_REQUIRED;
+      if (isAdmin && onChainBalance < DEFAULT_MEMBER_TOKENS) {
+        return DEFAULT_MEMBER_TOKENS;
       }
       return onChainBalance;
     }
@@ -537,8 +541,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const capSol = useMemo(() => allocationCap(tier), [tier]);
   const points = useMemo(() => longevityPoints(balance), [balance]);
 
-  const isZeroBalance = connected && !isAdmin && balance < MIN_GENESIS_REQUIRED;
-  const isUnlocked = connected && !needsSignature && (isAdmin || balance >= MIN_GENESIS_REQUIRED);
+  const isZeroBalance = connected && !isAdmin && balance < DEFAULT_MEMBER_TOKENS;
+  const isUnlocked = connected && !needsSignature && (isAdmin || balance >= DEFAULT_MEMBER_TOKENS);
 
   /**
    * Patch 1: Request or retrieve cached ed25519 signature headers proving wallet ownership.

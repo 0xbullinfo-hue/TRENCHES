@@ -85,10 +85,10 @@ test('Wallet connect modal deduplication, event synchronization, and account-swi
   );
   assert.equal(providerConnected, true, 'WalletProviderBase must end in connected=true even when connect() resolves before select()');
 
-  // 3. Account-switch isolation & signature-gating invariant
-  const MIN_GENESIS_REQUIRED = 1_000_000;
+  // 3. Account-switch isolation & signature-gating invariant ($20 USD threshold)
+  const MEMBER_THRESHOLD_TOKENS = 1_219_512;
   function computeIsUnlocked({ connected, needsSignature, isAdmin, balance }) {
-    return Boolean(connected && !needsSignature && (isAdmin || balance >= MIN_GENESIS_REQUIRED));
+    return Boolean(connected && !needsSignature && (isAdmin || balance >= MEMBER_THRESHOLD_TOKENS));
   }
 
   assert.equal(

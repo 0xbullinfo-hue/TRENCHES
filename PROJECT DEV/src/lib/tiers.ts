@@ -1,15 +1,30 @@
 /**
- * Single-Tier Access Architecture:
- * Holding >= 1,000,000 $GENESIS in the connected wallet unlocks full Lab Access.
+ * TrenchLabs Dynamic Access Architecture:
+ * - Free: $0, public features & closed ledger.
+ * - Member: Buy & hold >= $20 USD worth of $GENESIS in the connected wallet.
+ * - Pro: Buy & stake >= $250 USD worth of $GENESIS on StakePoint (90-day lock).
+ *
+ * All thresholds are USD-denominated and calculated dynamically from token price,
+ * completely replacing legacy fixed token gates.
  */
 
-export type TierId = 'LOCKED' | 'LAB_MEMBER';
+export type TierId = 'LOCKED' | 'LAB_MEMBER' | 'PRO';
 
-export const MIN_GENESIS_REQUIRED = 1_000_000;
+export const MEMBER_USD_TARGET = 20;
+export const PRO_USD_TARGET = 250;
+
+/** Default reference price when API/oracle is offline ($0.0000164) */
+export const DEFAULT_GENESIS_USD_PRICE = 0.0000164;
+
+export function calculateRequiredTokens(usdTarget: number, priceUsd = DEFAULT_GENESIS_USD_PRICE): number {
+  if (priceUsd <= 0) return 0;
+  return Math.ceil(usdTarget / priceUsd);
+}
 
 export interface Tier {
   id: TierId;
   label: string;
+  usdTarget: number;
   min: number;
   multiplier: number;
   baseCapSol: number;
@@ -19,7 +34,8 @@ export interface Tier {
 export const TIERS: Record<TierId, Tier> = {
   LOCKED: {
     id: 'LOCKED',
-    label: 'Locked (< 1M $GENESIS)',
+    label: 'Locked (< $20 $GENESIS)',
+    usdTarget: 0,
     min: 0,
     multiplier: 0,
     baseCapSol: 0,
@@ -27,18 +43,43 @@ export const TIERS: Record<TierId, Tier> = {
   },
   LAB_MEMBER: {
     id: 'LAB_MEMBER',
-    label: 'Lab Member (1M+ $GENESIS)',
-    min: MIN_GENESIS_REQUIRED,
+    label: 'Lab Member (~$20 $GENESIS held)',
+    usdTarget: MEMBER_USD_TARGET,
+    min: calculateRequiredTokens(MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE),
     multiplier: 1,
     baseCapSol: 10,
     rank: 1,
   },
+  PRO: {
+    id: 'PRO',
+    label: 'Pro Trader (~$250 $GENESIS staked on StakePoint)',
+    usdTarget: PRO_USD_TARGET,
+    min: calculateRequiredTokens(PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE),
+    multiplier: 2.5,
+    baseCapSol: 25,
+    rank: 2,
+  },
 };
 
-export const TIER_LADDER: Tier[] = [TIERS.LAB_MEMBER];
+export const TIER_LADDER: Tier[] = [TIERS.LAB_MEMBER, TIERS.PRO];
 
-export function tierFor(balance: number): Tier {
-  if (balance >= MIN_GENESIS_REQUIRED) return TIERS.LAB_MEMBER;
+export function tierFor(balance: number, priceUsd = DEFAULT_GENESIS_USD_PRICE): Tier {
+  const balanceUsd = balance * priceUsd;
+  if (balanceUsd >= MEMBER_USD_TARGET) return TIERS.LAB_MEMBER;
+  return TIERS.LOCKED;
+}
+
+export function tierForBalanceAndStake(
+  balanceTokens: number,
+  stakedTokens: number,
+  priceUsd = DEFAULT_GENESIS_USD_PRICE
+): Tier {
+  const stakedUsd = stakedTokens * priceUsd;
+  if (stakedUsd >= PRO_USD_TARGET) return TIERS.PRO;
+
+  const balanceUsd = balanceTokens * priceUsd;
+  if (balanceUsd >= MEMBER_USD_TARGET) return TIERS.LAB_MEMBER;
+
   return TIERS.LOCKED;
 }
 
@@ -47,10 +88,13 @@ export function allocationCap(t: Tier): number {
 }
 
 export function nextTier(t: Tier): Tier | null {
-  return t.id === 'LOCKED' ? TIERS.LAB_MEMBER : null;
+  if (t.id === 'LOCKED') return TIERS.LAB_MEMBER;
+  if (t.id === 'LAB_MEMBER') return TIERS.PRO;
+  return null;
 }
 
-export function longevityPoints(balance: number): number {
-  if (balance < MIN_GENESIS_REQUIRED) return 0;
-  return Math.floor((balance / MIN_GENESIS_REQUIRED) * 2500);
+export function longevityPoints(balance: number, priceUsd = DEFAULT_GENESIS_USD_PRICE): number {
+  const requiredTokens = calculateRequiredTokens(MEMBER_USD_TARGET, priceUsd);
+  if (requiredTokens <= 0 || balance < requiredTokens) return 0;
+  return Math.floor((balance / requiredTokens) * 2500);
 }

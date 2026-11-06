@@ -60,8 +60,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const streamflowProgramId =
-    process.env.NEXT_PUBLIC_STREAMFLOW_PROGRAM_ID || 'STAKEvGqQTtzJZH6BWDcbpzXXn2BBerPAgQ3EGLN2GH';
+  const stakepointProgramId = process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID;
   const rpcUrl =
     process.env.SOLANA_RPC ||
     process.env.NEXT_PUBLIC_SOLANA_RPC ||
@@ -92,10 +91,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const interactedWithProgram = accountKeys.includes(streamflowProgramId);
-    if (!interactedWithProgram) {
+    if (stakepointProgramId && !accountKeys.includes(stakepointProgramId)) {
       return NextResponse.json(
-        { error: 'verification_failed', message: 'Transaction did not interact with Streamflow staking program' },
+        { error: 'verification_failed', message: 'Transaction did not interact with StakePoint staking program' },
         { status: 400 }
       );
     }
@@ -140,7 +138,7 @@ export async function POST(req: Request) {
       amount_raw: amountRaw,
       lock_days: lockDays,
       tx_signature: txSignature,
-      staking_provider: 'streamflow',
+      staking_provider: 'stakepoint',
     });
 
     const newTier = await resolveTier(session.wallet);
