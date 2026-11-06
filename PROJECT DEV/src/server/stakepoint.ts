@@ -134,17 +134,23 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    // 6. Verify program interaction (if program ID is specified in environment)
+    // 6. Verify program interaction (fail closed if program ID is not configured)
     const integration = getStakePointIntegrationStatus();
-    if (integration.status === 'ACTIVE' && integration.programId) {
-      const interacted = accountKeys.includes(integration.programId);
-      if (!interacted) {
-        return {
-          success: false,
-          status: 'REJECTED',
-          error: `Transaction did not interact with the designated StakePoint program (${integration.programId})`,
-        };
-      }
+    if (integration.status !== 'ACTIVE' || !integration.programId) {
+      return {
+        success: false,
+        status: 'BLOCKED',
+        error: 'StakePoint on-chain verification is BLOCKED: Program ID not configured in server environment (NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID). Set the StakePoint program ID in environment variables.',
+      };
+    }
+
+    const interacted = accountKeys.includes(integration.programId);
+    if (!interacted) {
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: `Transaction did not interact with the designated StakePoint program (${integration.programId})`,
+      };
     }
 
     // 7. Verify token balance delta for $GENESIS mint
@@ -157,6 +163,14 @@ export async function verifyAndRecordStakePointPosition(
     const postBalance = postBalances.find(
       (b) => b.mint === GENESIS_MINT && (b.owner === walletAddress || accountKeys[b.accountIndex] === walletAddress)
     );
+
+    if (!preBalance || !postBalance) {
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: 'Transaction does not involve the authenticated wallet $GENESIS token account.',
+      };
+    }
 
     let amountRaw = BigInt(0);
     if (preBalance?.uiTokenAmount?.amount && postBalance?.uiTokenAmount?.amount) {
@@ -173,6 +187,18 @@ export async function verifyAndRecordStakePointPosition(
         success: false,
         status: 'REJECTED',
         error: 'No outgoing $GENESIS token transfer detected in this transaction.',
+      };
+    }
+
+    // Confirm that an external account/vault received incoming $GENESIS tokens
+    const recipientBalance = postBalances.find(
+      (b) => b.mint === GENESIS_MINT && b.owner !== walletAddress && accountKeys[b.accountIndex] !== walletAddress
+    );
+    if (!recipientBalance) {
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: 'No destination or pool vault received $GENESIS tokens in this transaction.',
       };
     }
 
@@ -226,3 +252,4 @@ export async function verifyAndRecordStakePointPosition(
     };
   }
 }
+

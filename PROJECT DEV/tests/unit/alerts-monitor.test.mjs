@@ -73,3 +73,4 @@ test('Alerts Monitor: Worker executes gracefully', async () => {
   assert.ok(typeof result.notificationsSent === 'number');
   assert.ok(Array.isArray(result.errors));
 });
+

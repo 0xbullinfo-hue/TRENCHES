@@ -29,3 +29,4 @@ test('Price Oracle: Fallback constant is well-defined and positive', () => {
   assert.equal(FALLBACK_GENESIS_PRICE, 0.0000164);
   assert.ok(FALLBACK_GENESIS_PRICE > 0);
 });
+

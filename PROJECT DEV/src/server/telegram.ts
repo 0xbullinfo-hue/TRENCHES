@@ -31,11 +31,9 @@ export const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const API_BASE = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
 export const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.com').replace(/\/$/, '');
 
-// Official Group Invite Links
-export const MEMBER_INVITE_URL =
-  process.env.TELEGRAM_MEMBER_INVITE_URL || 'https://t.me/+S5bRJX17PRkzMTE0';
-export const PRO_INVITE_URL =
-  process.env.TELEGRAM_PRO_INVITE_URL || 'https://t.me/+aCatLce8Dfk5ZjZk';
+// Group Invite Links (Configured strictly via environment variables, never hardcoded)
+export const MEMBER_INVITE_URL = process.env.TELEGRAM_MEMBER_INVITE_URL || '';
+export const PRO_INVITE_URL = process.env.TELEGRAM_PRO_INVITE_URL || '';
 
 export const TELEGRAM_GROUPS = {
   member: process.env.TELEGRAM_MEMBER_GROUP_ID,
@@ -95,13 +93,19 @@ export async function tgCall(method: string, body: Record<string, unknown>): Pro
   }
 }
 
-/** Sends a message; on HTTP 429 waits the server-provided retry_after (max 5s) and retries once. */
+/** Sends a message; on HTTP 429 waits the server-provided retry_after (max 5s) and retries once. Default parse_mode is HTML. */
 export async function tgSend(
   chatId: string | number,
   text: string,
   extra: Record<string, unknown> = {}
 ): Promise<TgCallResult> {
-  const payload = { chat_id: normChat(chatId), text, disable_web_page_preview: true, ...extra };
+  const payload = {
+    chat_id: normChat(chatId),
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...extra,
+  };
   let res = await tgCall('sendMessage', payload);
   if (res.status === 429) {
     await sleep(Math.min((res.retryAfter ?? 1) * 1000, 5_000));
@@ -154,7 +158,11 @@ export async function createTelegramInvite(
     }
   }
 
-  return fallbackUrl;
+  if (fallbackUrl && fallbackUrl.trim().length > 0) {
+    return fallbackUrl;
+  }
+
+  throw new Error(`Unable to generate invite link for ${tier} group: Bot credentials or group ID not configured`);
 }
 
 /**
@@ -201,55 +209,79 @@ export async function handleTelegramVerification(
 
     // User qualifies as Pro
     if (resultTier === 'pro') {
-      const invite = await createTelegramInvite('pro', effectiveUserId ?? undefined);
-      await upsertTelegramMember({
-        wallet_address: wallet,
-        telegram_user_id: effectiveUserId,
-        tier: 'pro',
-        in_group: true,
-      });
+      try {
+        const invite = await createTelegramInvite('pro', effectiveUserId ?? undefined);
+        await upsertTelegramMember({
+          wallet_address: wallet,
+          telegram_user_id: effectiveUserId,
+          tier: 'pro',
+          in_group: true,
+        });
 
-      return {
-        replyText:
-          `✅ <b>Verified as PRO</b>\n\n` +
-          `Welcome to TrenchLabs Pro. Join the private Pro group below:\n` +
-          `👉 ${invite}\n\n` +
-          `You will receive real-time calls and priority alpha notifications.`,
-        success: true,
-      };
+        return {
+          replyText:
+            `✅ <b>Verified as PRO</b>\n\n` +
+            `Welcome to TrenchLabs Pro. Join the private Pro group below:\n` +
+            `👉 ${invite}\n\n` +
+            `You will receive real-time calls and priority alpha notifications.`,
+          success: true,
+        };
+      } catch (inviteErr) {
+        console.error('[TrenchLabs] Pro invite generation failed:', inviteErr);
+        return {
+          replyText:
+            `✅ <b>Verified as PRO</b>\n\n` +
+            `Your wallet is qualified for Pro, but dynamic group invite links are currently unavailable.\n\n` +
+            `Please contact an administrator or check back on the dashboard shortly:\n` +
+            `🔗 ${dashboard}`,
+          success: false,
+        };
+      }
     }
 
     // User qualifies as Member ($20 held, but not active Pro stake)
     if (resultTier === 'member') {
-      const invite = await createTelegramInvite('member', effectiveUserId ?? undefined);
-      await upsertTelegramMember({
-        wallet_address: wallet,
-        telegram_user_id: effectiveUserId,
-        tier: 'member',
-        in_group: true,
-      });
+      try {
+        const invite = await createTelegramInvite('member', effectiveUserId ?? undefined);
+        await upsertTelegramMember({
+          wallet_address: wallet,
+          telegram_user_id: effectiveUserId,
+          tier: 'member',
+          in_group: true,
+        });
 
-      if (targetTier === 'pro') {
+        if (targetTier === 'pro') {
+          return {
+            replyText:
+              `⚠️ <b>Verified as Member</b>\n\n` +
+              `Your wallet holds $20+ in $GENESIS, but you do not currently have an active $250 stake for Pro.\n\n` +
+              `👉 <b>Join Member Group:</b> ${invite}\n\n` +
+              `To unlock the Pro group and high-conviction calls, stake $250 on your dashboard:\n` +
+              `🔗 ${SITE_URL}/dashboard/stake`,
+            success: true,
+          };
+        }
+
         return {
           replyText:
-            `⚠️ <b>Verified as Member</b>\n\n` +
-            `Your wallet holds $20+ in $GENESIS, but you do not currently have an active $250 stake for Pro.\n\n` +
-            `👉 <b>Join Member Group:</b> ${invite}\n\n` +
-            `To unlock the Pro group and high-conviction calls, stake $250 on your dashboard:\n` +
+            `✅ <b>Verified as Member</b>\n\n` +
+            `Welcome to TrenchLabsHQ. Join the Member group below:\n` +
+            `👉 ${invite}\n\n` +
+            `Want Pro signals? Stake $250 in $GENESIS for 90 days on your dashboard:\n` +
             `🔗 ${SITE_URL}/dashboard/stake`,
           success: true,
         };
+      } catch (inviteErr) {
+        console.error('[TrenchLabs] Member invite generation failed:', inviteErr);
+        return {
+          replyText:
+            `✅ <b>Verified as Member</b>\n\n` +
+            `Your wallet is qualified for Member access, but dynamic group invite links are currently unavailable.\n\n` +
+            `Please contact an administrator or check back on the dashboard shortly:\n` +
+            `🔗 ${dashboard}`,
+          success: false,
+        };
       }
-
-      return {
-        replyText:
-          `✅ <b>Verified as Member</b>\n\n` +
-          `Welcome to TrenchLabsHQ. Join the Member group below:\n` +
-          `👉 ${invite}\n\n` +
-          `Want Pro signals? Stake $250 in $GENESIS for 90 days on your dashboard:\n` +
-          `🔗 ${SITE_URL}/dashboard/stake`,
-        success: true,
-      };
     }
 
     return {
@@ -300,6 +332,10 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
           if (isAdminWallet(m.wallet_address)) return;
 
           const currentTier = await resolveTier(m.wallet_address);
+          if (currentTier === 'unknown') {
+            console.warn(`[TrenchLabs Sweep] Skipping ${m.wallet_address} due to RPC/balance error; eviction prevented`);
+            return;
+          }
           const userId = m.telegram_user_id as number;
 
           // Case A: Was registered as PRO, but stake is now expired/unqualified
@@ -320,11 +356,15 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
               });
               result.demotedToMember++;
 
+              const memberInviteLine = MEMBER_INVITE_URL
+                ? `👉 <b>Join the Member Group:</b> ${MEMBER_INVITE_URL}\n\n`
+                : '';
+
               await tgSend(
                 userId,
                 `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
                 `Your 90-day stake has completed. Because your wallet still holds $20+ in $GENESIS, you remain a <b>Member</b>.\n\n` +
-                `👉 <b>Join the Member Group:</b> ${MEMBER_INVITE_URL}\n\n` +
+                memberInviteLine +
                 `To regain full Pro access and priority signals, re-stake at least $250 in $GENESIS:\n` +
                 `🔗 ${SITE_URL}/dashboard/stake`
               );

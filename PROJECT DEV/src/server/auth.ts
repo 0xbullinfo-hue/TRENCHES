@@ -38,7 +38,7 @@ export interface WalletAuthResult {
 
 export interface AuthSession {
   wallet: string;
-  tier: 'free' | 'member' | 'pro';
+  tier: 'free' | 'member' | 'pro' | 'unknown';
 }
 
 export function signSession(wallet: string, maxAgeSec = SESSION_MAX_AGE_SEC): string {

@@ -3,7 +3,7 @@ import { getActiveStakes, loadDb, StakeRow } from '@/server/db';
 import { readGenesisBalanceCached, readGenesisRawBalanceCached } from '@/server/genesis';
 import { getGenesisPrice } from '@/server/price';
 
-export type UserTier = 'free' | 'member' | 'pro';
+export type UserTier = 'free' | 'member' | 'pro' | 'unknown';
 
 export const MEMBER_USD_THRESHOLD = 20;
 export const PRO_STAKE_USD_THRESHOLD = 250;
@@ -121,6 +121,7 @@ export async function resolveWalletEntitlement(
   let balanceTokens = 0;
   let balanceRaw = '0';
   let balanceUsd = 0;
+  let balanceLookupError = false;
 
   if (overrides?.mockHoldingTokens !== undefined) {
     balanceTokens = overrides.mockHoldingTokens;
@@ -139,7 +140,7 @@ export async function resolveWalletEntitlement(
         balanceTokens = await readGenesisBalanceCached(walletAddress);
         balanceUsd = +(balanceTokens * priceUsd).toFixed(2);
       } catch {
-        // keep 0
+        balanceLookupError = true;
       }
     }
   }
@@ -222,6 +223,9 @@ export async function resolveWalletEntitlement(
     if (isExpired) {
       downgradeReason = 'Pro staking duration expired. Retained Member access based on $20 holding balance.';
     }
+  } else if (balanceLookupError) {
+    tier = 'unknown';
+    downgradeReason = 'Balance lookup temporarily unavailable due to RPC error; skipping status changes';
   } else {
     tier = 'free';
     if (isExpired) {

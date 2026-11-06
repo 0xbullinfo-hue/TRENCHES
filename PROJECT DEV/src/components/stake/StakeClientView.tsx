@@ -10,7 +10,7 @@ import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButt
 
 interface InitialStakeData {
   wallet: string;
-  current_tier: 'free' | 'member' | 'pro';
+  current_tier: 'free' | 'member' | 'pro' | 'unknown';
   stake: {
     amount_raw: string;
     amount_genesis: number;

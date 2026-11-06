@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
+import { getGenesisPrice } from '@/server/price';
 
 export { TOKEN_DECIMALS, TOKEN_SYMBOL };
 
@@ -225,20 +226,29 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
   }
 
   if (fs.existsSync(DATA_FILE_PATH)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf-8'));
-      if (parsed && typeof parsed === 'object') {
-        if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
-        if (!Array.isArray(parsed.tier_thresholds)) parsed.tier_thresholds = [];
-        if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
-        if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
-        if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
-        if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
-        inMemoryDb = parsed;
-        return inMemoryDb;
+    const rawContent = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
+    if (rawContent && rawContent.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawContent);
+        if (parsed && typeof parsed === 'object') {
+          if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
+          if (!Array.isArray(parsed.tier_thresholds)) parsed.tier_thresholds = [];
+          if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
+          if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
+          if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
+          if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
+          inMemoryDb = parsed;
+          return inMemoryDb;
+        }
+      } catch (parseErr) {
+        console.error('[TrenchLabs DB] Local db.json corrupted or unreadable. Preserving backup:', parseErr);
+        const backupPath = `${DATA_FILE_PATH}.corrupted.${Date.now()}`;
+        try {
+          fs.copyFileSync(DATA_FILE_PATH, backupPath);
+          console.error(`[TrenchLabs DB] Preserved corrupted db copy at ${backupPath}`);
+        } catch {}
+        throw new Error(`Database file is corrupted. Corrupted copy saved to ${backupPath}. Reseed aborted to prevent data loss.`);
       }
-    } catch {
-      // ignore
     }
   }
 
@@ -278,31 +288,39 @@ export async function getTierThresholds(): Promise<{
   member: TierThresholdRow;
   pro: TierThresholdRow;
   stale: boolean;
+  priceSource: string;
 }> {
-  const db = await loadDb();
-  let member = db.tier_thresholds.find((t) => t.tier === 'member');
-  let pro = db.tier_thresholds.find((t) => t.tier === 'pro');
-
-  if (!member || !pro) {
-    const seeded = buildInitialSeed();
-    await withDbLock(async () => {
-      const current = await loadDb();
-      if (!current.tier_thresholds.some((t) => t.tier === 'member')) {
-        current.tier_thresholds.push(seeded.tier_thresholds[0]);
-      }
-      if (!current.tier_thresholds.some((t) => t.tier === 'pro')) {
-        current.tier_thresholds.push(seeded.tier_thresholds[1]);
-      }
-      await saveDb(current);
-    });
-    member = member || seeded.tier_thresholds[0];
-    pro = pro || seeded.tier_thresholds[1];
-  }
-
+  const priceResult = await getGenesisPrice();
+  const livePrice = priceResult.priceUsd > 0 ? priceResult.priceUsd : 0.0000164;
   const now = new Date().toISOString();
-  const stale = member.valid_until < now || pro.valid_until < now;
+  const validUntil = getNextMondayUtc();
 
-  return { member, pro, stale };
+  const memberRaw = computeRawTokenAmount(20, livePrice, TOKEN_DECIMALS);
+  const proRaw = computeRawTokenAmount(250, livePrice, TOKEN_DECIMALS);
+
+  const member: TierThresholdRow = {
+    id: 'threshold-member',
+    tier: 'member',
+    usd_target: 20,
+    token_amount: memberRaw,
+    twap_price_usd: livePrice,
+    valid_from: now,
+    valid_until: validUntil,
+    created_at: now,
+  };
+
+  const pro: TierThresholdRow = {
+    id: 'threshold-pro',
+    tier: 'pro',
+    usd_target: 250,
+    token_amount: proRaw,
+    twap_price_usd: livePrice,
+    valid_from: now,
+    valid_until: validUntil,
+    created_at: now,
+  };
+
+  return { member, pro, stale: !priceResult.isFresh, priceSource: priceResult.source };
 }
 
 // -------------------------------------------------------------
@@ -318,7 +336,7 @@ export async function getActiveStakes(walletAddress: string): Promise<StakeRow[]
 }
 
 export async function getStakeStatusForWallet(walletAddress: string) {
-  const { member, pro, stale } = await getTierThresholds();
+  const { member, pro, stale, priceSource } = await getTierThresholds();
   const activeStakes = await getActiveStakes(walletAddress);
   const now = Date.now();
 
@@ -396,7 +414,7 @@ export async function getStakeStatusForWallet(walletAddress: string) {
         lock_days: 90,
         valid_until: pro.valid_until,
       },
-      twap_source: 'placeholder',
+      twap_source: priceSource,
       recalculated_at: member.valid_from,
       stale,
     },
@@ -629,33 +647,19 @@ export async function upsertTelegramMember(params: {
 // Tier Resolution (§8, §4)
 // -------------------------------------------------------------
 
-export async function resolveTier(walletAddress: string): Promise<'free' | 'member' | 'pro'> {
+export async function resolveTier(walletAddress: string): Promise<'free' | 'member' | 'pro' | 'unknown'> {
   if (isAdminWallet(walletAddress)) {
     return 'pro';
   }
 
-  // 1. Check for active Pro stakes >= $250
-  const activeStakes = await getActiveStakes(walletAddress);
-  const totalStakedRaw = activeStakes.reduce((acc, s) => acc + BigInt(s.amount_raw), BigInt(0));
-  const { pro, member } = await getTierThresholds();
-  const proThresholdRaw = BigInt(pro.token_amount);
-
-  if (totalStakedRaw >= proThresholdRaw) {
-    return 'pro';
-  }
-
-  // 2. Check on-chain balance for Member tier ($20 threshold)
   try {
-    const balance = await readGenesisBalanceCached(walletAddress);
-    const memberThresholdTokens = Number(member.token_amount) / Math.pow(10, TOKEN_DECIMALS);
-    if (balance >= memberThresholdTokens) {
-      return 'member';
-    }
+    const { resolveWalletEntitlement } = await import('@/server/entitlements');
+    const ent = await resolveWalletEntitlement(walletAddress);
+    return ent.tier;
   } catch (err) {
-    console.error('[TrenchLabs DB] Balance lookup failed during tier resolution:', err);
+    console.error('[TrenchLabs DB] resolveTier error:', err);
+    return 'unknown';
   }
-
-  return 'free';
 }
 
 // -------------------------------------------------------------

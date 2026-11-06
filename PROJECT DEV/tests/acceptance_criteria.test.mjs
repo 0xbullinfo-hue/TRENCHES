@@ -28,8 +28,8 @@ function seedStakeDirect(walletAddress, amountRaw = '1200000000000000') {
   }
 }
 
-// Helper to create a signed session cookie
-function makeSessionCookie(wallet, secret = 'trenchlabs-session-secret-key-32ch') {
+// Helper to create a signed session cookie matching active session secret
+function makeSessionCookie(wallet, secret = process.env.SESSION_SECRET || 'dev-only-session-secret-do-not-use-in-production') {
   const exp = Math.floor(Date.now() / 1000) + 3600;
   const payload = `${wallet}|${exp}`;
   const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');

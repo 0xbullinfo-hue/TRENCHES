@@ -152,3 +152,4 @@ export async function getGenesisPrice(): Promise<GenesisPriceResult> {
     error: 'All price oracles unavailable; using fallback baseline',
   };
 }
+

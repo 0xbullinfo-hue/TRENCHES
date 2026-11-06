@@ -34,11 +34,23 @@ test('formatCallMessage escapes HTML in every user-controlled field', () => {
   assert.ok(!/<DEGEN>|<script>|<2x>/.test(msg), 'no raw user HTML may remain');
 });
 
-test('createTelegramInvite falls back to official group invite URLs', async () => {
-  const memberInvite = await tg.createTelegramInvite('member');
-  assert.equal(memberInvite, 'https://t.me/+S5bRJX17PRkzMTE0');
+test('createTelegramInvite rejects when credentials or group IDs are unconfigured (no leaked defaults)', async () => {
+  const origMember = process.env.TELEGRAM_MEMBER_INVITE_URL;
+  const origPro = process.env.TELEGRAM_PRO_INVITE_URL;
+  delete process.env.TELEGRAM_MEMBER_INVITE_URL;
+  delete process.env.TELEGRAM_PRO_INVITE_URL;
 
-  const proInvite = await tg.createTelegramInvite('pro');
-  assert.equal(proInvite, 'https://t.me/+aCatLce8Dfk5ZjZk');
+  await assert.rejects(
+    async () => await tg.createTelegramInvite('member'),
+    /Unable to generate invite link/
+  );
+
+  await assert.rejects(
+    async () => await tg.createTelegramInvite('pro'),
+    /Unable to generate invite link/
+  );
+
+  if (origMember) process.env.TELEGRAM_MEMBER_INVITE_URL = origMember;
+  if (origPro) process.env.TELEGRAM_PRO_INVITE_URL = origPro;
 });
 
