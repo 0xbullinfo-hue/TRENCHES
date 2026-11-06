@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { fetchGenesisPools } from '@/lib/stakepoint/fetchPools';
+import { GENESIS_MINT } from '@/lib/config';
 
 export const revalidate = 300;
 
 export async function GET() {
-  const mint = process.env.NEXT_PUBLIC_GENESIS_MINT;
+  const mint = GENESIS_MINT;
   try {
     const pools = await fetchGenesisPools();
     return NextResponse.json(

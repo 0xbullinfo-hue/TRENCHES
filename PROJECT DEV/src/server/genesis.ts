@@ -8,6 +8,15 @@ const RPC_ENDPOINTS: string[] = (
   .map((s) => s.trim())
   .filter(Boolean);
 
+let warnedPublicRpc = false;
+function warnIfPublicRpc(): void {
+  if (warnedPublicRpc || process.env.NODE_ENV !== 'production') return;
+  warnedPublicRpc = true;
+  if (RPC_ENDPOINTS.every((e) => e.includes('api.mainnet-beta.solana.com'))) {
+    console.warn('[TrenchLabs] Using the public Solana RPC in production; it rate-limits aggressively. Set SOLANA_RPC to a keyed provider (Helius/QuickNode).');
+  }
+}
+
 // In-memory 30s cache for on-chain balances to prevent RPC hammering and DoS (shared by API + Telegram fan-out)
 const balanceCache = new Map<string, { v: number; t: number }>();
 const BALANCE_TTL_MS = 30_000;
@@ -15,6 +24,8 @@ const BALANCE_TTL_MS = 30_000;
 async function readGenesisBalance(owner: string, signal?: AbortSignal): Promise<number> {
   if (!MINT_CONFIGURED) return 0;
   let lastError: Error | null = null;
+
+  warnIfPublicRpc();
 
   for (const endpoint of RPC_ENDPOINTS) {
     try {

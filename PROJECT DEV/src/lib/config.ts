@@ -6,11 +6,14 @@
 export const DEFAULT_GENESIS_MINT = 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump';
 
 /** Official Master Admin Wallet with full post/edit/delete/pin privileges & gate bypass */
-export const ADMIN_WALLET = 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e';
+export const ADMIN_WALLET =
+  (typeof process !== 'undefined' && process.env?.ADMIN_WALLET?.trim()) ||
+  'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e';
 export const ADMIN_WALLET_SHORT = `${ADMIN_WALLET.slice(0, 6)}...${ADMIN_WALLET.slice(-4)}`;
 
 export const SOLANA_RPC =
-  process.env.NEXT_PUBLIC_SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
+  (typeof process !== 'undefined' && (process.env?.SOLANA_RPC || process.env?.NEXT_PUBLIC_SOLANA_RPC)) ||
+  'https://api.mainnet-beta.solana.com';
 
 export const GENESIS_MINT =
   process.env.NEXT_PUBLIC_GENESIS_MINT || DEFAULT_GENESIS_MINT;

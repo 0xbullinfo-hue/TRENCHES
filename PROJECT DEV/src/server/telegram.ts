@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import { isAdminWallet } from '@/lib/config';
-import { MIN_GENESIS_REQUIRED } from '@/lib/tiers';
 import {
   KV_CONFIGURED,
   kvDel,
@@ -16,12 +15,32 @@ import {
 } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import type { AlphaRecord } from '@/server/alphas-data';
+import {
+  claimVerificationSession,
+  getVerificationSession,
+  listGroupMembers,
+  releaseVerificationSession,
+  resolveTier,
+  setMemberInGroup,
+  upsertTelegramMember,
+} from '@/server/db';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '');
 export const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const API_BASE = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
-const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.com').replace(/\/$/, '');
+export const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.com').replace(/\/$/, '');
+
+// Official Group Invite Links
+export const MEMBER_INVITE_URL =
+  process.env.TELEGRAM_MEMBER_INVITE_URL || 'https://t.me/+S5bRJX17PRkzMTE0';
+export const PRO_INVITE_URL =
+  process.env.TELEGRAM_PRO_INVITE_URL || 'https://t.me/+aCatLce8Dfk5ZjZk';
+
+export const TELEGRAM_GROUPS = {
+  member: process.env.TELEGRAM_MEMBER_GROUP_ID,
+  pro: process.env.TELEGRAM_PRO_GROUP_ID,
+};
 
 const SUBS_KEY = 'tg:subs'; // hash: wallet -> chatId
 const chatKey = (chatId: string | number) => `tg:chat:${chatId}`; // chatId -> wallet
@@ -34,149 +53,320 @@ export const telegramConfigured = () =>
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function tgSend(
-  chatId: string | number,
-  text: string,
-  extra: Record<string, unknown> = {}
-): Promise<{ ok: boolean; status: number }> {
+export interface TgCallResult {
+  ok: boolean;
+  status: number;
+  description?: string;
+  retryAfter?: number;
+  result?: unknown;
+}
+
+const normChat = (chatId: string | number) => (/^-?\d+$/.test(String(chatId)) ? Number(chatId) : chatId);
+
+/** Low-level Bot API call with timeout. Never throws. */
+export async function tgCall(method: string, body: Record<string, unknown>): Promise<TgCallResult> {
+  if (!BOT_TOKEN) return { ok: false, status: 0, description: 'bot token not configured' };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8_000);
   try {
-    const res = await fetch(`${API_BASE}/bot${BOT_TOKEN}/sendMessage`, {
+    const res = await fetch(`${API_BASE}/bot${BOT_TOKEN}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: /^-?\d+$/.test(String(chatId)) ? Number(chatId) : chatId, text, disable_web_page_preview: true, ...extra }),
+      body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    return { ok: res.ok, status: res.status };
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      description?: string;
+      result?: unknown;
+      parameters?: { retry_after?: number };
+    } | null;
+    return {
+      ok: res.ok && json?.ok !== false,
+      status: res.status,
+      description: json?.description,
+      retryAfter: json?.parameters?.retry_after,
+      result: json?.result,
+    };
   } catch {
-    return { ok: false, status: 0 };
+    return { ok: false, status: 0, description: 'network error' };
   } finally {
     clearTimeout(timer);
   }
 }
 
-import {
-  getVerificationSession,
-  markSessionUsed,
-  resolveTier,
-  upsertTelegramMember,
-} from '@/server/db';
+/** Sends a message; on HTTP 429 waits the server-provided retry_after (max 5s) and retries once. */
+export async function tgSend(
+  chatId: string | number,
+  text: string,
+  extra: Record<string, unknown> = {}
+): Promise<TgCallResult> {
+  const payload = { chat_id: normChat(chatId), text, disable_web_page_preview: true, ...extra };
+  let res = await tgCall('sendMessage', payload);
+  if (res.status === 429) {
+    await sleep(Math.min((res.retryAfter ?? 1) * 1000, 5_000));
+    res = await tgCall('sendMessage', payload);
+  }
+  return res;
+}
 
+/**
+ * Decides what a failed sendMessage means. Only a definitive "this chat will never accept messages"
+ * (blocked / deactivated / chat gone) may unlink a subscriber; a 400 for any other reason
+ * (e.g. malformed message) must never remove people.
+ */
+export function classifySendFailure(status: number, description = ''): 'blocked' | 'retry' | 'other' {
+  const d = description.toLowerCase();
+  if (status === 403) return 'blocked';
+  if (status === 400 && (d.includes('chat not found') || d.includes('user is deactivated') || d.includes('bot was blocked'))) {
+    return 'blocked';
+  }
+  if (status === 429 || status === 0 || status >= 500) return 'retry';
+  return 'other';
+}
+
+/**
+ * Issues an invite link for the designated tier ('member' | 'pro').
+ * If group ID is configured and bot has admin rights, attempts single-use dynamic invite.
+ * Otherwise falls back cleanly to the official group invite URL.
+ */
 export async function createTelegramInvite(
   tier: 'member' | 'pro',
   userId?: number
 ): Promise<string> {
-  const groupId = tier === 'pro' ? process.env.TELEGRAM_PRO_GROUP_ID : process.env.TELEGRAM_MEMBER_GROUP_ID;
-  if (BOT_TOKEN && groupId) {
+  const fallbackUrl = tier === 'pro' ? PRO_INVITE_URL : MEMBER_INVITE_URL;
+  const rawGroupId = tier === 'pro' ? TELEGRAM_GROUPS.pro : TELEGRAM_GROUPS.member;
+
+  if (BOT_TOKEN && rawGroupId) {
     try {
-      const res = await fetch(`${API_BASE}/bot${BOT_TOKEN}/createChatInviteLink`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: groupId,
-          member_limit: 1,
-          expire_date: Math.floor(Date.now() / 1000) + 3600, // 60 minutes
-          name: `Invite for ${userId || 'user'} (${tier})`,
-        }),
+      const res = await tgCall('createChatInviteLink', {
+        chat_id: normChat(rawGroupId),
+        member_limit: 1,
+        expire_date: Math.floor(Date.now() / 1000) + 3600, // 60 minutes
+        name: `Invite for ${userId || 'user'} (${tier})`,
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.result?.invite_link) {
-          return data.result.invite_link;
-        }
+      const link = (res.result as { invite_link?: string } | undefined)?.invite_link;
+      if (res.ok && link) {
+        return link;
       }
     } catch (e) {
       console.error('[TrenchLabs] createChatInviteLink error:', e);
     }
   }
 
-  // Graceful fallback for mock / development / unconfigured group
-  return `https://t.me/+trench_${tier}_${crypto.randomBytes(6).toString('base64url')}`;
+  return fallbackUrl;
 }
 
 /**
- * Consumes `vs_<session_id>` verification session per §8.
- * Re-verifies on-chain, issues single-use invite, updates telegram_members, marks session used.
+ * Consumes `vs_<session_id>` verification deep link.
+ * Atomically claims session, re-verifies on-chain, issues tier invite, and updates records.
  */
 export async function handleTelegramVerification(
   sessionId: string,
   chatId: number | string,
   userId?: number
 ): Promise<{ replyText: string; success: boolean }> {
-  const session = await getVerificationSession(sessionId);
   const effectiveUserId = userId || (typeof chatId === 'number' ? chatId : Number(chatId)) || null;
+  const dashboard = `${SITE_URL}/dashboard`;
 
-  if (!session) {
-    return {
-      replyText:
-        'This link is invalid. Get a new one from your dashboard at trenchlabs.xyz/dashboard.',
-      success: false,
-    };
+  const claim = await claimVerificationSession(sessionId, effectiveUserId);
+  if (claim.status !== 'ok') {
+    const replies = {
+      not_found: `This link is invalid. Get a new one from your dashboard: ${dashboard}`,
+      used: 'This link was already used. Get a new one from your dashboard if you still need access.',
+      expired: `This link expired. Get a new one from your dashboard: ${dashboard}`,
+    } as const;
+    return { replyText: replies[claim.status], success: false };
   }
 
-  if (session.used_at) {
-    return {
-      replyText:
-        'This link was already used. Get a new one from your dashboard if you still need access.',
-      success: false,
-    };
-  }
-
-  if (new Date(session.expires_at).getTime() < Date.now()) {
-    return {
-      replyText: 'This link expired. Get a new one from your dashboard.',
-      success: false,
-    };
-  }
-
-  // Re-verify on-chain — do NOT trust the session's tier claim
-  const wallet = session.wallet_address;
+  const wallet = claim.session.wallet_address;
+  const targetTier = claim.session.tier;
   const shortWallet = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
-  let resultTier: 'free' | 'member' | 'pro' = 'free';
 
   try {
-    resultTier = await resolveTier(wallet);
+    const resultTier = await resolveTier(wallet);
+
+    // Free: does not meet requirements
+    if (resultTier === 'free') {
+      await releaseVerificationSession(sessionId);
+      return {
+        replyText:
+          `Your wallet ${shortWallet} doesn't currently qualify.\n\n` +
+          `• Member access: Hold at least $20 in $GENESIS\n` +
+          `• Pro access: Stake $250 for 90 days\n\n` +
+          `Top up on the dashboard: ${dashboard}`,
+        success: false,
+      };
+    }
+
+    // User qualifies as Pro
+    if (resultTier === 'pro') {
+      const invite = await createTelegramInvite('pro', effectiveUserId ?? undefined);
+      await upsertTelegramMember({
+        wallet_address: wallet,
+        telegram_user_id: effectiveUserId,
+        tier: 'pro',
+        in_group: true,
+      });
+
+      return {
+        replyText:
+          `✅ <b>Verified as PRO</b>\n\n` +
+          `Welcome to TrenchLabs Pro. Join the private Pro group below:\n` +
+          `👉 ${invite}\n\n` +
+          `You will receive real-time calls and priority alpha notifications.`,
+        success: true,
+      };
+    }
+
+    // User qualifies as Member ($20 held, but not active Pro stake)
+    if (resultTier === 'member') {
+      const invite = await createTelegramInvite('member', effectiveUserId ?? undefined);
+      await upsertTelegramMember({
+        wallet_address: wallet,
+        telegram_user_id: effectiveUserId,
+        tier: 'member',
+        in_group: true,
+      });
+
+      if (targetTier === 'pro') {
+        return {
+          replyText:
+            `⚠️ <b>Verified as Member</b>\n\n` +
+            `Your wallet holds $20+ in $GENESIS, but you do not currently have an active $250 stake for Pro.\n\n` +
+            `👉 <b>Join Member Group:</b> ${invite}\n\n` +
+            `To unlock the Pro group and high-conviction calls, stake $250 on your dashboard:\n` +
+            `🔗 ${SITE_URL}/dashboard/stake`,
+          success: true,
+        };
+      }
+
+      return {
+        replyText:
+          `✅ <b>Verified as Member</b>\n\n` +
+          `Welcome to TrenchLabsHQ. Join the Member group below:\n` +
+          `👉 ${invite}\n\n` +
+          `Want Pro signals? Stake $250 in $GENESIS for 90 days on your dashboard:\n` +
+          `🔗 ${SITE_URL}/dashboard/stake`,
+        success: true,
+      };
+    }
+
+    return {
+      replyText: `Could not determine qualification. Please try again from ${dashboard}`,
+      success: false,
+    };
   } catch (err) {
-    console.error('[TrenchLabs] RPC verification error during /start:', err);
+    console.error('[TrenchLabs] Telegram verification error:', err);
+    await releaseVerificationSession(sessionId).catch(() => {});
     return {
-      replyText: 'Network error verifying your wallet. Try again in a minute.',
+      replyText: 'Network error verifying your wallet. Your link is still valid — tap Start again in a minute.',
       success: false,
     };
   }
+}
 
-  if (resultTier === 'free') {
-    await markSessionUsed(sessionId, effectiveUserId);
-    return {
-      replyText: `Your wallet ${shortWallet} doesn't currently qualify. You need $20 held for Member or $250 staked for Pro.`,
-      success: false,
-    };
+export interface SweepResult {
+  checked: number;
+  demotedToMember: number;
+  evicted: number;
+  errors: number;
+  truncated: boolean;
+}
+
+/**
+ * Recurring background worker:
+ * 1. Checks Pro members whose 90-day stake expired (unlocks_at <= now).
+ *    -> Evicts from Pro group, demotes to Member (if holding $20+), invites to Member group, and prompts to re-stake $250.
+ * 2. Checks Member holders whose balance dropped below $20.
+ *    -> Evicts from Member group.
+ */
+export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult> {
+  const result: SweepResult = { checked: 0, demotedToMember: 0, evicted: 0, errors: 0, truncated: false };
+  const started = Date.now();
+  const members = await listGroupMembers();
+  const BATCH = 10;
+
+  for (let i = 0; i < members.length; i += BATCH) {
+    if (Date.now() - started > budgetMs) {
+      result.truncated = true;
+      break;
+    }
+
+    await Promise.all(
+      members.slice(i, i + BATCH).map(async (m) => {
+        result.checked++;
+        try {
+          if (isAdminWallet(m.wallet_address)) return;
+
+          const currentTier = await resolveTier(m.wallet_address);
+          const userId = m.telegram_user_id as number;
+
+          // Case A: Was registered as PRO, but stake is now expired/unqualified
+          if (m.tier === 'pro' && currentTier !== 'pro') {
+            // Kick from Pro group
+            if (TELEGRAM_GROUPS.pro) {
+              await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId });
+              await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId, only_if_banned: true });
+            }
+
+            if (currentTier === 'member') {
+              // Downgrade to Member
+              await upsertTelegramMember({
+                wallet_address: m.wallet_address,
+                telegram_user_id: userId,
+                tier: 'member',
+                in_group: true,
+              });
+              result.demotedToMember++;
+
+              await tgSend(
+                userId,
+                `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
+                `Your 90-day stake has completed. Because your wallet still holds $20+ in $GENESIS, you remain a <b>Member</b>.\n\n` +
+                `👉 <b>Join the Member Group:</b> ${MEMBER_INVITE_URL}\n\n` +
+                `To regain full Pro access and priority signals, re-stake at least $250 in $GENESIS:\n` +
+                `🔗 ${SITE_URL}/dashboard/stake`
+              );
+            } else {
+              // Less than $20 held too -> completely out
+              await setMemberInGroup(m.wallet_address, false);
+              result.evicted++;
+
+              await tgSend(
+                userId,
+                `⚠️ <b>Access Expired</b>\n\n` +
+                `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $GENESIS.\n\n` +
+                `Top up or re-stake on the dashboard to regain access:\n` +
+                `🔗 ${SITE_URL}/dashboard`
+              );
+            }
+          }
+
+          // Case B: Was registered as MEMBER, but balance fell below $20
+          else if (m.tier === 'member' && currentTier === 'free') {
+            if (TELEGRAM_GROUPS.member) {
+              await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId });
+              await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId, only_if_banned: true });
+            }
+            await setMemberInGroup(m.wallet_address, false);
+            result.evicted++;
+
+            await tgSend(
+              userId,
+              `⚠️ Your wallet no longer holds the minimum $20 in $GENESIS required for Member access. You have been removed from the Member group.\n\n` +
+              `Top up at ${SITE_URL}/dashboard to get a new invite.`
+            );
+          }
+        } catch (err) {
+          result.errors++;
+          console.error('[TrenchLabs] sweep error for member:', err);
+        }
+      })
+    );
   }
 
-  const target = session.tier;
-  if (target === 'pro' && resultTier !== 'pro') {
-    await markSessionUsed(sessionId, effectiveUserId);
-    return {
-      replyText:
-        "You're not currently eligible for Pro (stake may have expired). Check your dashboard for a Member invite instead.",
-      success: false,
-    };
-  }
-
-  const invite = await createTelegramInvite(target, effectiveUserId ?? undefined);
-  await upsertTelegramMember({
-    wallet_address: wallet,
-    telegram_user_id: effectiveUserId,
-    tier: target,
-    in_group: true,
-  });
-  await markSessionUsed(sessionId, effectiveUserId);
-
-  const formattedTarget = target.charAt(0).toUpperCase() + target.slice(1);
-  return {
-    replyText: `✅ Verified as ${formattedTarget}.\n\nJoin your group: ${invite}\n\nSingle-use, expires in 60 minutes.`,
-    success: true,
-  };
+  return result;
 }
 
 // ---------- linking ----------
@@ -190,6 +380,10 @@ export async function createLinkCode(wallet: string): Promise<{ url: string }> {
 export async function isLinked(wallet: string): Promise<boolean> {
   const subs = await kvHGetAll(SUBS_KEY);
   return Boolean(subs[wallet]);
+}
+
+export async function getLinkedWallet(chatId: string | number): Promise<string | null> {
+  return (await kvGet(chatKey(chatId))) || null;
 }
 
 export async function unlinkWallet(wallet: string): Promise<void> {
@@ -212,7 +406,6 @@ export async function completeLink(code: string, chatId: string | number): Promi
   const wallet = await kvGetDel(codeKey(code));
   if (!wallet) return null;
 
-  // Use a distributed lock on the wallet during mapping assignment to avoid races
   const lockKey = `lock:link:${wallet}`;
   const token = Math.random().toString(36).slice(2);
   let locked = false;
@@ -220,7 +413,6 @@ export async function completeLink(code: string, chatId: string | number): Promi
     locked = await kvLock(lockKey, token, 10);
   }
   try {
-    // One chat <-> one wallet, in both directions (no stale mappings).
     const prevWallet = await kvGet(chatKey(chatId));
     if (prevWallet && prevWallet !== wallet) await kvHDel(SUBS_KEY, prevWallet);
     const subs = await kvHGetAll(SUBS_KEY);
@@ -239,7 +431,7 @@ export async function completeLink(code: string, chatId: string | number): Promi
 
 // ---------- fan-out ----------
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function formatCallMessage(r: AlphaRecord): string {
   const tps = (r.takeProfits ?? []).map((t) => esc(t.label)).join(' · ') || '—';
@@ -258,40 +450,51 @@ export interface FanoutResult {
   sent: number;
   skipped: number;
   removed: number;
+  deferred: number;
 }
 
 /**
- * Sends a new call to every linked holder. Re-checks the $GENESIS balance for each recipient at send
- * time, so holders who sold stop receiving calls. Telegram allows ~30 msgs/sec, so we batch.
+ * Sends a new call to every linked holder. Re-checks the tier for each recipient at send time,
+ * so holders who sold or dropped below Member stop receiving calls. Telegram allows ~30 msgs/sec, so we batch.
  */
-export async function notifyNewCall(r: AlphaRecord): Promise<FanoutResult> {
-  const result: FanoutResult = { sent: 0, skipped: 0, removed: 0 };
+export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<FanoutResult> {
+  const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
   if (!telegramConfigured()) return result;
 
+  const started = Date.now();
   const subs = Object.entries(await kvHGetAll(SUBS_KEY));
   const text = formatCallMessage(r);
   const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${SITE_URL}/dashboard` }]] };
   const BATCH = 20;
 
   for (let i = 0; i < subs.length; i += BATCH) {
+    if (Date.now() - started > budgetMs) {
+      result.deferred = subs.length - i;
+      console.error(`[TrenchLabs] Fan-out time budget exhausted; ${result.deferred} subscribers not notified.`);
+      break;
+    }
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
           if (!isAdminWallet(wallet)) {
-            const bal = await readGenesisBalanceCached(wallet);
-            if (bal < MIN_GENESIS_REQUIRED) {
+            const tier = await resolveTier(wallet);
+            if (tier === 'free') {
               result.skipped++;
               return;
             }
           }
           const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
-          if (res.ok) result.sent++;
-          else if (res.status === 403 || res.status === 400) {
-            // user blocked the bot / chat gone -> drop the subscription
+          if (res.ok) {
+            result.sent++;
+          } else if (classifySendFailure(res.status, res.description) === 'blocked') {
             await unlinkWallet(wallet);
             result.removed++;
-          } else result.skipped++;
-        } catch {
+          } else {
+            console.error('[TrenchLabs] Alert send failed:', res.status, res.description);
+            result.skipped++;
+          }
+        } catch (err) {
+          console.error('[TrenchLabs] Alert fan-out error:', err);
           result.skipped++;
         }
       })

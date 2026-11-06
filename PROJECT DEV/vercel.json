@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/telegram/sweep",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+

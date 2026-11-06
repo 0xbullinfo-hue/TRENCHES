@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { GENESIS_MINT } from '@/lib/config';
 import { fetchGenesisPools } from '@/lib/stakepoint/fetchPools';
 import { StakePointPool } from '@/lib/stakepoint/types';
 import { StakePointCardError } from './StakePointCardError';
@@ -203,7 +204,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
 
 // Server Component implementation per §5
 export async function StakePointCard() {
-  const mint = process.env.NEXT_PUBLIC_GENESIS_MINT;
+  const mint = GENESIS_MINT;
   let pools: StakePointPool[] = [];
   let hasError = false;
 

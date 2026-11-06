@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/server/auth';
-import { createStake, resolveTier } from '@/server/db';
+import { createStake, getTierThresholds, loadDb, resolveTier, TOKEN_DECIMALS } from '@/server/db';
 import { Connection } from '@solana/web3.js';
-import { SOLANA_RPC } from '@/lib/config';
+import { GENESIS_MINT, SOLANA_RPC } from '@/lib/config';
+import { KV_CONFIGURED, kvLock } from '@/server/kv';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const session = await getAuthSession(req);
@@ -21,19 +24,47 @@ export async function POST(req: Request) {
   const amountRaw = typeof body.amount_raw === 'string' ? body.amount_raw.trim() : '';
   const lockDays = typeof body.lock_days === 'number' ? body.lock_days : parseInt(String(body.lock_days || 90), 10);
 
-  if (!txSignature || !amountRaw || !Number.isFinite(lockDays) || lockDays <= 0) {
+  // Validate parameters
+  if (
+    !txSignature ||
+    !amountRaw ||
+    !/^\d+$/.test(amountRaw) ||
+    BigInt(amountRaw) <= BigInt(0) ||
+    !Number.isFinite(lockDays) ||
+    lockDays < 90
+  ) {
     return NextResponse.json(
-      { error: 'bad_request', message: 'Missing or invalid parameters' },
+      { error: 'bad_request', message: 'Missing or invalid parameters. Minimum lock is 90 days.' },
       { status: 400 }
     );
+  }
+
+  // Prevent duplicate signature submission across all accounts
+  const db = await loadDb();
+  const existingStake = db.stakes.find((s) => s.tx_signature === txSignature);
+  if (existingStake) {
+    return NextResponse.json(
+      { error: 'verification_failed', message: 'Transaction signature already used for a stake' },
+      { status: 400 }
+    );
+  }
+
+  // Distributed lock to prevent concurrent double-submission
+  if (KV_CONFIGURED) {
+    const locked = await kvLock(`stake-tx:${txSignature}`, '1', 120);
+    if (!locked) {
+      return NextResponse.json(
+        { error: 'verification_failed', message: 'Transaction is currently being processed' },
+        { status: 400 }
+      );
+    }
   }
 
   const streamflowProgramId =
     process.env.NEXT_PUBLIC_STREAMFLOW_PROGRAM_ID || 'STAKEvGqQTtzJZH6BWDcbpzXXn2BBerPAgQ3EGLN2GH';
   const rpcUrl =
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-    process.env.NEXT_PUBLIC_SOLANA_RPC ||
     process.env.SOLANA_RPC ||
+    process.env.NEXT_PUBLIC_SOLANA_RPC ||
     SOLANA_RPC;
 
   try {
@@ -69,6 +100,41 @@ export async function POST(req: Request) {
       );
     }
 
+    // Verify token balance delta for GENESIS_MINT on user's account
+    const preBalances = tx.meta?.preTokenBalances || [];
+    const postBalances = tx.meta?.postTokenBalances || [];
+
+    const preBalance = preBalances.find(
+      (b) => b.mint === GENESIS_MINT && (b.owner === session.wallet || accountKeys[b.accountIndex] === session.wallet)
+    );
+    const postBalance = postBalances.find(
+      (b) => b.mint === GENESIS_MINT && (b.owner === session.wallet || accountKeys[b.accountIndex] === session.wallet)
+    );
+
+    if (preBalance?.uiTokenAmount?.amount && postBalance?.uiTokenAmount?.amount) {
+      const preRaw = BigInt(preBalance.uiTokenAmount.amount);
+      const postRaw = BigInt(postBalance.uiTokenAmount.amount);
+      const transferred = preRaw - postRaw;
+      if (transferred < BigInt(amountRaw)) {
+        return NextResponse.json(
+          { error: 'verification_failed', message: 'On-chain transferred token amount is less than claimed stake' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Verify token value satisfies the $250 USD target
+    const { pro } = await getTierThresholds();
+    const tokenAmountNumber = Number(BigInt(amountRaw)) / Math.pow(10, TOKEN_DECIMALS);
+    const usdValue = tokenAmountNumber * pro.twap_price_usd;
+
+    if (usdValue < 240) { // allow a minor margin of rounding error vs 250
+      return NextResponse.json(
+        { error: 'verification_failed', message: 'Staked amount does not meet the $250 USD Pro minimum requirement' },
+        { status: 400 }
+      );
+    }
+
     await createStake({
       wallet_address: session.wallet,
       amount_raw: amountRaw,
@@ -87,4 +153,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

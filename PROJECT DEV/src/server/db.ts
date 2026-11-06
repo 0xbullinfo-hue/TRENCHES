@@ -76,6 +76,19 @@ interface TrenchDatabaseSchema {
 }
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
+
+/** Local-file persistence is only safe in dev or on a single persistent server (ALLOW_FILE_PERSISTENCE=true). */
+const FILE_PERSISTENCE_ALLOWED =
+  process.env.NODE_ENV !== 'production' || process.env.ALLOW_FILE_PERSISTENCE === 'true';
+
+function assertPersistence(): void {
+  if (!KV_CONFIGURED && !FILE_PERSISTENCE_ALLOWED) {
+    throw new Error(
+      'Persistence not configured. Set UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or ALLOW_FILE_PERSISTENCE=true on a single persistent server).'
+    );
+  }
+}
+
 const DB_KV_KEY = 'trench:db:tables';
 const DB_LOCK_KEY = 'trench:lock:db';
 
@@ -174,6 +187,7 @@ async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
 }
 
 export async function loadDb(): Promise<TrenchDatabaseSchema> {
+  assertPersistence();
   if (KV_CONFIGURED) {
     const raw = await kvGet(DB_KV_KEY);
     if (!raw) {
@@ -184,17 +198,26 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
     try {
       const parsed = JSON.parse(raw) as TrenchDatabaseSchema;
       if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
+      if (!Array.isArray(parsed.tier_thresholds)) parsed.tier_thresholds = [];
+      if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
+      if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
+      if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
       return parsed;
-    } catch {
-      return buildInitialSeed();
+    } catch (err) {
+      console.error('[TrenchLabs DB] Stored database is unreadable:', err);
+      throw new Error('Database unreadable');
     }
   }
 
   if (fs.existsSync(DATA_FILE_PATH)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf-8'));
-      if (parsed && Array.isArray(parsed.tier_thresholds)) {
+      if (parsed && typeof parsed === 'object') {
         if (!Array.isArray(parsed.ledger_entries)) parsed.ledger_entries = [];
+        if (!Array.isArray(parsed.tier_thresholds)) parsed.tier_thresholds = [];
+        if (!Array.isArray(parsed.stakes)) parsed.stakes = [];
+        if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
+        if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
         inMemoryDb = parsed;
         return inMemoryDb;
       }
@@ -214,6 +237,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
 }
 
 export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
+  assertPersistence();
   inMemoryDb = db;
   if (KV_CONFIGURED) {
     await kvSet(DB_KV_KEY, JSON.stringify(db));
@@ -226,6 +250,7 @@ export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
     fs.renameSync(tmp, DATA_FILE_PATH);
   } catch (err) {
     console.error('[TrenchLabs DB] Local save error:', err);
+    throw err;
   }
 }
 
@@ -400,10 +425,9 @@ export async function createStake(params: {
 const BASE62_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 export function generateBase62Id(length = 12): string {
-  const bytes = crypto.randomBytes(length);
   let res = '';
   for (let i = 0; i < length; i++) {
-    res += BASE62_CHARS[bytes[i] % BASE62_CHARS.length];
+    res += BASE62_CHARS[crypto.randomInt(BASE62_CHARS.length)];
   }
   return res;
 }
@@ -423,6 +447,12 @@ export async function createOrReuseVerificationSession(
     const db = await loadDb();
     const now = new Date();
     const nowMs = now.getTime();
+
+    // Prune sessions that expired more than a day ago so the stored blob cannot grow without bound.
+    const pruneBefore = nowMs - 24 * 60 * 60 * 1000;
+    db.verification_sessions = db.verification_sessions.filter(
+      (s) => new Date(s.expires_at).getTime() > pruneBefore
+    );
 
     // 1. Rate limit: max 3 sessions per wallet per 5 min
     const fiveMinutesAgo = nowMs - 5 * 60 * 1000;
@@ -482,6 +512,43 @@ export async function markSessionUsed(
   });
 }
 
+export type ClaimResult =
+  | { status: 'ok'; session: VerificationSessionRow }
+  | { status: 'not_found' | 'used' | 'expired' };
+
+/**
+ * Atomically claims a verification session (check + mark used under one lock) so a double-tap or
+ * Telegram retry cannot redeem it twice. Call releaseVerificationSession() if the follow-up work fails.
+ */
+export async function claimVerificationSession(
+  sessionId: string,
+  telegramUserId: number | null
+): Promise<ClaimResult> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const session = db.verification_sessions.find((s) => s.session_id === sessionId);
+    if (!session) return { status: 'not_found' as const };
+    if (session.used_at) return { status: 'used' as const };
+    if (new Date(session.expires_at).getTime() <= Date.now()) return { status: 'expired' as const };
+    session.used_at = new Date().toISOString();
+    session.telegram_user_id = telegramUserId;
+    await saveDb(db);
+    return { status: 'ok' as const, session: { ...session } };
+  });
+}
+
+export async function releaseVerificationSession(sessionId: string): Promise<void> {
+  await withDbLock(async () => {
+    const db = await loadDb();
+    const session = db.verification_sessions.find((s) => s.session_id === sessionId);
+    if (session) {
+      session.used_at = null;
+      session.telegram_user_id = null;
+      await saveDb(db);
+    }
+  });
+}
+
 // -------------------------------------------------------------
 // Database Operations: Telegram Members
 // -------------------------------------------------------------
@@ -489,6 +556,23 @@ export async function markSessionUsed(
 export async function getTelegramMember(walletAddress: string): Promise<TelegramMemberRow | null> {
   const db = await loadDb();
   return db.telegram_members.find((m) => m.wallet_address === walletAddress) || null;
+}
+
+export async function listGroupMembers(): Promise<TelegramMemberRow[]> {
+  const db = await loadDb();
+  return db.telegram_members.filter((m) => m.in_group && m.telegram_user_id !== null);
+}
+
+export async function setMemberInGroup(walletAddress: string, inGroup: boolean): Promise<void> {
+  await withDbLock(async () => {
+    const db = await loadDb();
+    const m = db.telegram_members.find((x) => x.wallet_address === walletAddress);
+    if (m) {
+      m.in_group = inGroup;
+      m.last_synced_at = new Date().toISOString();
+      await saveDb(db);
+    }
+  });
 }
 
 export async function upsertTelegramMember(params: {
@@ -544,11 +628,11 @@ export async function resolveTier(walletAddress: string): Promise<'free' | 'memb
     return 'pro';
   }
 
-  // 2. Check on-chain balance for Member tier
+  // 2. Check on-chain balance for Member tier ($20 threshold)
   try {
     const balance = await readGenesisBalanceCached(walletAddress);
     const memberThresholdTokens = Number(member.token_amount) / Math.pow(10, TOKEN_DECIMALS);
-    if (balance >= memberThresholdTokens || balance >= 1_000_000) {
+    if (balance >= memberThresholdTokens) {
       return 'member';
     }
   } catch (err) {

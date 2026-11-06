@@ -1,3 +1,4 @@
+import { GENESIS_MINT } from '@/lib/config';
 import { StakePointPool, RawStakePointPool } from './types';
 
 export function normalizePools(raw: unknown): StakePointPool[] {
@@ -69,7 +70,7 @@ export function normalizePools(raw: unknown): StakePointPool[] {
 }
 
 export async function fetchGenesisPools(): Promise<StakePointPool[]> {
-  const mint = process.env.NEXT_PUBLIC_GENESIS_MINT;
+  const mint = GENESIS_MINT;
   if (!mint) {
     throw new Error('GENESIS mint not configured');
   }

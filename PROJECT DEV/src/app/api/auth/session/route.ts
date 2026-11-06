@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import {
   SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SEC,
   getAuthSession,
   signSession,
   verifySolanaSignature,
   MAX_TIMESTAMP_DRIFT_MS,
 } from '@/server/auth';
 import { resolveTier } from '@/server/db';
+import { KV_CONFIGURED, kvLock } from '@/server/kv';
+import { clientIp, rateLimit } from '@/server/ratelimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +49,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Signature expired' }, { status: 400 });
   }
 
+  const limit = await rateLimit(`session:${clientIp(req)}`, 20, 60);
+  if (!limit.ok) {
+    return NextResponse.json({ ok: false, error: 'Too many requests' }, { status: 429 });
+  }
+
   const msg = ['TrenchLabs Access', req.method, new URL(req.url).pathname, ts].join('|');
   const fallbackMsg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
   const valid = verifySolanaSignature(wallet, sig, msg) || verifySolanaSignature(wallet, sig, fallbackMsg);
@@ -53,7 +62,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid signature' }, { status: 401 });
   }
 
-  const token = signSession(wallet);
+  // A signature may mint a session cookie only once (shared lock across instances)
+  if (KV_CONFIGURED) {
+    const replayId = crypto.createHash('sha256').update(`session:${sig}`).digest('hex');
+    const first = await kvLock(`session-replay:${replayId}`, '1', Math.ceil(MAX_TIMESTAMP_DRIFT_MS / 1000));
+    if (!first) {
+      return NextResponse.json({ ok: false, error: 'Signature already used' }, { status: 401 });
+    }
+  }
+
+  let token: string;
+  try {
+    token = signSession(wallet);
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Sessions are not configured' }, { status: 503 });
+  }
   const tier = await resolveTier(wallet);
 
   const res = NextResponse.json({
@@ -69,7 +92,7 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 7 * 24 * 3600,
+    maxAge: SESSION_MAX_AGE_SEC,
   });
 
   return res;

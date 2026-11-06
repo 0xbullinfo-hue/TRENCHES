@@ -7,7 +7,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const BOT_USERNAME = process.env.BOT_USERNAME || 'Trenchlabs_bot';
+const BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME || process.env.BOT_USERNAME || 'Trenchlabs_bot').replace(/^@/, '');
 
 export async function POST(req: NextRequest) {
   const session = await getAuthSession(req);

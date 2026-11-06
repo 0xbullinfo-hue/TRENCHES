@@ -8,10 +8,22 @@ const ED25519_SPKI_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 export const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
 
 export const SESSION_COOKIE_NAME = 'trench_session';
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  process.env.TELEGRAM_WEBHOOK_SECRET ||
-  'trenchlabs-session-secret-key-32ch';
+export const SESSION_MAX_AGE_SEC = 24 * 3600; // 24 hours
+const DEV_ONLY_SESSION_SECRET = 'dev-only-session-secret-do-not-use-in-production';
+
+/**
+ * Session HMAC secret. Production REQUIRES a dedicated SESSION_SECRET (>= 32 chars); there is no
+ * fallback to any other secret. Resolved lazily so `next build` does not need it.
+ */
+function getSessionSecret(): string | null {
+  const s = process.env.SESSION_SECRET;
+  if (s && s.length >= 32) return s;
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[TrenchLabs Auth] SESSION_SECRET is missing or shorter than 32 chars; sessions are disabled.');
+    return null;
+  }
+  return DEV_ONLY_SESSION_SECRET;
+}
 
 export interface AdminAuthResult {
   authorized: boolean;
@@ -29,10 +41,12 @@ export interface AuthSession {
   tier: 'free' | 'member' | 'pro';
 }
 
-export function signSession(wallet: string, maxAgeSec = 7 * 24 * 3600): string {
+export function signSession(wallet: string, maxAgeSec = SESSION_MAX_AGE_SEC): string {
+  const secret = getSessionSecret();
+  if (!secret) throw new Error('SESSION_SECRET is not configured');
   const exp = Math.floor(Date.now() / 1000) + maxAgeSec;
   const payload = `${wallet}|${exp}`;
-  const hmac = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
   return `${payload}.${hmac}`;
 }
 
@@ -42,8 +56,14 @@ export function verifySessionToken(token: string): { wallet: string } | null {
   if (lastDot === -1) return null;
   const payload = token.slice(0, lastDot);
   const sig = token.slice(lastDot + 1);
-  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
-  if (sig !== expected) return null;
+
+  const secret = getSessionSecret();
+  if (!secret) return null; // fail closed
+
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
 
   const [wallet, expStr] = payload.split('|');
   const exp = Number(expStr);
@@ -58,8 +78,17 @@ export function parseCookieHeader(cookieHeader?: string | null): Record<string, 
   if (!cookieHeader) return out;
   const parts = cookieHeader.split(';');
   for (const part of parts) {
-    const [k, v] = part.trim().split('=');
-    if (k && v) out[k] = decodeURIComponent(v);
+    const trimmed = part.trim();
+    const idx = trimmed.indexOf('=');
+    if (idx <= 0) continue;
+    const k = trimmed.slice(0, idx);
+    const v = trimmed.slice(idx + 1);
+    if (!v) continue;
+    try {
+      out[k] = decodeURIComponent(v);
+    } catch {
+      out[k] = v;
+    }
   }
   return out;
 }
