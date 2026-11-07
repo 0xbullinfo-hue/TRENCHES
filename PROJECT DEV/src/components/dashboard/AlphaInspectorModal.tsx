@@ -16,6 +16,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  Flame,
   Lock,
   Pin,
   ShieldCheck,
@@ -61,7 +62,9 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     setDemoPreset,
     demoEnabled,
     togglePinCall,
+    toggleMaxAlpha,
     toggleTpHit,
+    setCallOutcome,
     deleteAlphaCall,
   } = useGenesisBalance();
   const [copiedCa, setCopiedCa] = useState(false);
@@ -112,16 +115,36 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
       aria-labelledby="modal-token-name"
     >
       <div
-        className="w-full max-w-2xl rounded bg-surface border border-line overflow-hidden shadow-none"
+        className={`w-full max-w-2xl rounded bg-surface overflow-hidden transition-all ${
+          token.isMaxAlpha
+            ? 'border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.35)] ring-1 ring-orange-500/50'
+            : 'border border-line shadow-none'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
         <div className="px-5 py-3.5 bg-surface-card border-b border-line flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 font-sans text-xs font-bold">
+            {token.isMaxAlpha && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-orange-500 text-black font-extrabold uppercase shadow-sm">
+                <Flame className="w-3 h-3 fill-black" />
+                <span>MAX ALPHA</span>
+              </span>
+            )}
             {token.pinned && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
                 <Pin className="w-3 h-3" />
                 <span>PINNED PRIORITY CALL</span>
+              </span>
+            )}
+            {token.outcome === 'PROFIT' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
+                <span>ACHIEVED (IN PROFIT) ✓</span>
+              </span>
+            )}
+            {token.outcome === 'LOSS' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-danger text-white font-extrabold uppercase">
+                <span>AT LOSS ✕</span>
               </span>
             )}
             {token.locked ? (
@@ -288,11 +311,27 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
           {/* Admin Quick Controls Inside Inspector */}
           {isAdmin && (
-            <div className="p-3 rounded-lg bg-surface-card border border-pump flex flex-wrap items-center justify-between gap-2 font-sans text-xs">
+            <div className="p-3.5 rounded-lg bg-surface-card border border-pump flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
               <div className="flex items-center gap-2 text-pump font-bold">
                 <span>ADMIN CONTROLS ({ADMIN_WALLET_SHORT})</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Max Alpha Toggle */}
+                <button
+                  type="button"
+                  onClick={() => toggleMaxAlpha(token.id, !token.isMaxAlpha)}
+                  className={`px-3 py-1.5 rounded border font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    token.isMaxAlpha
+                      ? 'bg-orange-500 text-black border-orange-500 shadow-sm'
+                      : 'bg-surface text-white border-line hover:border-orange-400 hover:text-orange-400'
+                  }`}
+                  title="Toggle Max Alpha (Orange highlight)"
+                >
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>{token.isMaxAlpha ? 'Max Alpha Active' : 'Mark as Max Alpha'}</span>
+                </button>
+
+                {/* Priority Pin Toggle */}
                 <button
                   type="button"
                   onClick={() => togglePinCall(token.id, !token.pinned)}
@@ -303,8 +342,50 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   }`}
                 >
                   <Pin className="w-3.5 h-3.5" />
-                  <span>{token.pinned ? 'Unpin Priority' : 'Pin as Priority'}</span>
+                  <span>{token.pinned ? 'Unpin Priority' : 'Pin Priority'}</span>
                 </button>
+
+                {/* Outcome Selector */}
+                <div className="flex items-center gap-1 sm:border-l sm:border-line sm:pl-2">
+                  <button
+                    type="button"
+                    onClick={() => setCallOutcome(token.id, 'PROFIT')}
+                    className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
+                      token.outcome === 'PROFIT'
+                        ? 'bg-pump text-canvas border-pump'
+                        : 'bg-surface text-muted hover:text-white border-line hover:border-pump'
+                    }`}
+                    title="Mark as Achieved (In Profit)"
+                  >
+                    ✓ Achieved (Profit)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCallOutcome(token.id, 'LOSS')}
+                    className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
+                      token.outcome === 'LOSS'
+                        ? 'bg-danger text-white border-danger'
+                        : 'bg-surface text-muted hover:text-white border-line hover:border-danger'
+                    }`}
+                    title="Mark as At Loss"
+                  >
+                    ✕ At Loss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCallOutcome(token.id, 'PENDING')}
+                    className={`px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                      !token.outcome || token.outcome === 'PENDING'
+                        ? 'bg-surface border-line text-white font-bold'
+                        : 'bg-surface text-dim border-line hover:text-white'
+                    }`}
+                    title="Reset outcome to Open"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Delete Call */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -314,10 +395,10 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     await deleteAlphaCall(token.id);
                     onClose();
                   }}
-                  className="px-3 py-1.5 rounded bg-surface hover:bg-danger/20 border border-line hover:border-danger text-danger font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded bg-surface hover:bg-danger/20 border border-line hover:border-danger text-danger font-bold inline-flex items-center gap-1 cursor-pointer"
+                  title="Delete call"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Call</span>
                 </button>
               </div>
             </div>

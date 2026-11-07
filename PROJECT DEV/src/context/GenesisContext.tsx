@@ -69,6 +69,7 @@ export interface CreateCallPayload {
   stopLoss: string;
   takeProfitInput: string;
   pinned: boolean;
+  isMaxAlpha?: boolean;
   summary?: string;
   serialTag?: string;
 }
@@ -103,6 +104,7 @@ interface GenesisContextValue {
 
   createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
+  toggleMaxAlpha: (id: string, isMaxAlpha: boolean) => Promise<boolean>;
   toggleTpHit: (id: string, tpIndex: number) => Promise<boolean>;
   setCallOutcome: (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING') => Promise<boolean>;
   updateCallMarketCap: (id: string, marketCap: string) => Promise<boolean>;
@@ -889,6 +891,30 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     [getAdminHeaders]
   );
 
+  const toggleMaxAlpha = useCallback(
+    async (id: string, nextMaxAlpha: boolean): Promise<boolean> => {
+      try {
+        const bodyStr = JSON.stringify({ id, isMaxAlpha: nextMaxAlpha });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers,
+          body: bodyStr,
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[TrenchLabs] toggleMaxAlpha error:', err);
+        return false;
+      }
+    },
+    [getAdminHeaders]
+  );
+
   const toggleTpHit = useCallback(
     async (id: string, tpIndex: number): Promise<boolean> => {
       try {
@@ -1065,6 +1091,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     requestUnlockSignature,
     createAlphaCall,
     togglePinCall,
+    toggleMaxAlpha,
     toggleTpHit,
     setCallOutcome,
     updateCallMarketCap,

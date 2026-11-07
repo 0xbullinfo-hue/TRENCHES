@@ -63,8 +63,10 @@ export interface AlphaRecord {
   spotlightRank?: 1 | 2 | 3 | 4 | 5;
   /** Serial call tag, e.g. EXP01, EXP02, EXP03 */
   serialTag?: string;
-  /** Admin outcome classification: PROFIT made, LOSS made, or PENDING */
+  /** Admin outcome classification: PROFIT made (achieved), LOSS made, or PENDING */
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
+  /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
+  isMaxAlpha?: boolean;
   sparkline: number[];
   art: AlphaArtTheme;
 }
@@ -1000,7 +1002,8 @@ export async function alphasForTier(
       deployedVia: r.deployedVia,
       spotlightRank: r.spotlightRank,
       serialTag,
-      outcome: r.outcome || (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
+      outcome: r.outcome ?? (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
+      isMaxAlpha: Boolean(r.isMaxAlpha),
       sparkline: r.sparkline,
       art: r.art,
     };

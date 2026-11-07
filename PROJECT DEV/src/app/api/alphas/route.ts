@@ -247,6 +247,7 @@ export async function POST(req: NextRequest) {
     const takeProfits = buildTakeProfits(entryMcUsd, currentMcUsd, multipliers);
 
     const pinned = Boolean(payload.pinned);
+    const isMaxAlpha = Boolean(payload.isMaxAlpha);
     const quoteMap: Record<Chain, QuoteToken> = {
       SOL: 'SOL',
       BSC: 'BNB',
@@ -310,6 +311,7 @@ export async function POST(req: NextRequest) {
       takeProfits,
       pinned,
       pinnedAt: pinned ? new Date().toISOString() : null,
+      isMaxAlpha,
       entryMarketCap: formatCompactUsd(entryMcUsd),
       entryMarketCapUsd: entryMcUsd,
       minTier: 'LAB_MEMBER',
@@ -427,6 +429,10 @@ export async function PATCH(req: NextRequest) {
             i === tpIdx ? { ...tp, hit: !tp.hit } : tp
           );
         }
+      }
+
+      if (typeof payload.isMaxAlpha === 'boolean') {
+        target.isMaxAlpha = payload.isMaxAlpha;
       }
 
       if (

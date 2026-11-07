@@ -45,7 +45,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
-type FilterTab = 'ALL' | 'PINNED' | 'MOVERS' | 'NEW' | 'WATCHLIST';
+type FilterTab = 'ALL' | 'PINNED' | 'MAX_ALPHA' | 'MOVERS' | 'NEW' | 'WATCHLIST';
 type SortKey = 'PRIORITY' | 'MCAP' | 'CHANGE' | 'NEWEST';
 type ViewMode = 'GRID' | 'TABLE';
 
@@ -69,6 +69,7 @@ export const IncubatorHub: React.FC = () => {
     setBoundEvmAddress,
     createAlphaCall,
     togglePinCall,
+    toggleMaxAlpha,
     toggleTpHit,
     deleteAlphaCall,
     setCallOutcome,
@@ -100,6 +101,7 @@ export const IncubatorHub: React.FC = () => {
   const [formStopLoss, setFormStopLoss] = useState('-25% SL');
   const [formTakeProfits, setFormTakeProfits] = useState('2x, 5x, 10x');
   const [formPinned, setFormPinned] = useState(true);
+  const [formMaxAlpha, setFormMaxAlpha] = useState(false);
   const [formSummary, setFormSummary] = useState('');
   const [formSerialTag, setFormSerialTag] = useState('');
   const [fetchingDex, setFetchingDex] = useState(false);
@@ -226,6 +228,7 @@ export const IncubatorHub: React.FC = () => {
       stopLoss: formStopLoss.trim() || '-25% SL',
       takeProfitInput: formTakeProfits.trim() || '2x, 5x, 10x',
       pinned: formPinned,
+      isMaxAlpha: formMaxAlpha,
       summary: formSummary.trim(),
       serialTag: formSerialTag.trim() || nextSerialTag,
     });
@@ -234,13 +237,14 @@ export const IncubatorHub: React.FC = () => {
       showToast(
         `Posted ${formTicker.toUpperCase()} (${formChain}) [${
           formSerialTag.trim() || nextSerialTag
-        }]${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
+        }]${formMaxAlpha ? ' [MAX ALPHA 🔥]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
       );
       setFormCa('');
       setFormName('');
       setFormTicker('');
       setFormSummary('');
       setFormSerialTag('');
+      setFormMaxAlpha(false);
     } else {
       showToast('Failed to post call — ensure Admin Wallet is active.');
     }
@@ -293,6 +297,8 @@ export const IncubatorHub: React.FC = () => {
         switch (activeFilter) {
           case 'PINNED':
             return item.pinned;
+          case 'MAX_ALPHA':
+            return Boolean(item.isMaxAlpha);
           case 'MOVERS':
             return item.change24hPct >= 200;
           case 'NEW':
@@ -341,17 +347,30 @@ export const IncubatorHub: React.FC = () => {
             setInspectedToken(coin);
           }
         }}
-        className={`group relative rounded-xl bg-surface flex flex-col justify-between cursor-pointer transition-colors p-4 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
-          isPinned ? 'border-2 border-pump' : 'border border-line hover:border-pump'
+        className={`group relative rounded-xl bg-surface flex flex-col justify-between cursor-pointer transition-all duration-200 p-4 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+          coin.isMaxAlpha
+            ? 'border-2 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.35)] ring-1 ring-orange-500/50 hover:border-orange-400'
+            : isPinned
+            ? 'border-2 border-pump hover:border-pump-hover'
+            : 'border border-line hover:border-pump'
         }`}
       >
         <div>
-          {/* Top Row: Serial Tag (EXP01) + Priority Pin + Chain Badge + Age + Star & Admin buttons */}
+          {/* Top Row: Serial Tag (EXP01) + Max Alpha + Priority Pin + Chain Badge + Outcome + Age + Star & Admin buttons */}
           <div className="flex items-center justify-between gap-2 pb-3 border-b border-line">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="px-2 py-0.5 rounded bg-surface-card border border-pump font-mono text-xs font-black text-pump">
+              <span className={`px-2 py-0.5 rounded font-mono text-xs font-black ${
+                coin.isMaxAlpha ? 'bg-orange-500/10 border border-orange-500 text-orange-400' : 'bg-surface-card border border-pump text-pump'
+              }`}>
                 {serial}
               </span>
+
+              {coin.isMaxAlpha && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500 text-black font-mono text-[10px] font-black uppercase tracking-wider shadow-sm">
+                  <Flame className="w-2.5 h-2.5 fill-black" />
+                  <span>MAX ALPHA</span>
+                </span>
+              )}
 
               {isPinned && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
@@ -366,12 +385,12 @@ export const IncubatorHub: React.FC = () => {
 
               {coin.outcome === 'PROFIT' && (
                 <span className="px-2 py-0.5 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
-                  PROFIT MADE ✓
+                  ACHIEVED (IN PROFIT) ✓
                 </span>
               )}
               {coin.outcome === 'LOSS' && (
                 <span className="px-2 py-0.5 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
-                  LOSE MADE ✕
+                  AT LOSS ✕
                 </span>
               )}
             </div>
@@ -380,22 +399,40 @@ export const IncubatorHub: React.FC = () => {
               <span className="font-mono text-xs text-muted">{coin.age}</span>
 
               {isAdmin && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    togglePinCall(coin.id, !coin.pinned);
-                    showToast(`${coin.pinned ? 'Unpinned' : 'Pinned'} ${coin.ticker}`);
-                  }}
-                  className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
-                    coin.pinned
-                      ? 'bg-pump text-canvas border-pump font-black'
-                      : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-white'
-                  }`}
-                  title={coin.pinned ? 'Unpin Priority Call' : 'Pin Call as Priority'}
-                >
-                  {coin.pinned ? 'PINNED' : 'PIN'}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMaxAlpha(coin.id, !coin.isMaxAlpha);
+                      showToast(`${coin.isMaxAlpha ? 'Removed Max Alpha from' : 'Marked as Max Alpha:'} ${coin.ticker}`);
+                    }}
+                    className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
+                      coin.isMaxAlpha
+                        ? 'bg-orange-500 text-black border-orange-500 font-black shadow-sm'
+                        : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-orange-400'
+                    }`}
+                    title={coin.isMaxAlpha ? 'Remove Max Alpha badge' : 'Mark as Max Alpha (Orange highlight)'}
+                  >
+                    {coin.isMaxAlpha ? '⚡ MAX' : 'MAX'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePinCall(coin.id, !coin.pinned);
+                      showToast(`${coin.pinned ? 'Unpinned' : 'Pinned'} ${coin.ticker}`);
+                    }}
+                    className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
+                      coin.pinned
+                        ? 'bg-pump text-canvas border-pump font-black'
+                        : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-white'
+                    }`}
+                    title={coin.pinned ? 'Unpin Priority Call' : 'Pin Call as Priority'}
+                  >
+                    {coin.pinned ? 'PINNED' : 'PIN'}
+                  </button>
+                </>
               )}
 
               {isAdmin && (
@@ -543,32 +580,32 @@ export const IncubatorHub: React.FC = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setCallOutcome(coin.id, 'PROFIT');
-                  showToast(`Marked ${coin.ticker} as Profit Made ✓`);
+                  showToast(`Marked ${coin.ticker} as Achieved (In Profit) ✓`);
                 }}
                 className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
                   coin.outcome === 'PROFIT'
                     ? 'bg-pump text-canvas border-pump'
                     : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
                 }`}
-                title="Mark trade call as Profit Made"
+                title="Mark trade call as Achieved (In Profit)"
               >
-                ✓ PROFIT
+                ✓ ACHIEVED (PROFIT)
               </button>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setCallOutcome(coin.id, 'LOSS');
-                  showToast(`Marked ${coin.ticker} as Lose Made ✕`);
+                  showToast(`Marked ${coin.ticker} as At Loss ✕`);
                 }}
                 className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
                   coin.outcome === 'LOSS'
                     ? 'bg-danger text-white border-danger'
                     : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
                 }`}
-                title="Mark trade call as Lose Made"
+                title="Mark trade call as At Loss"
               >
-                ✕ LOSE
+                ✕ AT LOSS
               </button>
               <button
                 type="button"
@@ -831,7 +868,7 @@ export const IncubatorHub: React.FC = () => {
               {/* 3. Total Profit Calls */}
               <div className="p-4 rounded-xl bg-surface-card border border-line">
                 <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
-                  TOTAL PROFIT CALLS
+                  ACHIEVED (IN PROFIT)
                 </div>
                 <div className="font-sans text-2xl sm:text-3xl font-black text-pump mt-1 tnum">
                   {totalProfitCalls}
@@ -844,7 +881,7 @@ export const IncubatorHub: React.FC = () => {
               {/* 4. Total Lose Calls */}
               <div className="p-4 rounded-xl bg-surface-card border border-line">
                 <div className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
-                  TOTAL LOSE CALLS
+                  CALLS AT LOSS
                 </div>
                 <div className="font-sans text-2xl sm:text-3xl font-black text-danger mt-1 tnum">
                   {totalLoseCalls}
@@ -1018,6 +1055,17 @@ export const IncubatorHub: React.FC = () => {
                     />
                   </div>
 
+                  <label className="inline-flex items-center gap-1.5 font-sans text-xs font-bold text-orange-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formMaxAlpha}
+                      onChange={(e) => setFormMaxAlpha(e.target.checked)}
+                      className="accent-orange-500 w-4 h-4 cursor-pointer"
+                    />
+                    <Flame className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Max Alpha (Orange Outline)</span>
+                  </label>
+
                   <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-white cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1026,7 +1074,7 @@ export const IncubatorHub: React.FC = () => {
                       className="accent-[#34D399] w-4 h-4 cursor-pointer"
                     />
                     <Pin className="w-3.5 h-3.5 text-pump" />
-                    <span>Pin as Priority Call</span>
+                    <span>Pin Priority</span>
                   </label>
 
                   <button
@@ -1132,6 +1180,7 @@ export const IncubatorHub: React.FC = () => {
               {(
                 [
                   { id: 'ALL', label: 'All' },
+                  { id: 'MAX_ALPHA', label: '⚡ Max Alpha' },
                   { id: 'PINNED', label: '📌 Pinned' },
                   { id: 'MOVERS', label: '🔥 Movers' },
                   { id: 'NEW', label: '✨ New' },
@@ -1142,9 +1191,13 @@ export const IncubatorHub: React.FC = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveFilter(tab.id)}
-                  className={`px-2.5 py-1 rounded font-bold cursor-pointer ${
+                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
                     activeFilter === tab.id
-                      ? 'bg-pump text-canvas'
+                      ? tab.id === 'MAX_ALPHA'
+                        ? 'bg-orange-500 text-black'
+                        : 'bg-pump text-canvas'
+                      : tab.id === 'MAX_ALPHA'
+                      ? 'text-orange-400 hover:text-orange-300'
                       : 'text-muted hover:text-white'
                   }`}
                 >
@@ -1294,7 +1347,13 @@ export const IncubatorHub: React.FC = () => {
                             quoteToken={token.quoteToken}
                           />
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {token.isMaxAlpha && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500 text-black font-mono text-[10px] font-black uppercase shadow-sm">
+                                  <Flame className="w-2.5 h-2.5 fill-black" />
+                                  <span>MAX</span>
+                                </span>
+                              )}
                               {token.pinned && (
                                 <Pin className="w-3.5 h-3.5 text-pump shrink-0" />
                               )}
@@ -1302,6 +1361,16 @@ export const IncubatorHub: React.FC = () => {
                               <span className="font-mono text-xs text-pump font-bold">
                                 {token.ticker}
                               </span>
+                              {token.outcome === 'PROFIT' && (
+                                <span className="px-1.5 py-0.2 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
+                                  ACHIEVED ✓
+                                </span>
+                              )}
+                              {token.outcome === 'LOSS' && (
+                                <span className="px-1.5 py-0.2 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
+                                  LOSS ✕
+                                </span>
+                              )}
                             </div>
                             <div className="font-mono text-xs text-muted flex items-center gap-2 mt-0.5">
                               <span className="px-1.5 py-0.2 rounded bg-surface-card border border-line text-white font-bold">
@@ -1380,21 +1449,39 @@ export const IncubatorHub: React.FC = () => {
                       <td className="py-3.5 px-4 text-right font-sans text-xs">
                         <div className="inline-flex items-center gap-1.5">
                           {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePinCall(token.id, !token.pinned);
-                              }}
-                              className={`p-1.5 rounded border cursor-pointer ${
-                                token.pinned
-                                  ? 'bg-pump text-canvas border-pump'
-                                  : 'bg-surface-card text-muted border-line'
-                              }`}
-                              title="Toggle Priority Pin"
-                            >
-                              <Pin className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleMaxAlpha(token.id, !token.isMaxAlpha);
+                                  showToast(`${token.isMaxAlpha ? 'Removed Max Alpha from' : 'Marked as Max Alpha:'} ${token.ticker}`);
+                                }}
+                                className={`p-1.5 rounded border cursor-pointer transition-colors ${
+                                  token.isMaxAlpha
+                                    ? 'bg-orange-500 text-black border-orange-500 shadow-sm'
+                                    : 'bg-surface-card text-muted hover:text-orange-400 border-line'
+                                }`}
+                                title="Toggle Max Alpha"
+                              >
+                                <Flame className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePinCall(token.id, !token.pinned);
+                                }}
+                                className={`p-1.5 rounded border cursor-pointer ${
+                                  token.pinned
+                                    ? 'bg-pump text-canvas border-pump'
+                                    : 'bg-surface-card text-muted border-line'
+                                }`}
+                                title="Toggle Priority Pin"
+                              >
+                                <Pin className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                           <a
                             href={marketUrl}
