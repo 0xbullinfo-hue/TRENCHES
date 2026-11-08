@@ -13,7 +13,7 @@ jobs:
       - name: Trigger GET /api/telegram/monitor
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL || 'https://trenchlabshq.xyz' }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.trenchlabshq.xyz' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repository secret is not configured."
@@ -31,3 +31,4 @@ jobs:
             echo "::error::Monitor endpoint returned HTTP $HTTP_STATUS"
             exit 1
           fi
+

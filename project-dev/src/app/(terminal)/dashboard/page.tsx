@@ -4,6 +4,7 @@ import React from 'react';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { IncubatorHub } from '@/components/dashboard/IncubatorHub';
 import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
+import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
 import { useGenesisBalance } from '@/context/GenesisContext';
 
 export default function DashboardPage() {
@@ -13,9 +14,12 @@ export default function DashboardPage() {
     <section id="terminal" className="flex-1 py-6 bg-canvas">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {!connected ? (
-          <div className="py-8">
-            {/* Wallet Authentication Required: Zero cards shown until visitor connects wallet */}
+          <div className="py-8 space-y-6">
+            {/* Wallet Authentication Required: Zero alpha/raid cards shown until visitor connects wallet */}
             <LockedTerminal />
+            <div className="max-w-2xl mx-auto">
+              <StakePointCardClient />
+            </div>
           </div>
         ) : (
           /* Incubator Terminal:

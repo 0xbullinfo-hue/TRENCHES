@@ -470,10 +470,15 @@ export interface MarketDataDeps {
   lockPollMs: number;
 }
 
+export interface MarketRequestOptions {
+  /** Optional per-request timeout bound (ms), clamped to the remaining execution budget. */
+  timeoutMs?: number;
+}
+
 export interface MarketDataService {
-  getMarketData(token: MarketToken): Promise<NormalizedMarketData>;
-  fetchCoinStats(token: MarketToken): Promise<ProviderData>;
-  fetchDexScreener(token: MarketToken): Promise<ProviderData>;
+  getMarketData(token: MarketToken, options?: MarketRequestOptions): Promise<NormalizedMarketData>;
+  fetchCoinStats(token: MarketToken, timeoutMsOverride?: number): Promise<ProviderData>;
+  fetchDexScreener(token: MarketToken, timeoutMsOverride?: number): Promise<ProviderData>;
   getDiagnostics(): MarketDiagnostics;
 }
 
@@ -499,9 +504,17 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
 
   const config = () => getMarketProviderConfig(deps.env);
 
+  const resolveTimeoutMs = (override?: number): number => {
+    const base = config().timeoutMs;
+    if (typeof override === 'number' && Number.isFinite(override)) {
+      return Math.max(50, Math.min(base, Math.floor(override)));
+    }
+    return base;
+  };
+
   // ---- adapters ----------------------------------------------------------------------------
 
-  async function fetchCoinStats(tokenIn: MarketToken): Promise<ProviderData> {
+  async function fetchCoinStats(tokenIn: MarketToken, timeoutMsOverride?: number): Promise<ProviderData> {
     const apiKey = getCoinStatsApiKey(deps.env);
     if (!apiKey) throw new ProviderError('COINSTATS', 'not_configured');
     const token = normalizeToken(tokenIn);
@@ -516,7 +529,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
       'COINSTATS',
       url,
       { 'X-API-KEY': apiKey, Accept: 'application/json' },
-      config().timeoutMs
+      resolveTimeoutMs(timeoutMsOverride)
     );
 
     if (!isRecord(json) || !Array.isArray(json.result)) throw new ProviderError('COINSTATS', 'malformed');
@@ -556,7 +569,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
     };
   }
 
-  async function fetchDexScreener(tokenIn: MarketToken): Promise<ProviderData> {
+  async function fetchDexScreener(tokenIn: MarketToken, timeoutMsOverride?: number): Promise<ProviderData> {
     const token = normalizeToken(tokenIn);
     const slug = token ? CHAIN_TO_DEX_SLUG[token.chain] : null;
     if (!token || !slug) throw new ProviderError('DEXSCREENER', 'unsupported');
@@ -566,7 +579,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
       'DEXSCREENER',
       `${DEXSCREENER_BASE}/${encodeURIComponent(token.contractAddress)}`,
       { Accept: 'application/json' },
-      config().timeoutMs
+      resolveTimeoutMs(timeoutMsOverride)
     );
     if (!isRecord(json)) throw new ProviderError('DEXSCREENER', 'malformed');
     if (json.pairs === null || (Array.isArray(json.pairs) && json.pairs.length === 0)) {
@@ -732,8 +745,17 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
 
   // ---- orchestration -----------------------------------------------------------------------
 
-  async function refresh(token: MarketToken, stale: CacheRecord | null): Promise<NormalizedMarketData> {
+  async function refresh(
+    token: MarketToken,
+    stale: CacheRecord | null,
+    timeoutMsOverride?: number
+  ): Promise<NormalizedMarketData> {
     const cfg = config();
+    const refreshStartedAt = deps.now();
+    const remainingBudgetMs = (): number | undefined => {
+      if (typeof timeoutMsOverride !== 'number' || !Number.isFinite(timeoutMsOverride)) return undefined;
+      return Math.max(0, timeoutMsOverride - (deps.now() - refreshStartedAt));
+    };
     const lockKey = `md:lock:${token.chain}:${token.contractAddress}`;
     const lockToken = crypto.randomUUID();
     let lockHeld = false;
@@ -741,9 +763,14 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
     // Cross-instance single flight: if another instance is already refreshing this token, wait briefly
     // for its result instead of hitting the providers again. Redis problems fail OPEN.
     try {
-      lockHeld = await deps.store.lock(lockKey, lockToken, Math.ceil((cfg.timeoutMs * 2) / 1000) + 2);
+      const effectiveTimeoutMs = resolveTimeoutMs(timeoutMsOverride);
+      lockHeld = await deps.store.lock(lockKey, lockToken, Math.ceil((effectiveTimeoutMs * 2) / 1000) + 2);
       if (!lockHeld) {
-        const deadline = deps.now() + deps.lockWaitMs;
+        const maxWait =
+          typeof timeoutMsOverride === 'number' && Number.isFinite(timeoutMsOverride)
+            ? Math.min(deps.lockWaitMs, Math.max(0, Math.floor(timeoutMsOverride / 2)))
+            : deps.lockWaitMs;
+        const deadline = deps.now() + maxWait;
         while (deps.now() < deadline) {
           await deps.sleep(deps.lockPollMs);
           const rec = await readCache(token);
@@ -767,11 +794,12 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
 
       let coinstatsAttempted = false;
       if (cfg.coinstatsEnabled) {
+        const rem = remainingBudgetMs();
         if (health.COINSTATS.backoffUntilMs > deps.now()) {
           health.COINSTATS.skippedBackoff++;
-        } else {
+        } else if (rem === undefined || rem >= 50) {
           coinstatsAttempted = true;
-          const data = await runProvider('COINSTATS', token, fetchCoinStats);
+          const data = await runProvider('COINSTATS', token, (t) => fetchCoinStats(t, rem));
           if (data) {
             await writeCache(token, data, 'COINSTATS');
             result = fromProvider(data, 'COINSTATS');
@@ -780,16 +808,19 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
       }
 
       if (!result && cfg.dexscreenerEnabled) {
-        if (cfg.coinstatsEnabled) {
-          counters.dexFallbacks++;
-          deps.log.info(
-            `[TrenchLabs MarketData] DexScreener fallback activated (${coinstatsAttempted ? 'CoinStats failed' : 'CoinStats in backoff'}) chain=${token.chain}`
-          );
-        }
-        const data = await runProvider('DEXSCREENER', token, fetchDexScreener);
-        if (data) {
-          await writeCache(token, data, 'DEXSCREENER');
-          result = fromProvider(data, 'DEXSCREENER');
+        const rem = remainingBudgetMs();
+        if (rem === undefined || rem >= 50) {
+          if (cfg.coinstatsEnabled) {
+            counters.dexFallbacks++;
+            deps.log.info(
+              `[TrenchLabs MarketData] DexScreener fallback activated (${coinstatsAttempted ? 'CoinStats failed' : 'CoinStats in backoff'}) chain=${token.chain}`
+            );
+          }
+          const data = await runProvider('DEXSCREENER', token, (t) => fetchDexScreener(t, rem));
+          if (data) {
+            await writeCache(token, data, 'DEXSCREENER');
+            result = fromProvider(data, 'DEXSCREENER');
+          }
         }
       }
 
@@ -814,7 +845,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
     }
   }
 
-  async function getMarketData(tokenIn: MarketToken): Promise<NormalizedMarketData> {
+  async function getMarketData(tokenIn: MarketToken, options?: MarketRequestOptions): Promise<NormalizedMarketData> {
     const token = normalizeToken(tokenIn);
     if (!token) {
       return unavailable({
@@ -838,7 +869,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
     const key = marketCacheKey(token);
     let pending = inflight.get(key);
     if (!pending) {
-      pending = refresh(token, cached).finally(() => inflight.delete(key));
+      pending = refresh(token, cached, options?.timeoutMs).finally(() => inflight.delete(key));
       inflight.set(key, pending);
     }
     return pending;
@@ -891,8 +922,8 @@ function service(): MarketDataService {
 }
 
 /** Central entry point: validated, cached, provider-prioritised market data for one token. */
-export function getMarketData(token: MarketToken): Promise<NormalizedMarketData> {
-  return service().getMarketData(token);
+export function getMarketData(token: MarketToken, options?: MarketRequestOptions): Promise<NormalizedMarketData> {
+  return service().getMarketData(token, options);
 }
 
 /** Provider health for the protected admin endpoint. Contains no secrets. */

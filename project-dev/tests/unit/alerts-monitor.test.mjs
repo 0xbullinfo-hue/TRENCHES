@@ -331,7 +331,7 @@ test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never trigge
   assert.equal(rThrown.skippedByReason.lookup_error, 1);
   assert.equal(notified, 0);
 
-  // Case C: saveRegistry fails -> notifications are suppressed and in-memory state is rolled back
+  // Case C: saveRegistry fails -> notifications are suppressed, in-memory state is rolled back, and operationalFailure is reported
   const inMemoryRegistry = [makeCall()];
   const rSaveFail = await runAutomatedAlertsMonitor({
     now: () => NOW,
@@ -343,6 +343,9 @@ test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never trigge
     notifyTp: async () => ({ sent: ++notified, failed: 0, total: 1 }),
     notifySl: async () => ({ sent: ++notified, failed: 0, total: 1 }),
   });
+  assert.equal(rSaveFail.ok, false, 'Failed registry persistence must report ok: false');
+  assert.equal(rSaveFail.operationalFailure, true);
+  assert.ok(rSaveFail.failureReason?.includes('kv write error'));
   assert.equal(rSaveFail.tpTriggered, 0);
   assert.equal(rSaveFail.notificationsSent, 0);
   assert.equal(notified, 0);
@@ -352,6 +355,25 @@ test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never trigge
     'Failed persistence must roll back in-memory mutations so state is never corrupted'
   );
   assert.equal(inMemoryRegistry[0].outcome, 'NEUTRAL');
+
+  // Case C2: loadRegistry fails -> operationalFailure is reported
+  const rLoadFail = await runAutomatedAlertsMonitor({
+    now: () => NOW,
+    maxDataAgeMs: 60_000,
+    withLock: async (fn) => fn(),
+    loadRegistry: async () => {
+      throw new Error('Redis read failed');
+    },
+    saveRegistry: async () => ({ success: true }),
+    getMarketData: async () => makeTelemetry({ marketCap: 300_000 }),
+    notifyTp: async () => ({ sent: ++notified, failed: 0, total: 1 }),
+    notifySl: async () => ({ sent: ++notified, failed: 0, total: 1 }),
+  });
+  assert.equal(rLoadFail.ok, false, 'Failed registry load must report ok: false');
+  assert.equal(rLoadFail.operationalFailure, true);
+  assert.ok(rLoadFail.failureReason?.includes('Redis read failed'));
+  assert.equal(rLoadFail.evaluated, 0);
+  assert.equal(notified, 0);
 
   // Case D: Telegram notification failure is recorded in errors without corrupting persisted registry state
   const persistedRegistry = [makeCall()];
@@ -410,6 +432,92 @@ test('Alerts Monitor: concurrent invocations serialized by withRegistryLock neve
   assert.equal(resA.tpTriggered + resB.tpTriggered, 1, 'TP1 must trigger only once across concurrent runs');
   assert.equal(tpEvents.length, 1, 'Only one Telegram notification fan-out may occur');
   assert.equal(stored[0].takeProfits[0].hit, true);
+});
+
+test('Alerts Monitor: enforces remaining execution budget, clamps request timeouts, reserves persistence time, and reports incomplete runs', async () => {
+  let clock = NOW;
+  const registry = [
+    makeCall({ id: 'call-1', ticker: '$ONE', ca: SOL_TOKEN }),
+    makeCall({ id: 'call-2', ticker: '$TWO', ca: SOL_OTHER }),
+    makeCall({ id: 'call-3', ticker: '$THREE', ca: SOL_TOKEN }),
+  ];
+  const observedTimeouts = [];
+  let savedRecords = null;
+  const notifiedTickers = [];
+
+  // Total budget: 10,000ms; reserve 2,000ms for persistence + notify -> 8,000ms lookup window.
+  // Min request budget: 1,000ms.
+  const res = await runAutomatedAlertsMonitor({
+    now: () => clock,
+    budgetMs: 10_000,
+    reserveForPersistAndNotifyMs: 2_000,
+    minRequestBudgetMs: 1_000,
+    maxRequestTimeoutMs: 5_000,
+    maxDataAgeMs: 60_000,
+    withLock: async (fn) => fn(),
+    loadRegistry: async () => registry,
+    saveRegistry: async (records) => {
+      savedRecords = structuredClone(records);
+      return { success: true };
+    },
+    getMarketData: async (token, options) => {
+      observedTimeouts.push(options?.timeoutMs);
+      // First lookup takes 7,500ms, leaving only 500ms in the 8,000ms lookup window (< 1,000ms minRequestBudgetMs)
+      clock += 7_500;
+      return makeTelemetry({
+        contractAddress: token.contractAddress,
+        marketCap: 250_000,
+        fetchedAt: new Date(clock - 1_000).toISOString(),
+      });
+    },
+    notifyTp: async (alpha) => {
+      notifiedTickers.push(alpha.ticker);
+      return { sent: 1, skipped: 0, removed: 0, deferred: 0 };
+    },
+    notifySl: async () => ({ sent: 0, skipped: 0, removed: 0, deferred: 0 }),
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.incomplete, true, 'Must explicitly report incomplete run when lookup budget is exhausted');
+  assert.equal(res.evaluated, 1, 'Must not start market-data requests for call-2 or call-3 when insufficient budget remains');
+  assert.equal(observedTimeouts.length, 1);
+  assert.equal(observedTimeouts[0], 5_000, 'First request timeout is capped at maxRequestTimeoutMs (5,000ms)');
+  assert.equal(res.skippedByReason.time_budget_exceeded, 2, 'Both remaining active calls must be recorded as time_budget_exceeded');
+  assert.equal(res.tpTriggered, 1);
+  assert.equal(res.notificationsSent, 1);
+  assert.deepEqual(notifiedTickers, ['$ONE']);
+  assert.equal(savedRecords[0].takeProfits[0].hit, true, 'Evaluated call state must be persisted using reserved budget');
+  assert.equal(savedRecords[1].takeProfits[0].hit, false, 'Unevaluated calls must remain untouched');
+  assert.equal(savedRecords[2].takeProfits[0].hit, false, 'Unevaluated calls must remain untouched');
+});
+
+test('Alerts Monitor: aborts a hanging market-data request that exceeds remaining execution budget', async () => {
+  const registry = [makeCall({ id: 'call-hang', ticker: '$HANG' })];
+  const res = await runAutomatedAlertsMonitor({
+    now: () => Date.now(),
+    budgetMs: 400,
+    reserveForPersistAndNotifyMs: 100,
+    minRequestBudgetMs: 50,
+    maxRequestTimeoutMs: 5_000,
+    maxDataAgeMs: 60_000,
+    withLock: async (fn) => fn(),
+    loadRegistry: async () => registry,
+    saveRegistry: async () => ({ success: true }),
+    getMarketData: async (_token, options) => {
+      // Verify the timeoutMs was clamped to the remaining lookup window (~300ms) rather than 5,000ms
+      assert.ok(options?.timeoutMs <= 300, `Expected clamped timeout <= 300ms, got ${options?.timeoutMs}`);
+      return new Promise((resolve) => setTimeout(() => resolve(makeTelemetry()), 2_000));
+    },
+    notifyTp: async () => ({ sent: 1, skipped: 0, removed: 0, deferred: 0 }),
+    notifySl: async () => ({ sent: 1, skipped: 0, removed: 0, deferred: 0 }),
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.incomplete, true);
+  assert.equal(res.evaluated, 1);
+  assert.equal(res.tpTriggered, 0);
+  assert.equal(res.skippedByReason.time_budget_exceeded, 1);
+  assert.ok(res.errors.some((e) => e.includes('execution budget limit')));
 });
 
 test('Alerts Monitor Route: GET /api/telegram/monitor enforces CRON_SECRET and Bearer auth', async () => {

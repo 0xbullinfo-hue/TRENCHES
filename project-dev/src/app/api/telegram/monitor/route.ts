@@ -31,11 +31,28 @@ export async function GET(req: NextRequest) {
     const startedAt = Date.now();
 
     const result = await runAutomatedAlertsMonitor();
+    const executedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+
+    if (!result.ok || result.operationalFailure) {
+      return NextResponse.json(
+        {
+          ok: false,
+          incomplete: result.incomplete,
+          error: result.failureReason || 'TP/SL monitoring operational failure',
+          executedAt,
+          durationMs,
+          result,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
-      executedAt: new Date().toISOString(),
-      durationMs: Date.now() - startedAt,
+      incomplete: result.incomplete,
+      executedAt,
+      durationMs,
       result,
     });
   } catch (error) {
