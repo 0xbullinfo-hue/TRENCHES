@@ -54,3 +54,29 @@ test('createTelegramInvite rejects when credentials or group IDs are unconfigure
   if (origPro) process.env.TELEGRAM_PRO_INVITE_URL = origPro;
 });
 
+test('formatCallMessage adheres to Lab Assistant template structure', () => {
+  const msg = tg.formatCallMessage({
+    ticker: 'GENESIS',
+    chain: 'SOL',
+    entryMarketCap: '$1.5M',
+    risk: 2,
+    stopLoss: '-20% SL',
+    riskRewardRatio: '1:4',
+    takeProfits: [{ label: '2x' }, { label: '5x' }],
+    ca: 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump',
+  });
+
+  assert.ok(msg.includes('🚨 <b>NEW CALL</b>'));
+  assert.ok(msg.includes('Ticker - <b>GENESIS</b>'));
+  assert.ok(msg.includes('Chain - <b>SOL</b>'));
+  assert.ok(msg.includes('Entry MC - <b>$1.5M</b>'));
+  assert.ok(msg.includes('Risk- <b>2/5</b>'));
+  assert.ok(msg.includes('SL - <b>-20% SL</b>'));
+  assert.ok(msg.includes('TP - <b>2x · 5x</b>'));
+  assert.ok(msg.includes('CA\n<code>EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump</code>'));
+  assert.ok(msg.includes('Not financial advice.'));
+  assert.ok(msg.includes('DYOR.'));
+  assert.ok(msg.includes('Signed\n<b>Lab Assistant</b>'));
+  assert.equal(tg.MEMBER_DELAY_MS, 5 * 60 * 1000, 'Member tier delay must be exactly 5 minutes');
+});
+

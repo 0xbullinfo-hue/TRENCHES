@@ -21,7 +21,7 @@ import {
 import { verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { readGenesisBalanceCached } from '@/server/genesis';
-import { notifyNewCall } from '@/server/telegram';
+import { notifyNewCall, dispatchDelayedMemberCalls } from '@/server/telegram';
 import { getMarketTelemetry } from '@/server/market-data';
 import type {
   AlphasErr,
@@ -174,6 +174,12 @@ export async function GET(req: NextRequest) {
     serverTime: new Date().toISOString(),
     verifiedUsersCount,
   };
+
+  after(() => {
+    dispatchDelayedMemberCalls().catch((e) =>
+      console.error('[TrenchLabs API] Background delayed member dispatch error:', e)
+    );
+  });
 
   return NextResponse.json(body, { headers: NO_STORE });
 }

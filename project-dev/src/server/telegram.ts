@@ -475,15 +475,43 @@ const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'
 
 export function formatCallMessage(r: AlphaRecord): string {
   const tps = (r.takeProfits ?? []).map((t) => esc(t.label)).join(' · ') || '—';
+  const now = new Date();
+  const dateFormatted =
+    now.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }) +
+    ' · ' +
+    now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+      hour12: false,
+    });
+
   const lines = [
-    `🚨 <b>NEW CALL — ${esc(r.ticker)}</b> · ${esc(r.chain)}`,
-    `Entry MC ${esc(r.entryMarketCap)} · Risk ${r.risk}/5`,
-    `${esc(r.stopLoss)} · ${esc(r.riskRewardRatio)}`,
-    `TP ${tps}`,
-    r.ca ? `CA <code>${esc(r.ca)}</code>` : '',
-    '<i>Not financial advice. DYOR.</i>',
+    '🚨 <b>NEW CALL</b>',
+    '',
+    `Ticker - <b>${esc(r.ticker)}</b>`,
+    `Chain - <b>${esc(r.chain)}</b>`,
+    `Entry MC - <b>${esc(r.entryMarketCap)}</b>`,
+    '',
+    `Risk- <b>${r.risk}/5</b>`,
+    '',
+    `SL - <b>${esc(r.stopLoss)}</b>`,
+    `TP - <b>${tps}</b>`,
+    '',
+    r.ca ? `CA\n<code>${esc(r.ca)}</code>` : 'CA\n<i>None provided</i>',
+    '',
+    '<i>Not financial advice.</i>',
+    '<i>DYOR.</i>',
+    '',
+    'Signed',
+    '<b>Lab Assistant</b>',
+    `<i>${esc(dateFormatted)}</i>`,
   ];
-  return lines.filter(Boolean).join('\n');
+  return lines.join('\n');
 }
 
 export interface FanoutResult {
@@ -493,9 +521,117 @@ export interface FanoutResult {
   deferred: number;
 }
 
+export const DELAYED_MEMBER_CALLS_KEY = 'telegram:delayed_member_calls_v1';
+export const MEMBER_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+
+export interface DelayedMemberCall {
+  callId: string;
+  call: AlphaRecord;
+  deliverAt: number; // timestamp ms
+  createdAt: number;
+}
+
+export async function enqueueDelayedMemberCall(r: AlphaRecord): Promise<void> {
+  const deliverAt = Date.now() + MEMBER_DELAY_MS;
+  const item: DelayedMemberCall = {
+    callId: r.id,
+    call: r,
+    deliverAt,
+    createdAt: Date.now(),
+  };
+
+  try {
+    await kvHSet(DELAYED_MEMBER_CALLS_KEY, r.id, JSON.stringify(item));
+  } catch (err) {
+    console.error('[TrenchLabs] Failed to enqueue delayed member call to KV:', err);
+  }
+
+  // Node runtime local fallback timer
+  if (typeof setTimeout !== 'undefined') {
+    const timer = setTimeout(() => {
+      dispatchDelayedMemberCalls().catch((e) =>
+        console.error('[TrenchLabs] Timer dispatchDelayedMemberCalls error:', e)
+      );
+    }, MEMBER_DELAY_MS);
+    if (timer && typeof timer.unref === 'function') timer.unref();
+  }
+}
+
+export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ dispatched: number; pending: number }> {
+  if (!telegramConfigured()) return { dispatched: 0, pending: 0 };
+
+  const lockKey = 'lock:dispatch_delayed_member_calls';
+  const lockToken = Math.random().toString(36).slice(2);
+  const locked = await kvLock(lockKey, lockToken, 45);
+  if (!locked) {
+    return { dispatched: 0, pending: 0 };
+  }
+
+  try {
+    const rawMap = await kvHGetAll(DELAYED_MEMBER_CALLS_KEY);
+    const now = Date.now();
+    const items = Object.entries(rawMap || {})
+      .map(([id, rawStr]) => {
+        try {
+          return JSON.parse(rawStr) as DelayedMemberCall;
+        } catch {
+          return null;
+        }
+      })
+      .filter((x): x is DelayedMemberCall => x !== null);
+
+    const due = items.filter((it) => it.deliverAt <= now);
+    if (due.length === 0) {
+      return { dispatched: 0, pending: items.length };
+    }
+
+    const subs = Object.entries(await kvHGetAll(SUBS_KEY));
+    const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${SITE_URL}/dashboard` }]] };
+    const BATCH = 20;
+    let dispatchedCount = 0;
+
+    for (const item of due) {
+      const text = formatCallMessage(item.call);
+      for (let i = 0; i < subs.length; i += BATCH) {
+        await Promise.all(
+          subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
+            try {
+              if (isAdminWallet(wallet)) {
+                // Admin already received instant alert
+                return;
+              }
+              const tier = await resolveTier(wallet);
+              // Only deliver to Member tier holders ($20+ held)
+              if (tier !== 'member') return;
+
+              const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+              if (res.ok) {
+                dispatchedCount++;
+              } else if (classifySendFailure(res.status, res.description) === 'blocked') {
+                await unlinkWallet(wallet);
+              }
+            } catch (err) {
+              console.error('[TrenchLabs] Delayed member send error:', err);
+            }
+          })
+        );
+        if (i + BATCH < subs.length) await sleep(1_100);
+      }
+
+      // Remove dispatched call from delayed queue
+      await kvHDel(DELAYED_MEMBER_CALLS_KEY, item.callId);
+    }
+
+    return { dispatched: dispatchedCount, pending: items.length - due.length };
+  } finally {
+    await kvUnlock(lockKey, lockToken).catch(() => {});
+  }
+}
+
 /**
- * Sends a new call to every linked holder. Re-checks the tier for each recipient at send time,
- * so holders who sold or dropped below Member stop receiving calls. Telegram allows ~30 msgs/sec, so we batch.
+ * Sends a new call to every linked holder.
+ * PRO tier ($250 staked) & Master Admin get INSTANT delivery (0 delay).
+ * MEMBER tier ($20 held) is enqueued for 5-minute delayed delivery.
  */
 export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<FanoutResult> {
   const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
@@ -507,6 +643,8 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
   const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${SITE_URL}/dashboard` }]] };
   const BATCH = 20;
 
+  let hasMembersToDelay = false;
+
   for (let i = 0; i < subs.length; i += BATCH) {
     if (Date.now() - started > budgetMs) {
       result.deferred = subs.length - i;
@@ -516,13 +654,21 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          if (!isAdminWallet(wallet)) {
-            const tier = await resolveTier(wallet);
-            if (tier === 'free') {
-              result.skipped++;
-              return;
-            }
+          const isAdmin = isAdminWallet(wallet);
+          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
+
+          if (tier === 'free') {
+            result.skipped++;
+            return;
           }
+
+          if (tier === 'member') {
+            // Member tier is delayed by 5 minutes
+            hasMembersToDelay = true;
+            return;
+          }
+
+          // Pro ($250 staked) & Master Admin receive instant alert
           const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
           if (res.ok) {
             result.sent++;
@@ -541,6 +687,12 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
     );
     if (i + BATCH < subs.length) await sleep(1_100);
   }
+
+  // Enqueue 5-minute delayed alert for Member tier
+  if (hasMembersToDelay || subs.length > 0) {
+    await enqueueDelayedMemberCall(r);
+  }
+
   return result;
 }
 
