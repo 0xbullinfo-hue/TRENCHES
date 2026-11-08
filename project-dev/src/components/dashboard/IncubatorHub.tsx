@@ -1058,7 +1058,7 @@ export const IncubatorHub: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
             {pinnedCalls.map(renderAlphaCard)}
             {pinnedCampaigns.map((camp) => (
               <CampaignCard
@@ -1170,18 +1170,18 @@ export const IncubatorHub: React.FC = () => {
         </div>
 
         {/* Blockchain Category Bar + Filter Pills + Sort + Grid/Table Toggle */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3 border-b border-line">
-          {/* Blockchain Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-2.5 pb-3 border-b border-line">
+          {/* Blockchain Category Tabs (No Slider, Fully Visible) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             {ALL_CHAINS.map((ch) => {
               const active = selectedChain === ch;
-              const label = ch === 'ROBIN' ? 'ROBIN (Robinhood)' : ch;
+              const label = ch;
               return (
                 <button
                   key={ch}
                   type="button"
                   onClick={() => setSelectedChain(ch)}
-                  className={`h-9 px-3 rounded-md font-mono text-xs font-extrabold whitespace-nowrap border cursor-pointer transition-colors inline-flex items-center justify-center ${
+                  className={`h-8 px-2.5 rounded-md font-mono text-xs font-bold whitespace-nowrap border cursor-pointer transition-colors inline-flex items-center justify-center ${
                     active
                       ? 'bg-pump text-canvas border-pump'
                       : 'bg-surface hover:bg-surface-card text-white border-line'
@@ -1189,7 +1189,7 @@ export const IncubatorHub: React.FC = () => {
                 >
                   <span>{label}</span>
                   <span
-                    className={`ml-1.5 text-[10px] ${
+                    className={`ml-1 text-[10px] ${
                       active ? 'text-canvas' : 'text-pump'
                     }`}
                   >
@@ -1200,9 +1200,9 @@ export const IncubatorHub: React.FC = () => {
             })}
           </div>
 
-          {/* Right Controls: Filter Tabs + Sort + View Mode */}
+          {/* Right Controls: Filter Tabs + Sort + View Mode (Tops Aligned at Exact Same Level) */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="h-9 flex items-center bg-surface border border-line rounded-md p-1 font-sans text-xs">
+            <div className="h-8 inline-flex items-center bg-surface border border-line rounded-md p-0.5 font-sans text-xs">
               {(
                 [
                   { id: 'ALL', label: 'All' },
@@ -1210,14 +1210,13 @@ export const IncubatorHub: React.FC = () => {
                   { id: 'PINNED', label: '📌 Pinned' },
                   { id: 'MOVERS', label: '🔥 Movers' },
                   { id: 'NEW', label: '✨ New' },
-                  { id: 'WATCHLIST', label: `⭐ (${watchlist.length})` },
                 ] as { id: FilterTab; label: string }[]
               ).map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveFilter(tab.id)}
-                  className={`h-7 px-2.5 rounded font-bold cursor-pointer transition-colors inline-flex items-center justify-center ${
+                  className={`h-[26px] px-2 rounded font-bold cursor-pointer transition-colors inline-flex items-center justify-center text-xs ${
                     activeFilter === tab.id
                       ? tab.id === 'MAX_ALPHA'
                         ? 'bg-orange-500 text-black'
@@ -1232,8 +1231,8 @@ export const IncubatorHub: React.FC = () => {
               ))}
             </div>
 
-            <div className="h-9 flex items-center gap-1.5 px-3 rounded-md bg-surface border border-line font-sans text-xs text-muted">
-              <Filter className="w-3.5 h-3.5 text-pump" />
+            <div className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-md bg-surface border border-line font-sans text-xs text-muted">
+              <Filter className="w-3.5 h-3.5 text-pump shrink-0" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -1254,11 +1253,11 @@ export const IncubatorHub: React.FC = () => {
               </select>
             </div>
 
-            <div className="h-9 flex items-center bg-surface border border-line rounded-md p-1 font-sans text-xs">
+            <div className="h-8 inline-flex items-center bg-surface border border-line rounded-md p-0.5 font-sans text-xs">
               <button
                 type="button"
                 onClick={() => setViewMode('GRID')}
-                className={`h-7 inline-flex items-center gap-1 px-2.5 rounded font-semibold cursor-pointer ${
+                className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
                   viewMode === 'GRID'
                     ? 'bg-pump text-canvas'
                     : 'text-muted hover:text-white'
@@ -1270,7 +1269,7 @@ export const IncubatorHub: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setViewMode('TABLE')}
-                className={`h-7 inline-flex items-center gap-1 px-2.5 rounded font-semibold cursor-pointer ${
+                className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
                   viewMode === 'TABLE'
                     ? 'bg-pump text-canvas'
                     : 'text-muted hover:text-white'
@@ -1286,7 +1285,7 @@ export const IncubatorHub: React.FC = () => {
         {/* VIEW MODE A: TRADE CALL CARDS GRID (3 IN A ROW, EXACT SAME FORMAT AS PINNED CARDS) */}
         {viewMode === 'GRID' ? (
           apiLoading && alphas.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
@@ -1321,7 +1320,7 @@ export const IncubatorHub: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
               {filteredTokens.map(renderAlphaCard)}
             </div>
           )
