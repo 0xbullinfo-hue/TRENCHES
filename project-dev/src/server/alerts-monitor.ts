@@ -5,22 +5,43 @@ import {
   withRegistryLock,
 } from '@/server/alphas-data';
 import type { AlphaRecord } from '@/server/alphas-data';
+import { KV_CONFIGURED, isKvConfigured } from '@/server/kv';
 import { getMarketData, normalizeToken } from '@/server/market-data';
 import type { MarketRequestOptions, MarketToken, NormalizedMarketData } from '@/server/market-data';
 import { getMarketProviderConfig, MAX_FUTURE_CLOCK_SKEW_MS } from '@/server/market-config';
+import {
+  buildNotificationEventId,
+  buildSlTargetId,
+  buildTpTargetId,
+  enqueueOutboxEvent,
+  processNotificationOutbox,
+  rollbackCreatedOutboxEvents,
+  type EnqueueOutboxEventInput,
+  type NotificationOutboxDeps,
+} from '@/server/notification-outbox';
 import { notifyTpTriggered, notifySlTriggered } from '@/server/telegram';
 
-export { MAX_FUTURE_CLOCK_SKEW_MS };
+export {
+  MAX_FUTURE_CLOCK_SKEW_MS,
+  buildNotificationEventId,
+  buildTpTargetId,
+  buildSlTargetId,
+};
 
 export interface AlertMonitorResult {
   ok: boolean;
   incomplete: boolean;
-  operationalFailure?: boolean;
+  operationalFailure: boolean;
   failureReason?: string;
   evaluated: number;
   tpTriggered: number;
   slTriggered: number;
+  eventsCreated: number;
+  eventsProcessed: number;
   notificationsSent: number;
+  notificationsPending: number;
+  notificationsRetried: number;
+  notificationsPermanentlyFailed: number;
   errors: string[];
   /** Calls skipped because market data was missing, stale, unverified or invalid. */
   skippedDueToProvider: number;
@@ -163,6 +184,10 @@ export interface AlertsMonitorDeps {
   minRequestBudgetMs?: number;
   /** Maximum per-request market-data timeout (ms) before clamping to remaining lookup budget. */
   maxRequestTimeoutMs?: number;
+  /** Optional durable Redis outbox dependency overrides. */
+  outbox?: Partial<NotificationOutboxDeps>;
+  /** Force durable Redis outbox mode even when KV env vars are unset (for testing Redis-unavailable failure mode). */
+  requireOutbox?: boolean;
 }
 
 class BudgetRequestTimeoutError extends Error {
@@ -187,21 +212,31 @@ async function withRequestTimeout<T>(promise: Promise<T>, timeoutMs: number): Pr
 }
 
 type PendingEvent =
-  | { kind: 'TP'; alpha: AlphaRecord; label: string; mcLabel: string }
-  | { kind: 'SL'; alpha: AlphaRecord; mcLabel: string };
+  | { kind: 'TP'; alpha: AlphaRecord; index: number; targetId: string; label: string; mcLabel: string }
+  | { kind: 'SL'; alpha: AlphaRecord; targetId: string; label: string; mcLabel: string };
 
 /**
  * Automated monitoring worker that:
  * 1. Retrieves validated market data for active alpha calls within a strict execution budget.
  * 2. Refuses to act on missing, invalid, unverified, mismatched or stale telemetry.
- * 3. Records triggered events idempotently (a persisted `hit` flag prevents duplicates).
- * 4. Persists the new state FIRST, and only then notifies - so a failed save can never cause repeat alerts.
- * 5. Sends informational Telegram notifications. TRENCHLABS never executes trades.
+ * 3. Records triggered events idempotently (a persisted `hit` flag + deterministic outbox event ID prevents duplicates).
+ * 4. Persists the notification event in the Redis outbox AND the updated registry state FIRST, and only then dispatches.
+ * 5. Processes pending and retryable subscriber deliveries from the Redis outbox within the remaining execution budget.
  */
 export async function runAutomatedAlertsMonitor(
   overrides: Partial<AlertsMonitorDeps> = {}
 ): Promise<AlertMonitorResult> {
   const providerConfig = getMarketProviderConfig();
+  const hasCustomLegacyNotify = Boolean(
+    (overrides.notifyTp || overrides.notifySl) && !overrides.outbox && !overrides.requireOutbox
+  );
+  const redisConfigured =
+    overrides.outbox?.isRedisConfigured?.() ?? (KV_CONFIGURED || isKvConfigured());
+  const useDurableOutbox =
+    Boolean(overrides.requireOutbox) ||
+    Boolean(overrides.outbox) ||
+    (!hasCustomLegacyNotify && (redisConfigured || process.env.NODE_ENV === 'production'));
+
   const deps: AlertsMonitorDeps = {
     getMarketData,
     loadRegistry: loadCallsRegistry,
@@ -225,16 +260,24 @@ export async function runAutomatedAlertsMonitor(
   const lookupDeadlineMs = startedAt + lookupWindowMs;
   const minRequestBudgetMs =
     deps.minRequestBudgetMs ??
-    (lookupWindowMs >= 2_000 ? Math.min(1_000, Math.floor(lookupWindowMs * 0.1)) : Math.min(50, Math.max(1, lookupWindowMs)));
+    (lookupWindowMs >= 2_000
+      ? Math.min(1_000, Math.floor(lookupWindowMs * 0.1))
+      : Math.min(50, Math.max(1, lookupWindowMs)));
   const maxRequestTimeoutMs = deps.maxRequestTimeoutMs ?? providerConfig.timeoutMs;
 
   const result: AlertMonitorResult = {
     ok: true,
     incomplete: false,
+    operationalFailure: false,
     evaluated: 0,
     tpTriggered: 0,
     slTriggered: 0,
+    eventsCreated: 0,
+    eventsProcessed: 0,
     notificationsSent: 0,
+    notificationsPending: 0,
+    notificationsRetried: 0,
+    notificationsPermanentlyFailed: 0,
     errors: [],
     skippedDueToProvider: 0,
     skippedByReason: {},
@@ -252,6 +295,7 @@ export async function runAutomatedAlertsMonitor(
     } catch (err) {
       const msg = `Failed to load registry: ${(err as Error).message}`;
       result.ok = false;
+      result.incomplete = true;
       result.operationalFailure = true;
       result.failureReason = msg;
       result.errors.push(msg);
@@ -333,7 +377,14 @@ export async function runAutomatedAlertsMonitor(
         alpha.outcome = 'PROFIT';
         modified = true;
         result.tpTriggered++;
-        pending.push({ kind: 'TP', alpha, label: hit.label, mcLabel });
+        pending.push({
+          kind: 'TP',
+          alpha,
+          index: hit.index,
+          targetId: buildTpTargetId(hit.index, hit.label),
+          label: hit.label,
+          mcLabel,
+        });
       }
 
       if (evaluation.slTriggered) {
@@ -342,20 +393,26 @@ export async function runAutomatedAlertsMonitor(
         alpha.outcome = 'LOSS';
         modified = true;
         result.slTriggered++;
-        pending.push({ kind: 'SL', alpha, mcLabel });
+        pending.push({
+          kind: 'SL',
+          alpha,
+          targetId: buildSlTargetId(alpha.stopLoss),
+          label: alpha.stopLoss || 'SL',
+          mcLabel,
+        });
       }
     }
 
     if (modified) {
-      const saved = await deps.saveRegistry(registry).catch((err: Error) => ({ success: false, error: err.message }));
-      if (!saved.success) {
-        // Restore in-memory snapshots so failed persistence never corrupts registry state
+      // If triggers occurred without custom test callbacks and Redis is not configured, fail closed (never use filesystem for outbox)
+      if (!hasCustomLegacyNotify && !useDurableOutbox) {
         for (const [idx, snapshot] of rollbackSnapshots.entries()) {
           Object.assign(registry[idx], snapshot);
         }
-        // Not durably recorded => do NOT notify, otherwise the next run would alert again.
-        const msg = `Failed to save registry updates: ${saved.error ?? 'unknown error'}`;
+        const msg =
+          'Redis is not configured for durable notification outbox (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN required)';
         result.ok = false;
+        result.incomplete = true;
         result.operationalFailure = true;
         result.failureReason = msg;
         result.errors.push(msg);
@@ -363,32 +420,141 @@ export async function runAutomatedAlertsMonitor(
         result.slTriggered = 0;
         return [];
       }
+
+      const newlyCreatedEventIds: string[] = [];
+
+      if (useDurableOutbox) {
+        try {
+          for (const ev of pending) {
+            const input: EnqueueOutboxEventInput = {
+              call: structuredClone(ev.alpha),
+              triggerType: ev.kind,
+              targetId: ev.targetId,
+              targetLabel: ev.label,
+              marketCapLabel: ev.mcLabel,
+              nowMs: deps.now(),
+            };
+            const enq = await enqueueOutboxEvent(input, {
+              isRedisConfigured:
+                deps.outbox?.isRedisConfigured ?? (() => KV_CONFIGURED || isKvConfigured()),
+              now: deps.now,
+            });
+            if (enq.created) {
+              newlyCreatedEventIds.push(enq.eventId);
+              result.eventsCreated++;
+            }
+          }
+        } catch (outboxErr) {
+          await rollbackCreatedOutboxEvents(newlyCreatedEventIds);
+          for (const [idx, snapshot] of rollbackSnapshots.entries()) {
+            Object.assign(registry[idx], snapshot);
+          }
+          const msg = `Failed to persist notification outbox events: ${(outboxErr as Error).message}`;
+          result.ok = false;
+          result.incomplete = true;
+          result.operationalFailure = true;
+          result.failureReason = msg;
+          result.errors.push(msg);
+          result.tpTriggered = 0;
+          result.slTriggered = 0;
+          result.eventsCreated = 0;
+          return [];
+        }
+      }
+
+      const saved = await deps
+        .saveRegistry(registry)
+        .catch((err: Error) => ({ success: false, error: err.message }));
+      if (!saved.success) {
+        if (newlyCreatedEventIds.length > 0) {
+          await rollbackCreatedOutboxEvents(newlyCreatedEventIds);
+        }
+        // Restore in-memory snapshots so failed persistence never corrupts registry state
+        for (const [idx, snapshot] of rollbackSnapshots.entries()) {
+          Object.assign(registry[idx], snapshot);
+        }
+        // Not durably recorded => do NOT notify, otherwise the next run would alert again.
+        const msg = `Failed to save registry updates: ${saved.error ?? 'unknown error'}`;
+        result.ok = false;
+        result.incomplete = true;
+        result.operationalFailure = true;
+        result.failureReason = msg;
+        result.errors.push(msg);
+        result.tpTriggered = 0;
+        result.slTriggered = 0;
+        result.eventsCreated = 0;
+        return [];
+      }
     }
     return pending;
   });
 
-  // Notifications run after the registry lock is released (fan-out can take a while).
+  if (!result.ok || result.operationalFailure) {
+    return result;
+  }
+
   const totalDeadlineMs = startedAt + budgetMs;
-  for (const ev of events) {
+
+  if (useDurableOutbox) {
+    const remainingDispatchMs = Math.max(0, totalDeadlineMs - deps.now());
+    const outboxRes = await processNotificationOutbox({
+      now: deps.now,
+      budgetMs: remainingDispatchMs,
+      ...deps.outbox,
+    });
+
+    result.eventsProcessed = outboxRes.eventsProcessed;
+    result.notificationsSent = outboxRes.notificationsSent;
+    result.notificationsPending = outboxRes.notificationsPending;
+    result.notificationsRetried = outboxRes.notificationsRetried;
+    result.notificationsPermanentlyFailed = outboxRes.notificationsPermanentlyFailed;
+
+    if (outboxRes.incomplete || outboxRes.notificationsPending > 0) {
+      result.incomplete = true;
+    }
+    if (!outboxRes.ok || outboxRes.operationalFailure) {
+      result.ok = false;
+      result.incomplete = true;
+      result.operationalFailure = true;
+      result.failureReason = result.failureReason || outboxRes.failureReason;
+    }
+    if (outboxRes.errors.length > 0) {
+      result.errors.push(...outboxRes.errors);
+    }
+    return result;
+  }
+
+  // Injected callback path for unit tests providing custom notifyTp/notifySl overrides without Redis outbox
+  result.eventsCreated = events.length;
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
     const remainingNotifyMs = totalDeadlineMs - deps.now();
     if (remainingNotifyMs <= 0) {
       result.incomplete = true;
-      result.errors.push(`Notification dispatch stopped before ${ev.alpha.ticker}: execution budget exhausted`);
+      result.notificationsPending += events.length - i;
+      result.errors.push(
+        `Notification dispatch stopped before ${ev.alpha.ticker}: execution budget exhausted`
+      );
       break;
     }
+    result.eventsProcessed++;
     try {
       const fanout =
         ev.kind === 'TP'
           ? await deps.notifyTp(ev.alpha, ev.label, ev.mcLabel, remainingNotifyMs)
           : await deps.notifySl(ev.alpha, ev.mcLabel, remainingNotifyMs);
       result.notificationsSent += fanout.sent;
-      if ((fanout as { deferred?: number }).deferred && (fanout as { deferred: number }).deferred > 0) {
+      const deferred = (fanout as { deferred?: number }).deferred ?? 0;
+      if (deferred > 0) {
+        result.notificationsPending += deferred;
         result.incomplete = true;
       }
     } catch (notifyErr) {
       const msg = `Failed to send ${ev.kind} notification for ${ev.alpha.ticker}: ${(notifyErr as Error).message}`;
       console.error(`[TP/SL Monitor] ${msg}`);
       result.errors.push(msg);
+      result.notificationsPending++;
+      result.incomplete = true;
     }
   }
 

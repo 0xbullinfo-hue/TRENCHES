@@ -35,11 +35,20 @@ export async function GET(req: NextRequest) {
     const durationMs = Date.now() - startedAt;
 
     if (!result.ok || result.operationalFailure) {
+      const failureReason = result.failureReason || 'TP/SL monitoring operational failure';
       return NextResponse.json(
         {
           ok: false,
           incomplete: result.incomplete,
-          error: result.failureReason || 'TP/SL monitoring operational failure',
+          operationalFailure: true,
+          eventsCreated: result.eventsCreated,
+          eventsProcessed: result.eventsProcessed,
+          notificationsSent: result.notificationsSent,
+          notificationsPending: result.notificationsPending,
+          notificationsRetried: result.notificationsRetried,
+          notificationsPermanentlyFailed: result.notificationsPermanentlyFailed,
+          failureReason,
+          error: failureReason,
           executedAt,
           durationMs,
           result,
@@ -51,6 +60,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       incomplete: result.incomplete,
+      operationalFailure: false,
+      eventsCreated: result.eventsCreated,
+      eventsProcessed: result.eventsProcessed,
+      notificationsSent: result.notificationsSent,
+      notificationsPending: result.notificationsPending,
+      notificationsRetried: result.notificationsRetried,
+      notificationsPermanentlyFailed: result.notificationsPermanentlyFailed,
+      ...(result.failureReason ? { failureReason: result.failureReason } : {}),
       executedAt,
       durationMs,
       result,

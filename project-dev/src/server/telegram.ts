@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { isAdminWallet } from '@/lib/config';
 import {
   KV_CONFIGURED,
+  isKvConfigured,
   kvDel,
   kvGet,
   kvGetDel,
@@ -44,14 +45,19 @@ export const TELEGRAM_GROUPS = {
   pro: process.env.TELEGRAM_PRO_GROUP_ID,
 };
 
-const SUBS_KEY = 'tg:subs'; // hash: wallet -> chatId
+export const SUBS_KEY = 'tg:subs'; // hash: wallet -> chatId
 const chatKey = (chatId: string | number) => `tg:chat:${chatId}`; // chatId -> wallet
 const codeKey = (code: string) => `tg:code:${code}`;
 const CODE_TTL_SEC = 600;
 
 /** Alerts need the bot credentials AND the shared store (subscribers must survive restarts). */
 export const telegramConfigured = () =>
-  Boolean(BOT_TOKEN && BOT_USERNAME && WEBHOOK_SECRET && KV_CONFIGURED);
+  Boolean(
+    (process.env.TELEGRAM_BOT_TOKEN || BOT_TOKEN) &&
+      (process.env.TELEGRAM_BOT_USERNAME || BOT_USERNAME) &&
+      (process.env.TELEGRAM_WEBHOOK_SECRET || WEBHOOK_SECRET) &&
+      (KV_CONFIGURED || isKvConfigured())
+  );
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -65,13 +71,20 @@ export interface TgCallResult {
 
 const normChat = (chatId: string | number) => (/^-?\d+$/.test(String(chatId)) ? Number(chatId) : chatId);
 
-/** Low-level Bot API call with timeout. Never throws. */
-export async function tgCall(method: string, body: Record<string, unknown>): Promise<TgCallResult> {
-  if (!BOT_TOKEN) return { ok: false, status: 0, description: 'bot token not configured' };
+/** Low-level Bot API call with bounded timeout. Never throws. */
+export async function tgCall(
+  method: string,
+  body: Record<string, unknown>,
+  timeoutMs = 8_000
+): Promise<TgCallResult> {
+  const token = process.env.TELEGRAM_BOT_TOKEN || BOT_TOKEN;
+  const apiBase = process.env.TELEGRAM_API_BASE || API_BASE;
+  if (!token) return { ok: false, status: 0, description: 'bot token not configured' };
+  const safeTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.max(50, Math.floor(timeoutMs)) : 8_000;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8_000);
+  const timer = setTimeout(() => ctrl.abort(), safeTimeoutMs);
   try {
-    const res = await fetch(`${API_BASE}/bot${BOT_TOKEN}/${method}`, {
+    const res = await fetch(`${apiBase}/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

@@ -31,4 +31,36 @@ jobs:
             echo "::error::Monitor endpoint returned HTTP $HTTP_STATUS"
             exit 1
           fi
+          node -e '
+            const fs = require("fs");
+            let body;
+            try {
+              body = JSON.parse(fs.readFileSync("/tmp/monitor_response.json", "utf8"));
+            } catch (err) {
+              console.error("::error::Monitor endpoint did not return valid JSON:", err.message);
+              process.exit(1);
+            }
+            if (!body || body.ok !== true || body.operationalFailure === true) {
+              const reason = body?.failureReason || body?.error || "Operational failure reported by monitor";
+              console.error(`::error::TP/SL Monitor operational failure: ${reason}`);
+              process.exit(1);
+            }
+            const summary = {
+              ok: body.ok,
+              incomplete: Boolean(body.incomplete),
+              evaluated: body.result?.evaluated ?? 0,
+              eventsCreated: body.eventsCreated ?? 0,
+              eventsProcessed: body.eventsProcessed ?? 0,
+              notificationsSent: body.notificationsSent ?? 0,
+              notificationsPending: body.notificationsPending ?? 0,
+              notificationsRetried: body.notificationsRetried ?? 0,
+              notificationsPermanentlyFailed: body.notificationsPermanentlyFailed ?? 0,
+              durationMs: body.durationMs ?? 0,
+            };
+            if (body.incomplete) {
+              console.warn("::warning::TP/SL Monitor run completed partially (incomplete=true); pending deliveries remain queued in Redis outbox:", JSON.stringify(summary));
+            } else {
+              console.log("TP/SL Monitor run completed:", JSON.stringify(summary));
+            }
+          '
 
