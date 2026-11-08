@@ -8,12 +8,11 @@ const ENABLED = process.env.NEXT_PUBLIC_TELEGRAM_ALERTS === 'true';
 const LINK_PATH = '/api/telegram/link';
 const hintKey = (wallet: string) => `trenchlabs_tg_linked_v1:${wallet}`;
 
-type Status = 'idle' | 'working' | 'waiting' | 'linked';
+export type TelegramLinkStatus = 'idle' | 'working' | 'waiting' | 'linked';
 
-/** One button in the existing utility bar: link Telegram to get every new call pushed to you. */
-export function TelegramAlerts() {
+export function useTelegramLink() {
   const { publicKeyBase58, signRequestHeaders } = useGenesisBalance();
-  const [status, setStatus] = useState<Status>('idle');
+  const [status, setStatus] = useState<TelegramLinkStatus>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollGenRef = useRef(0);
@@ -114,6 +113,19 @@ export function TelegramAlerts() {
       setMessage((e as Error).message);
     }
   };
+
+  return {
+    status,
+    message,
+    start,
+    stop,
+    publicKeyBase58,
+  };
+}
+
+/** One button in the existing utility bar: link Telegram to get every new call pushed to you. */
+export function TelegramAlerts() {
+  const { status, message, start, stop, publicKeyBase58 } = useTelegramLink();
 
   if (!ENABLED) return null;
 

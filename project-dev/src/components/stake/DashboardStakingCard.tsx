@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
-import { ArrowUpRight, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
 import { StakePointPool } from '@/lib/stakepoint/types';
 import { formatTvlDisplay, formatLockPeriodDisplay } from '@/components/staking/StakePointCard';
+import { useTelegramLink } from '@/components/dashboard/TelegramAlerts';
 
 interface StakeStatusResponse {
   wallet: string;
@@ -39,33 +40,7 @@ export function TelegramVerificationCard({
   connected: boolean;
   isPro: boolean;
 }) {
-  const [openingTg, setOpeningTg] = useState(false);
-
-  const handleTelegramVerify = async (e: React.MouseEvent) => {
-    if (!connected) return;
-    try {
-      e.preventDefault();
-      setOpeningTg(true);
-      const targetTier = isPro ? 'pro' : 'member';
-      const res = await fetch('/api/verification/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_tier: targetTier }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.deep_link) {
-          window.open(json.deep_link, '_blank', 'noopener,noreferrer');
-          return;
-        }
-      }
-      window.open('https://t.me/Trenchlabs_bot', '_blank', 'noopener,noreferrer');
-    } catch {
-      window.open('https://t.me/Trenchlabs_bot', '_blank', 'noopener,noreferrer');
-    } finally {
-      setOpeningTg(false);
-    }
-  };
+  const { status, message, start, stop, publicKeyBase58 } = useTelegramLink();
 
   return (
     <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
@@ -90,19 +65,43 @@ export function TelegramVerificationCard({
       </div>
 
       <div className="pt-5 mt-auto space-y-3">
-        <div>
-          <a
-            href="https://t.me/Trenchlabs_bot"
-            onClick={handleTelegramVerify}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
-          >
-            <Send className="w-3.5 h-3.5 fill-current" />
-            <span>{openingTg ? 'CONNECTING...' : 'GET VERIFIED'}</span>
-            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-          </a>
-        </div>
+        {status === 'linked' ? (
+          <div className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
+            <span className="inline-flex items-center gap-1.5 text-pump font-bold uppercase text-[11px]">
+              <Check className="w-4 h-4 stroke-[2.5]" /> Telegram alerts on
+            </span>
+            <button
+              type="button"
+              onClick={stop}
+              className="text-muted hover:text-danger text-xs font-sans font-bold underline cursor-pointer"
+            >
+              Turn off
+            </button>
+          </div>
+        ) : (
+          <div>
+            <button
+              type="button"
+              onClick={start}
+              disabled={!connected || !publicKeyBase58 || status === 'working' || status === 'waiting'}
+              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-default"
+            >
+              <Send className="w-3.5 h-3.5 fill-current" />
+              <span>
+                {status === 'waiting'
+                  ? 'Press Start in Telegram…'
+                  : status === 'working'
+                    ? 'CONNECTING...'
+                    : 'GET VERIFIED'}
+              </span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </div>
+        )}
+
+        {message && (
+          <p className="font-sans text-xs text-danger font-semibold">{message}</p>
+        )}
 
         <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
           Direct bot verification via @Trenchlabs_bot • Member &amp; Pro channels
