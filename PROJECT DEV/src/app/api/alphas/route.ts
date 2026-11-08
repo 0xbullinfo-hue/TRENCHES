@@ -335,7 +335,7 @@ export async function POST(req: NextRequest) {
       ageMinutes: 1,
       caller: String(payload.caller || '@TrenchLabsAdmin').trim().slice(0, 40),
       callerWinRate: '—',
-      deployedVia: 'https://trenchlabshq.com',
+      deployedVia: 'https://trenchlabshq.xyz',
       spotlightRank: pinned ? 1 : undefined,
       serialTag:
         payload.serialTag ||

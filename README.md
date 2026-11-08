@@ -174,7 +174,7 @@ NEXT_PUBLIC_SOLANA_RPC=https://api.mainnet-beta.solana.com
 # Official Token Mint & Master Admin
 NEXT_PUBLIC_GENESIS_MINT=EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump
 ADMIN_WALLET=FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e
-SITE_URL=https://trenchlabshq.com
+SITE_URL=https://trenchlabshq.xyz
 
 # Telegram Bot & Group Configuration
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
@@ -240,7 +240,7 @@ For modern Next.js App Router applications, **Vercel** is the official and recom
 
 ### Connecting Namecheap Domain to Vercel
 
-1. In the **Vercel Project Dashboard** $\to$ **Settings** $\to$ **Domains**, add your domain (e.g., `trenchlabshq.com`).
+1. In the **Vercel Project Dashboard** $\to$ **Settings** $\to$ **Domains**, add your domain (e.g., `trenchlabshq.xyz`).
 2. Log into your **Namecheap Account** $\to$ **Domain List** $\to$ **Manage** $\to$ **Advanced DNS**:
    - **Type A Record:**
      - Host: `@`

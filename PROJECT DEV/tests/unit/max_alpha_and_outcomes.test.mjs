@@ -35,7 +35,7 @@ test('Max Alpha and Outcome Resolution: correctly reflects isMaxAlpha and outcom
       ageMinutes: 10,
       caller: '@Admin',
       callerWinRate: '80%',
-      deployedVia: 'https://trenchlabshq.com',
+      deployedVia: 'https://trenchlabshq.xyz',
       sparkline: [],
       art: {
         bgFrom: '#000',
@@ -79,7 +79,7 @@ test('Max Alpha and Outcome Resolution: correctly reflects isMaxAlpha and outcom
       ageMinutes: 30,
       caller: '@Admin',
       callerWinRate: '80%',
-      deployedVia: 'https://trenchlabshq.com',
+      deployedVia: 'https://trenchlabshq.xyz',
       sparkline: [],
       art: {
         bgFrom: '#000',
@@ -123,7 +123,7 @@ test('Max Alpha and Outcome Resolution: correctly reflects isMaxAlpha and outcom
       ageMinutes: 5,
       caller: '@Admin',
       callerWinRate: '80%',
-      deployedVia: 'https://trenchlabshq.com',
+      deployedVia: 'https://trenchlabshq.xyz',
       sparkline: [],
       art: {
         bgFrom: '#000',
@@ -180,3 +180,4 @@ test('Card Outline: isMaxAlpha triggers unique orange outline indicator', () => 
   assert.ok(getOutlineClass(maxAlphaCall).includes('border-orange-500'));
   assert.ok(getOutlineClass(maxAlphaAndPinnedCall).includes('border-orange-500'), 'Max Alpha orange outline takes precedence');
 });
+

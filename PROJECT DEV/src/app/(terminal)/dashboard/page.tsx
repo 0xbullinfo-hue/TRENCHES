@@ -5,6 +5,7 @@ import { LockedTerminal } from '@/components/LockedTerminal';
 import { IncubatorHub } from '@/components/dashboard/IncubatorHub';
 import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
 import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
+import { CampaignSection } from '@/components/campaigns/CampaignSection';
 import { useGenesisBalance } from '@/context/GenesisContext';
 
 export default function DashboardPage() {
@@ -18,6 +19,7 @@ export default function DashboardPage() {
             <div className="max-w-xl mx-auto">
               <StakePointCardClient />
             </div>
+            <CampaignSection userWallet={null} />
             <LockedTerminal />
           </div>
         ) : (

@@ -109,6 +109,7 @@ interface GenesisContextValue {
   setCallOutcome: (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING') => Promise<boolean>;
   updateCallMarketCap: (id: string, marketCap: string) => Promise<boolean>;
   deleteAlphaCall: (id: string) => Promise<boolean>;
+  getAdminHeaders?: (method: string, urlPath: string, bodyStr: string) => Promise<Record<string, string>>;
 
   watchlist: string[];
   toggleWatchlist: (tokenId: string) => void;
@@ -221,11 +222,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     clearPendingUnlockWatcher();
     setWalletConnectError(null);
     setConnectingWalletName(null);
-    queueMicrotask(() => setDemoPresetState('live'));
-    try {
-      window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, 'live');
-    } catch {}
-
     setIsWalletModalOpen(true);
   }, [clearPendingUnlockWatcher]);
 
@@ -246,8 +242,15 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         targetWallet.readyState !== WalletReadyState.Loadable
       ) {
         if (targetWallet.adapter.url) {
-          window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
+          try {
+            window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
+          } catch {
+            // ignore popup blocker error
+          }
         }
+        setWalletConnectError(
+          `${targetWallet.adapter.name} extension was not detected in this browser. Please install the extension, or select a quick connect preset below.`
+        );
         return;
       }
 
@@ -270,8 +273,20 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Trigger connect() directly within the user click gesture before React re-renders
-        await targetWallet.adapter.connect();
+        // Trigger connect() directly within the user click gesture with a 15-second safety timeout
+        const connectPromise = targetWallet.adapter.connect();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `Connection to ${targetWallet.adapter.name} timed out after 15 seconds. Please make sure your wallet extension is open, unlocked, and not blocked by a popup window.`
+                )
+              ),
+            15000
+          );
+        });
+        await Promise.race([connectPromise, timeoutPromise]);
         finalizeWalletConnection(targetWallet);
       } catch (err: unknown) {
         setConnectingWalletName(null);
@@ -743,10 +758,19 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   }, [fetchAlphasFromBackend]);
 
   const requestUnlockSignature = useCallback(async () => {
+    // If in demo preset mode, automatically unlock without requiring a cryptographic extension signature
+    if (DEMO_ENABLED && demoPreset !== 'live') {
+      setNeedsSignature(false);
+      const gen = ++requestGenerationRef.current;
+      await fetchAlphasFromBackend(true, gen);
+      return;
+    }
+
     const activeAdapter = wallet.wallet?.adapter;
     const pubKey = wallet.publicKey || activeAdapter?.publicKey;
     if (!pubKey) {
       console.warn('[TrenchLabs] Cannot sign: no active wallet public key');
+      setApiError('No active wallet connected. Please connect your Solana wallet.');
       return;
     }
     const addr = pubKey.toBase58();
@@ -759,6 +783,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
     if (!activeSignMessage) {
       console.warn('[TrenchLabs] Active wallet does not support message signing');
+      setApiError(
+        'Connected wallet does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.'
+      );
       return;
     }
 
@@ -789,7 +816,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setApiLoading(false);
     }
-  }, [wallet, fetchAlphasFromBackend]);
+  }, [wallet, demoPreset, fetchAlphasFromBackend]);
 
   useEffect(() => {
     const gen = ++requestGenerationRef.current;
@@ -1013,6 +1040,9 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const setDemoPreset = useCallback((preset: DemoPreset) => {
     if (!DEMO_ENABLED && preset !== 'live' && preset !== 'disconnected') return;
     setDemoPresetState(preset);
+    setWalletConnectError(null);
+    setConnectingWalletName(null);
+    setIsWalletModalOpen(false);
     try {
       window.localStorage.setItem(DEMO_PRESET_STORAGE_KEY, preset);
     } catch {
@@ -1096,6 +1126,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setCallOutcome,
     updateCallMarketCap,
     deleteAlphaCall,
+    getAdminHeaders,
     searchQuery,
     setSearchQuery,
     watchlist,
@@ -1126,6 +1157,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         onSelectWallet={handleSelectWallet}
         connectingWalletName={connectingWalletName}
         connectError={walletConnectError}
+        onCancelConnecting={() => {
+          clearPendingUnlockWatcher();
+          setConnectingWalletName(null);
+        }}
+        demoEnabled={DEMO_ENABLED}
+        onSelectDemoPreset={setDemoPreset}
       />
     </GenesisContext.Provider>
   );

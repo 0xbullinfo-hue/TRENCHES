@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { AlphaItem, Chain } from '@/lib/types';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AlphaItem, Chain, Campaign } from '@/lib/types';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import {
   ADMIN_WALLET,
@@ -22,6 +22,9 @@ import {
 } from '@/components/stake/DashboardStakingCard';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
+import { CampaignSection } from '@/components/campaigns/CampaignSection';
+import { CampaignCard } from '@/components/campaigns/CampaignCard';
+import { AdminCampaignManager } from '@/components/admin/AdminCampaignManager';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -73,6 +76,7 @@ export const IncubatorHub: React.FC = () => {
     toggleTpHit,
     deleteAlphaCall,
     setCallOutcome,
+    getAdminHeaders,
     apiLoading,
     apiError,
     refreshAll,
@@ -84,6 +88,12 @@ export const IncubatorHub: React.FC = () => {
   const [selectedChain, setSelectedChain] = useState<Chain | 'ALL'>('ALL');
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
+  const [adminDeskTab, setAdminDeskTab] = useState<'CALLS' | 'CAMPAIGNS'>('CALLS');
+  const [feedTab, setFeedTab] = useState<'CALLS' | 'RAIDS'>('CALLS');
+
+  // Community Campaigns State
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
 
   const [inspectedToken, setInspectedToken] = useState<AlphaItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -136,6 +146,73 @@ export const IncubatorHub: React.FC = () => {
     setToastMessage(msg);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2800);
+  };
+
+  const fetchCampaigns = useCallback(async () => {
+    try {
+      const url = publicKeyBase58
+        ? `/api/campaigns?wallet=${encodeURIComponent(publicKeyBase58)}`
+        : '/api/campaigns';
+      const res = await fetch(url);
+      const json = await res.json();
+      if (res.ok && json.ok && Array.isArray(json.campaigns)) {
+        setCampaigns(json.campaigns);
+      }
+    } catch (err) {
+      console.error('[IncubatorHub] fetch campaigns error:', err);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }, [publicKeyBase58]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      try {
+        const url = publicKeyBase58
+          ? `/api/campaigns?wallet=${encodeURIComponent(publicKeyBase58)}`
+          : '/api/campaigns';
+        const res = await fetch(url);
+        const json = await res.json();
+        if (active && res.ok && json.ok && Array.isArray(json.campaigns)) {
+          setCampaigns(json.campaigns);
+        }
+      } catch (err) {
+        console.error('[IncubatorHub] fetch campaigns error:', err);
+      } finally {
+        if (active) setCampaignsLoading(false);
+      }
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [publicKeyBase58]);
+
+  const handleTogglePinCampaign = async (campaignId: string, pinned: boolean) => {
+    try {
+      const bodyStr = JSON.stringify({ pinned });
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (getAdminHeaders) {
+        try {
+          headers = await getAdminHeaders('PATCH', `/api/campaigns/${campaignId}`, bodyStr);
+        } catch {
+          // fallback
+        }
+      }
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: 'PATCH',
+        headers,
+        body: bodyStr,
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        showToast(`${pinned ? 'Pinned' : 'Unpinned'} raid campaign priority`);
+        fetchCampaigns();
+      }
+    } catch (err) {
+      showToast(`Failed to update pin: ${(err as Error).message}`);
+    }
   };
 
   const handleCopyText = async (
@@ -271,6 +348,13 @@ export const IncubatorHub: React.FC = () => {
       ),
     [alphas, selectedChain]
   );
+
+  const pinnedCampaigns = useMemo(
+    () => campaigns.filter((c) => Boolean(c.pinned)),
+    [campaigns]
+  );
+
+  const totalPinned = pinnedCalls.length + pinnedCampaigns.length;
 
   const chainCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: alphas.length };
@@ -799,13 +883,6 @@ export const IncubatorHub: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. ALPHA TRADE CALLS: Full feed for verified users, locked terminal for unverified */}
-      {!isUnlocked ? (
-        <div className="pt-2">
-          <LockedTerminal />
-        </div>
-      ) : (
-        <>
       {/* 1. ADMIN COMMAND DESK (Visible when connected as FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e or Admin Mode) */}
       {isAdmin && (
         <div className="rounded-xl bg-surface border-2 border-pump overflow-hidden">
@@ -818,19 +895,51 @@ export const IncubatorHub: React.FC = () => {
                 {ADMIN_WALLET}
               </span>
               <span className="hidden md:inline font-sans text-xs text-muted">
-                • Full access to post, categorize, &amp; pin priority calls
+                • Full access to post calls &amp; run raid campaigns
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAdminForm(!showAdminForm)}
-              className="px-3.5 py-1.5 rounded bg-surface border border-pump font-sans text-xs font-black text-pump hover:bg-surface-3 cursor-pointer transition-colors"
-            >
-              {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
-            </button>
+            {/* Admin Desk Navigation Tabs */}
+            <div className="flex items-center bg-surface border border-line rounded-lg p-0.5 font-sans text-xs">
+              <button
+                type="button"
+                onClick={() => setAdminDeskTab('CALLS')}
+                className={`px-3 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                  adminDeskTab === 'CALLS'
+                    ? 'bg-pump text-canvas shadow-sm'
+                    : 'text-muted hover:text-white'
+                }`}
+              >
+                Alpha Calls Desk
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminDeskTab('CAMPAIGNS')}
+                className={`px-3 py-1 rounded-md font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  adminDeskTab === 'CAMPAIGNS'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-purple-400 hover:text-purple-300'
+                }`}
+              >
+                <span>⚡ X Raid Campaigns &amp; Airdrops</span>
+              </button>
+            </div>
+
+            {adminDeskTab === 'CALLS' && (
+              <button
+                type="button"
+                onClick={() => setShowAdminForm(!showAdminForm)}
+                className="px-3.5 py-1.5 rounded bg-surface border border-pump font-sans text-xs font-black text-pump hover:bg-surface-3 cursor-pointer transition-colors"
+              >
+                {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
+              </button>
+            )}
           </div>
 
+          {adminDeskTab === 'CAMPAIGNS' ? (
+            <AdminCampaignManager onToast={showToast} getAdminHeaders={getAdminHeaders} />
+          ) : (
+            <>
           {/* ADMIN TELEMETRY & PERFORMANCE OVERVIEW CARD */}
           <div className="p-5 border-b border-line bg-surface">
             <div className="font-sans text-xs font-black uppercase tracking-widest text-pump mb-3 flex items-center gap-2">
@@ -1089,32 +1198,98 @@ export const IncubatorHub: React.FC = () => {
               </div>
             </form>
           )}
+            </>
+          )}
         </div>
       )}
 
-      {/* PINNED PRIORITY CALLS SECTION (Admin-Pinned Calls for All Users) */}
-      {pinnedCalls.length > 0 && activeFilter === 'ALL' && (
+      {/* PINNED PRIORITY CALLS & RAIDS SECTION (Admin-Pinned Items for All Users) */}
+      {totalPinned > 0 && activeFilter === 'ALL' && (
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded bg-pump text-canvas font-mono text-xs font-black uppercase inline-flex items-center gap-1">
+              <span className="px-2.5 py-1 rounded bg-pump text-canvas font-mono text-xs font-black uppercase inline-flex items-center gap-1 shadow-sm">
                 <Pin className="w-3.5 h-3.5" />
-                <span>PINNED PRIORITY CALLS ({pinnedCalls.length})</span>
+                <span>PINNED PRIORITY ({totalPinned})</span>
               </span>
               <span className="font-sans text-xs text-muted">
-                High-priority trade setups pinned by Admin for all verified $GENESIS holders
+                High-priority trade setups &amp; community raid campaigns pinned by Admin
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {pinnedCalls.map(renderAlphaCard)}
+            {pinnedCampaigns.map((camp) => (
+              <CampaignCard
+                key={camp.id}
+                campaign={camp}
+                userWallet={publicKeyBase58}
+                isAdmin={isAdmin}
+                onTogglePin={handleTogglePinCampaign}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* 5. ALL CATEGORIZED ALPHA TRADE CALLS (Filterable by Blockchain: SOL, BSC, ETH, BASE, ROBIN, AVAX) */}
+      {/* MAIN FEED TABS: CALLS OR RAIDS */}
       <div className="space-y-4 pt-2">
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
+          <button
+            type="button"
+            onClick={() => setFeedTab('CALLS')}
+            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              feedTab === 'CALLS'
+                ? 'bg-pump text-canvas shadow-md'
+                : 'text-muted hover:text-white hover:bg-surface-card'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span>ALPHA TRADE CALLS</span>
+            <span
+              className={`px-2 py-0.5 rounded font-mono text-xs ${
+                feedTab === 'CALLS'
+                  ? 'bg-canvas text-pump font-black'
+                  : 'bg-surface-card text-muted'
+              }`}
+            >
+              {alphas.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFeedTab('RAIDS')}
+            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              feedTab === 'RAIDS'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
+            <span
+              className={`px-2 py-0.5 rounded font-mono text-xs ${
+                feedTab === 'RAIDS'
+                  ? 'bg-white text-purple-700 font-black'
+                  : 'bg-surface-card text-purple-400'
+              }`}
+            >
+              {campaigns.length}
+            </span>
+          </button>
+        </div>
+
+        {feedTab === 'CALLS' ? (
+          !isUnlocked ? (
+            <div className="pt-2">
+              <LockedTerminal />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* 5. ALL CATEGORIZED ALPHA TRADE CALLS (Filterable by Blockchain: SOL, BSC, ETH, BASE, ROBIN, AVAX) */}
+              <div className="space-y-4 pt-2">
         {apiError && (
           <div className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
             <div className="flex items-center gap-2.5 text-danger font-semibold">
@@ -1580,74 +1755,87 @@ export const IncubatorHub: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+      )
+    ) : (
+      <CampaignSection
+        userWallet={publicKeyBase58}
+        isAdmin={isAdmin}
+        campaigns={campaigns}
+        loading={campaignsLoading}
+        onRefresh={fetchCampaigns}
+        onTogglePin={handleTogglePinCampaign}
+      />
+    )}
+  </div>
 
       {/* 7. Bottom Utility Bar: Cross-Chain EVM Wallet Binding & Private Syndicate Telegram Key */}
-      <div className="rounded-xl bg-surface border border-line p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
-        <div className="lg:col-span-7 space-y-1.5">
-          <h3 className="font-sans text-base font-extrabold text-white">
-            Multi-Chain Wallet Binding &amp; Telegram Call Alerts
-          </h3>
-          <p className="font-sans text-sm text-muted leading-relaxed">
-            Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
-            is verified with{' '}
-            <strong className="text-pump">{formattedBalance} $GENESIS</strong>.
-            Optionally save a local EVM address for multi-chain notifications, and get
-            every new call pushed to Telegram.
-          </p>
-        </div>
-
-        <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-2.5">
-          {!boundEvmAddress ? (
-            <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={evmDraft}
-                onChange={(e) => setEvmDraft(e.target.value)}
-                placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
-                className="flex-1 h-9 px-3 rounded bg-surface-card border border-line font-mono text-xs text-white placeholder:text-dim focus:outline-none focus:border-pump"
-              />
-              <button
-                type="submit"
-                className="h-9 px-3.5 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-pump cursor-pointer shrink-0 transition-colors"
-              >
-                {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
-              </button>
-            </form>
-          ) : (
-            <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-toxic-bg border border-toxic-border font-mono text-xs">
-              <div className="flex items-center gap-2 truncate">
-                <span className="text-pump font-bold uppercase text-[10px]">MAPPED:</span>
-                <span className="text-white truncate font-medium">{boundEvmAddress}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setBoundEvmAddress('');
-                  setEvmDraft('');
-                }}
-                className="text-muted hover:text-danger ml-2 text-[11px] underline cursor-pointer shrink-0"
-                title="Change mapped address"
-              >
-                Change
-              </button>
-            </div>
-          )}
-
-          {/* Telegram Access Card (§7.3) */}
-          <div className="rounded-lg bg-surface border border-toxic-border/60 p-5 shadow-sm space-y-3">
-            <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-              TELEGRAM ACCESS
-            </div>
-            <p className="font-sans text-xs text-muted leading-relaxed">
-              Verify your wallet in Telegram to join your exclusive group and receive signals.
+      {isUnlocked && (
+        <div className="rounded-xl bg-surface border border-line p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+          <div className="lg:col-span-7 space-y-1.5">
+            <h3 className="font-sans text-base font-extrabold text-white">
+              Multi-Chain Wallet Binding &amp; Telegram Call Alerts
+            </h3>
+            <p className="font-sans text-sm text-muted leading-relaxed">
+              Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
+              is verified with{' '}
+              <strong className="text-pump">{formattedBalance} $GENESIS</strong>.
+              Optionally save a local EVM address for multi-chain notifications, and get
+              every new call pushed to Telegram.
             </p>
-            <TelegramConnectButton />
           </div>
 
-          <TelegramAlerts />
+          <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-2.5">
+            {!boundEvmAddress ? (
+              <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={evmDraft}
+                  onChange={(e) => setEvmDraft(e.target.value)}
+                  placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
+                  className="flex-1 h-9 px-3 rounded bg-surface-card border border-line font-mono text-xs text-white placeholder:text-dim focus:outline-none focus:border-pump"
+                />
+                <button
+                  type="submit"
+                  className="h-9 px-3.5 rounded bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-pump cursor-pointer shrink-0 transition-colors"
+                >
+                  {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-toxic-bg border border-toxic-border font-mono text-xs">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-pump font-bold uppercase text-[10px]">MAPPED:</span>
+                  <span className="text-white truncate font-medium">{boundEvmAddress}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBoundEvmAddress('');
+                    setEvmDraft('');
+                  }}
+                  className="text-muted hover:text-danger ml-2 text-[11px] underline cursor-pointer shrink-0"
+                  title="Change mapped address"
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
+            {/* Telegram Access Card (§7.3) */}
+            <div className="rounded-lg bg-surface border border-toxic-border/60 p-5 shadow-sm space-y-3">
+              <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+                TELEGRAM ACCESS
+              </div>
+              <p className="font-sans text-xs text-muted leading-relaxed">
+                Verify your wallet in Telegram to join your exclusive group and receive signals.
+              </p>
+              <TelegramConnectButton />
+            </div>
+
+            <TelegramAlerts />
+          </div>
         </div>
-      </div>
-      </>
       )}
 
       <AlphaInspectorModal

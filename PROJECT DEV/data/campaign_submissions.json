@@ -1,0 +1,90 @@
+[
+  {
+    "id": "sub-1794100788061-ff6779",
+    "campaignId": "camp-1794100788055-cb8ebf",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-08T01:19:48.061Z",
+    "airdroppedAt": "2026-11-08T01:19:48.074Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794099457415-b0c64c",
+    "campaignId": "camp-1794099457407-dc8c2d",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-08T00:57:37.415Z",
+    "airdroppedAt": "2026-11-08T00:57:37.428Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794058068073-4ff480",
+    "campaignId": "camp-1794058068067-1885df",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T13:27:48.073Z",
+    "airdroppedAt": "2026-11-07T13:27:48.087Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794058048024-4213c3",
+    "campaignId": "camp-1794058048016-19d75c",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T13:27:28.024Z",
+    "airdroppedAt": "2026-11-07T13:27:28.035Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794057706924-c5c200",
+    "campaignId": "camp-1794057706918-e97876",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T13:21:46.924Z",
+    "airdroppedAt": "2026-11-07T13:21:46.938Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794057010153-6786fa",
+    "campaignId": "camp-1794057010142-0269d2",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T13:10:10.153Z",
+    "airdroppedAt": "2026-11-07T13:10:10.178Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794056561894-4915f8",
+    "campaignId": "camp-1794056561881-e2457e",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T13:02:41.895Z",
+    "airdroppedAt": "2026-11-07T13:02:41.918Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
+    "id": "sub-1794055956137-f9694c",
+    "campaignId": "camp-1794055956126-304c9e",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-07T12:52:36.137Z",
+    "airdroppedAt": "2026-11-07T12:52:36.147Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  }
+]

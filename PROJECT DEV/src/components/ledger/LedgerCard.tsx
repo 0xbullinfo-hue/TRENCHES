@@ -49,7 +49,7 @@ function getXShareUrl(entry: LedgerCardData): string {
   text += `🎯 CA: ${entry.contract_address}\n\n`;
   text += `Curated via @TrenchLabsHQ incubator 🧪`;
 
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent('https://trenchlabshq.com')}`;
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent('https://trenchlabshq.xyz')}`;
 }
 
 export function LedgerCard({ entry }: { entry: LedgerCardData }) {

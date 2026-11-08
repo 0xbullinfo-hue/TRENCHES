@@ -133,7 +133,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 60,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '91.5% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 1,
     sparkline: [20, 24, 28, 35, 42, 50, 61, 75, 82, 88, 92, 95, 97, 99, 100],
     art: {
@@ -181,7 +181,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 120,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '88.0% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 2,
     sparkline: [18, 22, 27, 34, 40, 48, 55, 63, 72, 79, 85, 91, 95, 98, 100],
     art: {
@@ -229,7 +229,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 180,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '94.0% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 3,
     sparkline: [10, 15, 22, 30, 42, 55, 68, 77, 84, 89, 93, 96, 98, 100],
     art: {
@@ -276,7 +276,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 240,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '86.5% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 4,
     sparkline: [15, 20, 25, 30, 38, 45, 52, 60, 68, 75, 82, 88, 92, 96, 100],
     art: {
@@ -330,7 +330,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 120,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '84.2% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 1,
     sparkline: [18, 22, 20, 29, 34, 31, 42, 48, 45, 59, 64, 62, 75, 84, 89, 96],
     art: {
@@ -381,7 +381,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 45,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '88.0% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     spotlightRank: 2,
     sparkline: [14, 19, 25, 31, 38, 44, 52, 49, 63, 71, 76, 82, 85, 90, 95, 100],
     art: {
@@ -587,7 +587,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 35,
     caller: '@TrenchLabsAdmin',
     callerWinRate: '84.2% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     sparkline: [15, 18, 25, 31, 28, 39, 47, 55, 62, 59, 71, 77, 84, 89, 92, 99],
     art: {
       bgFrom: '#1F1B2C',
@@ -634,7 +634,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 120,
     caller: '@GiddyWaxEc',
     callerWinRate: '86.5% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     sparkline: [10, 14, 21, 29, 36, 34, 45, 53, 60, 68, 65, 74, 80, 85, 91, 98],
     art: {
       bgFrom: '#161C24',
@@ -684,7 +684,7 @@ const DEFAULT_REGISTRY: AlphaRecord[] = [
     ageMinutes: 19,
     caller: '@NobleEvenG',
     callerWinRate: '89.5% win',
-    deployedVia: 'https://trenchlabshq.com',
+    deployedVia: 'https://trenchlabshq.xyz',
     sparkline: [19, 25, 31, 28, 37, 45, 52, 58, 63, 61, 72, 78, 84, 88, 93, 98],
     art: {
       bgFrom: '#0D2624',

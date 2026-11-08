@@ -176,3 +176,39 @@ export interface AlphasErr {
 
 export type AlphasResponse = AlphasOk | AlphasErr;
 
+export type CampaignStatus = 'ACTIVE' | 'COMPLETED' | 'PAUSED';
+
+export type SubmissionStatus = 'PENDING' | 'AIRDROPPED' | 'REJECTED';
+
+export interface CampaignSubmission {
+  id: string;
+  campaignId: string;
+  walletAddress: string;
+  xHandle: string;
+  xRetweetLink: string;
+  status: SubmissionStatus;
+  airdroppedAt?: string | null;
+  airdropTx?: string | null;
+  submittedAt: string;
+}
+
+export interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  tweetUrl: string;
+  rewardAmount: string;
+  rewardToken?: string;
+  totalPool?: string;
+  targetActions?: string[];
+  status: CampaignStatus;
+  createdAt: string;
+  expiresAt?: string;
+  postedBy: string;
+  submissionsCount?: number;
+  airdroppedCount?: number;
+  userSubmission?: CampaignSubmission | null;
+  pinned?: boolean;
+  pinnedAt?: string | null;
+}
+

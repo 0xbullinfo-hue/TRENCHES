@@ -3,7 +3,16 @@
 import React, { useEffect, useRef } from 'react';
 import type { Wallet } from '@solana/wallet-adapter-react';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
-import { AlertCircle, ExternalLink, Loader2, ShieldCheck, Wallet as WalletIcon, X } from 'lucide-react';
+import {
+  AlertCircle,
+  ExternalLink,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  Wallet as WalletIcon,
+  X,
+} from 'lucide-react';
+import type { DemoPreset } from '@/context/GenesisContext';
 
 interface TrenchWalletModalProps {
   isOpen: boolean;
@@ -12,6 +21,9 @@ interface TrenchWalletModalProps {
   onSelectWallet: (wallet: Wallet) => Promise<void>;
   connectingWalletName?: string | null;
   connectError?: string | null;
+  onCancelConnecting?: () => void;
+  demoEnabled?: boolean;
+  onSelectDemoPreset?: (preset: DemoPreset) => void;
 }
 
 function canonicalWalletKey(name: string): string {
@@ -29,6 +41,9 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
   onSelectWallet,
   connectingWalletName = null,
   connectError = null,
+  onCancelConnecting,
+  demoEnabled = false,
+  onSelectDemoPreset,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +144,25 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
           </div>
         )}
 
+        {/* Active Connecting Notice with Cancel */}
+        {connectingWalletName && (
+          <div className="mx-5 mt-4 p-3 rounded-lg bg-toxic/10 border border-toxic/40 flex items-center justify-between gap-2.5 text-xs font-mono text-white">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-toxic animate-spin" />
+              <span>Connecting to {connectingWalletName}...</span>
+            </div>
+            {onCancelConnecting && (
+              <button
+                type="button"
+                onClick={onCancelConnecting}
+                className="text-xs font-bold text-danger hover:underline cursor-pointer px-1.5 py-0.5 rounded bg-surface border border-danger/30"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Wallet List */}
         <div className="p-5 space-y-2.5 max-h-[60vh] overflow-y-auto">
           {sortedWallets.length > 0 ? (
@@ -190,6 +224,50 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Local Dev / Quick Connect Presets (Only visible when demoEnabled is true) */}
+        {demoEnabled && (
+          <div className="px-5 pb-4 pt-3 border-t border-toxic-border/40 bg-surface-card/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[11px] font-bold text-toxic uppercase flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-toxic" />
+                <span>Localhost Quick Connect</span>
+              </span>
+              <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.2 rounded border border-toxic-border/30">
+                Dev Mode
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => onSelectDemoPreset?.('admin')}
+                className="p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic/50 hover:border-toxic text-white font-mono text-xs transition-colors cursor-pointer text-left flex flex-col justify-between"
+              >
+                <span className="text-toxic font-black">⚡ Master Admin</span>
+                <span className="text-[10px] text-muted mt-0.5">Admin Desk &amp; Pro</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSelectDemoPreset?.('1m')}
+                className="p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors cursor-pointer text-left flex flex-col justify-between"
+              >
+                <span className="text-white font-black">🛡️ Member Tier</span>
+                <span className="text-[10px] text-muted mt-0.5">1M+ $GENESIS</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSelectDemoPreset?.('0')}
+                className="p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors cursor-pointer text-left flex flex-col justify-between"
+              >
+                <span className="text-muted font-black">🆓 Free Tier</span>
+                <span className="text-[10px] text-muted mt-0.5">0 Tokens</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer info */}
         <div className="px-5 py-3.5 bg-surface-card/60 border-t border-toxic-border flex items-center justify-between text-2xs font-mono text-muted">

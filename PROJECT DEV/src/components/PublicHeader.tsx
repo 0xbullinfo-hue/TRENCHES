@@ -2,23 +2,13 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUpRight, LogOut, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
-  const router = useRouter();
   const { connected, shortAddress, connectWallet, disconnectDemoOrWallet } = useGenesisBalance();
-
-  const handleConnectClick = () => {
-    if (!connected) {
-      connectWallet();
-    } else {
-      router.push('/dashboard');
-    }
-  };
 
   const handleDisconnect = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -66,14 +56,24 @@ export const PublicHeader: React.FC = () => {
 
         {/* Right: CONNECT Button & Disconnect */}
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleConnectClick}
-            className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
-          >
-            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-            <span>{connected ? `DASHBOARD (${shortAddress})` : 'CONNECT WALLET'}</span>
-          </button>
+          {connected ? (
+            <Link
+              href="/dashboard"
+              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
+            >
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+              <span>DASHBOARD ({shortAddress})</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={connectWallet}
+              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
+            >
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+              <span>CONNECT WALLET</span>
+            </button>
+          )}
           {connected && (
             <button
               type="button"

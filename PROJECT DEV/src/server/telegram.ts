@@ -29,7 +29,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '');
 export const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const API_BASE = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
-export const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.com').replace(/\/$/, '');
+export const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.xyz').replace(/\/$/, '');
 
 // Group Invite Links (Configured strictly via environment variables, never hardcoded)
 export const MEMBER_INVITE_URL = process.env.TELEGRAM_MEMBER_INVITE_URL || '';
