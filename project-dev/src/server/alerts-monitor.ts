@@ -29,9 +29,11 @@ export interface AlertMonitorResult {
  */
 export function parseStopLossPercentage(slStr: string): number | null {
   if (!slStr) return null;
+  if (/\+\d/.test(slStr)) return null;
   const match = slStr.match(/(-?\d+(\.\d+)?)\s*%/);
   if (match) {
     const val = parseFloat(match[1]);
+    if (!Number.isFinite(val) || val === 0 || Math.abs(val) >= 100) return null;
     return val < 0 ? val / 100 : -val / 100;
   }
   return null;
@@ -123,18 +125,18 @@ export function evaluateTargets(
   if (!Number.isFinite(currentMcUsd) || currentMcUsd <= 0) return null;
   if (!Number.isFinite(entryMc) || entryMc <= 0) return null;
 
+  const slPct = parseStopLossPercentage(call.stopLoss);
+  const slTriggered =
+    slPct !== null && slPct < 0 && call.outcome !== 'LOSS' && currentMcUsd <= entryMc * (1 + slPct);
+
   const newTakeProfits: TargetEvaluation['newTakeProfits'] = [];
-  if (Array.isArray(call.takeProfits)) {
+  if (!slTriggered && Array.isArray(call.takeProfits)) {
     call.takeProfits.forEach((tp, index) => {
       if (!tp.hit && Number.isFinite(tp.multiple) && tp.multiple > 0 && currentMcUsd >= entryMc * tp.multiple) {
         newTakeProfits.push({ index, label: tp.label });
       }
     });
   }
-
-  const slPct = parseStopLossPercentage(call.stopLoss);
-  const slTriggered =
-    slPct !== null && slPct < 0 && call.outcome !== 'LOSS' && currentMcUsd <= entryMc * (1 + slPct);
 
   return { newTakeProfits, slTriggered };
 }
@@ -149,6 +151,8 @@ export interface AlertsMonitorDeps {
   now: () => number;
   /** Maximum age of market data that may trigger an alert. */
   maxDataAgeMs: number;
+  /** Maximum execution budget (ms) inside the serverless timeout window. */
+  budgetMs?: number;
 }
 
 type PendingEvent =
@@ -175,8 +179,12 @@ export async function runAutomatedAlertsMonitor(
     notifySl: notifySlTriggered,
     now: Date.now,
     maxDataAgeMs: getMarketProviderConfig().cacheTtlSeconds * 2 * 1000,
+    budgetMs: 50_000,
     ...overrides,
   };
+
+  const startedAt = deps.now();
+  const budgetMs = deps.budgetMs ?? 50_000;
 
   const result: AlertMonitorResult = {
     evaluated: 0,
@@ -202,12 +210,19 @@ export async function runAutomatedAlertsMonitor(
       return pending;
     }
 
+    const rollbackSnapshots = new Map<number, AlphaRecord>();
     let modified = false;
 
-    for (const alpha of registry) {
+    for (let idx = 0; idx < registry.length; idx++) {
+      const alpha = registry[idx];
       // Only monitor LIVE active calls
       if (alpha.status !== 'LIVE') continue;
       if (!alpha.ca) continue;
+
+      if (deps.now() - startedAt > budgetMs) {
+        skip('time_budget_exceeded');
+        continue;
+      }
 
       result.evaluated++;
 
@@ -229,6 +244,10 @@ export async function runAutomatedAlertsMonitor(
       if (!evaluation) {
         skip('invalid_entry_market_cap');
         continue;
+      }
+
+      if (evaluation.newTakeProfits.length > 0 || evaluation.slTriggered) {
+        rollbackSnapshots.set(idx, structuredClone(alpha));
       }
 
       const mcLabel = formatCompactUsd(verdict.marketCapUsd);
@@ -256,6 +275,10 @@ export async function runAutomatedAlertsMonitor(
     if (modified) {
       const saved = await deps.saveRegistry(registry).catch((err: Error) => ({ success: false, error: err.message }));
       if (!saved.success) {
+        // Restore in-memory snapshots so failed persistence never corrupts registry state
+        for (const [idx, snapshot] of rollbackSnapshots.entries()) {
+          Object.assign(registry[idx], snapshot);
+        }
         // Not durably recorded => do NOT notify, otherwise the next run would alert again.
         result.errors.push(`Failed to save registry updates: ${saved.error ?? 'unknown error'}`);
         result.tpTriggered = 0;
@@ -275,9 +298,9 @@ export async function runAutomatedAlertsMonitor(
           : await deps.notifySl(ev.alpha, ev.mcLabel);
       result.notificationsSent += fanout.sent;
     } catch (notifyErr) {
-      result.errors.push(
-        `Failed to send ${ev.kind} notification for ${ev.alpha.ticker}: ${(notifyErr as Error).message}`
-      );
+      const msg = `Failed to send ${ev.kind} notification for ${ev.alpha.ticker}: ${(notifyErr as Error).message}`;
+      console.error(`[TP/SL Monitor] ${msg}`);
+      result.errors.push(msg);
     }
   }
 

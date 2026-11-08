@@ -17,8 +17,9 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'CRON_SECRET not configured' }, { status: 503 });
   }
 
-  const given = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (!timingSafeEqualStr(given, secret)) {
+  const authHeader = req.headers.get('authorization')?.trim() || '';
+  const expected = `Bearer ${secret}`;
+  if (!authHeader || !timingSafeEqualStr(authHeader, expected)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
@@ -26,9 +27,20 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'telegram not configured' }, { status: 503 });
   }
 
-  const result = await sweepGroupMembers();
-  console.log('[TrenchLabs] member sweep completed:', JSON.stringify(result));
-  return NextResponse.json({ ok: true, ...result });
+  try {
+    const result = await sweepGroupMembers();
+    console.log('[TrenchLabs] member sweep completed:', JSON.stringify(result));
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    console.error(
+      '[TrenchLabs] member sweep failed:',
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+    return NextResponse.json(
+      { ok: false, error: 'Member sweep execution failed' },
+      { status: 500 }
+    );
+  }
 }
 
 export const GET = handle;

@@ -21,11 +21,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = campaignsLockChain.then(async () => {
-    if (!KV_CONFIGURED) return fn();
+    if (!KV_CONFIGURED) {
+      if (!FILE_PERSISTENCE_ALLOWED) {
+        throw new Error('Persistence not configured. Set ALLOW_FILE_PERSISTENCE=true or KV credentials.');
+      }
+      return fn();
+    }
     const token = crypto.randomUUID();
     let acquired = false;
     for (let i = 0; i < 20 && !acquired; i++) {
-      acquired = await kvLock(KV_LOCK_KEY, token, 10);
+      acquired = await kvLock(KV_LOCK_KEY, token, 30);
       if (!acquired) await sleep(150);
     }
     if (!acquired) throw new Error('Campaigns store busy, retry shortly');

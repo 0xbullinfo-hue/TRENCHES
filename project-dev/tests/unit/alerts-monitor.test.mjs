@@ -10,6 +10,7 @@ import {
 } from '../../src/server/alerts-monitor.ts';
 import { withRegistryLock } from '../../src/server/alphas-data.ts';
 import { GET as monitorGet } from '../../src/app/api/telegram/monitor/route.ts';
+import { GET as sweepGet } from '../../src/app/api/telegram/sweep/route.ts';
 import { SOL_TOKEN, SOL_OTHER, EVM_LOWER } from './helpers/market-fixtures.mjs';
 
 const NOW = Date.parse('2026-01-01T00:05:00.000Z');
@@ -64,6 +65,10 @@ test('Alerts Monitor: parseStopLossPercentage correctly parses percentages', () 
   assert.equal(parseStopLossPercentage('-30%'), -0.30);
   assert.equal(parseStopLossPercentage('20%'), -0.20);
   assert.equal(parseStopLossPercentage('-15.5% SL'), -0.155);
+  assert.equal(parseStopLossPercentage('0%'), null);
+  assert.equal(parseStopLossPercentage('-0%'), null);
+  assert.equal(parseStopLossPercentage('-100%'), null);
+  assert.equal(parseStopLossPercentage('+25%'), null);
   assert.equal(parseStopLossPercentage('invalid'), null);
   assert.equal(parseStopLossPercentage(''), null);
 });
@@ -326,12 +331,13 @@ test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never trigge
   assert.equal(rThrown.skippedByReason.lookup_error, 1);
   assert.equal(notified, 0);
 
-  // Case C: saveRegistry fails -> notifications are suppressed so next run won't duplicate
+  // Case C: saveRegistry fails -> notifications are suppressed and in-memory state is rolled back
+  const inMemoryRegistry = [makeCall()];
   const rSaveFail = await runAutomatedAlertsMonitor({
     now: () => NOW,
     maxDataAgeMs: 60_000,
     withLock: async (fn) => fn(),
-    loadRegistry: async () => [makeCall()],
+    loadRegistry: async () => inMemoryRegistry,
     saveRegistry: async () => ({ success: false, error: 'kv write error' }),
     getMarketData: async () => makeTelemetry({ marketCap: 300_000 }),
     notifyTp: async () => ({ sent: ++notified, failed: 0, total: 1 }),
@@ -340,6 +346,31 @@ test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never trigge
   assert.equal(rSaveFail.tpTriggered, 0);
   assert.equal(rSaveFail.notificationsSent, 0);
   assert.equal(notified, 0);
+  assert.equal(
+    inMemoryRegistry[0].takeProfits[0].hit,
+    false,
+    'Failed persistence must roll back in-memory mutations so state is never corrupted'
+  );
+  assert.equal(inMemoryRegistry[0].outcome, 'NEUTRAL');
+
+  // Case D: Telegram notification failure is recorded in errors without corrupting persisted registry state
+  const persistedRegistry = [makeCall()];
+  const rNotifyFail = await runAutomatedAlertsMonitor({
+    now: () => NOW,
+    maxDataAgeMs: 60_000,
+    withLock: async (fn) => fn(),
+    loadRegistry: async () => persistedRegistry,
+    saveRegistry: async () => ({ success: true }),
+    getMarketData: async () => makeTelemetry({ marketCap: 250_000 }),
+    notifyTp: async () => {
+      throw new Error('Telegram Bot API 502 Bad Gateway');
+    },
+    notifySl: async () => ({ sent: 0, failed: 0, total: 0 }),
+  });
+  assert.equal(rNotifyFail.tpTriggered, 1);
+  assert.equal(rNotifyFail.notificationsSent, 0);
+  assert.equal(persistedRegistry[0].takeProfits[0].hit, true, 'Persisted state remains intact');
+  assert.ok(rNotifyFail.errors.some((e) => e.includes('Telegram Bot API 502')));
 });
 
 test('Alerts Monitor: evaluateTargets requires positive finite entry and current USD market caps', () => {
@@ -417,6 +448,40 @@ test('Alerts Monitor Route: GET /api/telegram/monitor enforces CRON_SECRET and B
     assert.ok(typeof bodyOk.executedAt === 'string' && !Number.isNaN(Date.parse(bodyOk.executedAt)));
     assert.ok(typeof bodyOk.durationMs === 'number' && bodyOk.durationMs >= 0);
     assert.ok(typeof bodyOk.result?.evaluated === 'number');
+
+    // 4. Unhandled execution failure (e.g., production without Redis) -> 500
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevAllowFile = process.env.ALLOW_FILE_PERSISTENCE;
+    const prevRedisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_FILE_PERSISTENCE = 'false';
+      delete process.env.UPSTASH_REDIS_REST_URL;
+
+      const reqFail = new NextRequest('http://localhost:3000/api/telegram/monitor', {
+        headers: { authorization: 'Bearer test-cron-secret-xyz' },
+      });
+      const resFail = await monitorGet(reqFail);
+      assert.equal(resFail.status, 500);
+      assert.deepEqual(await resFail.json(), {
+        ok: false,
+        error: 'TP/SL monitoring execution failed',
+      });
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      if (prevAllowFile === undefined) delete process.env.ALLOW_FILE_PERSISTENCE;
+      else process.env.ALLOW_FILE_PERSISTENCE = prevAllowFile;
+      if (prevRedisUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+      else process.env.UPSTASH_REDIS_REST_URL = prevRedisUrl;
+    }
+
+    // 5. Sweep endpoint (/api/telegram/sweep) auth verification (rejects missing Bearer prefix)
+    const sweepBareSecret = new NextRequest('http://localhost:3000/api/telegram/sweep', {
+      headers: { authorization: 'test-cron-secret-xyz' },
+    });
+    const resSweepBare = await sweepGet(sweepBareSecret);
+    assert.equal(resSweepBare.status, 401, 'Sweep route must reject secret without Bearer prefix');
   } finally {
     if (prevSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = prevSecret;

@@ -29,7 +29,11 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '');
 export const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const API_BASE = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
-export const SITE_URL = (process.env.SITE_URL || 'https://trenchlabshq.xyz').replace(/\/$/, '');
+export const SITE_URL = (
+  process.env.SITE_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  'https://trenchlabshq.xyz'
+).replace(/\/$/, '');
 
 // Group Invite Links (Configured strictly via environment variables, never hardcoded)
 export const MEMBER_INVITE_URL = process.env.TELEGRAM_MEMBER_INVITE_URL || '';
@@ -315,98 +319,114 @@ export interface SweepResult {
  */
 export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult> {
   const result: SweepResult = { checked: 0, demotedToMember: 0, evicted: 0, errors: 0, truncated: false };
-  const started = Date.now();
-  const members = await listGroupMembers();
-  const BATCH = 10;
-
-  for (let i = 0; i < members.length; i += BATCH) {
-    if (Date.now() - started > budgetMs) {
-      result.truncated = true;
-      break;
+  const lockKey = 'lock:sweep_group_members';
+  const lockToken = crypto.randomUUID();
+  let locked = false;
+  if (KV_CONFIGURED) {
+    locked = await kvLock(lockKey, lockToken, 65);
+    if (!locked) {
+      return result;
     }
+  }
 
-    await Promise.all(
-      members.slice(i, i + BATCH).map(async (m) => {
-        result.checked++;
-        try {
-          if (isAdminWallet(m.wallet_address)) return;
+  try {
+    const started = Date.now();
+    const members = await listGroupMembers();
+    const BATCH = 10;
 
-          const currentTier = await resolveTier(m.wallet_address);
-          if (currentTier === 'unknown') {
-            console.warn(`[TrenchLabs Sweep] Skipping ${m.wallet_address} due to RPC/balance error; eviction prevented`);
-            return;
-          }
-          const userId = m.telegram_user_id as number;
+    for (let i = 0; i < members.length; i += BATCH) {
+      if (Date.now() - started > budgetMs) {
+        result.truncated = true;
+        break;
+      }
 
-          // Case A: Was registered as PRO, but stake is now expired/unqualified
-          if (m.tier === 'pro' && currentTier !== 'pro') {
-            // Kick from Pro group
-            if (TELEGRAM_GROUPS.pro) {
-              await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId });
-              await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId, only_if_banned: true });
+      await Promise.all(
+        members.slice(i, i + BATCH).map(async (m) => {
+          result.checked++;
+          try {
+            if (isAdminWallet(m.wallet_address)) return;
+
+            const currentTier = await resolveTier(m.wallet_address);
+            if (currentTier === 'unknown') {
+              console.warn(`[TrenchLabs Sweep] Skipping ${m.wallet_address} due to RPC/balance error; eviction prevented`);
+              return;
+            }
+            const userId = m.telegram_user_id as number;
+
+            // Case A: Was registered as PRO, but stake is now expired/unqualified
+            if (m.tier === 'pro' && currentTier !== 'pro') {
+              // Kick from Pro group
+              if (TELEGRAM_GROUPS.pro) {
+                await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId });
+                await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.pro), user_id: userId, only_if_banned: true });
+              }
+
+              if (currentTier === 'member') {
+                // Downgrade to Member
+                await upsertTelegramMember({
+                  wallet_address: m.wallet_address,
+                  telegram_user_id: userId,
+                  tier: 'member',
+                  in_group: true,
+                });
+                result.demotedToMember++;
+
+                const memberInviteLine = MEMBER_INVITE_URL
+                  ? `👉 <b>Join the Member Group:</b> ${MEMBER_INVITE_URL}\n\n`
+                  : '';
+
+                await tgSend(
+                  userId,
+                  `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
+                  `Your 90-day stake has completed. Because your wallet still holds $20+ in $GENESIS, you remain a <b>Member</b>.\n\n` +
+                  memberInviteLine +
+                  `To regain full Pro access and priority signals, re-stake at least $250 in $GENESIS:\n` +
+                  `🔗 ${SITE_URL}/dashboard/stake`
+                );
+              } else {
+                // Less than $20 held too -> completely out
+                await setMemberInGroup(m.wallet_address, false);
+                result.evicted++;
+
+                await tgSend(
+                  userId,
+                  `⚠️ <b>Access Expired</b>\n\n` +
+                  `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $GENESIS.\n\n` +
+                  `Top up or re-stake on the dashboard to regain access:\n` +
+                  `🔗 ${SITE_URL}/dashboard`
+                );
+              }
             }
 
-            if (currentTier === 'member') {
-              // Downgrade to Member
-              await upsertTelegramMember({
-                wallet_address: m.wallet_address,
-                telegram_user_id: userId,
-                tier: 'member',
-                in_group: true,
-              });
-              result.demotedToMember++;
-
-              const memberInviteLine = MEMBER_INVITE_URL
-                ? `👉 <b>Join the Member Group:</b> ${MEMBER_INVITE_URL}\n\n`
-                : '';
-
-              await tgSend(
-                userId,
-                `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
-                `Your 90-day stake has completed. Because your wallet still holds $20+ in $GENESIS, you remain a <b>Member</b>.\n\n` +
-                memberInviteLine +
-                `To regain full Pro access and priority signals, re-stake at least $250 in $GENESIS:\n` +
-                `🔗 ${SITE_URL}/dashboard/stake`
-              );
-            } else {
-              // Less than $20 held too -> completely out
+            // Case B: Was registered as MEMBER, but balance fell below $20
+            else if (m.tier === 'member' && currentTier === 'free') {
+              if (TELEGRAM_GROUPS.member) {
+                await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId });
+                await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId, only_if_banned: true });
+              }
               await setMemberInGroup(m.wallet_address, false);
               result.evicted++;
 
               await tgSend(
                 userId,
-                `⚠️ <b>Access Expired</b>\n\n` +
-                `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $GENESIS.\n\n` +
-                `Top up or re-stake on the dashboard to regain access:\n` +
-                `🔗 ${SITE_URL}/dashboard`
+                `⚠️ Your wallet no longer holds the minimum $20 in $GENESIS required for Member access. You have been removed from the Member group.\n\n` +
+                `Top up at ${SITE_URL}/dashboard to get a new invite.`
               );
             }
+          } catch (err) {
+            result.errors++;
+            console.error('[TrenchLabs] sweep error for member:', err);
           }
+        })
+      );
+    }
 
-          // Case B: Was registered as MEMBER, but balance fell below $20
-          else if (m.tier === 'member' && currentTier === 'free') {
-            if (TELEGRAM_GROUPS.member) {
-              await tgCall('banChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId });
-              await tgCall('unbanChatMember', { chat_id: normChat(TELEGRAM_GROUPS.member), user_id: userId, only_if_banned: true });
-            }
-            await setMemberInGroup(m.wallet_address, false);
-            result.evicted++;
-
-            await tgSend(
-              userId,
-              `⚠️ Your wallet no longer holds the minimum $20 in $GENESIS required for Member access. You have been removed from the Member group.\n\n` +
-              `Top up at ${SITE_URL}/dashboard to get a new invite.`
-            );
-          }
-        } catch (err) {
-          result.errors++;
-          console.error('[TrenchLabs] sweep error for member:', err);
-        }
-      })
-    );
+    return result;
+  } finally {
+    if (locked) {
+      await kvUnlock(lockKey, lockToken).catch(() => false);
+    }
   }
-
-  return result;
 }
 
 // ---------- linking ----------
@@ -447,10 +467,10 @@ export async function completeLink(code: string, chatId: string | number): Promi
   if (!wallet) return null;
 
   const lockKey = `lock:link:${wallet}`;
-  const token = Math.random().toString(36).slice(2);
+  const token = crypto.randomUUID();
   let locked = false;
   if (KV_CONFIGURED) {
-    locked = await kvLock(lockKey, token, 10);
+    locked = await kvLock(lockKey, token, 15);
   }
   try {
     const prevWallet = await kvGet(chatKey(chatId));
@@ -569,8 +589,8 @@ export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ d
   if (!telegramConfigured()) return { dispatched: 0, pending: 0 };
 
   const lockKey = 'lock:dispatch_delayed_member_calls';
-  const lockToken = Math.random().toString(36).slice(2);
-  const locked = await kvLock(lockKey, lockToken, 45);
+  const lockToken = crypto.randomUUID();
+  const locked = await kvLock(lockKey, lockToken, 65);
   if (!locked) {
     return { dispatched: 0, pending: 0 };
   }
@@ -780,9 +800,11 @@ export async function notifyTpTriggered(
             await unlinkWallet(wallet);
             result.removed++;
           } else {
+            console.error('[TrenchLabs] TP alert send failed:', res.status, res.description);
             result.skipped++;
           }
-        } catch {
+        } catch (err) {
+          console.error('[TrenchLabs] TP alert fan-out error:', err);
           result.skipped++;
         }
       })
@@ -833,9 +855,11 @@ export async function notifySlTriggered(
             await unlinkWallet(wallet);
             result.removed++;
           } else {
+            console.error('[TrenchLabs] SL alert send failed:', res.status, res.description);
             result.skipped++;
           }
-        } catch {
+        } catch (err) {
+          console.error('[TrenchLabs] SL alert fan-out error:', err);
           result.skipped++;
         }
       })

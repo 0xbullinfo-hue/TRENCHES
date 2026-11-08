@@ -180,11 +180,12 @@ let dbLockChain = Promise.resolve();
 
 async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = dbLockChain.then(async () => {
+    assertPersistence();
     if (!KV_CONFIGURED) return fn();
     const token = safeRandomUUID();
     let acquired = false;
     for (let i = 0; i < 20 && !acquired; i++) {
-      acquired = await kvLock(DB_LOCK_KEY, token, 10);
+      acquired = await kvLock(DB_LOCK_KEY, token, 30);
       if (!acquired) await sleep(100);
     }
     if (!acquired) throw new Error('Database busy, retry shortly');

@@ -1,6 +1,17 @@
 import fs from 'fs';
 import crypto from 'crypto';
-import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  KV_CONFIGURED,
+  isKvConfigured,
+  kvGet,
+  kvSet,
+  kvLock,
+  kvRenewLock,
+  kvVerifyLock,
+  kvUnlock,
+  kvSetIfLocked,
+} from '@/server/kv';
 import path from 'path';
 import type {
   AlphaArtTheme,
@@ -101,33 +112,199 @@ export function buildTakeProfits(
 const DEFAULT_REGISTRY: AlphaRecord[] = [];
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'calls.json');
-const KV_KEY = 'trench:calls:v1';
-const KV_LOCK_KEY = 'trench:calls:lock';
+export const KV_KEY = 'trench:calls:v1';
+export const KV_LOCK_KEY = 'trench:calls:lock';
+/**
+ * Default distributed lock lease in seconds.
+ * Must exceed the maximum serverless function duration (maxDuration = 60s).
+ */
+export const DEFAULT_REGISTRY_LOCK_TTL_SEC = 65;
 
 /** Local-disk persistence is only allowed in dev, or explicitly on a single persistent server. */
-const FILE_PERSISTENCE_ALLOWED =
-  process.env.NODE_ENV !== 'production' || process.env.ALLOW_FILE_PERSISTENCE === 'true';
+export function isFilePersistenceAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV !== 'production' || env.ALLOW_FILE_PERSISTENCE === 'true';
+}
+
+export interface RegistryLockKvAdapter {
+  isConfigured: (env?: NodeJS.ProcessEnv) => boolean;
+  lock: (key: string, token: string, ttlSec: number) => Promise<boolean>;
+  renew: (key: string, token: string, ttlSec: number) => Promise<boolean>;
+  verify: (key: string, token: string) => Promise<boolean>;
+  unlock: (key: string, token: string) => Promise<boolean>;
+  setIfLocked: (lockKey: string, lockToken: string, dataKey: string, value: string) => Promise<boolean>;
+}
+
+const defaultLockKvAdapter: RegistryLockKvAdapter = {
+  isConfigured: (env) => KV_CONFIGURED || isKvConfigured(env),
+  lock: kvLock,
+  renew: kvRenewLock,
+  verify: kvVerifyLock,
+  unlock: kvUnlock,
+  setIfLocked: kvSetIfLocked,
+};
+
+export interface RegistryLockContext {
+  readonly key: string;
+  readonly token: string;
+  readonly ttlSec: number;
+  readonly isDistributed: boolean;
+  lost: boolean;
+  lostReason?: string;
+  assertOwned: () => Promise<void>;
+  setProtected: (dataKey: string, value: string) => Promise<boolean>;
+}
+
+export interface RegistryLockOptions {
+  /** Lock TTL in seconds (default: 65s, exceeding 60s maxDuration). */
+  ttlSec?: number;
+  /** Interval in ms between atomic lease renewals (default: min(15s, ttl/3)). */
+  renewIntervalMs?: number;
+  /** Max lock acquisition attempts under contention (default: 20). */
+  maxAttempts?: number;
+  /** Delay in ms between acquisition retries (default: 150ms). */
+  retryDelayMs?: number;
+  /** Optional environment override for tests. */
+  env?: NodeJS.ProcessEnv;
+  /** Optional KV adapter override for deterministic distributed lock testing. */
+  kv?: Partial<RegistryLockKvAdapter>;
+}
+
+const registryLockStorage = new AsyncLocalStorage<RegistryLockContext>();
 
 let registryLockChain: Promise<unknown> = Promise.resolve();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Serialises read-modify-write cycles: in-process queue + distributed lock when KV is configured. */
-export function withRegistryLock<T>(fn: () => Promise<T> | T): Promise<T> {
+/**
+ * Serialises read-modify-write cycles:
+ * - In-process promise queue + distributed Redis lock when KV is configured.
+ * - Uses cryptographically unique tokens (crypto.randomUUID()).
+ * - Uses a 65s lease (> 60s maxDuration) with periodic atomic token-verified lease renewal.
+ * - Tracks lock ownership via AsyncLocalStorage and aborts writes if lock ownership is lost.
+ * - Fails safely in serverless production if neither Redis nor ALLOW_FILE_PERSISTENCE=true is configured.
+ */
+export function withRegistryLock<T>(
+  fn: (ctx: RegistryLockContext) => Promise<T> | T,
+  options: RegistryLockOptions = {}
+): Promise<T> {
+  const env = options.env ?? process.env;
+  const kv: RegistryLockKvAdapter = { ...defaultLockKvAdapter, ...options.kv };
+  const ttlSec =
+    typeof options.ttlSec === 'number' && Number.isFinite(options.ttlSec) && options.ttlSec > 0
+      ? Math.max(1, Math.ceil(options.ttlSec))
+      : DEFAULT_REGISTRY_LOCK_TTL_SEC;
+  const renewIntervalMs =
+    typeof options.renewIntervalMs === 'number' &&
+    Number.isFinite(options.renewIntervalMs) &&
+    options.renewIntervalMs > 0
+      ? options.renewIntervalMs
+      : Math.max(100, Math.min(15_000, Math.floor((ttlSec * 1000) / 3)));
+  const maxAttempts =
+    typeof options.maxAttempts === 'number' && options.maxAttempts >= 1 ? Math.floor(options.maxAttempts) : 20;
+  const retryDelayMs =
+    typeof options.retryDelayMs === 'number' && options.retryDelayMs >= 0 ? options.retryDelayMs : 150;
+
   const run = registryLockChain.then(async () => {
-    if (!KV_CONFIGURED) return fn();
     const token = crypto.randomUUID();
-    let acquired = false;
-    for (let i = 0; i < 20 && !acquired; i++) {
-      acquired = await kvLock(KV_LOCK_KEY, token, 10);
-      if (!acquired) await sleep(150);
+    const distributed = kv.isConfigured(env);
+
+    if (!distributed) {
+      if (!isFilePersistenceAllowed(env)) {
+        throw new Error(
+          'Production distributed lock requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or ALLOW_FILE_PERSISTENCE=true on a single persistent server).'
+        );
+      }
+      const localCtx: RegistryLockContext = {
+        key: KV_LOCK_KEY,
+        token,
+        ttlSec,
+        isDistributed: false,
+        lost: false,
+        assertOwned: async () => {
+          if (localCtx.lost) {
+            throw new Error(localCtx.lostReason || 'Registry lock ownership lost');
+          }
+        },
+        setProtected: async () => !localCtx.lost,
+      };
+      return await registryLockStorage.run(localCtx, () => fn(localCtx));
     }
-    if (!acquired) throw new Error('Registry busy, retry shortly');
+
+    let acquired = false;
+    for (let i = 0; i < maxAttempts && !acquired; i++) {
+      // Redis errors propagate immediately (never silently treat failure as acquired lock)
+      acquired = await kv.lock(KV_LOCK_KEY, token, ttlSec);
+      if (!acquired && i + 1 < maxAttempts) {
+        await sleep(retryDelayMs);
+      }
+    }
+    if (!acquired) {
+      throw new Error('Registry busy, retry shortly');
+    }
+
+    const ctx: RegistryLockContext = {
+      key: KV_LOCK_KEY,
+      token,
+      ttlSec,
+      isDistributed: true,
+      lost: false,
+      assertOwned: async () => {
+        if (ctx.lost) {
+          throw new Error(ctx.lostReason || 'Registry lock ownership lost');
+        }
+        const ok = await kv.verify(KV_LOCK_KEY, token);
+        if (!ok) {
+          ctx.lost = true;
+          ctx.lostReason = 'Registry lock ownership lost in Redis';
+          throw new Error(ctx.lostReason);
+        }
+      },
+      setProtected: async (dataKey: string, value: string) => {
+        if (ctx.lost) return false;
+        const ok = await kv.setIfLocked(KV_LOCK_KEY, token, dataKey, value);
+        if (!ok) {
+          ctx.lost = true;
+          ctx.lostReason = 'Registry lock ownership lost before save';
+        }
+        return ok;
+      },
+    };
+
+    let renewInFlight = false;
+    const renewTimer = setInterval(async () => {
+      if (renewInFlight || ctx.lost) return;
+      renewInFlight = true;
+      try {
+        const renewed = await kv.renew(KV_LOCK_KEY, token, ttlSec);
+        if (!renewed) {
+          ctx.lost = true;
+          ctx.lostReason = 'Registry lock renewal failed: lock expired or owned by another worker';
+          clearInterval(renewTimer);
+        }
+      } catch (err) {
+        ctx.lost = true;
+        ctx.lostReason = `Registry lock renewal error: ${(err as Error).message || 'Redis error'}`;
+        clearInterval(renewTimer);
+      } finally {
+        renewInFlight = false;
+      }
+    }, renewIntervalMs);
+
+    if (typeof renewTimer.unref === 'function') {
+      renewTimer.unref();
+    }
+
     try {
-      return await fn();
+      const result = await registryLockStorage.run(ctx, () => fn(ctx));
+      if (ctx.lost) {
+        throw new Error(ctx.lostReason || 'Registry lock ownership lost during execution');
+      }
+      return result;
     } finally {
-      await kvUnlock(KV_LOCK_KEY, token).catch(() => undefined);
+      clearInterval(renewTimer);
+      await kv.unlock(KV_LOCK_KEY, token).catch(() => false);
     }
   });
+
   registryLockChain = run.then(
     () => undefined,
     () => undefined
@@ -140,12 +317,17 @@ export function withRegistryLock<T>(fn: () => Promise<T> | T): Promise<T> {
  * returns defaults), otherwise the next save would overwrite real data with seed data.
  */
 export async function loadCallsRegistry(): Promise<AlphaRecord[]> {
-  if (KV_CONFIGURED) {
+  if (KV_CONFIGURED || isKvConfigured()) {
     const raw = await kvGet(KV_KEY);
     if (!raw) return DEFAULT_REGISTRY;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) throw new Error('Corrupt calls registry in KV');
     return parsed as AlphaRecord[];
+  }
+  if (!isFilePersistenceAllowed()) {
+    throw new Error(
+      'Persistence not configured. Set UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or ALLOW_FILE_PERSISTENCE=true on a single persistent server).'
+    );
   }
   if (!fs.existsSync(DATA_FILE_PATH)) return DEFAULT_REGISTRY;
   const parsed = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf-8'));
@@ -157,11 +339,31 @@ export async function saveCallsRegistry(
   records: AlphaRecord[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (KV_CONFIGURED) {
+    const ctx = registryLockStorage.getStore();
+    if (ctx) {
+      if (ctx.lost) {
+        return {
+          success: false,
+          error: ctx.lostReason || 'Registry lock ownership lost; aborting write',
+        };
+      }
+      if (ctx.isDistributed) {
+        const written = await ctx.setProtected(KV_KEY, JSON.stringify(records));
+        if (!written) {
+          return {
+            success: false,
+            error: ctx.lostReason || 'Registry lock ownership lost before save',
+          };
+        }
+        return { success: true };
+      }
+    }
+
+    if (KV_CONFIGURED || isKvConfigured()) {
       await kvSet(KV_KEY, JSON.stringify(records));
       return { success: true };
     }
-    if (!FILE_PERSISTENCE_ALLOWED) {
+    if (!isFilePersistenceAllowed()) {
       return {
         success: false,
         error:

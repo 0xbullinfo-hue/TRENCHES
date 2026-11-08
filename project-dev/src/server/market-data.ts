@@ -15,6 +15,7 @@
  * The previous implementation called /coins/token/<ca> and parsed `data.coin || data`; that route does
  * not exist (404) and the response is a `result` array, so it could never have returned data.
  */
+import crypto from 'crypto';
 import { KV_CONFIGURED, kvGet, kvLock, kvSetEx, kvUnlock } from '@/server/kv';
 import {
   describeCoinStatsConfig,
@@ -734,7 +735,7 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
   async function refresh(token: MarketToken, stale: CacheRecord | null): Promise<NormalizedMarketData> {
     const cfg = config();
     const lockKey = `md:lock:${token.chain}:${token.contractAddress}`;
-    const lockToken = Math.random().toString(36).slice(2);
+    const lockToken = crypto.randomUUID();
     let lockHeld = false;
 
     // Cross-instance single flight: if another instance is already refreshing this token, wait briefly

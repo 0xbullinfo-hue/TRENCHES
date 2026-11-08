@@ -8,13 +8,31 @@ const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 export const KV_CONFIGURED = Boolean(KV_URL && KV_TOKEN);
 
+export function isKvConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(env.UPSTASH_REDIS_REST_URL?.trim() && env.UPSTASH_REDIS_REST_TOKEN?.trim());
+}
+
+const UNLOCK_LUA =
+  "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
+
+const RENEW_LOCK_LUA =
+  "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('expire',KEYS[1],tonumber(ARGV[2])) else return 0 end";
+
+const SET_IF_LOCKED_LUA =
+  "if redis.call('get',KEYS[1])==ARGV[1] then redis.call('set',KEYS[2],ARGV[2]) return 1 else return 0 end";
+
 async function cmd(args: Array<string | number>): Promise<unknown> {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim() || KV_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || KV_TOKEN;
+  if (!url || !token) {
+    throw new Error('KV error: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not configured');
+  }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 4_000);
   try {
-    const res = await fetch(KV_URL as string, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(args),
       cache: 'no-store',
       signal: ctrl.signal,
@@ -44,17 +62,53 @@ export async function kvIncrWindow(key: string, windowSec: number): Promise<numb
 }
 
 export async function kvLock(key: string, token: string, ttlSec: number): Promise<boolean> {
-  return (await cmd(['SET', key, token, 'NX', 'EX', ttlSec])) === 'OK';
+  if (!key || !token) throw new Error('kvLock requires non-empty key and token');
+  const safeTtl = Math.max(1, Math.ceil(ttlSec));
+  if (!Number.isFinite(safeTtl)) throw new Error('kvLock requires a finite positive ttlSec');
+  return (await cmd(['SET', key, token, 'NX', 'EX', safeTtl])) === 'OK';
 }
 
-export async function kvUnlock(key: string, token: string): Promise<void> {
-  await cmd([
-    'EVAL',
-    "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
-    1,
-    key,
-    token,
-  ]);
+/**
+ * Atomically extends the lock TTL only when the existing lock token matches `token`.
+ * Returns true if the lease was renewed, false if the lock expired or is held by another owner.
+ */
+export async function kvRenewLock(key: string, token: string, ttlSec: number): Promise<boolean> {
+  if (!key || !token) return false;
+  const safeTtl = Math.max(1, Math.ceil(ttlSec));
+  if (!Number.isFinite(safeTtl)) return false;
+  const res = await cmd(['EVAL', RENEW_LOCK_LUA, 1, key, token, safeTtl]);
+  return Number(res) === 1;
+}
+
+/** Checks whether the lock key is currently owned by `token`. */
+export async function kvVerifyLock(key: string, token: string): Promise<boolean> {
+  if (!key || !token) return false;
+  return (await kvGet(key)) === token;
+}
+
+/**
+ * Atomically releases the lock only when the existing lock token matches `token`.
+ * Returns true if deleted, false if already expired or owned by another worker.
+ */
+export async function kvUnlock(key: string, token: string): Promise<boolean> {
+  if (!key || !token) return false;
+  const res = await cmd(['EVAL', UNLOCK_LUA, 1, key, token]);
+  return Number(res) === 1;
+}
+
+/**
+ * Atomically writes `dataKey = value` ONLY if `lockKey` is currently held by `lockToken`.
+ * Prevents a worker whose lock expired from overwriting shared state.
+ */
+export async function kvSetIfLocked(
+  lockKey: string,
+  lockToken: string,
+  dataKey: string,
+  value: string
+): Promise<boolean> {
+  if (!lockKey || !lockToken || !dataKey) return false;
+  const res = await cmd(['EVAL', SET_IF_LOCKED_LUA, 2, lockKey, dataKey, lockToken, value]);
+  return Number(res) === 1;
 }
 
 export async function kvSetEx(key: string, value: string, ttlSec: number): Promise<void> {
