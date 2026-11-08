@@ -610,10 +610,8 @@ export const IncubatorHub: React.FC = () => {
               </div>
 
               <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-                Exclusive multi-chain trade calls for verified{' '}
-                <span className="text-pump font-bold">$GENESIS</span> holders
-                across <strong className="text-white">SOL, BSC, ETH, BASE, ROBIN (Robinhood Chain), &amp; AVAX</strong>.
-                Every card displays live Market Cap, dual Risk Ratio, and Take Profit multipliers (<span className="font-mono text-pump">2x / 5x / 10x</span>).
+                Your community edge in the trenches. Connect your wallet to unlock curated multi-chain trade calls across 6 chains with structured Entry MC and target take-profits — or run community raids to earn verified{' '}
+                <span className="text-pump font-bold">$GENESIS</span> airdrops.
               </p>
             </div>
 
