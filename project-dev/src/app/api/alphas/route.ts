@@ -150,6 +150,14 @@ export async function GET(req: NextRequest) {
     })
   );
 
+  let verifiedUsersCount = 0;
+  try {
+    const { countVerifiedUsers } = await import('@/server/db');
+    verifiedUsersCount = await countVerifiedUsers();
+  } catch {
+    verifiedUsersCount = 0;
+  }
+
   const body: AlphasOk = {
     ok: true,
     tier: tier.id,
@@ -164,6 +172,7 @@ export async function GET(req: NextRequest) {
     callers: buildCallers(registry),
     portfolio: samplePortfolio(),
     serverTime: new Date().toISOString(),
+    verifiedUsersCount,
   };
 
   return NextResponse.json(body, { headers: NO_STORE });

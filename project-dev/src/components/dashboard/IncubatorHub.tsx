@@ -81,6 +81,7 @@ export const IncubatorHub: React.FC = () => {
     deleteAlphaCall,
     setCallOutcome,
     getAdminHeaders,
+    verifiedUsersCount,
     apiLoading,
     apiError,
     refreshAll,
@@ -836,7 +837,7 @@ export const IncubatorHub: React.FC = () => {
   const totalCallsMade = alphas.length;
   const totalProfitCalls = alphas.filter((a) => a.outcome === 'PROFIT').length;
   const totalLoseCalls = alphas.filter((a) => a.outcome === 'LOSS').length;
-  const totalVerifiedUsers = 142;
+  const totalVerifiedUsers = verifiedUsersCount ?? 0;
 
   return (
     <div className="space-y-6 pb-10">

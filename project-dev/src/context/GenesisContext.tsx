@@ -94,6 +94,7 @@ interface GenesisContextValue {
   alphas: AlphaItem[];
   callers: SyndicateCaller[];
   portfolio: Portfolio | null;
+  verifiedUsersCount: number;
   apiLoading: boolean;
   apiError: string | null;
   needsSignature: boolean;
@@ -155,6 +156,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [alphas, setAlphas] = useState<AlphaItem[]>([]);
   const [callers, setCallers] = useState<SyndicateCaller[]>([]);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [verifiedUsersCount, setVerifiedUsersCount] = useState<number>(0);
   const [apiLoading, setApiLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [needsSignature, setNeedsSignature] = useState<boolean>(false);
@@ -730,6 +732,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setAlphas([]);
           setCallers([]);
           setPortfolio(null);
+          setVerifiedUsersCount(0);
           setApiError(!data.ok ? data.message || data.error : 'ACCESS_DENIED_ZERO_BALANCE');
         } else {
           // Patch 7: Read verified balance from server response
@@ -737,6 +740,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setAlphas(data.items);
           setCallers(data.callers ?? []);
           setPortfolio(data.portfolio);
+          setVerifiedUsersCount(typeof data.verifiedUsersCount === 'number' ? data.verifiedUsersCount : 0);
           setApiError(null);
         }
       } catch (err) {
@@ -1102,6 +1106,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     setAlphas([]);
     setCallers([]);
     setPortfolio(null);
+    setVerifiedUsersCount(0);
     setApiError(null);
     setNeedsSignature(false);
 
@@ -1139,6 +1144,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     alphas,
     callers,
     portfolio,
+    verifiedUsersCount,
     apiLoading,
     apiError,
     needsSignature,

@@ -156,6 +156,7 @@ export interface AlphasOk {
   callers: SyndicateCaller[];
   portfolio: Portfolio;
   serverTime: string;
+  verifiedUsersCount?: number;
 }
 
 export interface AlphasErr {

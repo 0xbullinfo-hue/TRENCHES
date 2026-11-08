@@ -597,6 +597,25 @@ export async function listGroupMembers(): Promise<TelegramMemberRow[]> {
   return db.telegram_members.filter((m) => m.in_group && m.telegram_user_id !== null);
 }
 
+export async function countVerifiedUsers(): Promise<number> {
+  const db = await loadDb();
+  const verifiedWallets = new Set<string>();
+
+  for (const m of db.telegram_members || []) {
+    if (m.in_group || m.telegram_user_id !== null) {
+      if (m.wallet_address) verifiedWallets.add(m.wallet_address);
+    }
+  }
+
+  for (const s of db.verification_sessions || []) {
+    if (s.used_at !== null || s.telegram_user_id !== null) {
+      if (s.wallet_address) verifiedWallets.add(s.wallet_address);
+    }
+  }
+
+  return verifiedWallets.size;
+}
+
 export async function setMemberInGroup(walletAddress: string, inGroup: boolean): Promise<void> {
   await withDbLock(async () => {
     const db = await loadDb();
