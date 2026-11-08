@@ -4,10 +4,6 @@
     {
       "path": "/api/telegram/sweep",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/telegram/monitor",
-      "schedule": "*/5 * * * *"
     }
   ]
 }

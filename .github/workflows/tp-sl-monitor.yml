@@ -1,0 +1,33 @@
+name: TP/SL Automated Monitor (5m External Scheduler)
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger GET /api/telegram/monitor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://trenchlabshq.xyz' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not configured."
+            exit 1
+          fi
+          TARGET_URL="${SITE_URL%/}/api/telegram/monitor"
+          HTTP_STATUS=$(curl -sS -o /tmp/monitor_response.json -w "%{http_code}" \
+            --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "$TARGET_URL")
+          cat /tmp/monitor_response.json
+          echo ""
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Monitor endpoint returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
