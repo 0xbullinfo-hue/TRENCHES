@@ -23,6 +23,7 @@ import {
   calculateRequiredTokens,
   DEFAULT_GENESIS_USD_PRICE,
   Tier,
+  TierId,
   allocationCap,
   longevityPoints,
   tierFor,
@@ -70,6 +71,7 @@ export interface CreateCallPayload {
   takeProfitInput: string;
   pinned: boolean;
   isMaxAlpha?: boolean;
+  minTier?: TierId;
   summary?: string;
   serialTag?: string;
   logoUrl?: string;

@@ -80,3 +80,16 @@ test('formatCallMessage adheres to Lab Assistant template structure', () => {
   assert.equal(tg.MEMBER_DELAY_MS, 5 * 60 * 1000, 'Member tier delay must be exactly 5 minutes');
 });
 
+test('isProOnlyCall: correctly flags Pro-only and Max Alpha calls to prevent leak to $20 members', () => {
+  // Pro tier call
+  assert.equal(tg.isProOnlyCall({ minTier: 'PRO', isMaxAlpha: false }), true);
+  // Max Alpha call (regardless of minTier)
+  assert.equal(tg.isProOnlyCall({ minTier: 'LAB_MEMBER', isMaxAlpha: true }), true);
+  assert.equal(tg.isProOnlyCall({ minTier: 'PRO', isMaxAlpha: true }), true);
+
+  // General member call
+  assert.equal(tg.isProOnlyCall({ minTier: 'LAB_MEMBER', isMaxAlpha: false }), false);
+  assert.equal(tg.isProOnlyCall({ minTier: 'LAB_MEMBER' }), false);
+});
+
+

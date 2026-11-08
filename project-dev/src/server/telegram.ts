@@ -514,6 +514,14 @@ export function formatCallMessage(r: AlphaRecord): string {
   return lines.join('\n');
 }
 
+/**
+ * Checks whether an alpha call is strictly reserved for Pro traders ($250 staked).
+ * Pro-only calls (including MAX ALPHA or minTier === 'PRO') must never be sent or leaked to $20 Member tier users.
+ */
+export function isProOnlyCall(r: AlphaRecord): boolean {
+  return r.minTier === 'PRO' || Boolean(r.isMaxAlpha);
+}
+
 export interface FanoutResult {
   sent: number;
   skipped: number;
@@ -591,6 +599,12 @@ export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ d
     let dispatchedCount = 0;
 
     for (const item of due) {
+      // Pro-only calls must never be dispatched to $20 Member tier subscribers
+      if (isProOnlyCall(item.call)) {
+        await kvHDel(DELAYED_MEMBER_CALLS_KEY, item.callId);
+        continue;
+      }
+
       const text = formatCallMessage(item.call);
       for (let i = 0; i < subs.length; i += BATCH) {
         await Promise.all(
@@ -631,12 +645,13 @@ export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ d
 /**
  * Sends a new call to every linked holder.
  * PRO tier ($250 staked) & Master Admin get INSTANT delivery (0 delay).
- * MEMBER tier ($20 held) is enqueued for 5-minute delayed delivery.
+ * MEMBER tier ($20 held) is enqueued for 5-minute delayed delivery (unless the call is PRO-only).
  */
 export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<FanoutResult> {
   const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
   if (!telegramConfigured()) return result;
 
+  const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await kvHGetAll(SUBS_KEY));
   const text = formatCallMessage(r);
@@ -663,7 +678,12 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
           }
 
           if (tier === 'member') {
-            // Member tier is delayed by 5 minutes
+            // Pro-only calls are NEVER delivered to member tier (neither instant nor delayed)
+            if (isProOnly) {
+              result.skipped++;
+              return;
+            }
+            // Member tier is delayed by 5 minutes for general calls
             hasMembersToDelay = true;
             return;
           }
@@ -688,8 +708,8 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
     if (i + BATCH < subs.length) await sleep(1_100);
   }
 
-  // Enqueue 5-minute delayed alert for Member tier
-  if (hasMembersToDelay || subs.length > 0) {
+  // Enqueue 5-minute delayed alert for Member tier ONLY if this call is NOT Pro-only
+  if (!isProOnly && (hasMembersToDelay || subs.length > 0)) {
     await enqueueDelayedMemberCall(r);
   }
 
@@ -727,6 +747,7 @@ export async function notifyTpTriggered(
   const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
   if (!telegramConfigured()) return result;
 
+  const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await kvHGetAll(SUBS_KEY));
   const text = formatTpTriggeredMessage(r, targetLabel, currentMcStr);
@@ -741,12 +762,16 @@ export async function notifyTpTriggered(
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          if (!isAdminWallet(wallet)) {
-            const tier = await resolveTier(wallet);
-            if (tier === 'free') {
-              result.skipped++;
-              return;
-            }
+          const isAdmin = isAdminWallet(wallet);
+          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
+          if (tier === 'free') {
+            result.skipped++;
+            return;
+          }
+          // If this call is Pro-only, do not notify Member tier
+          if (isProOnly && tier !== 'pro') {
+            result.skipped++;
+            return;
           }
           const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
           if (res.ok) {
@@ -775,6 +800,7 @@ export async function notifySlTriggered(
   const result: FanoutResult = { sent: 0, skipped: 0, removed: 0, deferred: 0 };
   if (!telegramConfigured()) return result;
 
+  const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await kvHGetAll(SUBS_KEY));
   const text = formatSlTriggeredMessage(r, currentMcStr);
@@ -789,12 +815,16 @@ export async function notifySlTriggered(
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          if (!isAdminWallet(wallet)) {
-            const tier = await resolveTier(wallet);
-            if (tier === 'free') {
-              result.skipped++;
-              return;
-            }
+          const isAdmin = isAdminWallet(wallet);
+          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
+          if (tier === 'free') {
+            result.skipped++;
+            return;
+          }
+          // If this call is Pro-only, do not notify Member tier
+          if (isProOnly && tier !== 'pro') {
+            result.skipped++;
+            return;
           }
           const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
           if (res.ok) {

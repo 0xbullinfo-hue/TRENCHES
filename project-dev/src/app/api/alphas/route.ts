@@ -356,7 +356,7 @@ export async function POST(req: NextRequest) {
           : liveLogoUrl || undefined,
       entryMarketCap: formatCompactUsd(entryMcUsd),
       entryMarketCapUsd: entryMcUsd,
-      minTier: 'LAB_MEMBER',
+      minTier: isMaxAlpha || payload.minTier === 'PRO' ? 'PRO' : (payload.minTier === 'LOCKED' ? 'LOCKED' : 'LAB_MEMBER'),
       ca,
       links,
       summary:
@@ -582,6 +582,15 @@ export async function PATCH(req: NextRequest) {
 
       if (typeof payload.isMaxAlpha === 'boolean') {
         target.isMaxAlpha = payload.isMaxAlpha;
+        if (payload.isMaxAlpha) {
+          target.minTier = 'PRO';
+        } else if (!payload.minTier) {
+          target.minTier = 'LAB_MEMBER';
+        }
+      }
+
+      if (payload.minTier === 'PRO' || payload.minTier === 'LAB_MEMBER' || payload.minTier === 'LOCKED') {
+        target.minTier = payload.minTier;
       }
 
       if (

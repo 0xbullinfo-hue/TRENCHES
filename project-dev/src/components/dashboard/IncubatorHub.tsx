@@ -359,6 +359,7 @@ export const IncubatorHub: React.FC = () => {
         takeProfitInput: formTakeProfits.trim(),
         pinned: formPinned,
         isMaxAlpha: formMaxAlpha,
+        minTier: formMaxAlpha ? 'PRO' : 'LAB_MEMBER',
         summary: formSummary.trim(),
         logoUrl: formLogoUrl.trim() || undefined,
       });
@@ -387,6 +388,7 @@ export const IncubatorHub: React.FC = () => {
       takeProfitInput: formTakeProfits.trim() || '2x, 5x, 10x',
       pinned: formPinned,
       isMaxAlpha: formMaxAlpha,
+      minTier: formMaxAlpha ? 'PRO' : 'LAB_MEMBER',
       summary: formSummary.trim(),
       serialTag: formSerialTag.trim() || nextSerialTag,
       logoUrl: formLogoUrl.trim() || undefined,
@@ -396,12 +398,14 @@ export const IncubatorHub: React.FC = () => {
       showToast(
         `Posted ${formTicker.toUpperCase()} (${formChain}) [${
           formSerialTag.trim() || nextSerialTag
-        }]${formMaxAlpha ? ' [MAX ALPHA 🔥]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
+        }]${formMaxAlpha ? ' [MAX ALPHA 🔥 PRO ONLY]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
       );
       handleCancelEdit();
-      setTimeout(() => {
-        fetch('/api/telegram/dispatch-delayed', { method: 'POST' }).catch(() => {});
-      }, 5 * 60 * 1000);
+      if (!formMaxAlpha) {
+        setTimeout(() => {
+          fetch('/api/telegram/dispatch-delayed', { method: 'POST' }).catch(() => {});
+        }, 5 * 60 * 1000);
+      }
     } else {
       showToast('Failed to post call — ensure Admin Wallet is active.');
     }
@@ -999,7 +1003,7 @@ export const IncubatorHub: React.FC = () => {
                       className="accent-orange-500 w-4 h-4 cursor-pointer"
                     />
                     <Flame className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Max Alpha (Orange Outline)</span>
+                    <span>Max Alpha (Pro Only 🔥)</span>
                   </label>
 
                   <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-white cursor-pointer select-none">
