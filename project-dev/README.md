@@ -1,4 +1,4 @@
-# TrenchLabsHQ — PROJECT DEV
+# TrenchLabsHQ — project-dev
 
 Next.js 16 (App Router) dApp: a token-gated terminal of alpha calls for **$GENESIS** holders on Solana with **StakePoint** 90-day staking and live pool telemetry.
 

@@ -124,7 +124,7 @@ Runs periodically (hourly or daily via `vercel.json` cron) to audit group member
 
 ```
 Trench_Lab/
-├── PROJECT DEV/                     # Main Next.js 16 Web Application
+├── project-dev/                     # Main Next.js 16 Web Application
 │   ├── src/
 │   │   ├── app/                     # App Router pages & API routes
 │   │   │   ├── (public)/            # Landing page & public ledger
@@ -157,7 +157,7 @@ Trench_Lab/
 
 ## ⚙️ Environment Configuration
 
-Copy `PROJECT DEV/.env.example` to `PROJECT DEV/.env.local` and populate:
+Copy `project-dev/.env.example` to `project-dev/.env.local` and populate:
 
 ```ini
 # Production Session Secret (32+ characters)
@@ -202,7 +202,7 @@ STAKE_LOCK_DAYS=90
 Run all commands from inside the `PROJECT DEV` directory:
 
 ```bash
-cd "PROJECT DEV"
+cd "project-dev"
 
 # Install clean dependencies
 npm ci
@@ -254,7 +254,7 @@ For modern Next.js App Router applications, **Vercel** is the official and recom
 
 ### Setting Root Directory in Vercel
 In Vercel **Project Settings** $\to$ **General**:
-- Set **Root Directory** to `PROJECT DEV`.
+- Set **Root Directory** to `project-dev`.
 
 ---
 
