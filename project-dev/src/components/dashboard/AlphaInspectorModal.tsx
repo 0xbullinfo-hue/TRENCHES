@@ -181,6 +181,8 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
           <div className="flex items-start gap-4">
             <TokenArtwork
               art={token.art}
+              logoUrl={token.logoUrl}
+              ticker={token.ticker}
               size="md"
               chain={token.chain}
               quoteToken={token.quoteToken}
@@ -206,11 +208,10 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
                 <div className="text-right font-mono tnum">
                   <div className="text-lg font-extrabold text-white">
-                    {token.marketCap}{' '}
-                    <span className="text-xs font-normal text-muted">CURRENT MC</span>
+                    {token.entryMarketCap || token.marketCap}
                   </div>
                   <div className="text-xs font-bold text-pump">
-                    Entry MC: {token.entryMarketCap} (+{token.change24hPct.toFixed(0)}%)
+                    ENTRY MC
                   </div>
                 </div>
               </div>
@@ -226,13 +227,13 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {/* 1. Market Cap & Entry */}
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
               <div className="text-[11px] text-muted font-bold uppercase">
-                CURRENT MARKET CAP
+                ENTRY MARKET CAP
               </div>
               <div className="text-lg font-extrabold text-white font-mono">
-                {token.marketCap}
+                {token.entryMarketCap || token.marketCap}
               </div>
               <div className="text-xs text-pump font-mono">
-                Entry MC: {token.entryMarketCap}
+                Recorded at time of call
               </div>
             </div>
 

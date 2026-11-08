@@ -13,6 +13,7 @@ import {
   SOLSCAN,
 } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
+import { AlphaCallCard } from './AlphaCallCard';
 import { SinceCallChip } from './SinceCallChip';
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
@@ -110,6 +111,7 @@ export const IncubatorHub: React.FC = () => {
   const [formCa, setFormCa] = useState('');
   const [formName, setFormName] = useState('');
   const [formTicker, setFormTicker] = useState('');
+  const [formLogoUrl, setFormLogoUrl] = useState('');
   const [formChain, setFormChain] = useState<Chain>('SOL');
   const [formCurrentMc, setFormCurrentMc] = useState('$250K');
   const [formEntryMc, setFormEntryMc] = useState('$250K');
@@ -267,6 +269,7 @@ export const IncubatorHub: React.FC = () => {
       if (pair) {
         if (pair.baseToken?.name) setFormName(pair.baseToken.name);
         if (pair.baseToken?.symbol) setFormTicker(`$${pair.baseToken.symbol}`);
+        if (pair.info?.imageUrl) setFormLogoUrl(pair.info.imageUrl);
         const chainId = String(pair.chainId || '').toLowerCase();
         if (chainId.includes('sol')) setFormChain('SOL');
         else if (chainId.includes('bsc')) setFormChain('BSC');
@@ -302,6 +305,7 @@ export const IncubatorHub: React.FC = () => {
     setFormName(call.name);
     setFormTicker(call.ticker);
     setFormCa(call.ca || '');
+    setFormLogoUrl(call.logoUrl || '');
     setFormChain(call.chain);
     setFormCurrentMc(call.marketCap || '');
     setFormEntryMc(call.entryMarketCap || '');
@@ -323,6 +327,7 @@ export const IncubatorHub: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingCall(null);
     setFormCa('');
+    setFormLogoUrl('');
     setFormName('');
     setFormTicker('');
     setFormCurrentMc('$250K');
@@ -355,6 +360,7 @@ export const IncubatorHub: React.FC = () => {
         pinned: formPinned,
         isMaxAlpha: formMaxAlpha,
         summary: formSummary.trim(),
+        logoUrl: formLogoUrl.trim() || undefined,
       });
       setSubmittingCall(false);
       if (ok) {
@@ -383,6 +389,7 @@ export const IncubatorHub: React.FC = () => {
       isMaxAlpha: formMaxAlpha,
       summary: formSummary.trim(),
       serialTag: formSerialTag.trim() || nextSerialTag,
+      logoUrl: formLogoUrl.trim() || undefined,
     });
     setSubmittingCall(false);
     if (ok) {
@@ -413,13 +420,19 @@ export const IncubatorHub: React.FC = () => {
     }
   };
 
+  const isProOrAdmin = tier.id === 'PRO' || isAdmin;
+
   const pinnedCalls = useMemo(
     () =>
-      alphas.filter(
-        (a) =>
-          a.pinned && (selectedChain === 'ALL' || a.chain === selectedChain)
-      ),
-    [alphas, selectedChain]
+      isUnlocked
+        ? alphas.filter(
+            (a) =>
+              a.pinned &&
+              (selectedChain === 'ALL' || a.chain === selectedChain) &&
+              (!a.isMaxAlpha || isProOrAdmin)
+          )
+        : [],
+    [alphas, selectedChain, isUnlocked, isProOrAdmin]
   );
 
   const pinnedCampaigns = useMemo(
@@ -429,17 +442,24 @@ export const IncubatorHub: React.FC = () => {
 
   const totalPinned = pinnedCalls.length + pinnedCampaigns.length;
 
+  const visibleAlphas = useMemo(
+    () => alphas.filter((a) => !a.isMaxAlpha || isProOrAdmin),
+    [alphas, isProOrAdmin]
+  );
+
   const chainCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: alphas.length };
+    const counts: Record<string, number> = { ALL: visibleAlphas.length };
     for (const ch of ['SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX']) {
-      counts[ch] = alphas.filter((a) => a.chain === ch).length;
+      counts[ch] = visibleAlphas.filter((a) => a.chain === ch).length;
     }
     return counts;
-  }, [alphas]);
+  }, [visibleAlphas]);
 
   const filteredTokens = useMemo(() => {
     return alphas
       .filter((item) => {
+        // Only Admin and Pro users can see MAX ALPHA cards
+        if (item.isMaxAlpha && !isProOrAdmin) return false;
         if (selectedChain !== 'ALL' && item.chain !== selectedChain) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -477,362 +497,40 @@ export const IncubatorHub: React.FC = () => {
         if (sortBy === 'CHANGE') return b.change24hPct - a.change24hPct;
         return a.ageMinutes - b.ageMinutes;
       });
-  }, [alphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy]);
+  }, [alphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy, isProOrAdmin]);
 
   const topWinningCoins = useMemo(
-    () => [...alphas].sort((a, b) => b.change24hPct - a.change24hPct).slice(0, 4),
-    [alphas]
+    () =>
+      alphas
+        .filter((a) => !a.isMaxAlpha || isProOrAdmin)
+        .sort((a, b) => b.change24hPct - a.change24hPct)
+        .slice(0, 4),
+    [alphas, isProOrAdmin]
   );
 
   const renderAlphaCard = (coin: AlphaItem) => {
-    const isStarred = watchlist.includes(coin.id);
-    const marketUrl = getPrimaryMarketUrl(coin);
-    const chainMeta = CHAIN_METADATA[coin.chain] || CHAIN_METADATA.SOL;
-    const isPinned = Boolean(coin.pinned);
-    const serial = coin.serialTag || 'EXP01';
-
+    if (coin.isMaxAlpha && !isProOrAdmin) return null;
     return (
-      <article
+      <AlphaCallCard
         key={coin.id}
-        tabIndex={0}
-        role="button"
-        aria-label={`Inspect ${coin.name} (${coin.ticker}) call`}
-        onClick={() => setInspectedToken(coin)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setInspectedToken(coin);
+        coin={coin}
+        isAdmin={isAdmin}
+        isStarred={watchlist.includes(coin.id)}
+        onInspect={setInspectedToken}
+        onEdit={handleStartEditCall}
+        onDelete={(c) => {
+          if (!window.confirm(`Are you sure you want to delete alpha call ${c.ticker}?`)) {
+            return;
           }
+          deleteAlphaCall(c.id);
+          showToast(`Deleted call ${c.ticker}`);
         }}
-        className={`group relative rounded-xl bg-surface flex flex-col justify-between cursor-pointer transition-all duration-200 p-4 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
-          coin.isMaxAlpha
-            ? 'border-2 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.35)] ring-1 ring-orange-500/50 hover:border-orange-400'
-            : isPinned
-            ? 'border-2 border-pump hover:border-pump-hover'
-            : 'border border-line hover:border-pump'
-        }`}
-      >
-        <div>
-          {/* Top Row: Serial Tag (EXP01) + Max Alpha + Priority Pin + Chain Badge + Outcome + Age + Star & Admin buttons */}
-          <div className="flex items-center justify-between gap-2 pb-3 border-b border-line">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`px-2 py-0.5 rounded font-mono text-xs font-black ${
-                coin.isMaxAlpha ? 'bg-orange-500/10 border border-orange-500 text-orange-400' : 'bg-surface-card border border-pump text-pump'
-              }`}>
-                {serial}
-              </span>
-
-              {coin.isMaxAlpha && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500 text-black font-mono text-[10px] font-black uppercase tracking-wider shadow-sm">
-                  <Flame className="w-2.5 h-2.5 fill-black" />
-                  <span>MAX ALPHA</span>
-                </span>
-              )}
-
-              {isPinned && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
-                  <Pin className="w-2.5 h-2.5" />
-                  <span>PRIORITY PIN</span>
-                </span>
-              )}
-
-              <span className="px-2 py-0.5 rounded bg-surface-card border border-line font-mono text-[10px] font-bold text-white">
-                {coin.chain === 'ROBIN' ? 'ROBIN (Robinhood)' : coin.chain}
-              </span>
-
-              {coin.outcome === 'PROFIT' && (
-                <span className="px-2 py-0.5 rounded bg-pump text-canvas font-mono text-[10px] font-black uppercase">
-                  ACHIEVED (IN PROFIT) ✓
-                </span>
-              )}
-              {coin.outcome === 'LOSS' && (
-                <span className="px-2 py-0.5 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
-                  AT LOSS ✕
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="font-mono text-xs text-muted">{coin.age}</span>
-
-              {isAdmin && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStartEditCall(coin);
-                    }}
-                    className="px-2 py-0.5 rounded border border-line bg-surface-card hover:bg-surface-3 text-[10px] font-mono text-muted hover:text-pump hover:border-pump cursor-pointer transition-colors inline-flex items-center gap-1"
-                    title="Edit Live Call"
-                  >
-                    <Pencil className="w-2.5 h-2.5" />
-                    <span>EDIT</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleMaxAlpha(coin.id, !coin.isMaxAlpha);
-                      showToast(`${coin.isMaxAlpha ? 'Removed Max Alpha from' : 'Marked as Max Alpha:'} ${coin.ticker}`);
-                    }}
-                    className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
-                      coin.isMaxAlpha
-                        ? 'bg-orange-500 text-black border-orange-500 font-black shadow-sm'
-                        : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-orange-400'
-                    }`}
-                    title={coin.isMaxAlpha ? 'Remove Max Alpha badge' : 'Mark as Max Alpha (Orange highlight)'}
-                  >
-                    {coin.isMaxAlpha ? '⚡ MAX' : 'MAX'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePinCall(coin.id, !coin.pinned);
-                      showToast(`${coin.pinned ? 'Unpinned' : 'Pinned'} ${coin.ticker}`);
-                    }}
-                    className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
-                      coin.pinned
-                        ? 'bg-pump text-canvas border-pump font-black'
-                        : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-white'
-                    }`}
-                    title={coin.pinned ? 'Unpin Priority Call' : 'Pin Call as Priority'}
-                  >
-                    {coin.pinned ? 'PINNED' : 'PIN'}
-                  </button>
-                </>
-              )}
-
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!window.confirm(`Are you sure you want to delete alpha call ${coin.ticker}?`)) {
-                      return;
-                    }
-                    deleteAlphaCall(coin.id);
-                    showToast(`Deleted call ${coin.ticker}`);
-                  }}
-                  className="w-6 h-6 rounded bg-surface-card hover:bg-surface-3 border border-line hover:border-danger text-muted hover:text-danger flex items-center justify-center cursor-pointer"
-                  title="Delete Call"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleWatchlist(coin.id);
-                }}
-                className="w-6 h-6 rounded bg-surface-card hover:bg-surface-3 border border-line flex items-center justify-center cursor-pointer"
-                title="Toggle Watchlist"
-              >
-                <Star
-                  className={`w-3.5 h-3.5 ${
-                    isStarred ? 'text-amber fill-amber' : 'text-muted'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* Token Identity + Current Market Cap */}
-          <div className="flex items-center justify-between gap-3 py-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <TokenArtwork
-                art={coin.art}
-                size="sm"
-                chain={coin.chain}
-                quoteToken={coin.quoteToken}
-                locked={coin.locked}
-              />
-              <div className="min-w-0">
-                <div className="font-sans font-extrabold text-base text-white truncate">
-                  {coin.name}
-                </div>
-                <div className="font-mono text-xs text-pump font-bold">
-                  {coin.ticker} • {chainMeta.label}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-right font-mono tnum shrink-0">
-              <div className="text-[10px] text-muted uppercase">CURRENT MC</div>
-              <div className="text-lg font-extrabold text-white">
-                {coin.marketCap}
-              </div>
-              <div className="text-[11px] text-pump">
-                Entry {coin.entryMarketCap}
-              </div>
-              <div className="mt-1">
-                <SinceCallChip current={coin.marketCapUsd} entry={coin.entryMarketCapUsd} />
-              </div>
-            </div>
-          </div>
-
-          {/* Contract Address (CA) Bar */}
-          <div className="px-2.5 py-1.5 rounded bg-surface-card border border-line flex items-center justify-between gap-2 font-mono text-xs">
-            <span className="text-muted text-[11px] shrink-0">CA:</span>
-            <span className="text-white truncate tnum">{coin.ca || 'Locked'}</span>
-            {coin.ca && (
-              <button
-                type="button"
-                onClick={(e) =>
-                  handleCopyText(coin.ca || '', `card-ca-${coin.id}`, coin.ticker, e)
-                }
-                className="text-pump hover:text-white font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                {copiedId === `card-ca-${coin.id}` ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span className="text-[11px]">
-                  {copiedId === `card-ca-${coin.id}` ? 'COPIED' : 'COPY'}
-                </span>
-              </button>
-            )}
-          </div>
-
-          {/* Dual Risk Ratio + Take Profit Multipliers */}
-          <div className="grid grid-cols-2 gap-2 mt-3 font-mono text-xs">
-            <div className="p-2.5 rounded bg-surface-card border border-line">
-              <div className="flex items-center justify-between text-[10px] text-muted uppercase">
-                <span>RISK RATIO</span>
-                <span className="text-amber">{coin.stopLoss}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="font-bold text-white">
-                  Lvl {coin.risk}/5
-                </span>
-                <span className="px-1.5 py-0.5 rounded bg-surface border border-line text-pump font-bold text-[11px]">
-                  {coin.riskRewardRatio}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded bg-surface-card border border-line">
-              <div className="text-[10px] text-muted uppercase flex items-center gap-1">
-                <Target className="w-3 h-3 text-pump" />
-                <span>TAKE PROFIT</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-1 mt-1">
-                {coin.takeProfits.map((tp) => (
-                  <span
-                    key={tp.label}
-                    className={`px-1.5 py-0.5 rounded text-[11px] font-extrabold border ${
-                      tp.hit
-                        ? 'bg-pump text-canvas border-pump'
-                        : 'bg-surface text-white border-line'
-                    }`}
-                  >
-                    {tp.label}
-                    {tp.hit ? ' ✓' : ''}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Admin Outcome Selector (Visible strictly when Master Admin is connected) */}
-        {isAdmin && (
-          <div className="mt-3 pt-2 border-t border-line flex items-center justify-between gap-1.5 font-mono text-xs">
-            <span className="text-[10px] uppercase font-bold text-muted">SET OUTCOME:</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCallOutcome(coin.id, 'PROFIT');
-                  showToast(`Marked ${coin.ticker} as Achieved (In Profit) ✓`);
-                }}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
-                  coin.outcome === 'PROFIT'
-                    ? 'bg-pump text-canvas border-pump'
-                    : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
-                }`}
-                title="Mark trade call as Achieved (In Profit)"
-              >
-                ✓ ACHIEVED (PROFIT)
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCallOutcome(coin.id, 'LOSS');
-                  showToast(`Marked ${coin.ticker} as At Loss ✕`);
-                }}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
-                  coin.outcome === 'LOSS'
-                    ? 'bg-danger text-white border-danger'
-                    : 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border-line'
-                }`}
-                title="Mark trade call as At Loss"
-              >
-                ✕ AT LOSS
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCallOutcome(coin.id, 'PENDING');
-                  showToast(`Reset ${coin.ticker} to Open`);
-                }}
-                className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
-                  !coin.outcome || coin.outcome === 'PENDING'
-                    ? 'bg-surface border-line text-white font-bold'
-                    : 'bg-surface-card hover:bg-surface-3 text-dim border-line'
-                }`}
-                title="Reset outcome to Open"
-              >
-                RESET
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Card Footer */}
-        <div className="mt-3 pt-2.5 border-t border-line flex items-center justify-between gap-2 font-sans text-xs">
-          {coin.ca ? (
-            <button
-              type="button"
-              onClick={(e) =>
-                handleCopyText(coin.ca || '', `card-btn-${coin.id}`, coin.ticker, e)
-              }
-              className="flex-1 py-1.5 px-3 rounded bg-surface-card hover:bg-surface-3 border border-line text-white font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {copiedId === `card-btn-${coin.id}` ? (
-                <Check className="w-3.5 h-3.5 text-pump" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-pump" />
-              )}
-              <span>
-                {copiedId === `card-btn-${coin.id}` ? 'COPIED CA' : 'COPY CA'}
-              </span>
-            </button>
-          ) : (
-            <div className="flex-1 py-1.5 px-3 rounded bg-surface-card border border-line text-muted text-center font-mono text-[11px]">
-              LOCKED (1M REQ)
-            </div>
-          )}
-
-          <a
-            href={marketUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="py-1.5 px-3.5 rounded bg-pump hover:bg-pump-hover text-canvas font-extrabold inline-flex items-center gap-1.5 transition-colors shrink-0"
-          >
-            <span>TRADE ON MARKET</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
-      </article>
+        onToggleWatchlist={toggleWatchlist}
+        onSetOutcome={(id, outcome) => {
+          setCallOutcome(id, outcome);
+          showToast(`Marked ${coin.ticker} as ${outcome === 'PROFIT' ? 'PROFIT ACHIEVED' : 'AT LOSS'}`);
+        }}
+      />
     );
   };
 
@@ -841,6 +539,10 @@ export const IncubatorHub: React.FC = () => {
   const totalProfitCalls = alphas.filter((a) => a.outcome === 'PROFIT').length;
   const totalLoseCalls = alphas.filter((a) => a.outcome === 'LOSS').length;
   const totalVerifiedUsers = verifiedUsersCount ?? 0;
+
+  if (!connected) {
+    return <LockedTerminal />;
+  }
 
   return (
     <div className="space-y-6 pb-10">
@@ -1143,6 +845,18 @@ export const IncubatorHub: React.FC = () => {
                       <span>{fetchingDex ? 'Fetching...' : 'Auto-Fill'}</span>
                     </button>
                   </div>
+                  {formLogoUrl && (
+                    <div className="flex items-center gap-2 pt-1 text-xs font-mono text-pump">
+                      <img
+                        src={formLogoUrl}
+                        alt="Onchain Logo Preview"
+                        className="w-5 h-5 rounded-md object-cover border border-pump/40"
+                      />
+                      <span className="text-[11px] text-muted truncate">
+                        Onchain Logo verified from DEX
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Token Name */}
@@ -1359,61 +1073,72 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* MAIN FEED TABS: CALLS OR RAIDS */}
+      {/* MAIN FEED TABS: CALLS OR RAIDS (For verified users with $GENESIS holding) */}
       <div className="space-y-4 pt-2">
-        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
-          <button
-            type="button"
-            onClick={() => setFeedTab('CALLS')}
-            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              feedTab === 'CALLS'
-                ? 'bg-pump text-canvas shadow-md'
-                : 'text-muted hover:text-white hover:bg-surface-card'
-            }`}
-          >
-            <Target className="w-4 h-4" />
-            <span>ALPHA TRADE CALLS</span>
-            <span
-              className={`px-2 py-0.5 rounded font-mono text-xs ${
+        {isUnlocked && (
+          <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
+            <button
+              type="button"
+              onClick={() => setFeedTab('CALLS')}
+              className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 feedTab === 'CALLS'
-                  ? 'bg-canvas text-pump font-black'
-                  : 'bg-surface-card text-muted'
+                  ? 'bg-pump text-canvas shadow-md'
+                  : 'text-muted hover:text-white hover:bg-surface-card'
               }`}
             >
-              {alphas.length}
-            </span>
-          </button>
+              <Target className="w-4 h-4" />
+              <span>ALPHA TRADE CALLS</span>
+              <span
+                className={`px-2 py-0.5 rounded font-mono text-xs ${
+                  feedTab === 'CALLS'
+                    ? 'bg-canvas text-pump font-black'
+                    : 'bg-surface-card text-muted'
+                }`}
+              >
+                {alphas.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setFeedTab('RAIDS')}
-            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              feedTab === 'RAIDS'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
-            <span
-              className={`px-2 py-0.5 rounded font-mono text-xs ${
+            <button
+              type="button"
+              onClick={() => setFeedTab('RAIDS')}
+              className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 feedTab === 'RAIDS'
-                  ? 'bg-white text-purple-700 font-black'
-                  : 'bg-surface-card text-purple-400'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
               }`}
             >
-              {campaigns.length}
-            </span>
-          </button>
-        </div>
+              <Sparkles className="w-4 h-4" />
+              <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
+              <span
+                className={`px-2 py-0.5 rounded font-mono text-xs ${
+                  feedTab === 'RAIDS'
+                    ? 'bg-white text-purple-700 font-black'
+                    : 'bg-surface-card text-purple-400'
+                }`}
+              >
+                {campaigns.length}
+              </span>
+            </button>
+          </div>
+        )}
 
-        {feedTab === 'CALLS' ? (
-          !isUnlocked ? (
-            <div className="pt-2">
-              <LockedTerminal />
+        {!isUnlocked ? (
+          <div className="space-y-6 pt-2">
+            <LockedTerminal />
+            <div className="space-y-3 pt-2">
+              <CampaignSection
+                userWallet={publicKeyBase58}
+                isAdmin={isAdmin}
+                campaigns={campaigns}
+                loading={campaignsLoading}
+                onRefresh={fetchCampaigns}
+                onTogglePin={handleTogglePinCampaign}
+              />
             </div>
-          ) : (
-            <div className="space-y-6">
+          </div>
+        ) : feedTab === 'CALLS' ? (
+          <div className="space-y-6">
               {/* 5. ALL CATEGORIZED ALPHA TRADE CALLS (Filterable by Blockchain: SOL, BSC, ETH, BASE, ROBIN, AVAX) */}
               <div className="space-y-4 pt-2">
         {apiError && (
@@ -1481,7 +1206,7 @@ export const IncubatorHub: React.FC = () => {
               {(
                 [
                   { id: 'ALL', label: 'All' },
-                  { id: 'MAX_ALPHA', label: '⚡ Max Alpha' },
+                  ...(isProOrAdmin ? [{ id: 'MAX_ALPHA', label: '⚡ Max Alpha' } as { id: FilterTab; label: string }] : []),
                   { id: 'PINNED', label: '📌 Pinned' },
                   { id: 'MOVERS', label: '🔥 Movers' },
                   { id: 'NEW', label: '✨ New' },
@@ -1608,7 +1333,7 @@ export const IncubatorHub: React.FC = () => {
                 <tr className="border-b border-line bg-surface-card font-sans text-xs text-muted uppercase">
                   <th className="py-3.5 px-4">Token &amp; Chain</th>
                   <th className="py-3.5 px-4">Contract Address (CA)</th>
-                  <th className="py-3.5 px-4 text-right">Current MC (Entry)</th>
+                  <th className="py-3.5 px-4 text-right">Entry MC</th>
                   <th className="py-3.5 px-4 text-center">Risk Ratio (Both)</th>
                   <th className="py-3.5 px-4">Take Profit (Multipliers)</th>
                   <th className="py-3.5 px-4 text-right">Action</th>
@@ -1643,21 +1368,14 @@ export const IncubatorHub: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <TokenArtwork
                             art={token.art}
+                            logoUrl={token.logoUrl}
+                            ticker={token.ticker}
                             size="sm"
                             chain={token.chain}
                             quoteToken={token.quoteToken}
                           />
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {token.isMaxAlpha && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500 text-black font-mono text-[10px] font-black uppercase shadow-sm">
-                                  <Flame className="w-2.5 h-2.5 fill-black" />
-                                  <span>MAX</span>
-                                </span>
-                              )}
-                              {token.pinned && (
-                                <Pin className="w-3.5 h-3.5 text-pump shrink-0" />
-                              )}
                               <span className="font-bold text-white">{token.name}</span>
                               <span className="font-mono text-xs text-pump font-bold">
                                 {token.ticker}
@@ -1710,13 +1428,10 @@ export const IncubatorHub: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono tnum">
                         <div className="font-bold text-white text-base">
-                          {token.marketCap}
+                          {token.entryMarketCap || token.marketCap}
                         </div>
-                        <div className="text-xs text-pump">
-                          Entry {token.entryMarketCap}
-                        </div>
-                        <div className="mt-1">
-                          <SinceCallChip current={token.marketCapUsd} entry={token.entryMarketCapUsd} />
+                        <div className="text-[10px] text-muted uppercase">
+                          ENTRY MC
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-center font-mono text-xs">
@@ -1893,7 +1608,6 @@ export const IncubatorHub: React.FC = () => {
           </div>
         </div>
       </div>
-      )
     ) : (
       <CampaignSection
         userWallet={publicKeyBase58}

@@ -72,6 +72,7 @@ export interface CreateCallPayload {
   isMaxAlpha?: boolean;
   summary?: string;
   serialTag?: string;
+  logoUrl?: string;
 }
 
 interface GenesisContextValue {

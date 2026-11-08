@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
+import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE, TIERS } from '@/lib/tiers';
 import { resolveTier } from '@/server/db';
 import {
   ADMIN_WALLET,
@@ -118,16 +118,16 @@ export async function GET(req: NextRequest) {
 
   const effectiveBalance = Math.max(
     balance,
-    isAdmin ? calculateRequiredTokens(MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE) : 0
+    isAdmin ? calculateRequiredTokens(PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE) : 0
   );
-  const tier = tierFor(effectiveBalance);
+  const tier = isAdmin ? TIERS.PRO : tierFor(effectiveBalance);
   let registry;
   try {
     registry = await loadCallsRegistry();
   } catch {
     return storeDown();
   }
-  const baseItems = await alphasForTier(tier.id, Date.now(), registry);
+  const baseItems = await alphasForTier(tier.id, Date.now(), registry, isAdmin);
 
   // Wire live market telemetry into calls with CA
   const items = await Promise.all(
@@ -231,8 +231,12 @@ export async function POST(req: NextRequest) {
     let liveMcUsd = 0;
     let liveChange24h = 0;
     let liveVolumeUsd = 0;
+    let liveLogoUrl = '';
     try {
       const telemetry = await getMarketTelemetry(ca, 0, 0, chain);
+      if (telemetry?.imageUrl) {
+        liveLogoUrl = telemetry.imageUrl;
+      }
       if (telemetry?.marketCapUsd && telemetry.marketCapUsd > 0) {
         liveMcUsd = telemetry.marketCapUsd;
         liveChange24h = telemetry.change24hPct || 0;
@@ -273,9 +277,9 @@ export async function POST(req: NextRequest) {
     const rawMultipliers: number[] = Array.isArray(payload.multipliers)
       ? payload.multipliers.map((m: unknown) => Number(m)).filter((n: number) => n > 0)
       : String(payload.takeProfitInput || '2x, 5x, 10x')
-          .split(/[,\s/]+/)
-          .map((s) => parseFloat(s.replace(/x/i, '')))
-          .filter((n) => Number.isFinite(n) && n > 0);
+        .split(/[,\s/]+/)
+        .map((s) => parseFloat(s.replace(/x/i, '')))
+        .filter((n) => Number.isFinite(n) && n > 0);
 
     const multipliers = rawMultipliers.length > 0 ? rawMultipliers : [2, 5, 10];
     const takeProfits = buildTakeProfits(entryMcUsd, currentMcUsd, multipliers);
@@ -296,36 +300,36 @@ export async function POST(req: NextRequest) {
     const links =
       chain === 'SOL'
         ? [
-            { label: 'DexScreener', href: `https://dexscreener.com/solana/${ca}` },
-            { label: 'Pump.fun', href: `https://pump.fun/coin/${ca}` },
-            { label: 'Photon', href: `https://photon-sol.tinyastro.io/` },
-          ]
+          { label: 'DexScreener', href: `https://dexscreener.com/solana/${ca}` },
+          { label: 'Pump.fun', href: `https://pump.fun/coin/${ca}` },
+          { label: 'Photon', href: `https://photon-sol.tinyastro.io/` },
+        ]
         : chain === 'BSC'
-        ? [
+          ? [
             { label: 'DexScreener', href: `https://dexscreener.com/bsc/${ca}` },
             { label: 'BscScan', href: `https://bscscan.com/token/${ca}` },
           ]
-        : chain === 'ETH'
-        ? [
-            { label: 'DexScreener', href: `https://dexscreener.com/ethereum/${ca}` },
-            { label: 'Etherscan', href: `https://etherscan.io/token/${ca}` },
-          ]
-        : chain === 'BASE'
-        ? [
-            { label: 'DexScreener', href: `https://dexscreener.com/base/${ca}` },
-            { label: 'BaseScan', href: `https://basescan.org/token/${ca}` },
-          ]
-        : chain === 'AVAX'
-        ? [
-            { label: 'DexScreener', href: `https://dexscreener.com/avalanche/${ca}` },
-            { label: 'Snowtrace', href: `https://snowtrace.io/token/${ca}` },
-          ]
-        : [
-            {
-              label: 'DexScreener',
-              href: `https://dexscreener.com/search?q=${encodeURIComponent(ca)}`,
-            },
-          ];
+          : chain === 'ETH'
+            ? [
+              { label: 'DexScreener', href: `https://dexscreener.com/ethereum/${ca}` },
+              { label: 'Etherscan', href: `https://etherscan.io/token/${ca}` },
+            ]
+            : chain === 'BASE'
+              ? [
+                { label: 'DexScreener', href: `https://dexscreener.com/base/${ca}` },
+                { label: 'BaseScan', href: `https://basescan.org/token/${ca}` },
+              ]
+              : chain === 'AVAX'
+                ? [
+                  { label: 'DexScreener', href: `https://dexscreener.com/avalanche/${ca}` },
+                  { label: 'Snowtrace', href: `https://snowtrace.io/token/${ca}` },
+                ]
+                : [
+                  {
+                    label: 'DexScreener',
+                    href: `https://dexscreener.com/search?q=${encodeURIComponent(ca)}`,
+                  },
+                ];
 
     const newRecord: AlphaRecord = {
       id: `${rawTicker.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`,
@@ -346,6 +350,10 @@ export async function POST(req: NextRequest) {
       pinned,
       pinnedAt: pinned ? new Date().toISOString() : null,
       isMaxAlpha,
+      logoUrl:
+        typeof payload.logoUrl === 'string' && payload.logoUrl.trim().startsWith('http')
+          ? payload.logoUrl.trim()
+          : liveLogoUrl || undefined,
       entryMarketCap: formatCompactUsd(entryMcUsd),
       entryMarketCapUsd: entryMcUsd,
       minTier: 'LAB_MEMBER',
@@ -399,7 +407,7 @@ export async function POST(req: NextRequest) {
     after(() => notifyNewCall(newRecord).catch((e) => console.error('[TrenchLabs] Telegram fan-out failed:', e)));
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -489,6 +497,10 @@ export async function PATCH(req: NextRequest) {
         target.summary = payload.summary.trim().slice(0, 500);
       }
 
+      if (typeof payload.logoUrl === 'string') {
+        target.logoUrl = payload.logoUrl.trim() || undefined;
+      }
+
       if (typeof payload.risk === 'number') {
         target.risk = Math.min(5, Math.max(1, payload.risk));
         target.riskRewardRatio = `Risk Lvl ${target.risk}/5`;
@@ -543,9 +555,9 @@ export async function PATCH(req: NextRequest) {
         const rawMultipliers: number[] = Array.isArray(payload.multipliers)
           ? payload.multipliers.map((m: unknown) => Number(m)).filter((n: number) => n > 0)
           : String(payload.takeProfitInput || '')
-              .split(/[,\s/]+/)
-              .map((s) => parseFloat(s.replace(/x/i, '')))
-              .filter((n) => Number.isFinite(n) && n > 0);
+            .split(/[,\s/]+/)
+            .map((s) => parseFloat(s.replace(/x/i, '')))
+            .filter((n) => Number.isFinite(n) && n > 0);
         if (rawMultipliers.length > 0) {
           target.takeProfits = buildTakeProfits(target.entryMarketCapUsd, target.marketCapUsd, rawMultipliers);
         }
@@ -589,7 +601,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -627,7 +639,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('LAB_MEMBER') },
+      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
       { headers: NO_STORE }
     );
   } catch (e) {

@@ -138,22 +138,25 @@ test('Max Alpha and Outcome Resolution: correctly reflects isMaxAlpha and outcom
     },
   ];
 
-  const results = await alphasForTier('LAB_MEMBER', Date.now(), mockCalls);
+  // Member tier: Max Alpha calls are strictly hidden from standard members
+  const memberResults = await alphasForTier('LAB_MEMBER', Date.now(), mockCalls);
+  assert.equal(memberResults.find((r) => r.id === 'test-call-1'), undefined, 'Max Alpha call must NOT be visible to standard LAB_MEMBER');
 
-  // Call 1
-  const call1 = results.find((r) => r.id === 'test-call-1');
-  assert.ok(call1, 'Call 1 should exist');
+  // Pro tier & Admin: Max Alpha calls are visible
+  const proResults = await alphasForTier('PRO', Date.now(), mockCalls);
+  const call1 = proResults.find((r) => r.id === 'test-call-1');
+  assert.ok(call1, 'Call 1 should exist for PRO viewer');
   assert.equal(call1.isMaxAlpha, true, 'Call 1 should be marked as Max Alpha');
   assert.equal(call1.outcome, 'PROFIT', 'Call 1 outcome should be PROFIT (Achieved)');
 
   // Call 2
-  const call2 = results.find((r) => r.id === 'test-call-2');
+  const call2 = memberResults.find((r) => r.id === 'test-call-2');
   assert.ok(call2, 'Call 2 should exist');
   assert.equal(call2.isMaxAlpha, false, 'Call 2 should NOT be Max Alpha');
   assert.equal(call2.outcome, 'LOSS', 'Call 2 outcome should be LOSS (At Loss) despite TP hit');
 
   // Call 3
-  const call3 = results.find((r) => r.id === 'test-call-3');
+  const call3 = memberResults.find((r) => r.id === 'test-call-3');
   assert.ok(call3, 'Call 3 should exist');
   assert.equal(call3.isMaxAlpha, false, 'Call 3 should NOT be Max Alpha');
   assert.equal(call3.outcome, 'PENDING', 'Call 3 outcome should be PENDING (Open)');

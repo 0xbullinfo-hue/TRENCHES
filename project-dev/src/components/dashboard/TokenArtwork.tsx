@@ -5,6 +5,8 @@ import type { AlphaArtTheme, Chain, QuoteToken } from '@/lib/types';
 
 interface TokenArtworkProps {
   art: AlphaArtTheme;
+  logoUrl?: string;
+  ticker?: string;
   sparkline?: number[];
   chain?: Chain;
   quoteToken?: QuoteToken;
@@ -299,6 +301,8 @@ function MotifGraphic({
 
 export const TokenArtwork: React.FC<TokenArtworkProps> = ({
   art,
+  logoUrl,
+  ticker,
   sparkline,
   chain = 'SOL',
   quoteToken = 'PUMP',
@@ -306,13 +310,26 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
   locked = false,
   className = '',
 }) => {
+  const [imgError, setImgError] = React.useState(false);
+  const effectiveLogoUrl = !imgError && (logoUrl || art.imageUrl);
+
   if (size === 'sm' || size === 'md') {
     const dim = size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
     return (
       <div
-        className={`relative ${dim} rounded-md overflow-hidden shrink-0 border border-line bg-surface-card ${className}`}
+        className={`relative ${dim} rounded-lg overflow-hidden shrink-0 border border-line bg-surface-card ${className}`}
       >
-        <MotifGraphic motif={art.motif} accent={art.accent} secondary={art.secondary} />
+        {effectiveLogoUrl ? (
+          <img
+            src={effectiveLogoUrl}
+            alt={ticker ? `${ticker} logo` : 'Token logo'}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+        ) : (
+          <MotifGraphic motif={art.motif} accent={art.accent} secondary={art.secondary} />
+        )}
       </div>
     );
   }
@@ -321,7 +338,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
 
   return (
     <div
-      className={`relative w-full aspect-square rounded-md overflow-hidden border border-line bg-surface-card select-none ${className}`}
+      className={`relative w-full aspect-square rounded-xl overflow-hidden border border-line bg-surface-card select-none ${className}`}
     >
       {/* Top-Left Category / Motif Pill if present */}
       {art.badgeText && (
@@ -330,13 +347,23 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
         </div>
       )}
 
-      {/* Main Illustration */}
+      {/* Main Illustration / Onchain Logo */}
       <div
-        className={`w-full h-full p-4 transition-transform duration-200 group-hover:scale-105 ${
+        className={`w-full h-full p-4 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center ${
           locked ? 'opacity-65' : ''
         }`}
       >
-        <MotifGraphic motif={art.motif} accent={art.accent} secondary={art.secondary} />
+        {effectiveLogoUrl ? (
+          <img
+            src={effectiveLogoUrl}
+            alt={ticker ? `${ticker} logo` : 'Token logo'}
+            className="w-full h-full object-cover rounded-lg shadow-sm"
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+        ) : (
+          <MotifGraphic motif={art.motif} accent={art.accent} secondary={art.secondary} />
+        )}
       </div>
 
       {/* Bottom-Right Inline Toxic Lime Sparkline + Chain/Quote Pill */}

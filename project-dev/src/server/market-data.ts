@@ -13,6 +13,7 @@ interface CachedMarketPrice {
   volume24hUsd: number;
   fetchedAt: number;
   source: 'COINSTATS' | 'DEXSCREENER';
+  imageUrl?: string;
 }
 
 const priceCache = new Map<string, CachedMarketPrice>();
@@ -33,6 +34,7 @@ export interface TokenMarketTelemetry {
   priceUsd?: number;
   change24hPct?: number;
   volume24hUsd?: number;
+  imageUrl?: string;
   source: MarketDataSource;
   freshness: DataFreshness;
   updatedAt: string;
@@ -170,13 +172,15 @@ async function fetchFromDexScreener(ca: string, expectedChain?: string): Promise
       const price = Number(pair.priceUsd || 0);
       const change24h = Number(pair.priceChange?.h24 || 0);
       const vol24h = Number(pair.volume?.h24 || 0);
+      const imageUrl = (pair as { info?: { imageUrl?: string } })?.info?.imageUrl;
 
-      if (mc > 0) {
+      if (mc > 0 || imageUrl) {
         return {
           priceUsd: price,
           marketCapUsd: mc,
           change24hPct: change24h,
           volume24hUsd: vol24h,
+          imageUrl: typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : undefined,
           fetchedAt: Date.now(),
           source: 'DEXSCREENER',
         };
@@ -294,6 +298,7 @@ export async function getMarketTelemetry(
       priceUsd: liveData.priceUsd,
       change24hPct: liveData.change24hPct,
       volume24hUsd: liveData.volume24hUsd,
+      imageUrl: liveData.imageUrl,
       source: liveData.source,
       freshness: 'LIVE',
       updatedAt: new Date(liveData.fetchedAt).toISOString(),

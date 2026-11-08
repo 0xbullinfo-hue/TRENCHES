@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "id": "camp-1794104432143-a57f3f",
+    "title": "TRENCHLABS RAID TEST",
+    "description": "Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.",
+    "tweetUrl": "https://x.com/TrenchLabsHQ/status/1850000000000000000",
+    "rewardAmount": "50 $GENESIS",
+    "totalPool": "10,000 $GENESIS",
+    "targetActions": [
+      "Like",
+      "Retweet",
+      "Quote with $GENESIS"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2026-11-08T02:00:00.000Z",
+    "postedBy": "TrenchLabsAdmin",
+    "submissionsCount": 1,
+    "pinned": true,
+    "pinnedAt": "2026-11-08T02:00:00.000Z"
+  }
+]

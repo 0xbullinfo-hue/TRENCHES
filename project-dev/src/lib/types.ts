@@ -30,6 +30,7 @@ export interface AlphaArtTheme {
   secondary: string;
   motif: ArtMotif;
   badgeText?: string;
+  imageUrl?: string;
 }
 
 export interface TakeProfitTarget {
@@ -103,6 +104,8 @@ export interface AlphaItem {
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
+  /** Direct onchain or DexScreener token logo image URL */
+  logoUrl?: string;
   sparkline: number[];
   art: AlphaArtTheme;
   marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE' | 'FALLBACK' | 'RECORDED' | 'UNAVAILABLE';

@@ -67,6 +67,8 @@ export interface AlphaRecord {
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
+  /** Direct onchain or DexScreener token logo image URL */
+  logoUrl?: string;
   sparkline: number[];
   art: AlphaArtTheme;
 }
@@ -240,7 +242,8 @@ function nextBoundary(now: number, cycleMin: number, phaseMin: number): string {
 export async function alphasForTier(
   tier: TierId,
   now = Date.now(),
-  preloaded?: AlphaRecord[]
+  preloaded?: AlphaRecord[],
+  isAdmin = false
 ): Promise<AlphaItem[]> {
   const rank = TIERS[tier].rank;
   const registry = preloaded ?? (await loadCallsRegistry());
@@ -260,7 +263,16 @@ export async function alphasForTier(
     return a.ageMinutes - b.ageMinutes;
   });
 
-  return sorted.map((r, idx) => {
+  const isProViewer = rank >= TIERS.PRO.rank || isAdmin;
+  const filtered = sorted.filter((r) => {
+    // Only Admin and Pro users can see MAX ALPHA cards
+    if (r.isMaxAlpha && !isProViewer) {
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.map((r, idx) => {
     const locked = TIERS[r.minTier].rank > rank;
     const minBalanceRequired = TIERS[r.minTier].min;
     const serialTag = r.serialTag || `EXP${String(idx + 1).padStart(2, '0')}`;
@@ -312,6 +324,7 @@ export async function alphasForTier(
       serialTag,
       outcome: r.outcome ?? (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
       isMaxAlpha: Boolean(r.isMaxAlpha),
+      logoUrl: r.logoUrl,
       sparkline: r.sparkline,
       art: r.art,
     };

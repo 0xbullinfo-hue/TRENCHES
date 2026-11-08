@@ -8,9 +8,10 @@ import { StakePointCardError } from './StakePointCardError';
 
 interface StakePointCardClientProps {
   initialPools?: StakePointPool[];
+  hideIfEmpty?: boolean;
 }
 
-export function StakePointCardClient({ initialPools }: StakePointCardClientProps) {
+export function StakePointCardClient({ initialPools, hideIfEmpty = false }: StakePointCardClientProps) {
   const [pools, setPools] = useState<StakePointPool[] | null>(initialPools ?? null);
   const [loading, setLoading] = useState<boolean>(!initialPools);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,12 @@ export function StakePointCardClient({ initialPools }: StakePointCardClientProps
   }
 
   if (error && !pools) {
+    if (hideIfEmpty) return null;
     return <StakePointCardError onRetry={loadData} errorMessage={error} />;
+  }
+
+  if (hideIfEmpty && (!pools || pools.length === 0)) {
+    return null;
   }
 
   return <StakePointCardView pools={pools || []} />;

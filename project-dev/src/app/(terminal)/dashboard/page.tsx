@@ -4,8 +4,6 @@ import React from 'react';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { IncubatorHub } from '@/components/dashboard/IncubatorHub';
 import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
-import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
-import { CampaignSection } from '@/components/campaigns/CampaignSection';
 import { useGenesisBalance } from '@/context/GenesisContext';
 
 export default function DashboardPage() {
@@ -15,22 +13,22 @@ export default function DashboardPage() {
     <section id="terminal" className="flex-1 py-6 bg-canvas">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {!connected ? (
-          <div className="py-8 space-y-6">
-            <div className="max-w-xl mx-auto">
-              <StakePointCardClient />
-            </div>
-            <CampaignSection userWallet={null} />
+          <div className="py-8">
+            {/* Wallet Authentication Required: Zero cards shown until visitor connects wallet */}
             <LockedTerminal />
           </div>
         ) : (
-          /* Incubator Terminal (Contains Disclaimer, Welcome Card, Staking Card below Welcome Card, and Alpha Calls) */
+          /* Incubator Terminal:
+             - Free signed-in users see Raid cards
+             - Verified token holders see Raid cards + Call cards
+             - Pro & Admin see Max Alpha cards + Raid cards + Call cards
+          */
           <IncubatorHub />
         )}
 
-        {/* Performance Ledger Card Grid Embed (Only in user dashboard) */}
+        {/* Historical Verified Multipliers Ledger */}
         <DashboardLedgerEmbed />
       </div>
     </section>
   );
 }
-
