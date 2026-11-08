@@ -115,12 +115,28 @@ test('isValidMarketData: rejects wrong token, wrong chain, bad price and corrupt
   assert.equal(md.isValidMarketData('x', solToken), false);
 });
 
-test('isWithinStaleLimit: bounded window', () => {
-  const now = Date.parse('2026-01-01T00:10:00Z');
-  assert.equal(md.isWithinStaleLimit('2026-01-01T00:08:00Z', now, 180), true);
-  assert.equal(md.isWithinStaleLimit('2026-01-01T00:06:00Z', now, 180), false);
+test('isWithinStaleLimit: bounded window and clock-skew protection', () => {
+  const now = Date.parse('2026-01-01T00:10:00.000Z');
+  assert.equal(md.MAX_FUTURE_CLOCK_SKEW_MS, 30_000);
+  assert.equal(md.MAX_FUTURE_CLOCK_SKEW_MS, cfg.MAX_FUTURE_CLOCK_SKEW_MS);
+
+  // Valid current timestamp -> Accepted
+  assert.equal(md.isWithinStaleLimit(new Date(now).toISOString(), now, 180), true);
+  // Valid recent timestamp inside staleTtlSeconds -> Accepted
+  assert.equal(md.isWithinStaleLimit('2026-01-01T00:08:00.000Z', now, 180), true);
+  // Minor future clock skew (+10s and +30s boundary) -> Accepted
+  assert.equal(md.isWithinStaleLimit(new Date(now + 10_000).toISOString(), now, 180), true);
+  assert.equal(md.isWithinStaleLimit(new Date(now + 30_000).toISOString(), now, 180), true);
+  // Future timestamp beyond tolerance (+31s) -> Rejected
+  assert.equal(md.isWithinStaleLimit(new Date(now + 31_000).toISOString(), now, 180), false);
+  // Expired cache entry (> 180s) -> Rejected
+  assert.equal(md.isWithinStaleLimit('2026-01-01T00:06:00.000Z', now, 180), false);
+  // Missing date -> Rejected
   assert.equal(md.isWithinStaleLimit(null, now, 180), false);
+  assert.equal(md.isWithinStaleLimit('', now, 180), false);
+  // Invalid date -> Rejected
   assert.equal(md.isWithinStaleLimit('garbage', now, 180), false);
+  assert.equal(md.isWithinStaleLimit(new Date(now).toISOString(), Number.NaN, 180), false);
 });
 
 // ------------------------------------------------------------------ CoinStats adapter

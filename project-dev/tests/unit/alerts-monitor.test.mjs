@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { NextRequest } from 'next/server';
 import {
+  MAX_FUTURE_CLOCK_SKEW_MS,
   parseStopLossPercentage,
   assessTelemetryForAlerts,
   evaluateTargets,
   runAutomatedAlertsMonitor,
 } from '../../src/server/alerts-monitor.ts';
+import { withRegistryLock } from '../../src/server/alphas-data.ts';
+import { GET as monitorGet } from '../../src/app/api/telegram/monitor/route.ts';
 import { SOL_TOKEN, SOL_OTHER, EVM_LOWER } from './helpers/market-fixtures.mjs';
 
 const NOW = Date.parse('2026-01-01T00:05:00.000Z');
@@ -174,26 +178,107 @@ test('Alerts Monitor: rejects wrong token identity (wrong contract address or wr
   assert.deepEqual(unverified, { eligible: false, reason: 'unverified_token' });
 });
 
-test('Alerts Monitor: rejects stale telemetry (status STALE or fetchedAt older than maxDataAgeMs)', async () => {
+test('Alerts Monitor: rejects stale telemetry and enforces 30s future clock-skew boundary', () => {
   const call = makeCall();
+  const maxAgeMs = 60_000;
+  assert.equal(MAX_FUTURE_CLOCK_SKEW_MS, 30_000);
 
   // Provider status is STALE (shared cache fallback during outage)
   const staleStatus = assessTelemetryForAlerts(
     makeTelemetry({ status: 'STALE', marketCap: 500_000 }),
     call,
     NOW,
-    60_000
+    maxAgeMs
   );
   assert.deepEqual(staleStatus, { eligible: false, reason: 'status_not_live' });
 
-  // Status is LIVE/CACHED but timestamp exceeds maxAgeMs
-  const oldTimestamp = assessTelemetryForAlerts(
-    makeTelemetry({ status: 'CACHED', fetchedAt: new Date(NOW - 120_000).toISOString(), marketCap: 500_000 }),
-    call,
-    NOW,
-    60_000
+  // 1. Current timestamp -> Eligible
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: new Date(NOW).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: true, marketCapUsd: 500_000 }
   );
-  assert.deepEqual(oldTimestamp, { eligible: false, reason: 'stale_data' });
+
+  // 2. Timestamp 10 seconds old -> Eligible if within max age
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: new Date(NOW - 10_000).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: true, marketCapUsd: 500_000 }
+  );
+
+  // 3. Timestamp older than max age -> Rejected: stale_data
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ status: 'CACHED', fetchedAt: new Date(NOW - 61_000).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: false, reason: 'stale_data' }
+  );
+
+  // 4. Timestamp 10 seconds in future -> Eligible within clock-skew tolerance
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: new Date(NOW + 10_000).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: true, marketCapUsd: 500_000 }
+  );
+
+  // 5. Timestamp 30 seconds in future -> Eligible at tolerance boundary
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: new Date(NOW + 30_000).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: true, marketCapUsd: 500_000 }
+  );
+
+  // 6. Timestamp 31 seconds in future -> Rejected: future_timestamp
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: new Date(NOW + 31_000).toISOString(), marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: false, reason: 'future_timestamp' }
+  );
+
+  // 7. Missing timestamp -> Rejected: stale_data
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: null, marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: false, reason: 'stale_data' }
+  );
+
+  // 8. Invalid timestamp -> Rejected: stale_data
+  assert.deepEqual(
+    assessTelemetryForAlerts(
+      makeTelemetry({ fetchedAt: 'not-a-valid-timestamp', marketCap: 500_000 }),
+      call,
+      NOW,
+      maxAgeMs
+    ),
+    { eligible: false, reason: 'stale_data' }
+  );
 });
 
 test('Alerts Monitor: provider outage (UNAVAILABLE or thrown error) never triggers false TP/SL alerts', async () => {
@@ -262,4 +347,78 @@ test('Alerts Monitor: evaluateTargets requires positive finite entry and current
   assert.equal(evaluateTargets(call, 200_000), null);
   assert.equal(evaluateTargets(makeCall(), 0), null);
   assert.equal(evaluateTargets(makeCall(), -100), null);
+});
+
+test('Alerts Monitor: concurrent invocations serialized by withRegistryLock never fire duplicate notifications', async () => {
+  let stored = [makeCall()];
+  const tpEvents = [];
+
+  const makeDeps = () => ({
+    now: () => NOW,
+    maxDataAgeMs: 60_000,
+    withLock: withRegistryLock,
+    loadRegistry: async () => structuredClone(stored),
+    saveRegistry: async (records) => {
+      await new Promise((r) => setTimeout(r, 15));
+      stored = structuredClone(records);
+      return { success: true };
+    },
+    getMarketData: async () => makeTelemetry({ marketCap: 250_000 }), // hits TP1 (2x)
+    notifyTp: async (alpha, label) => {
+      tpEvents.push({ id: alpha.id, label });
+      return { sent: 1, failed: 0, total: 1 };
+    },
+    notifySl: async () => ({ sent: 0, failed: 0, total: 0 }),
+  });
+
+  const [resA, resB] = await Promise.all([
+    runAutomatedAlertsMonitor(makeDeps()),
+    runAutomatedAlertsMonitor(makeDeps()),
+  ]);
+
+  assert.equal(resA.tpTriggered + resB.tpTriggered, 1, 'TP1 must trigger only once across concurrent runs');
+  assert.equal(tpEvents.length, 1, 'Only one Telegram notification fan-out may occur');
+  assert.equal(stored[0].takeProfits[0].hit, true);
+});
+
+test('Alerts Monitor Route: GET /api/telegram/monitor enforces CRON_SECRET and Bearer auth', async () => {
+  const prevSecret = process.env.CRON_SECRET;
+  try {
+    // 1. Missing CRON_SECRET -> 500
+    delete process.env.CRON_SECRET;
+    const reqNoConfig = new NextRequest('http://localhost:3000/api/telegram/monitor');
+    const resNoConfig = await monitorGet(reqNoConfig);
+    assert.equal(resNoConfig.status, 500);
+    const bodyNoConfig = await resNoConfig.json();
+    assert.deepEqual(bodyNoConfig, { ok: false, error: 'Cron authentication is not configured' });
+
+    // 2. Configured CRON_SECRET, missing or wrong Authorization header -> 401
+    process.env.CRON_SECRET = 'test-cron-secret-xyz';
+    const reqNoAuth = new NextRequest('http://localhost:3000/api/telegram/monitor');
+    const resNoAuth = await monitorGet(reqNoAuth);
+    assert.equal(resNoAuth.status, 401);
+    assert.deepEqual(await resNoAuth.json(), { ok: false, error: 'Unauthorized' });
+
+    const reqBadAuth = new NextRequest('http://localhost:3000/api/telegram/monitor', {
+      headers: { authorization: 'Bearer wrong-secret' },
+    });
+    const resBadAuth = await monitorGet(reqBadAuth);
+    assert.equal(resBadAuth.status, 401);
+    assert.deepEqual(await resBadAuth.json(), { ok: false, error: 'Unauthorized' });
+
+    // 3. Valid Bearer token -> 200 with executedAt, durationMs, and result
+    const reqOk = new NextRequest('http://localhost:3000/api/telegram/monitor', {
+      headers: { authorization: 'Bearer test-cron-secret-xyz' },
+    });
+    const resOk = await monitorGet(reqOk);
+    assert.equal(resOk.status, 200);
+    const bodyOk = await resOk.json();
+    assert.equal(bodyOk.ok, true);
+    assert.ok(typeof bodyOk.executedAt === 'string' && !Number.isNaN(Date.parse(bodyOk.executedAt)));
+    assert.ok(typeof bodyOk.durationMs === 'number' && bodyOk.durationMs >= 0);
+    assert.ok(typeof bodyOk.result?.evaluated === 'number');
+  } finally {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  }
 });

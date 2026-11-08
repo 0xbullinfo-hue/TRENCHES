@@ -28,6 +28,8 @@ export const DEFAULT_CACHE_TTL_SECONDS = 30;
 export const DEFAULT_STALE_TTL_SECONDS = 180;
 /** Upper bound so a typo cannot make a request hang past the serverless function limit. */
 export const MAX_TIMEOUT_MS = 30_000;
+/** Maximum tolerated forward clock skew (30 seconds) before rejecting future-dated telemetry. */
+export const MAX_FUTURE_CLOCK_SKEW_MS = 30_000;
 
 /** Parses a positive, finite number; anything else (undefined, '', NaN, 0, negative) yields the fallback. */
 export function positiveNumber(raw: string | undefined, fallback: number): number {

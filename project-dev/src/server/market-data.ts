@@ -20,8 +20,11 @@ import {
   describeCoinStatsConfig,
   getCoinStatsApiKey,
   getMarketProviderConfig,
+  MAX_FUTURE_CLOCK_SKEW_MS,
   type CoinStatsConfigState,
 } from '@/server/market-config';
+
+export { MAX_FUTURE_CLOCK_SKEW_MS };
 
 // ---------------------------------------------------------------------------------------------
 // Types
@@ -220,12 +223,29 @@ export function isValidMarketData(data: unknown, token: MarketToken): data is Pr
   return true;
 }
 
-/** True when the entry is no older than the bounded stale window. */
-export function isWithinStaleLimit(fetchedAt: string | null, nowMs: number, staleTtlSeconds: number): boolean {
+/** True when the entry is within clock-skew tolerance and no older than the bounded stale window. */
+export function isWithinStaleLimit(
+  fetchedAt: string | null,
+  nowMs: number,
+  staleTtlSeconds: number
+): boolean {
   if (!fetchedAt) return false;
-  const t = Date.parse(fetchedAt);
-  if (Number.isNaN(t)) return false;
-  return Math.max(0, nowMs - t) <= staleTtlSeconds * 1000;
+
+  const timestamp = Date.parse(fetchedAt);
+
+  if (!Number.isFinite(timestamp) || !Number.isFinite(nowMs)) {
+    return false;
+  }
+
+  const ageMs = nowMs - timestamp;
+
+  // Reject timestamps that are implausibly ahead of server time.
+  if (ageMs < -MAX_FUTURE_CLOCK_SKEW_MS) {
+    return false;
+  }
+
+  // Accept only data inside the configured stale window.
+  return ageMs <= staleTtlSeconds * 1000;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -697,6 +717,9 @@ export function createMarketDataService(overrides: Partial<MarketDataDeps> = {})
     try {
       const data = await adapter(token);
       if (!isValidMarketData(data, token)) throw new ProviderError(provider, 'invalid_data');
+      if (!isWithinStaleLimit(data.fetchedAt, deps.now(), config().staleTtlSeconds)) {
+        throw new ProviderError(provider, 'invalid_data');
+      }
       recordSuccess(provider, deps.now() - started);
       return data;
     } catch (error) {

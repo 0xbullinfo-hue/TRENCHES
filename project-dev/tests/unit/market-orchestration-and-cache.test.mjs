@@ -216,6 +216,91 @@ test('Cache: hit within cacheTtlSeconds returns CACHED without calling providers
   assert.equal(diag.cache.hits, 1);
 });
 
+test('Cache: clock-skew tolerance (+10s, +30s accepted; +31s future, expired, invalid, missing rejected)', async () => {
+  const clock = makeClock();
+  const store = md.createMemoryMarketCacheStore(clock.now);
+  const fetchState = makeFetch({
+    coinstats: () => json(coinstatsBody(SOL_TOKEN, { price: 8.88, marketCap: 88_800_000 })),
+    dex: () => json({ pairs: [] }),
+  });
+  const { svc } = makeService({
+    clock,
+    store,
+    fetchState,
+    env: { COINSTATS_ENABLED: 'true', COINSTATS_API_KEY: KEY, MARKET_DATA_CACHE_TTL_SECONDS: '30', MARKET_DATA_STALE_TTL_SECONDS: '180' },
+  });
+
+  const key = md.marketCacheKey(solToken);
+  const putRecord = async (fetchedAt, price = 2.0) => {
+    await store.set(
+      key,
+      JSON.stringify({
+        v: 1,
+        origin: 'COINSTATS',
+        data: {
+          chain: 'SOL',
+          contractAddress: SOL_TOKEN,
+          price,
+          marketCap: 20_000_000,
+          volume24h: 1000,
+          priceChange24h: 5,
+          liquidity: null,
+          imageUrl: null,
+          fetchedAt,
+        },
+      }),
+      300
+    );
+  };
+
+  // 1. Valid current timestamp -> Accepted as CACHED
+  await putRecord(new Date(clock.now()).toISOString(), 2.0);
+  const currentHit = await svc.getMarketData(solToken);
+  assert.equal(currentHit.status, 'CACHED');
+  assert.equal(currentHit.price, 2.0);
+  assert.equal(fetchState.count('COINSTATS'), 0);
+
+  // 2. Minor future clock skew (+10s and +30s boundary) -> Accepted as CACHED
+  await putRecord(new Date(clock.now() + 10_000).toISOString(), 2.1);
+  const skew10 = await svc.getMarketData(solToken);
+  assert.equal(skew10.status, 'CACHED');
+  assert.equal(skew10.price, 2.1);
+
+  await putRecord(new Date(clock.now() + 30_000).toISOString(), 2.3);
+  const skew30 = await svc.getMarketData(solToken);
+  assert.equal(skew30.status, 'CACHED');
+  assert.equal(skew30.price, 2.3);
+  assert.equal(fetchState.count('COINSTATS'), 0);
+
+  // 3. Future timestamp beyond tolerance (+31s) -> Rejected (never returned as CACHED; triggers fresh provider fetch)
+  await putRecord(new Date(clock.now() + 31_000).toISOString(), 99.99);
+  const beyondSkew = await svc.getMarketData(solToken);
+  assert.equal(beyondSkew.status, 'LIVE');
+  assert.equal(beyondSkew.price, 8.88, 'Future-dated cached record must be rejected and refetched');
+  assert.equal(fetchState.count('COINSTATS'), 1);
+
+  // 4. Expired cache entry (> 180s stale TTL) -> Rejected
+  await putRecord(new Date(clock.now() - 181_000).toISOString(), 77.77);
+  const expired = await svc.getMarketData(solToken);
+  assert.equal(expired.status, 'LIVE');
+  assert.equal(expired.price, 8.88);
+  assert.equal(fetchState.count('COINSTATS'), 2);
+
+  // 5. Invalid date -> Rejected
+  await putRecord('not-a-valid-date', 66.66);
+  const invalidDate = await svc.getMarketData(solToken);
+  assert.equal(invalidDate.status, 'LIVE');
+  assert.equal(invalidDate.price, 8.88);
+  assert.equal(fetchState.count('COINSTATS'), 3);
+
+  // 6. Missing date -> Rejected
+  await putRecord(null, 55.55);
+  const missingDate = await svc.getMarketData(solToken);
+  assert.equal(missingDate.status, 'LIVE');
+  assert.equal(missingDate.price, 8.88);
+  assert.equal(fetchState.count('COINSTATS'), 4);
+});
+
 test('Cache: chain and contract address isolation prevents cross-token collisions', async () => {
   const clock = makeClock();
   const store = md.createMemoryMarketCacheStore(clock.now);

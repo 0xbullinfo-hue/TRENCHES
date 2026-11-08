@@ -7,8 +7,10 @@ import {
 import type { AlphaRecord } from '@/server/alphas-data';
 import { getMarketData, normalizeToken } from '@/server/market-data';
 import type { MarketToken, NormalizedMarketData } from '@/server/market-data';
-import { getMarketProviderConfig } from '@/server/market-config';
+import { getMarketProviderConfig, MAX_FUTURE_CLOCK_SKEW_MS } from '@/server/market-config';
 import { notifyTpTriggered, notifySlTriggered } from '@/server/telegram';
+
+export { MAX_FUTURE_CLOCK_SKEW_MS };
 
 export interface AlertMonitorResult {
   evaluated: number;
@@ -40,7 +42,8 @@ export type TelemetryRejection =
   | 'unverified_token' // the call has no valid chain/contract to verify against
   | 'identity_mismatch' // the data describes another token/chain
   | 'invalid_market_cap'
-  | 'stale_data';
+  | 'stale_data'
+  | 'future_timestamp';
 
 export type TelemetryVerdict =
   | { eligible: true; marketCapUsd: number }
@@ -70,9 +73,33 @@ export function assessTelemetryForAlerts(
   const mc = data.marketCap;
   if (typeof mc !== 'number' || !Number.isFinite(mc) || mc <= 0) return { eligible: false, reason: 'invalid_market_cap' };
 
-  const fetchedAt = data.fetchedAt ? Date.parse(data.fetchedAt) : NaN;
-  if (Number.isNaN(fetchedAt) || Math.max(0, nowMs - fetchedAt) > maxAgeMs) {
-    return { eligible: false, reason: 'stale_data' };
+  const fetchedAt = data.fetchedAt
+    ? Date.parse(data.fetchedAt)
+    : NaN;
+
+  if (!Number.isFinite(fetchedAt) || !Number.isFinite(nowMs)) {
+    return {
+      eligible: false,
+      reason: 'stale_data',
+    };
+  }
+
+  const telemetryAgeMs = nowMs - fetchedAt;
+
+  // Reject timestamps more than 30 seconds ahead of server time.
+  if (telemetryAgeMs < -MAX_FUTURE_CLOCK_SKEW_MS) {
+    return {
+      eligible: false,
+      reason: 'future_timestamp',
+    };
+  }
+
+  // Reject data older than the configured maximum age.
+  if (telemetryAgeMs > maxAgeMs) {
+    return {
+      eligible: false,
+      reason: 'stale_data',
+    };
   }
 
   return { eligible: true, marketCapUsd: mc };
