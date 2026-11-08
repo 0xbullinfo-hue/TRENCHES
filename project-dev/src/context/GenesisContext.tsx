@@ -168,7 +168,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
   const prevPublicKeyRef = useRef<string | null>(null);
   const pendingUnlockTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchAlphasRef = useRef<(interactiveAuth?: boolean, gen?: number) => Promise<void>>(async () => {});
+  const fetchAlphasRef = useRef<(interactiveAuth?: boolean, gen?: number) => Promise<void>>(async () => { });
 
   const [connectingWalletName, setConnectingWalletName] = useState<string | null>(null);
   const [walletConnectError, setWalletConnectError] = useState<string | null>(null);
@@ -261,8 +261,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         const previousAdapter = wallet.wallet?.adapter;
         const isSameAdapterReconnect = Boolean(
           previousAdapter === targetWallet.adapter &&
-            targetWallet.adapter.connected &&
-            demoPreset === 'live'
+          targetWallet.adapter.connected &&
+          demoPreset === 'live'
         );
 
         // If user clicked the already-connected live wallet in Switch Wallet, disconnect first so they can switch accounts or re-authorize
@@ -355,7 +355,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         console.warn('[TrenchLabs] Wallet connect error:', err);
         setWalletConnectError(
           errMsg ||
-            `Could not connect to ${targetWallet.adapter.name}. Please unlock your wallet extension and try again.`
+          `Could not connect to ${targetWallet.adapter.name}. Please unlock your wallet extension and try again.`
         );
       }
     },
@@ -611,7 +611,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         };
         try {
           sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
-          fetch('/api/auth/session', { method: 'POST', headers }).catch(() => {});
+          fetch('/api/auth/session', { method: 'POST', headers }).catch(() => { });
         } catch {
           // ignore cache write failure
         }
@@ -1077,7 +1077,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const disconnectDemoOrWallet = useCallback(async () => {
     try {
-      fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
+      fetch('/api/auth/session', { method: 'DELETE' }).catch(() => { });
       if (wallet.connected || wallet.wallet) {
         await wallet.disconnect();
       }

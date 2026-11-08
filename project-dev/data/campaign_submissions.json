@@ -1,5 +1,16 @@
 [
   {
+    "id": "sub-1794104432148-68a983",
+    "campaignId": "camp-1794104432143-a57f3f",
+    "walletAddress": "11111111111111111111111111111111",
+    "xHandle": "@solanaraider",
+    "xRetweetLink": "https://x.com/solanaraider/status/999999999",
+    "status": "AIRDROPPED",
+    "submittedAt": "2026-11-08T02:20:32.148Z",
+    "airdroppedAt": "2026-11-08T02:20:32.158Z",
+    "airdropTx": "5Ver7CJ4d1k6JvJm9JuG8F7z6kXn1sYQp2w3e4r5t6y7u8i9o0p"
+  },
+  {
     "id": "sub-1794104076611-7dfb3b",
     "campaignId": "camp-1794104076598-a4b036",
     "walletAddress": "11111111111111111111111111111111",
