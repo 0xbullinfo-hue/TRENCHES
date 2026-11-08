@@ -908,10 +908,10 @@ export const IncubatorHub: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
-                {/* Current Market Cap */}
+                {/* Entry Market Cap */}
                 <div className="md:col-span-3 space-y-1">
                   <label className="block font-sans text-[11px] font-bold text-muted uppercase">
-                    Current MC *
+                    Entry MC *
                   </label>
                   <input
                     type="text"
@@ -1181,7 +1181,7 @@ export const IncubatorHub: React.FC = () => {
                   key={ch}
                   type="button"
                   onClick={() => setSelectedChain(ch)}
-                  className={`px-3 py-1.5 rounded-md font-mono text-xs font-extrabold whitespace-nowrap border cursor-pointer transition-colors ${
+                  className={`h-9 px-3 rounded-md font-mono text-xs font-extrabold whitespace-nowrap border cursor-pointer transition-colors inline-flex items-center justify-center ${
                     active
                       ? 'bg-pump text-canvas border-pump'
                       : 'bg-surface hover:bg-surface-card text-white border-line'
@@ -1202,7 +1202,7 @@ export const IncubatorHub: React.FC = () => {
 
           {/* Right Controls: Filter Tabs + Sort + View Mode */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="flex items-center bg-surface border border-line rounded-md p-0.5 font-sans text-xs">
+            <div className="h-9 flex items-center bg-surface border border-line rounded-md p-1 font-sans text-xs">
               {(
                 [
                   { id: 'ALL', label: 'All' },
@@ -1217,7 +1217,7 @@ export const IncubatorHub: React.FC = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveFilter(tab.id)}
-                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                  className={`h-7 px-2.5 rounded font-bold cursor-pointer transition-colors inline-flex items-center justify-center ${
                     activeFilter === tab.id
                       ? tab.id === 'MAX_ALPHA'
                         ? 'bg-orange-500 text-black'
@@ -1232,8 +1232,8 @@ export const IncubatorHub: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-surface border border-line font-sans text-xs text-muted">
-              <Filter className="w-3 h-3 text-pump" />
+            <div className="h-9 flex items-center gap-1.5 px-3 rounded-md bg-surface border border-line font-sans text-xs text-muted">
+              <Filter className="w-3.5 h-3.5 text-pump" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -1254,11 +1254,11 @@ export const IncubatorHub: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-center bg-surface border border-line rounded-md p-0.5 font-sans text-xs">
+            <div className="h-9 flex items-center bg-surface border border-line rounded-md p-1 font-sans text-xs">
               <button
                 type="button"
                 onClick={() => setViewMode('GRID')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                className={`h-7 inline-flex items-center gap-1 px-2.5 rounded font-semibold cursor-pointer ${
                   viewMode === 'GRID'
                     ? 'bg-pump text-canvas'
                     : 'text-muted hover:text-white'
@@ -1270,7 +1270,7 @@ export const IncubatorHub: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setViewMode('TABLE')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                className={`h-7 inline-flex items-center gap-1 px-2.5 rounded font-semibold cursor-pointer ${
                   viewMode === 'TABLE'
                     ? 'bg-pump text-canvas'
                     : 'text-muted hover:text-white'

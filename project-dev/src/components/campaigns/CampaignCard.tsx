@@ -121,7 +121,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     <article
       tabIndex={0}
       aria-label={`X Raid Campaign: ${campaign.title}`}
-      className="group relative rounded-xl bg-surface flex flex-col justify-between transition-all duration-200 p-4 border-2 border-purple-500 shadow-[0_0_22px_rgba(168,85,247,0.35)] ring-1 ring-purple-500/50 hover:border-purple-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+      className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-200 p-4 border-2 border-purple-500 shadow-[0_0_22px_rgba(168,85,247,0.35)] ring-1 ring-purple-500/50 hover:border-purple-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
     >
       <div>
         {/* Top Row: Serial Tag + X Raid Indicator + Status + Participants */}
