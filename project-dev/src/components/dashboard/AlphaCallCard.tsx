@@ -5,6 +5,7 @@ import type { AlphaItem } from '@/lib/types';
 import { CHAIN_METADATA } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
 import { getPrimaryMarketUrl } from './AlphaInspectorModal';
+import { MarketDataBadge } from './MarketDataBadge';
 import {
   Check,
   Copy,
@@ -106,6 +107,8 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             <span className="px-2 py-0.5 rounded bg-surface-card border border-line font-mono text-[10px] font-bold text-white">
               {coin.chain === 'ROBIN' ? 'ROBIN' : coin.chain}
             </span>
+
+            <MarketDataBadge item={coin} />
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">

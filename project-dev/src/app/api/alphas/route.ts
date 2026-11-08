@@ -22,7 +22,8 @@ import { verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { notifyNewCall, dispatchDelayedMemberCalls } from '@/server/telegram';
-import { getMarketTelemetry } from '@/server/market-data';
+import { getMarketData } from '@/server/market-data';
+import { hydrateAlphaItems } from '@/server/market-view';
 import type {
   AlphasErr,
   AlphasOk,
@@ -129,26 +130,9 @@ export async function GET(req: NextRequest) {
   }
   const baseItems = await alphasForTier(tier.id, Date.now(), registry, isAdmin);
 
-  // Wire live market telemetry into calls with CA
-  const items = await Promise.all(
-    baseItems.map(async (it) => {
-      if (!it.ca) return it;
-      try {
-        const t = await getMarketTelemetry(it.ca, it.marketCapUsd, it.change24hPct, it.chain);
-        const mc = t.marketCapUsd ?? it.marketCapUsd;
-        return {
-          ...it,
-          marketCapUsd: mc,
-          marketCap: formatCompactUsd(mc),
-          change24hPct: t.change24hPct ?? it.change24hPct,
-          dataFreshness: t.freshness,
-          marketDataSource: t.source,
-        };
-      } catch {
-        return it;
-      }
-    })
-  );
+  // Wire validated market telemetry into calls. Every item is labelled LIVE / CACHED / STALE /
+  // UNAVAILABLE / MANUAL so the UI never presents recorded or stale numbers as live provider data.
+  const items = await hydrateAlphaItems(baseItems);
 
   let verifiedUsersCount = 0;
   try {
@@ -227,23 +211,24 @@ export async function POST(req: NextRequest) {
       return err(400, 'BAD_REQUEST', 'Invalid contract address length');
     }
 
-    // Automatically fetch live market telemetry from DexScreener when call is posted
+    // Fetch validated market telemetry when the call is posted (CoinStats if enabled, else DexScreener).
+    // Only LIVE/CACHED provider data is used; STALE or missing data never pre-fills call values.
     let liveMcUsd = 0;
-    let liveChange24h = 0;
-    let liveVolumeUsd = 0;
+    let liveChange24h: number | null = null;
+    let liveVolumeUsd: number | null = null;
     let liveLogoUrl = '';
     try {
-      const telemetry = await getMarketTelemetry(ca, 0, 0, chain);
-      if (telemetry?.imageUrl) {
-        liveLogoUrl = telemetry.imageUrl;
-      }
-      if (telemetry?.marketCapUsd && telemetry.marketCapUsd > 0) {
-        liveMcUsd = telemetry.marketCapUsd;
-        liveChange24h = telemetry.change24hPct || 0;
-        liveVolumeUsd = telemetry.volume24hUsd || 0;
+      const telemetry = await getMarketData({ chain, contractAddress: ca });
+      if (telemetry.status === 'LIVE' || telemetry.status === 'CACHED') {
+        if (telemetry.imageUrl) liveLogoUrl = telemetry.imageUrl;
+        if (telemetry.priceChange24h !== null) liveChange24h = telemetry.priceChange24h;
+        if (telemetry.volume24h !== null) liveVolumeUsd = telemetry.volume24h;
+        if (telemetry.marketCap && telemetry.marketCap > 0) {
+          liveMcUsd = telemetry.marketCap;
+        }
       }
     } catch (e) {
-      console.warn('[Alphas POST] Failed to fetch live DexScreener market cap:', e);
+      console.warn('[Alphas POST] Failed to fetch live market data:', (e as Error).message);
     }
 
     const currentMcStr = String(payload.marketCap || '').trim();
@@ -252,7 +237,15 @@ export async function POST(req: NextRequest) {
         ? Number(payload.marketCapUsd)
         : parseShorthandUsd(currentMcStr);
 
-    const currentMcUsd = liveMcUsd > 0 ? liveMcUsd : (explicitCurrentMcUsd || 100_000);
+    // Never invent a market cap: it becomes the entry baseline for take-profit / stop-loss monitoring.
+    const currentMcUsd = liveMcUsd > 0 ? liveMcUsd : explicitCurrentMcUsd;
+    if (!(currentMcUsd > 0)) {
+      return err(
+        400,
+        'BAD_REQUEST',
+        'Market cap could not be fetched from a data provider. Enter the market cap manually.'
+      );
+    }
 
     const entryMcStr = String(payload.entryMarketCap || '').trim();
     const explicitEntryMcUsd =
@@ -370,9 +363,19 @@ export async function POST(req: NextRequest) {
       holderRewardsRaw: 0,
       holderRewardsQuote: '—',
       holdersPaid: 0,
-      volume24h: liveVolumeUsd > 0 ? formatCompactUsd(liveVolumeUsd) : String(payload.volume24h || '—'),
+      volume24h:
+        liveVolumeUsd !== null && liveVolumeUsd >= 0
+          ? liveVolumeUsd === 0
+            ? '$0'
+            : formatCompactUsd(liveVolumeUsd)
+          : String(payload.volume24h || '—'),
       netInflow24h: '—',
-      change24hPct: liveChange24h !== 0 ? liveChange24h : (Number(payload.change24hPct) || 0),
+      change24hPct:
+        liveChange24h !== null
+          ? liveChange24h
+          : typeof payload.change24hPct === 'number' && Number.isFinite(payload.change24hPct)
+            ? payload.change24hPct
+            : null,
       age: 'Just now',
       ageMinutes: 1,
       caller: String(payload.caller || '@TrenchLabsAdmin').trim().slice(0, 40),
@@ -407,7 +410,7 @@ export async function POST(req: NextRequest) {
     after(() => notifyNewCall(newRecord).catch((e) => console.error('[TrenchLabs] Telegram fan-out failed:', e)));
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
+      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -610,7 +613,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
+      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -648,7 +651,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, items: await alphasForTier('PRO', Date.now(), undefined, true) },
+      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
       { headers: NO_STORE }
     );
   } catch (e) {

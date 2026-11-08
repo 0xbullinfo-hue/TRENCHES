@@ -91,7 +91,8 @@ export interface AlphaItem {
   holdersPaid?: number;
   volume24h: string;
   netInflow24h: string;
-  change24hPct: number;
+  /** 24h price change in %. null = no trustworthy provider value (render "—", never 0%). */
+  change24hPct: number | null;
   age: string;
   ageMinutes: number;
   caller: string;
@@ -108,8 +109,14 @@ export interface AlphaItem {
   logoUrl?: string;
   sparkline: number[];
   art: AlphaArtTheme;
-  marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'FIXTURE' | 'FALLBACK' | 'RECORDED' | 'UNAVAILABLE';
-  dataFreshness?: 'LIVE' | 'CACHED' | 'FALLBACK' | 'FIXTURE' | 'UNAVAILABLE';
+  /** Provider that produced the current market cap. 'RECORDED' = value stored when the call was posted. */
+  marketDataSource?: 'COINSTATS' | 'DEXSCREENER' | 'RECORDED' | null;
+  /**
+   * LIVE/CACHED/STALE = provider data; UNAVAILABLE = providers failed (recorded baseline shown, labelled);
+   * MANUAL = no provider can cover this call (no/unsupported contract), admin-entered values only.
+   */
+  dataFreshness?: 'LIVE' | 'CACHED' | 'STALE' | 'UNAVAILABLE' | 'MANUAL';
+  /** ISO time the provider produced the numbers. Absent for UNAVAILABLE/MANUAL. */
   lastPriceUpdated?: string;
 }
 

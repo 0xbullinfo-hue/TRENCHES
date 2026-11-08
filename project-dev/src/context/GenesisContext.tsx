@@ -42,7 +42,7 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xW
 
 export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
 
-export const DEMO_ENABLED = process.env.NODE_ENV !== 'production';
+export const DEMO_ENABLED = false;
 
 const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string> = {
   '0': 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
@@ -166,7 +166,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const [boundEvmAddress, setBoundEvmAddressState] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [watchlist, setWatchlist] = useState<string[]>(['pill-trench', 'robin-hoodlum', 'swordcat']);
+  const [watchlist, setWatchlist] = useState<string[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);

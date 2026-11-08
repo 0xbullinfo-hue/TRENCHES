@@ -15,6 +15,7 @@ import {
 import { TokenArtwork } from './TokenArtwork';
 import { AlphaCallCard } from './AlphaCallCard';
 import { SinceCallChip } from './SinceCallChip';
+import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
 import {
@@ -307,7 +308,7 @@ export const IncubatorHub: React.FC = () => {
     setFormCa(call.ca || '');
     setFormLogoUrl(call.logoUrl || '');
     setFormChain(call.chain);
-    setFormCurrentMc(call.marketCap || '');
+    setFormCurrentMc(call.marketCap && call.marketCap !== '—' ? call.marketCap : '');
     setFormEntryMc(call.entryMarketCap || '');
     setFormRiskLevel(call.risk || 3);
     setFormStopLoss(call.stopLoss || '-25% SL');
@@ -481,7 +482,7 @@ export const IncubatorHub: React.FC = () => {
           case 'MAX_ALPHA':
             return Boolean(item.isMaxAlpha);
           case 'MOVERS':
-            return item.change24hPct >= 200;
+            return item.change24hPct !== null && item.change24hPct >= 200;
           case 'NEW':
             return item.ageMinutes <= 180;
           case 'WATCHLIST':
@@ -498,7 +499,7 @@ export const IncubatorHub: React.FC = () => {
           return a.ageMinutes - b.ageMinutes;
         }
         if (sortBy === 'MCAP') return b.marketCapUsd - a.marketCapUsd;
-        if (sortBy === 'CHANGE') return b.change24hPct - a.change24hPct;
+        if (sortBy === 'CHANGE') return compareChangeDesc(a, b);
         return a.ageMinutes - b.ageMinutes;
       });
   }, [alphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy, isProOrAdmin]);
@@ -506,8 +507,9 @@ export const IncubatorHub: React.FC = () => {
   const topWinningCoins = useMemo(
     () =>
       alphas
-        .filter((a) => !a.isMaxAlpha || isProOrAdmin)
-        .sort((a, b) => b.change24hPct - a.change24hPct)
+        // Only calls with a trustworthy 24h figure can be ranked as "winners".
+        .filter((a) => (!a.isMaxAlpha || isProOrAdmin) && a.change24hPct !== null)
+        .sort(compareChangeDesc)
         .slice(0, 4),
     [alphas, isProOrAdmin]
   );
@@ -1578,18 +1580,23 @@ export const IncubatorHub: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-1 font-mono text-xs text-muted">
+                        <div className="flex flex-wrap items-center gap-2 mt-1 font-mono text-xs text-muted">
                           <span className="tnum">
                             MC {coin.marketCap} • {coin.riskRewardRatio} • TP{' '}
                             {coin.takeProfits.map((t) => t.label).join('/')}
                           </span>
+                          <MarketDataBadge item={coin} />
                         </div>
                       </div>
                     </div>
 
                     <div className="text-right font-mono tnum shrink-0">
-                      <div className="text-sm font-bold text-pump">
-                        +{coin.change24hPct.toFixed(0)}%
+                      <div
+                        className={`text-sm font-bold ${
+                          coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-pump'
+                        }`}
+                      >
+                        {formatChangePct(coin.change24hPct)}
                       </div>
                       <a
                         href={marketUrl}

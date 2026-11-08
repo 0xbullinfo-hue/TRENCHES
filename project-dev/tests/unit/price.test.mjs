@@ -8,7 +8,7 @@ test('Price Oracle: getGenesisPrice returns valid result structure', async () =>
   assert.ok(typeof result.priceUsd === 'number');
   assert.ok(result.priceUsd > 0, 'Price must be greater than zero');
   assert.ok(
-    ['jupiter', 'dexscreener', 'cached', 'fallback', 'unavailable'].includes(result.source),
+    ['coinstats', 'jupiter', 'dexscreener', 'cached', 'fallback', 'unavailable'].includes(result.source),
     `Unknown source: ${result.source}`
   );
   assert.ok(typeof result.isFresh === 'boolean');

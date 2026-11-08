@@ -45,41 +45,14 @@ export async function TierSection() {
   let recalculatedAt = '';
   let showFootnote = false;
 
-  // 1. Try server fetch of /api/tiers/current
   try {
-    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
-    const res = await fetch(`${siteUrl}/api/tiers/current`, {
-      cache: 'no-store',
-      next: { revalidate: 60 },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      memberTokenFormatted = formatTokenAmountDisplay(
-        data.member?.token_amount,
-        data.member?.token_decimals ?? 9
-      );
-      proTokenFormatted = formatTokenAmountDisplay(
-        data.pro?.token_amount,
-        data.pro?.token_decimals ?? 9
-      );
-      recalculatedAt = data.recalculated_at;
-      showFootnote = true;
-    } else {
-      throw new Error(`API returned ${res.status}`);
-    }
+    const { member, pro } = await getTierThresholds();
+    memberTokenFormatted = formatTokenAmountDisplay(member.token_amount, TOKEN_DECIMALS);
+    proTokenFormatted = formatTokenAmountDisplay(pro.token_amount, TOKEN_DECIMALS);
+    recalculatedAt = member.valid_from;
+    showFootnote = true;
   } catch {
-    // 2. Fallback: query database directly
-    try {
-      const { member, pro } = await getTierThresholds();
-      memberTokenFormatted = formatTokenAmountDisplay(member.token_amount, TOKEN_DECIMALS);
-      proTokenFormatted = formatTokenAmountDisplay(pro.token_amount, TOKEN_DECIMALS);
-      recalculatedAt = member.valid_from;
-      showFootnote = true;
-    } catch {
-      // 3. Fallback: placeholders, hide footnote
-      showFootnote = false;
-    }
+    showFootnote = false;
   }
 
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;

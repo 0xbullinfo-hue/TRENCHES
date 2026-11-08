@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import type { AlphaItem } from '@/lib/types';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { MarketDataBadge } from './MarketDataBadge';
 import {
   ADMIN_WALLET_SHORT,
   BUY_LINKS,
@@ -234,6 +235,10 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               </div>
               <div className="text-xs text-pump font-mono">
                 Recorded at time of call
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 font-mono text-xs text-muted">
+                <span>Now: {token.marketCap || '—'}</span>
+                <MarketDataBadge item={token} />
               </div>
             </div>
 

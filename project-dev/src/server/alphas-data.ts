@@ -54,7 +54,7 @@ export interface AlphaRecord {
   holdersPaid?: number;
   volume24h: string;
   netInflow24h: string;
-  change24hPct: number;
+  change24hPct: number | null;
   age: string;
   ageMinutes: number;
   caller: string;
@@ -314,7 +314,7 @@ export async function alphasForTier(
       holdersPaid: r.holdersPaid,
       volume24h: r.volume24h,
       netInflow24h: r.netInflow24h,
-      change24hPct: r.change24hPct,
+      change24hPct: typeof r.change24hPct === 'number' && Number.isFinite(r.change24hPct) ? r.change24hPct : null,
       age: r.age,
       ageMinutes: r.ageMinutes,
       caller: r.caller,
@@ -331,58 +331,7 @@ export async function alphasForTier(
   });
 }
 
-/** SAMPLE portfolio — illustrative benchmark cohort records. */
+/** Portfolio summary — empty until real verified claims are recorded (never ships mock/illustrative trades). */
 export function samplePortfolio(): Portfolio {
-  if (process.env.NODE_ENV === 'production') {
-    // Never ship illustrative PnL / signatures to production users.
-    return { claimedCount: 0, totalRealizedPnl: '—', isSample: true, note: 'No verified claims yet', history: [] };
-  }
-  return {
-    claimedCount: 4,
-    totalRealizedPnl: '+42.50 SOL',
-    isSample: true,
-    note: 'Historical Cohort Benchmark Sample (Illustrative)',
-    history: [
-      {
-        ticker: '$PILL',
-        chain: 'SOL',
-        size: '6.0 SOL',
-        pnl: '+21.40 SOL',
-        pnlPositive: true,
-        slot: 298_410_214,
-        claimedAt: '2026-10-31T14:22:00Z',
-        sig: '5KnpVqXy7c2Lw9RtZmA3bHe8sJd4FgU1oYi6NkPq72jQaBcDeFgHiJkLmNoPqRsTuVwXyZ12345',
-      },
-      {
-        ticker: '$BATON',
-        chain: 'SOL',
-        size: '4.0 SOL',
-        pnl: '+14.85 SOL',
-        pnlPositive: true,
-        slot: 297_118_902,
-        claimedAt: '2026-10-28T09:05:00Z',
-        sig: '3hTqWm9Rk2Zp8XvLc4Yb7NdA6sJe5FgU1oYi6NkPq72jQaBcDeFgHiJkLmNoPqRsTuVwXyZ67890',
-      },
-      {
-        ticker: '$SWORDCAT',
-        chain: 'SOL',
-        size: '3.0 SOL',
-        pnl: '+8.10 SOL',
-        pnlPositive: true,
-        slot: 295_604_771,
-        claimedAt: '2026-10-24T19:41:00Z',
-        sig: '2gRpVn8Qj1Yo7WuKb3Xa6McZ5rId4EfT9nXh5MjOp61iPzAbCdEfGhIjKlMnOpQrStUvWxYz11111',
-      },
-      {
-        ticker: '$STEALTH',
-        chain: 'BASE',
-        size: '2.5 SOL',
-        pnl: '-1.85 SOL',
-        pnlPositive: false,
-        slot: 294_002_356,
-        claimedAt: '2026-10-19T11:12:00Z',
-        sig: '4jSrXo9Tl3Ap8YwMd5Zc8OeB7tKf6GhV2pZj7OlQr83kRbCdEfGhIjKlMnOpQrStUvWxYz22222',
-      },
-    ],
-  };
+  return { claimedCount: 0, totalRealizedPnl: '—', isSample: false, note: 'No verified claims yet', history: [] };
 }
