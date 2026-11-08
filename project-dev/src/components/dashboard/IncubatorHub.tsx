@@ -29,14 +29,17 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Check,
+  CheckCircle2,
   Copy,
   ExternalLink,
   Filter,
   Flame,
   LayoutGrid,
   List,
+  Pencil,
   Pin,
   Plus,
+  Radio,
   Search,
   Send,
   ShieldCheck,
@@ -71,6 +74,7 @@ export const IncubatorHub: React.FC = () => {
     boundEvmAddress,
     setBoundEvmAddress,
     createAlphaCall,
+    updateAlphaCall,
     togglePinCall,
     toggleMaxAlpha,
     toggleTpHit,
@@ -99,8 +103,9 @@ export const IncubatorHub: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Admin Create Call Form State
+  // Admin Create/Edit Call Form State
   const [showAdminForm, setShowAdminForm] = useState<boolean>(true);
+  const [editingCall, setEditingCall] = useState<AlphaItem | null>(null);
   const [formCa, setFormCa] = useState('');
   const [formName, setFormName] = useState('');
   const [formTicker, setFormTicker] = useState('');
@@ -235,10 +240,10 @@ export const IncubatorHub: React.FC = () => {
     }
   };
 
-  const handleAutoFillDexScreener = async () => {
-    const cleanCa = formCa.trim();
+  const handleAutoFillDexScreener = async (customCa?: string) => {
+    const cleanCa = (typeof customCa === 'string' ? customCa : formCa).trim();
     if (!cleanCa) {
-      showToast('Paste a Contract Address (CA) first to auto-fill.');
+      if (!customCa) showToast('Paste a Contract Address (CA) first to auto-fill.');
       return;
     }
     setFetchingDex(true);
@@ -247,10 +252,12 @@ export const IncubatorHub: React.FC = () => {
         `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(cleanCa)}`
       );
       if (!res.ok) {
-        if (res.status === 429) {
-          showToast('DexScreener rate limit reached (HTTP 429). Please retry in a few seconds.');
-        } else {
-          showToast(`DexScreener request failed (HTTP ${res.status}). Enter details manually.`);
+        if (!customCa) {
+          if (res.status === 429) {
+            showToast('DexScreener rate limit reached (HTTP 429). Please retry in a few seconds.');
+          } else {
+            showToast(`DexScreener request failed (HTTP ${res.status}). Enter details manually.`);
+          }
         }
         return;
       }
@@ -274,17 +281,55 @@ export const IncubatorHub: React.FC = () => {
               ? `$${(mc / 1_000_000).toFixed(2)}M`
               : `$${(mc / 1_000).toFixed(1)}K`;
           setFormCurrentMc(formatted);
-          setFormEntryMc(formatted);
+          if (!editingCall) {
+            setFormEntryMc(formatted);
+          }
         }
         showToast(`Auto-filled live telemetry for ${pair.baseToken?.symbol || cleanCa}`);
-      } else {
+      } else if (!customCa) {
         showToast('No active DEX trading pair found for this CA. Enter details manually.');
       }
     } catch (err) {
-      showToast(`Network error reaching DexScreener: ${(err as Error).message || 'offline'}`);
+      if (!customCa) showToast(`Network error reaching DexScreener: ${(err as Error).message || 'offline'}`);
     } finally {
       setFetchingDex(false);
     }
+  };
+
+  const handleStartEditCall = (call: AlphaItem) => {
+    setEditingCall(call);
+    setFormName(call.name);
+    setFormTicker(call.ticker);
+    setFormCa(call.ca || '');
+    setFormChain(call.chain);
+    setFormCurrentMc(call.marketCap || '');
+    setFormEntryMc(call.entryMarketCap || '');
+    setFormRiskLevel(call.risk || 3);
+    setFormStopLoss(call.stopLoss || '-25% SL');
+    setFormTakeProfits(
+      call.takeProfits && call.takeProfits.length > 0
+        ? call.takeProfits.map((tp) => `${tp.multiple}x`).join(', ')
+        : '2x, 5x, 10x'
+    );
+    setFormPinned(call.pinned || false);
+    setFormMaxAlpha(call.isMaxAlpha || false);
+    setFormSummary(call.summary || '');
+    setFormSerialTag(call.serialTag || '');
+    setShowAdminForm(true);
+    showToast(`Loaded ${call.ticker} into Editor`);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCall(null);
+    setFormCa('');
+    setFormName('');
+    setFormTicker('');
+    setFormCurrentMc('$250K');
+    setFormEntryMc('$250K');
+    setFormSummary('');
+    setFormSerialTag('');
+    setFormMaxAlpha(false);
+    setFormPinned(true);
   };
 
   const handleAdminPostCall = async (e: React.FormEvent) => {
@@ -294,6 +339,35 @@ export const IncubatorHub: React.FC = () => {
       return;
     }
     setSubmittingCall(true);
+
+    if (editingCall) {
+      const ok = await updateAlphaCall(editingCall.id, {
+        name: formName.trim(),
+        ticker: formTicker.trim(),
+        ca: formCa.trim(),
+        chain: formChain,
+        marketCap: formCurrentMc.trim(),
+        entryMarketCap: formEntryMc.trim(),
+        risk: formRiskLevel,
+        stopLoss: formStopLoss.trim(),
+        takeProfitInput: formTakeProfits.trim(),
+        pinned: formPinned,
+        isMaxAlpha: formMaxAlpha,
+        summary: formSummary.trim(),
+      });
+      setSubmittingCall(false);
+      if (ok) {
+        showToast(`Saved changes to live call for ${formTicker.toUpperCase()}`);
+        handleCancelEdit();
+        if (inspectedToken?.id === editingCall.id) {
+          setInspectedToken(null);
+        }
+      } else {
+        showToast('Failed to update call — ensure Admin Wallet is active.');
+      }
+      return;
+    }
+
     const ok = await createAlphaCall({
       name: formName.trim(),
       ticker: formTicker.trim(),
@@ -316,12 +390,7 @@ export const IncubatorHub: React.FC = () => {
           formSerialTag.trim() || nextSerialTag
         }]${formMaxAlpha ? ' [MAX ALPHA 🔥]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
       );
-      setFormCa('');
-      setFormName('');
-      setFormTicker('');
-      setFormSummary('');
-      setFormSerialTag('');
-      setFormMaxAlpha(false);
+      handleCancelEdit();
     } else {
       showToast('Failed to post call — ensure Admin Wallet is active.');
     }
@@ -484,6 +553,18 @@ export const IncubatorHub: React.FC = () => {
 
               {isAdmin && (
                 <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEditCall(coin);
+                    }}
+                    className="px-2 py-0.5 rounded border border-line bg-surface-card hover:bg-surface-3 text-[10px] font-mono text-muted hover:text-pump hover:border-pump cursor-pointer transition-colors inline-flex items-center gap-1"
+                    title="Edit Live Call"
+                  >
+                    <Pencil className="w-2.5 h-2.5" />
+                    <span>EDIT</span>
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1004,6 +1085,24 @@ export const IncubatorHub: React.FC = () => {
 
           {showAdminForm && (
             <form onSubmit={handleAdminPostCall} className="p-5 space-y-4">
+              {editingCall && (
+                <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between gap-3 font-sans text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                    <span className="font-bold text-orange-400 uppercase tracking-wide">
+                      EDITING LIVE CALL: {editingCall.ticker} ({editingCall.name})
+                    </span>
+                    <span className="font-mono text-[10px] text-muted">[{editingCall.id}]</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-line text-muted hover:text-white font-mono text-xs cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 {/* CA Input + Auto-Fill */}
                 <div className="md:col-span-5 space-y-1">
@@ -1014,13 +1113,25 @@ export const IncubatorHub: React.FC = () => {
                     <input
                       type="text"
                       value={formCa}
-                      onChange={(e) => setFormCa(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormCa(val);
+                        const trimmed = val.trim();
+                        if (trimmed.length >= 32 && !trimmed.includes(' ')) {
+                          handleAutoFillDexScreener(trimmed);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (formCa.trim().length >= 32) {
+                          handleAutoFillDexScreener(formCa.trim());
+                        }
+                      }}
                       placeholder="Paste SOL / EVM / ROBIN Contract Address..."
                       className="flex-1 h-9 px-3 rounded bg-surface-card border border-line focus:border-pump font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                     />
                     <button
                       type="button"
-                      onClick={handleAutoFillDexScreener}
+                      onClick={() => handleAutoFillDexScreener()}
                       disabled={fetchingDex}
                       className="h-9 px-3 rounded bg-surface-card hover:bg-surface-3 border border-pump font-sans text-xs font-bold text-pump shrink-0 cursor-pointer inline-flex items-center gap-1"
                     >
@@ -1191,8 +1302,19 @@ export const IncubatorHub: React.FC = () => {
                     disabled={submittingCall}
                     className="h-9 px-5 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Plus className="w-4 h-4 stroke-[2.5]" />
-                    <span>{submittingCall ? 'Posting...' : 'PUBLISH CALL'}</span>
+                    {submittingCall ? (
+                      <span>Processing...</span>
+                    ) : editingCall ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                        <span>SAVE CHANGES</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                        <span>PUBLISH CALL</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1629,6 +1751,17 @@ export const IncubatorHub: React.FC = () => {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleStartEditCall(token);
+                                }}
+                                className="p-1.5 rounded border border-line bg-surface-card text-muted hover:text-pump hover:border-pump cursor-pointer transition-colors"
+                                title="Edit Live Call"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   toggleMaxAlpha(token.id, !token.isMaxAlpha);
                                   showToast(`${token.isMaxAlpha ? 'Removed Max Alpha from' : 'Marked as Max Alpha:'} ${token.ticker}`);
                                 }}
@@ -1841,6 +1974,7 @@ export const IncubatorHub: React.FC = () => {
       <AlphaInspectorModal
         token={inspectedToken}
         onClose={() => setInspectedToken(null)}
+        onEdit={handleStartEditCall}
       />
     </div>
   );

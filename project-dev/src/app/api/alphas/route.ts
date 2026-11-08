@@ -212,17 +212,36 @@ export async function POST(req: NextRequest) {
       return err(400, 'BAD_REQUEST', 'Invalid contract address length');
     }
 
-    const currentMcStr = String(payload.marketCap || '$100K').trim();
-    const currentMcUsd =
+    // Automatically fetch live market telemetry from DexScreener when call is posted
+    let liveMcUsd = 0;
+    let liveChange24h = 0;
+    let liveVolumeUsd = 0;
+    try {
+      const telemetry = await getMarketTelemetry(ca, 0, 0, chain);
+      if (telemetry?.marketCapUsd && telemetry.marketCapUsd > 0) {
+        liveMcUsd = telemetry.marketCapUsd;
+        liveChange24h = telemetry.change24hPct || 0;
+        liveVolumeUsd = telemetry.volume24hUsd || 0;
+      }
+    } catch (e) {
+      console.warn('[Alphas POST] Failed to fetch live DexScreener market cap:', e);
+    }
+
+    const currentMcStr = String(payload.marketCap || '').trim();
+    const explicitCurrentMcUsd =
       Number(payload.marketCapUsd) > 0
         ? Number(payload.marketCapUsd)
-        : parseShorthandUsd(currentMcStr) || 100_000;
+        : parseShorthandUsd(currentMcStr);
 
-    const entryMcStr = String(payload.entryMarketCap || currentMcStr).trim();
-    const entryMcUsd =
+    const currentMcUsd = liveMcUsd > 0 ? liveMcUsd : (explicitCurrentMcUsd || 100_000);
+
+    const entryMcStr = String(payload.entryMarketCap || '').trim();
+    const explicitEntryMcUsd =
       Number(payload.entryMarketCapUsd) > 0
         ? Number(payload.entryMarketCapUsd)
-        : parseShorthandUsd(entryMcStr) || currentMcUsd;
+        : parseShorthandUsd(entryMcStr);
+
+    const entryMcUsd = explicitEntryMcUsd > 0 ? explicitEntryMcUsd : currentMcUsd;
 
     if (currentMcUsd <= 0 || entryMcUsd <= 0) {
       return err(400, 'BAD_REQUEST', 'Market Cap and Entry Market Cap must be positive numbers');
@@ -328,9 +347,9 @@ export async function POST(req: NextRequest) {
       holderRewardsRaw: 0,
       holderRewardsQuote: '—',
       holdersPaid: 0,
-      volume24h: String(payload.volume24h || '—'),
+      volume24h: liveVolumeUsd > 0 ? formatCompactUsd(liveVolumeUsd) : String(payload.volume24h || '—'),
       netInflow24h: '—',
-      change24hPct: Number(payload.change24hPct) || 0,
+      change24hPct: liveChange24h !== 0 ? liveChange24h : (Number(payload.change24hPct) || 0),
       age: 'Just now',
       ageMinutes: 1,
       caller: String(payload.caller || '@TrenchLabsAdmin').trim().slice(0, 40),
@@ -401,25 +420,128 @@ export async function PATCH(req: NextRequest) {
 
       const target = { ...registry[idx] };
 
+      if (typeof payload.name === 'string' && payload.name.trim()) {
+        target.name = payload.name.trim().slice(0, 64);
+      }
+
+      if (typeof payload.ticker === 'string' && payload.ticker.trim()) {
+        target.ticker = payload.ticker.trim().startsWith('$')
+          ? payload.ticker.trim().slice(0, 16)
+          : `$${payload.ticker.trim().slice(0, 15)}`;
+      }
+
+      if (typeof payload.chain === 'string') {
+        const c = payload.chain.toUpperCase() as Chain;
+        if (VALID_CHAINS.includes(c)) {
+          target.chain = c;
+        }
+      }
+
+      if (typeof payload.ca === 'string' && payload.ca.trim()) {
+        const newCa = payload.ca.trim();
+        target.ca = newCa;
+        // Regenerate default DEX links for new CA
+        if (target.chain === 'SOL') {
+          target.links = [
+            { label: 'DexScreener', href: `https://dexscreener.com/solana/${newCa}` },
+            { label: 'Pump.fun', href: `https://pump.fun/coin/${newCa}` },
+            { label: 'Photon', href: 'https://photon-sol.tinyastro.io/' },
+          ];
+        } else if (target.chain === 'BSC') {
+          target.links = [
+            { label: 'DexScreener', href: `https://dexscreener.com/bsc/${newCa}` },
+            { label: 'BscScan', href: `https://bscscan.com/token/${newCa}` },
+          ];
+        } else if (target.chain === 'ETH') {
+          target.links = [
+            { label: 'DexScreener', href: `https://dexscreener.com/ethereum/${newCa}` },
+            { label: 'Etherscan', href: `https://etherscan.io/token/${newCa}` },
+          ];
+        } else if (target.chain === 'BASE') {
+          target.links = [
+            { label: 'DexScreener', href: `https://dexscreener.com/base/${newCa}` },
+            { label: 'BaseScan', href: `https://basescan.org/token/${newCa}` },
+          ];
+        } else if (target.chain === 'AVAX') {
+          target.links = [
+            { label: 'DexScreener', href: `https://dexscreener.com/avalanche/${newCa}` },
+            { label: 'Snowtrace', href: `https://snowtrace.io/token/${newCa}` },
+          ];
+        }
+      }
+
+      if (typeof payload.summary === 'string') {
+        target.summary = payload.summary.trim().slice(0, 500);
+      }
+
+      if (typeof payload.risk === 'number') {
+        target.risk = Math.min(5, Math.max(1, payload.risk));
+        target.riskRewardRatio = `Risk Lvl ${target.risk}/5`;
+      }
+
+      if (typeof payload.stopLoss === 'string' && payload.stopLoss.trim()) {
+        target.stopLoss = payload.stopLoss.trim().slice(0, 32);
+      }
+
+      if (typeof payload.status === 'string') {
+        const s = payload.status.toUpperCase();
+        if (s === 'LIVE' || s === 'CLOSED') {
+          target.status = s;
+        }
+      }
+
+      if (typeof payload.statusLabel === 'string') {
+        target.statusLabel = payload.statusLabel.trim().slice(0, 32);
+      }
+
+      if (typeof payload.allocation === 'string' && payload.allocation.trim()) {
+        target.allocation = payload.allocation.trim().slice(0, 32);
+      }
+
       if (typeof payload.pinned === 'boolean') {
         target.pinned = payload.pinned;
-        target.pinnedAt = payload.pinned ? new Date().toISOString() : null;
+        target.pinnedAt = payload.pinned ? (target.pinnedAt || new Date().toISOString()) : null;
         target.statusLabel = payload.pinned ? 'PRIORITY CALL' : 'LIVE CALL';
       }
 
-      if (payload.marketCap) {
-        const mcUsd = parseShorthandUsd(String(payload.marketCap));
+      if (payload.entryMarketCap || payload.entryMarketCapUsd) {
+        const entryUsd = Number(payload.entryMarketCapUsd) > 0
+          ? Number(payload.entryMarketCapUsd)
+          : parseShorthandUsd(String(payload.entryMarketCap));
+        if (entryUsd > 0) {
+          target.entryMarketCapUsd = entryUsd;
+          target.entryMarketCap = formatCompactUsd(entryUsd);
+        }
+      }
+
+      if (payload.marketCap || payload.marketCapUsd) {
+        const mcUsd = Number(payload.marketCapUsd) > 0
+          ? Number(payload.marketCapUsd)
+          : parseShorthandUsd(String(payload.marketCap));
         if (mcUsd > 0) {
           target.marketCapUsd = mcUsd;
           target.marketCap = formatCompactUsd(mcUsd);
-          target.takeProfits = target.takeProfits.map((tp) => ({
-            ...tp,
-            hit:
-              tp.hit ||
-              (target.entryMarketCapUsd > 0 &&
-                mcUsd >= target.entryMarketCapUsd * tp.multiple),
-          }));
         }
+      }
+
+      if (payload.takeProfitInput || Array.isArray(payload.multipliers)) {
+        const rawMultipliers: number[] = Array.isArray(payload.multipliers)
+          ? payload.multipliers.map((m: unknown) => Number(m)).filter((n: number) => n > 0)
+          : String(payload.takeProfitInput || '')
+              .split(/[,\s/]+/)
+              .map((s) => parseFloat(s.replace(/x/i, '')))
+              .filter((n) => Number.isFinite(n) && n > 0);
+        if (rawMultipliers.length > 0) {
+          target.takeProfits = buildTakeProfits(target.entryMarketCapUsd, target.marketCapUsd, rawMultipliers);
+        }
+      } else if (target.marketCapUsd > 0 && target.takeProfits) {
+        target.takeProfits = target.takeProfits.map((tp) => ({
+          ...tp,
+          hit:
+            tp.hit ||
+            (target.entryMarketCapUsd > 0 &&
+              target.marketCapUsd >= target.entryMarketCapUsd * tp.multiple),
+        }));
       }
 
       if (typeof payload.toggleTpIndex === 'number') {

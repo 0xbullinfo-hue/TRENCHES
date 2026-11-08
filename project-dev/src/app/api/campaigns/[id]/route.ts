@@ -52,8 +52,20 @@ export async function PATCH(
   if (typeof body.description === 'string') {
     updates.description = body.description.trim();
   }
+  if (typeof body.tweetUrl === 'string' && body.tweetUrl.trim()) {
+    updates.tweetUrl = body.tweetUrl.trim();
+  }
   if (typeof body.rewardAmount === 'string' && body.rewardAmount.trim()) {
     updates.rewardAmount = body.rewardAmount.trim();
+  }
+  if (typeof body.rewardToken === 'string' && body.rewardToken.trim()) {
+    updates.rewardToken = body.rewardToken.trim();
+  }
+  if (typeof body.totalPool === 'string' && body.totalPool.trim()) {
+    updates.totalPool = body.totalPool.trim();
+  }
+  if (Array.isArray(body.targetActions)) {
+    updates.targetActions = body.targetActions.map(String).filter((a) => a.trim().length > 0);
   }
   if (typeof body.pinned === 'boolean') {
     updates.pinned = body.pinned;

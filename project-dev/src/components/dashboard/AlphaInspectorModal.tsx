@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Flame,
   Lock,
+  Pencil,
   Pin,
   ShieldCheck,
   Sparkles,
@@ -30,6 +31,7 @@ import {
 interface AlphaInspectorModalProps {
   token: AlphaItem | null;
   onClose: () => void;
+  onEdit?: (token: AlphaItem) => void;
 }
 
 export function getPrimaryMarketUrl(token: AlphaItem): string {
@@ -55,6 +57,7 @@ export function getPrimaryMarketUrl(token: AlphaItem): string {
 export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
   token,
   onClose,
+  onEdit,
 }) => {
   const {
     formattedBalance,
@@ -316,6 +319,22 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <span>ADMIN CONTROLS ({ADMIN_WALLET_SHORT})</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {/* Edit Call Button */}
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEdit(token);
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded border border-pump bg-surface-card hover:bg-pump hover:text-canvas text-pump font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Edit trade call parameters"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit Post</span>
+                  </button>
+                )}
+
                 {/* Max Alpha Toggle */}
                 <button
                   type="button"

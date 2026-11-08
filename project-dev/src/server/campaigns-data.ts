@@ -42,25 +42,7 @@ export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
   return run;
 }
 
-const DEFAULT_CAMPAIGNS: Campaign[] = [
-  {
-    id: 'camp-genesis-raid-01',
-    title: 'X RAID: TrenchLabs v2 & $GENESIS Ecosystem Raid',
-    description: 'Engage with our official launch on X! Like, Retweet, and Quote tweet with your bullish take on TrenchLabs & $GENESIS. Submit your proof below to receive the verified airdrop.',
-    tweetUrl: 'https://x.com/TrenchLabsHQ/status/1850000000000000000',
-    rewardAmount: '50,000 $GENESIS',
-    rewardToken: '$GENESIS',
-    totalPool: '1,000,000 $GENESIS',
-    targetActions: ['Like', 'Retweet', 'Quote with $GENESIS'],
-    status: 'ACTIVE',
-    createdAt: new Date().toISOString(),
-    postedBy: ADMIN_WALLET,
-    submissionsCount: 0,
-    airdroppedCount: 0,
-    pinned: true,
-    pinnedAt: new Date().toISOString(),
-  },
-];
+const DEFAULT_CAMPAIGNS: Campaign[] = [];
 
 export async function loadCampaigns(): Promise<Campaign[]> {
   if (KV_CONFIGURED) {

@@ -103,6 +103,7 @@ interface GenesisContextValue {
   signRequestHeaders: (method: string, path: string) => Promise<Record<string, string> | null>;
 
   createAlphaCall: (payload: CreateCallPayload) => Promise<boolean>;
+  updateAlphaCall: (id: string, updates: Record<string, unknown>) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
   toggleMaxAlpha: (id: string, isMaxAlpha: boolean) => Promise<boolean>;
   toggleTpHit: (id: string, tpIndex: number) => Promise<boolean>;
@@ -894,6 +895,30 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     [getAdminHeaders]
   );
 
+  const updateAlphaCall = useCallback(
+    async (id: string, updates: Record<string, unknown>): Promise<boolean> => {
+      try {
+        const bodyStr = JSON.stringify({ id, ...updates });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers,
+          body: bodyStr,
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[TrenchLabs] updateAlphaCall error:', err);
+        return false;
+      }
+    },
+    [getAdminHeaders]
+  );
+
   const togglePinCall = useCallback(
     async (id: string, nextPinned: boolean): Promise<boolean> => {
       try {
@@ -1120,6 +1145,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     refreshAll,
     requestUnlockSignature,
     createAlphaCall,
+    updateAlphaCall,
     togglePinCall,
     toggleMaxAlpha,
     toggleTpHit,

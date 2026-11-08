@@ -13,6 +13,7 @@ import {
   Check,
   RefreshCw,
   Gift,
+  Pencil,
   Pin,
 } from 'lucide-react';
 
@@ -28,6 +29,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<CampaignSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
@@ -143,6 +145,31 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     }
   }, [selectedCampaignId, getAdminHeaders]);
 
+  const handleStartEditCampaign = (camp: Campaign) => {
+    setEditingCampaign(camp);
+    setFormTitle(camp.title);
+    setFormTweetUrl(camp.tweetUrl);
+    setFormRewardAmount(camp.rewardAmount);
+    setFormTotalPool(camp.totalPool || '1,000,000 $GENESIS');
+    setFormDescription(camp.description);
+    setFormPinned(camp.pinned ?? true);
+    setShowCreateForm(true);
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const handleCancelCampaignForm = () => {
+    setShowCreateForm(false);
+    setEditingCampaign(null);
+    setFormTitle('');
+    setFormTweetUrl('');
+    setFormRewardAmount('50,000 $GENESIS');
+    setFormTotalPool('1,000,000 $GENESIS');
+    setFormDescription(
+      'Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.'
+    );
+    setFormPinned(true);
+  };
+
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formTweetUrl.trim() || !formRewardAmount.trim()) {
@@ -164,29 +191,30 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
       const bodyStr = JSON.stringify(payload);
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const method = editingCampaign ? 'PATCH' : 'POST';
+      const endpoint = editingCampaign ? `/api/campaigns/${editingCampaign.id}` : '/api/campaigns';
+
       if (getAdminHeaders) {
         try {
-          headers = await getAdminHeaders('POST', '/api/campaigns', bodyStr);
+          headers = await getAdminHeaders(method, endpoint, bodyStr);
         } catch {
           // fallback to default headers
         }
       }
 
-      const res = await fetch('/api/campaigns', {
-        method: 'POST',
+      const res = await fetch(endpoint, {
+        method,
         headers,
         body: bodyStr,
       });
 
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        throw new Error(json.error || 'Failed to create campaign');
+        throw new Error(json.error || `Failed to ${editingCampaign ? 'update' : 'create'} campaign`);
       }
 
-      onToast(`Campaign "${payload.title}" created successfully!`);
-      setShowCreateForm(false);
-      setFormTitle('');
-      setFormTweetUrl('');
+      onToast(`Campaign "${payload.title}" ${editingCampaign ? 'updated' : 'created'} successfully!`);
+      handleCancelCampaignForm();
       fetchCampaigns();
     } catch (err) {
       alert((err as Error).message);
@@ -396,9 +424,16 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           onSubmit={handleCreateCampaign}
           className="p-4 rounded-xl bg-surface-card border border-purple-500/40 space-y-3"
         >
-          <div className="font-sans text-xs font-extrabold text-white flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>CREATE NEW X RAID CAMPAIGN</span>
+          <div className="font-sans text-xs font-extrabold text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>{editingCampaign ? `EDIT RAID: ${editingCampaign.title}` : 'CREATE NEW X RAID CAMPAIGN'}</span>
+            </div>
+            {editingCampaign && (
+              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono">
+                EDITING MODE
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -488,7 +523,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             <div className="flex items-center gap-2 justify-end">
               <button
                 type="button"
-                onClick={() => setShowCreateForm(false)}
+                onClick={handleCancelCampaignForm}
                 className="px-4 py-2 rounded bg-surface border border-line text-xs font-sans text-muted hover:text-white cursor-pointer"
               >
                 Cancel
@@ -498,8 +533,19 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 disabled={submittingCampaign}
                 className="px-5 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-black uppercase cursor-pointer transition-colors shadow-sm disabled:opacity-50 inline-flex items-center gap-1.5"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{submittingCampaign ? 'Publishing...' : 'Publish Raid Campaign'}</span>
+                {submittingCampaign ? (
+                  <span>Processing...</span>
+                ) : editingCampaign ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save Raid Changes</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Publish Raid Campaign</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -572,6 +618,16 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 >
                   <Pin className="w-3.5 h-3.5" />
                   <span>{currentCamp.pinned ? 'PINNED' : 'PIN'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStartEditCampaign(currentCamp)}
+                  className="px-3 py-1.5 rounded font-mono text-xs font-bold border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 cursor-pointer transition-colors inline-flex items-center gap-1"
+                  title="Edit Raid Campaign"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>EDIT RAID</span>
                 </button>
 
                 <button
