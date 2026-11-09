@@ -191,7 +191,7 @@ export const PipelineGrid: React.FC = () => {
                       <button
                         type="button"
                         onClick={(e) => handleCopyCa(token.contractAddress, e)}
-                        className="text-toxic hover:text-toxic-bright font-sans text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                        className="text-toxic hover:text-toxic-bright font-sans text-[11px] font-bold uppercase inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
                         title="Copy Contract Address"
                       >
                         {copyFailedCa === token.contractAddress ? (
@@ -241,7 +241,7 @@ export const PipelineGrid: React.FC = () => {
                     href={token.dexUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-2.5 px-3 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic-border hover:border-toxic text-white font-sans text-xs font-extrabold inline-flex items-center justify-center gap-1.5 transition-colors"
+                    className="w-full py-2.5 px-3 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic-border hover:border-toxic text-white font-sans text-xs font-extrabold uppercase inline-flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <span>VIEW ON DEXSCREENER</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />

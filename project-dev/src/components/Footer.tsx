@@ -15,28 +15,28 @@ export const Footer: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 uppercase">
           <a
             href={SOCIAL_LINKS.telegram}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-pump transition-colors font-medium"
+            className="hover:text-pump transition-colors font-bold uppercase"
           >
-            Telegram
+            TELEGRAM
           </a>
           <a
             href={SOCIAL_LINKS.x}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-pump transition-colors font-medium"
+            className="hover:text-pump transition-colors font-bold uppercase"
           >
-            X (Twitter)
+            X (TWITTER)
           </a>
           <a
             href="#hero-section"
-            className="hidden md:inline-flex items-center gap-1 text-muted hover:text-pump font-semibold transition-colors"
+            className="hidden md:inline-flex items-center gap-1 text-muted hover:text-pump font-bold uppercase transition-colors"
           >
-            <span>Back to top</span>
+            <span>BACK TO TOP</span>
             <ArrowUp className="w-3.5 h-3.5" />
           </a>
         </div>

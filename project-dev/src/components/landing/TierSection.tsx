@@ -153,7 +153,7 @@ export async function TierSection() {
                 priceLabel="$0"
                 subtitle="Watch and learn"
                 features={freeFeatures}
-                ctaLabel="Join Community"
+                ctaLabel="JOIN COMMUNITY"
                 ctaHref={communityUrl || '#'}
                 ctaDisabled={freeCtaDisabled}
                 ctaTooltip={freeCtaDisabled ? 'Community link coming soon' : undefined}
@@ -166,8 +166,10 @@ export async function TierSection() {
                 subtitle="Follow in real time"
                 thresholdLabel={`≈ ${memberTokenFormatted}`}
                 features={memberFeatures}
-                ctaLabel="Get Member →"
+                ctaLabel="CONNECT WALLET · LIVE SOON"
                 ctaHref="/dashboard"
+                ctaDisabled={true}
+                ctaTooltip="Wallet connection live soon"
               />
 
               {/* PRO */}
@@ -177,8 +179,10 @@ export async function TierSection() {
                 subtitle="90-day lock · Real-time alpha"
                 thresholdLabel={`≈ ${proTokenFormatted}`}
                 features={proFeatures}
-                ctaLabel="Stake for Pro →"
+                ctaLabel="EXPLORE STAKEPOINT · LIVE SOON"
                 ctaHref="/dashboard/stake"
+                ctaDisabled={true}
+                ctaTooltip="StakePoint staking live soon"
                 emphasized={true}
                 badge="Recommended"
               />

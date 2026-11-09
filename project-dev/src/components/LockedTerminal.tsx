@@ -101,11 +101,13 @@ export const LockedTerminal: React.FC = () => {
           <div className="max-w-md mx-auto pt-2">
             <button
               type="button"
-              onClick={connectWallet}
-              className="w-full h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              disabled
+              aria-disabled="true"
+              title="Wallet connection coming soon"
+              className="w-full h-11 px-6 rounded bg-surface-card border border-line text-muted font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-not-allowed opacity-75 select-none"
             >
-              <Wallet className="w-4 h-4" />
-              <span>Connect Solana Wallet</span>
+              <Wallet className="w-4 h-4 text-pump" />
+              <span>CONNECT SOLANA WALLET · LIVE SOON</span>
             </button>
           </div>
         </div>

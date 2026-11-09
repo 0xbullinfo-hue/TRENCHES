@@ -43,15 +43,13 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
               Staking — $GENESIS
             </h3>
-            <a
-              href="https://stakepoint.app/pools"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted hover:text-white transition-colors"
-              title="Open StakePoint"
+            <span
+              className="text-muted/50 cursor-not-allowed"
+              title="StakePoint integration live soon"
+              data-rel="noopener noreferrer"
             >
               <ArrowUpRight className="w-4 h-4" />
-            </a>
+            </span>
           </div>
 
           <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2">
@@ -65,15 +63,16 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
         </div>
 
         <div className="pt-5 mt-auto">
-          <a
-            href="https://stakepoint.app/pools"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title="Explore StakePoint Pools — Live Soon"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card border border-line text-muted font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-not-allowed opacity-75 select-none"
           >
-            <span>Explore StakePoint Pools</span>
+            <span>EXPLORE STAKEPOINT POOLS · LIVE SOON</span>
             <ArrowUpRight className="w-4 h-4 text-pump" />
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -104,15 +103,13 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
           <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
             Staking — $GENESIS
           </h3>
-          <a
-            href={pool.poolUrl}
-            target="_blank"
+          <span
+            className="text-muted/50 cursor-not-allowed"
+            title="Open Pool on StakePoint — Live Soon"
             rel="noopener noreferrer"
-            className="text-muted hover:text-pump transition-colors"
-            title="Open Pool on StakePoint"
           >
             <ArrowUpRight className="w-4 h-4" />
-          </a>
+          </span>
         </div>
 
         {/* APR Hero Box */}
@@ -172,29 +169,30 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
         )}
       </div>
 
-      {/* CTA Button */}
+      {/* CTA Button (Stake on StakePoint → disabled while LIVE SOON) */}
       <div className="pt-5 mt-auto space-y-3">
         <div>
-          <a
-            href={pool.poolUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title="Stake on StakePoint → Live Soon"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-not-allowed opacity-75 select-none shadow-sm"
           >
-            <span>Stake on StakePoint →</span>
-          </a>
+            <span>EXPLORE STAKEPOINT · LIVE SOON</span>
+          </button>
         </div>
 
         {hasMultiple && (
           <div className="pt-2 border-t border-line/40">
-            <a
-              href="https://stakepoint.app/pools"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-bold text-pump hover:text-pump-hover inline-flex items-center gap-1 transition-colors"
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="text-xs font-bold uppercase text-muted cursor-not-allowed inline-flex items-center gap-1 select-none"
             >
-              <span>View all pools →</span>
-            </a>
+              <span>VIEW ALL POOLS · LIVE SOON</span>
+            </button>
           </div>
         )}
       </div>

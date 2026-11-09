@@ -29,32 +29,32 @@ export const PublicHeader: React.FC = () => {
         {/* Center: Enlarged Navigation Menu Tabs */}
         <nav
           aria-label="Public Navigation"
-          className="hidden md:flex items-center gap-6 lg:gap-8 font-sans text-base lg:text-lg font-extrabold tracking-wide"
+          className="hidden md:flex items-center gap-6 lg:gap-8 font-sans text-base lg:text-lg font-extrabold uppercase tracking-wide"
         >
           <a
             href="#hero-section"
-            className="px-4 py-2 rounded-lg text-white hover:text-toxic hover:bg-surface transition-colors"
+            className="px-4 py-2 rounded-lg text-white hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
-            Home
+            HOME
           </a>
           <a
             href="#pipeline-section"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors"
+            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
-            Experiments
+            EXPERIMENTS
           </a>
           <a
             href={SOCIAL_LINKS.telegram}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface transition-colors inline-flex items-center gap-1.5"
+            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors inline-flex items-center gap-1.5"
           >
-            <span>Join the Lab</span>
+            <span>JOIN THE LAB</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
           </a>
         </nav>
 
-        {/* Right: CONNECT Button & Disconnect */}
+        {/* Right: CONNECT Button (Disabled — LIVE SOON) & Disconnect */}
         <div className="flex items-center gap-2 shrink-0">
           {connected ? (
             <Link
@@ -67,11 +67,13 @@ export const PublicHeader: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={connectWallet}
-              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
+              disabled
+              aria-disabled="true"
+              title="Wallet connection coming soon"
+              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-surface border border-toxic-border text-muted font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none"
             >
-              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-              <span>CONNECT WALLET</span>
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-toxic" />
+              <span>CONNECT WALLET · LIVE SOON</span>
             </button>
           )}
           {connected && (

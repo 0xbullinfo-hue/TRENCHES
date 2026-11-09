@@ -87,7 +87,7 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-toxic" />
                   <span>JOIN THE LAB</span>
@@ -97,7 +97,7 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-4 h-4 text-toxic" />
                   <span>FOLLOW ON X</span>

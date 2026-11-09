@@ -47,7 +47,7 @@ export const TerminalHeader: React.FC = () => {
             href="#ledger-embed"
             className="h-9 sm:h-10 px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
           >
-            <span>Ledger</span>
+            <span>LEDGER</span>
           </a>
 
           <a
@@ -103,11 +103,13 @@ export const TerminalHeader: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={connectWallet}
-              className="h-9 sm:h-11 px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-pointer shrink-0"
+              disabled
+              aria-disabled="true"
+              title="Wallet connection coming soon"
+              className="h-9 sm:h-11 px-4 sm:px-6 rounded-lg bg-surface border border-toxic-border text-muted font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-not-allowed opacity-75 shrink-0 select-none"
             >
-              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-              <span>CONNECT</span>
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-toxic" />
+              <span>CONNECT WALLET · LIVE SOON</span>
             </button>
           )}
         </div>

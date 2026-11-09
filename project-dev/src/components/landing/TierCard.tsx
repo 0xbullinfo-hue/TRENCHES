@@ -65,16 +65,18 @@ export function TierCard({
       {/* CTA Button */}
       <div className="pt-6 mt-auto">
         {ctaDisabled ? (
-          <div className="relative group">
+          <div className="relative group" data-target-href={ctaHref}>
             <button
+              type="button"
               disabled
-              title={ctaTooltip || 'Community link coming soon'}
-              className="w-full h-10 px-4 rounded-lg border border-toxic-border/40 text-muted cursor-not-allowed font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center select-none"
+              aria-disabled="true"
+              title={ctaTooltip || 'LIVE SOON'}
+              className="w-full h-10 px-4 rounded-lg border border-toxic-border/60 bg-surface text-muted cursor-not-allowed font-sans text-xs font-black uppercase tracking-wide flex items-center justify-center select-none opacity-80"
             >
-              {ctaLabel}
+              {ctaLabel.toUpperCase()}
             </button>
             {ctaTooltip && (
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-[11px] text-white bg-[#141b24] border border-toxic-border/40 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-[11px] text-white uppercase bg-[#141b24] border border-toxic-border/40 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
                 {ctaTooltip}
               </span>
             )}
@@ -90,7 +92,7 @@ export function TierCard({
                 : 'border border-toxic text-toxic hover:bg-toxic/10'
             }`}
           >
-            {ctaLabel}
+            {ctaLabel.toUpperCase()}
           </a>
         ) : (
           <Link
@@ -101,7 +103,7 @@ export function TierCard({
                 : 'border border-toxic text-toxic hover:bg-toxic/10'
             }`}
           >
-            {ctaLabel}
+            {ctaLabel.toUpperCase()}
           </Link>
         )}
       </div>
