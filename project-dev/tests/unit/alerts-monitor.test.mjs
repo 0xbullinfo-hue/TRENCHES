@@ -595,3 +595,29 @@ test('Alerts Monitor Route: GET /api/telegram/monitor enforces CRON_SECRET and B
     else process.env.CRON_SECRET = prevSecret;
   }
 });
+
+test('Alerts Monitor: deduplicates market-data requests across active calls sharing the same (chain, ca) in one cycle', async () => {
+  const registry = [
+    makeCall({ id: 'call-dup-1', ticker: '$SOLX', ca: SOL_TOKEN, entryMarketCapUsd: 100_000 }),
+    makeCall({ id: 'call-dup-2', ticker: '$SOLX', ca: SOL_TOKEN, entryMarketCapUsd: 100_000 }),
+  ];
+  let fetchCount = 0;
+
+  const res = await runAutomatedAlertsMonitor({
+    now: () => NOW,
+    maxDataAgeMs: 60_000,
+    withLock: async (fn) => fn(),
+    loadRegistry: async () => registry,
+    saveRegistry: async () => ({ success: true }),
+    getMarketData: async () => {
+      fetchCount++;
+      return makeTelemetry({ marketCap: 250_000 });
+    },
+    notifyTp: async () => ({ sent: 1, skipped: 0, removed: 0, deferred: 0 }),
+    notifySl: async () => ({ sent: 0, skipped: 0, removed: 0, deferred: 0 }),
+  });
+
+  assert.equal(res.evaluated, 2);
+  assert.equal(res.tpTriggered, 2);
+  assert.equal(fetchCount, 1, 'Duplicate (chain, ca) within a single monitor cycle must only call getMarketData once');
+});

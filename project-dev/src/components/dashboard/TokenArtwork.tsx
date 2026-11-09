@@ -320,6 +320,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
         className={`relative ${dim} rounded-lg overflow-hidden shrink-0 border border-line bg-surface-card ${className}`}
       >
         {effectiveLogoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- dynamic external DEX/IPFS token logo URL with onError fallback
           <img
             src={effectiveLogoUrl}
             alt={ticker ? `${ticker} logo` : 'Token logo'}
@@ -354,6 +355,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
         }`}
       >
         {effectiveLogoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- dynamic external DEX/IPFS token logo URL with onError fallback
           <img
             src={effectiveLogoUrl}
             alt={ticker ? `${ticker} logo` : 'Token logo'}

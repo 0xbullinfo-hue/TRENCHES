@@ -303,6 +303,7 @@ export async function runAutomatedAlertsMonitor(
     }
 
     const rollbackSnapshots = new Map<number, AlphaRecord>();
+    const perRunMarketCache = new Map<string, NormalizedMarketData>();
     let modified = false;
 
     for (let idx = 0; idx < registry.length; idx++) {
@@ -311,10 +312,16 @@ export async function runAutomatedAlertsMonitor(
       if (alpha.status !== 'LIVE') continue;
       if (!alpha.ca) continue;
 
+      const tokenKey = `${String(alpha.chain || '').trim().toUpperCase()}:${alpha.ca.trim().toLowerCase()}`;
+      const cachedInRun = perRunMarketCache.get(tokenKey);
+
       const nowBeforeLookup = deps.now();
       const remainingLookupMs = lookupDeadlineMs - nowBeforeLookup;
 
-      if (nowBeforeLookup - startedAt > budgetMs || remainingLookupMs < minRequestBudgetMs) {
+      if (
+        nowBeforeLookup - startedAt > budgetMs ||
+        (!cachedInRun && remainingLookupMs < minRequestBudgetMs)
+      ) {
         result.incomplete = true;
         // Count this call and all remaining active calls as skipped due to execution budget
         for (let remIdx = idx; remIdx < registry.length; remIdx++) {
@@ -335,13 +342,17 @@ export async function runAutomatedAlertsMonitor(
 
       let verdict: TelemetryVerdict;
       try {
-        const data = await withRequestTimeout(
-          deps.getMarketData(
-            { chain: alpha.chain, contractAddress: alpha.ca },
-            { timeoutMs: requestTimeoutMs }
-          ),
-          requestTimeoutMs
-        );
+        let data = cachedInRun;
+        if (!data) {
+          data = await withRequestTimeout(
+            deps.getMarketData(
+              { chain: alpha.chain, contractAddress: alpha.ca },
+              { timeoutMs: requestTimeoutMs }
+            ),
+            requestTimeoutMs
+          );
+          perRunMarketCache.set(tokenKey, data);
+        }
         verdict = assessTelemetryForAlerts(data, alpha, deps.now(), deps.maxDataAgeMs);
       } catch (err) {
         result.errors.push(`Market data lookup failed for ${alpha.ticker}: ${(err as Error).message}`);

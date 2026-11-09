@@ -10,14 +10,15 @@
 | --- | --- |
 | Product | TrenchLabsHQ.COM — multi-chain research incubator, Solana-native |
 | Token | `$GENESIS` — SPL token on Solana (`EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump`) |
-| Capital rule | **NO STAKING.** Liquid wallet balance only |
-| Hard gate | Balance `0` → HTTP 403 `ACCESS_DENIED_ZERO_BALANCE` & dashboard fully hidden. Balance `> 0` → access |
-| Routing Architecture | **Strict Separation (v3):** `(public)/page.tsx` (`/` Landing Page Only) + `(terminal)/dashboard/page.tsx` (`/dashboard` Token-Gated Incubator Terminal) + `/api/alphas` |
-| Framework | Next.js 14 App Router + TypeScript (client + API routes) |
+| Capital rule | ~~**NO STAKING.** Liquid wallet balance only~~ `SUPERSEDED by M23` — **3-Tier System:** `Free` ($0), `Member` ($20 `$GENESIS` held in wallet), `Pro` ($250 `$GENESIS` staked for 90 days on StakePoint pool `159`) |
+| Hard gate | Server-resolved entitlements (`src/server/entitlements.ts`): `free` (closed calls only), `member` (open calls + Member Telegram), `pro` (Max Alpha + real-time Telegram signals + TP/SL alerts), `unknown` (fail-closed on price-oracle outage) |
+| Routing Architecture | **Strict Separation (v5):** `(public)/page.tsx` (`/` Landing Page Only) + `(terminal)/dashboard/page.tsx` (`/dashboard` Token-Gated Incubator Terminal) + `(terminal)/dashboard/stake/page.tsx` + `/api/alphas`, `/api/tiers/current`, `/api/stake/*`, `/api/telegram/*` |
+| Framework | Next.js 16 (`^16.2.4`) App Router + TypeScript (client + API routes) |
+| Persistence | Upstash Redis (`src/server/kv.ts`) for calls registry (`trench:alphas:registry:v1`), distributed locks (`trench:alphas:lock`), Telegram subscribers (`tg:subs`), and durable TP/SL notification outbox (`trench:tpsl:outbox:*`) |
 | Styling | Tailwind CSS 3, Lucide React, Framer Motion (<200ms) |
 | Wallets | `@solana/wallet-adapter-*` (Phantom, Solflare adapters; Backpack via Wallet Standard auto-detect) |
 | Local URL | `http://localhost:3000/` (Landing Page) & `http://localhost:3000/dashboard` (User Dashboard) |
-| Active phase | Phase 8 Streamlined Hero, Early-Entry X-Profit Pipeline & Join The Lab Tiers (M16) — ✅ COMPLETE |
+| Active phase | M23–M25 — 3-Tier StakePoint Architecture, Durable Upstash Redis TP/SL Outbox & Production Hardening — ✅ COMPLETE |
 
 ---
 
@@ -88,7 +89,15 @@
 
 ## 4. Tier Formula
 
-### v4 (Single-Tier Architecture — Current Authoritative)
+### v5 (3-Tier USD-Indexed + StakePoint Architecture — Current Authoritative)
+| Requirement | Tier | Access |
+| --- | --- | --- |
+| `$0` | `free` | Public landing page, closed calls + P&L ledger, public Telegram channel |
+| `$20+ $GENESIS` held in wallet | `member` | Open calls (standard), Member Telegram group, Incubator dashboard access (`5m` delayed Telegram call dispatch) |
+| `$250+ $GENESIS` staked for `90 days` on StakePoint (Pool `159`) | `pro` | Everything in Member + Max Alpha (`PRO`) calls, real-time Telegram signals, automated TP/SL push alerts |
+| Oracle unreachable (`priceUsd === null`) | `unknown` | Fail-closed: no promotion/demotion, stake confirmation rejected (`503`), Telegram sweep skips evictions |
+
+### v4 (Single-Tier Architecture — `SUPERSEDED by v5`)
 | Balance | Tier | Multiplier | Access |
 | --- | --- | --- | --- |
 | `< 1,000,000 $GENESIS` | LOCKED | — | — (HTTP 403 / Locked Terminal) |

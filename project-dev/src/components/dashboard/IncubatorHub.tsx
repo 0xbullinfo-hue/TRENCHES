@@ -846,6 +846,7 @@ export const IncubatorHub: React.FC = () => {
                   </div>
                   {formLogoUrl && (
                     <div className="flex items-center gap-2 pt-1 text-xs font-mono text-pump">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- dynamic external DEX/IPFS token logo URL */}
                       <img
                         src={formLogoUrl}
                         alt="Onchain Logo Preview"

@@ -33,4 +33,6 @@ next-env.d.ts
 # local persistent state
 /data/calls.json
 /data/db.json
+/data/campaign_submissions.json
 /data/*.tmp
+/data/*.corrupted.*
