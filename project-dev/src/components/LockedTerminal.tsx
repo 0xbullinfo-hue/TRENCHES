@@ -2,14 +2,23 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { BUY_LINKS, GENESIS_MINT, SOLSCAN } from '@/lib/config';
 import {
+  BUY_LINKS,
+  GENESIS_MINT,
+  PUBLIC_DASHBOARD_ENABLED,
+  SOCIAL_LINKS,
+  SOFT_LAUNCH_MESSAGE,
+  SOLSCAN,
+} from '@/lib/config';
+import {
+  ArrowUpRight,
   Check,
   Copy,
   ExternalLink,
   KeyRound,
   Lock,
   RefreshCw,
+  Send,
   ShieldAlert,
   Wallet,
 } from 'lucide-react';
@@ -17,11 +26,11 @@ import {
 export const LockedTerminal: React.FC = () => {
   const {
     connected,
+    isAdmin,
     shortAddress,
     formattedBalance,
     needsSignature,
     requestUnlockSignature,
-    connectWallet,
     switchWallet,
     apiLoading,
     apiError,
@@ -50,7 +59,7 @@ export const LockedTerminal: React.FC = () => {
     }
   };
 
-  if (!connected) {
+  if (!connected || (!PUBLIC_DASHBOARD_ENABLED && !isAdmin)) {
     return (
       <div className="rounded border border-line bg-surface max-w-2xl mx-auto overflow-hidden">
         <div className="px-6 py-4 bg-surface-card border-b border-line flex items-center justify-between font-sans text-xs font-bold text-muted">
@@ -58,7 +67,9 @@ export const LockedTerminal: React.FC = () => {
             <Lock className="w-4 h-4 text-pump" />
             <span>WALLET AUTHENTICATION REQUIRED</span>
           </div>
-          <span className="text-pump">DISCONNECTED</span>
+          <span className="text-pump">
+            {!PUBLIC_DASHBOARD_ENABLED ? 'SOFT LAUNCH' : 'DISCONNECTED'}
+          </span>
         </div>
 
         <div className="p-6 sm:p-8 text-center space-y-5">
@@ -75,6 +86,11 @@ export const LockedTerminal: React.FC = () => {
               <strong className="text-pump-pill">$20 $GENESIS</strong>. This unlocks full
               access to live trade calls, contract addresses, and incubator allocations.
             </p>
+            {!PUBLIC_DASHBOARD_ENABLED && (
+              <p className="font-sans text-xs font-bold uppercase tracking-wider text-toxic max-w-lg mx-auto pt-1 leading-relaxed">
+                {SOFT_LAUNCH_MESSAGE}
+              </p>
+            )}
           </div>
 
           <div className="bg-canvas border border-line rounded p-3 font-mono text-xs flex items-center justify-between gap-2 max-w-md mx-auto">
@@ -98,7 +114,19 @@ export const LockedTerminal: React.FC = () => {
             </div>
           )}
 
-          <div className="max-w-md mx-auto pt-2">
+          <div className="max-w-md mx-auto pt-2 space-y-2.5">
+            {!PUBLIC_DASHBOARD_ENABLED && (
+              <a
+                href={SOCIAL_LINKS.telegram}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full h-11 px-6 rounded bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Send className="w-4 h-4 stroke-[2.5]" />
+                <span>JOIN THE SOFT LAUNCH</span>
+                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+              </a>
+            )}
             <button
               type="button"
               disabled

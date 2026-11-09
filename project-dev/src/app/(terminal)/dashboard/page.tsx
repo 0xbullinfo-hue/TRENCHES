@@ -6,16 +6,18 @@ import { IncubatorHub } from '@/components/dashboard/IncubatorHub';
 import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
 import { StakePointCardClient } from '@/components/staking/StakePointCardClient';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { PUBLIC_DASHBOARD_ENABLED } from '@/lib/config';
 
 export default function DashboardPage() {
-  const { connected } = useGenesisBalance();
+  const { connected, isAdmin } = useGenesisBalance();
+  const canAccessDashboard = connected && (PUBLIC_DASHBOARD_ENABLED || isAdmin);
 
   return (
     <section id="terminal" className="flex-1 py-6 bg-canvas">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {!connected ? (
+        {!canAccessDashboard ? (
           <div className="py-8 space-y-6">
-            {/* Wallet Authentication Required: Zero alpha/raid cards shown until visitor connects wallet */}
+            {/* Soft-Launch / Wallet Authentication Gate: Zero alpha/raid cards shown to ordinary public visitors */}
             <LockedTerminal />
             <div className="max-w-2xl mx-auto">
               <StakePointCardClient />

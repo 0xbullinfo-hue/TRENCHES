@@ -4,11 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
-import { SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, LogOut, Wallet } from 'lucide-react';
+import { PUBLIC_DASHBOARD_ENABLED, SOCIAL_LINKS } from '@/lib/config';
+import { ArrowUpRight, LogOut, Send, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
-  const { connected, shortAddress, connectWallet, disconnectDemoOrWallet } = useGenesisBalance();
+  const { connected, shortAddress, disconnectDemoOrWallet } = useGenesisBalance();
 
   const handleDisconnect = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -54,9 +54,9 @@ export const PublicHeader: React.FC = () => {
           </a>
         </nav>
 
-        {/* Right: CONNECT Button (Disabled — LIVE SOON) & Disconnect */}
+        {/* Right: Primary Soft-Launch CTA (or Dashboard when public access is enabled) & Disconnect */}
         <div className="flex items-center gap-2 shrink-0">
-          {connected ? (
+          {connected && PUBLIC_DASHBOARD_ENABLED ? (
             <Link
               href="/dashboard"
               className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
@@ -65,16 +65,16 @@ export const PublicHeader: React.FC = () => {
               <span>DASHBOARD ({shortAddress})</span>
             </Link>
           ) : (
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="Wallet connection coming soon"
-              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-surface border border-toxic-border text-muted font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none"
+            <a
+              href={SOCIAL_LINKS.telegram}
+              target="_blank"
+              rel="noreferrer"
+              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
             >
-              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-toxic" />
-              <span>CONNECT WALLET · LIVE SOON</span>
-            </button>
+              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+              <span>JOIN THE SOFT LAUNCH</span>
+              <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+            </a>
           )}
           {connected && (
             <button

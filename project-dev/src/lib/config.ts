@@ -45,6 +45,18 @@ export const SOCIAL_LINKS = {
 };
 
 /**
+ * Public Dashboard Soft-Launch Readiness Flag
+ * While false (soft launch), public header navigation points to Telegram
+ * ("JOIN THE SOFT LAUNCH") and ordinary public visitors cannot enter the
+ * interactive dashboard hub. Authorized admin testing remains unaffected.
+ */
+export const PUBLIC_DASHBOARD_ENABLED =
+  process.env.NEXT_PUBLIC_DASHBOARD_ENABLED === 'true' || false;
+
+export const SOFT_LAUNCH_MESSAGE =
+  'THE TOKEN IS LIVE. THE TRENCHLABS DASHBOARD IS COMING SOON. JOIN THE COMMUNITY FOR LAUNCH UPDATES.';
+
+/**
  * Maintenance Mode Configuration
  * Toggle via NEXT_PUBLIC_MAINTENANCE_MODE="true" in .env.local,
  * or change MAINTENANCE_MODE to true directly here anytime.

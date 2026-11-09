@@ -2,7 +2,12 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
+import {
+  BUY_LINKS,
+  PUBLIC_DASHBOARD_ENABLED,
+  SOCIAL_LINKS,
+  SOFT_LAUNCH_MESSAGE,
+} from '@/lib/config';
 import { ArrowUpRight, Send } from 'lucide-react';
 
 const TRUST_METRICS = [
@@ -103,6 +108,12 @@ export const HeroTerminal: React.FC = () => {
                   <span>FOLLOW ON X</span>
                 </a>
               </div>
+
+              {!PUBLIC_DASHBOARD_ENABLED && (
+                <p className="font-sans text-xs font-bold uppercase tracking-wider text-muted pt-1 leading-relaxed">
+                  {SOFT_LAUNCH_MESSAGE}
+                </p>
+              )}
             </div>
           </div>
 
