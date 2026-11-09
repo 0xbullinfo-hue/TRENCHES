@@ -96,7 +96,9 @@ export const IncubatorHub: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
   const [adminDeskTab, setAdminDeskTab] = useState<'CALLS' | 'CAMPAIGNS'>('CALLS');
-  const [feedTab, setFeedTab] = useState<'CALLS' | 'RAIDS'>('CALLS');
+  const [feedTab, setFeedTab] = useState<'CALLS' | 'RAIDS'>(() => {
+    return isUnlocked ? 'CALLS' : 'RAIDS';
+  });
 
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -677,12 +679,15 @@ export const IncubatorHub: React.FC = () => {
               <span className="px-2.5 py-0.5 rounded bg-pump text-canvas font-mono text-xs font-extrabold uppercase">
                 MASTER ADMIN DESK
               </span>
-              <span className="font-mono text-xs text-white font-bold">
-                {ADMIN_WALLET}
-              </span>
-              <span className="hidden md:inline font-sans text-xs text-muted">
-                • Full access to post calls &amp; run raid campaigns
-              </span>
+              {adminDeskTab === 'CALLS' && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminForm(!showAdminForm)}
+                  className="px-3.5 py-1.5 rounded bg-surface border border-pump font-sans text-xs font-black text-pump hover:bg-surface-3 cursor-pointer transition-colors"
+                >
+                  {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
+                </button>
+              )}
             </div>
 
             {/* Admin Desk Navigation Tabs */}
@@ -710,16 +715,6 @@ export const IncubatorHub: React.FC = () => {
                 <span>⚡ X Raid Campaigns &amp; Airdrops</span>
               </button>
             </div>
-
-            {adminDeskTab === 'CALLS' && (
-              <button
-                type="button"
-                onClick={() => setShowAdminForm(!showAdminForm)}
-                className="px-3.5 py-1.5 rounded bg-surface border border-pump font-sans text-xs font-black text-pump hover:bg-surface-3 cursor-pointer transition-colors"
-              >
-                {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
-              </button>
-            )}
           </div>
 
           {adminDeskTab === 'CAMPAIGNS' ? (
@@ -1050,16 +1045,18 @@ export const IncubatorHub: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 rounded bg-pump text-canvas font-mono text-xs font-black uppercase inline-flex items-center gap-1 shadow-sm">
                 <Pin className="w-3.5 h-3.5" />
-                <span>PINNED PRIORITY ({totalPinned})</span>
+                <span>PINNED PRIORITY ({isUnlocked ? totalPinned : pinnedCampaigns.length})</span>
               </span>
               <span className="font-sans text-xs text-muted">
-                High-priority trade setups &amp; community raid campaigns pinned by Admin
+                {isUnlocked
+                  ? 'High-priority trade setups & community raid campaigns pinned by Admin'
+                  : 'High-priority community raid campaigns pinned by Admin'}
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-            {pinnedCalls.map(renderAlphaCard)}
+            {isUnlocked && pinnedCalls.map(renderAlphaCard)}
             {pinnedCampaigns.map((camp) => (
               <CampaignCard
                 key={camp.id}
@@ -1073,57 +1070,55 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* MAIN FEED TABS: CALLS OR RAIDS (For verified users with $GENESIS holding) */}
+      {/* MAIN FEED TABS: CALLS OR RAIDS (Available to all signed-in users) */}
       <div className="space-y-4 pt-2">
-        {isUnlocked && (
-          <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
-            <button
-              type="button"
-              onClick={() => setFeedTab('CALLS')}
-              className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
+          <button
+            type="button"
+            onClick={() => setFeedTab('CALLS')}
+            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              feedTab === 'CALLS'
+                ? 'bg-pump text-canvas shadow-md'
+                : 'text-muted hover:text-white hover:bg-surface-card'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span>ALPHA TRADE CALLS</span>
+            <span
+              className={`px-2 py-0.5 rounded font-mono text-xs ${
                 feedTab === 'CALLS'
-                  ? 'bg-pump text-canvas shadow-md'
-                  : 'text-muted hover:text-white hover:bg-surface-card'
+                  ? 'bg-canvas text-pump font-black'
+                  : 'bg-surface-card text-muted'
               }`}
             >
-              <Target className="w-4 h-4" />
-              <span>ALPHA TRADE CALLS</span>
-              <span
-                className={`px-2 py-0.5 rounded font-mono text-xs ${
-                  feedTab === 'CALLS'
-                    ? 'bg-canvas text-pump font-black'
-                    : 'bg-surface-card text-muted'
-                }`}
-              >
-                {alphas.length}
-              </span>
-            </button>
+              {alphas.length}
+            </span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setFeedTab('RAIDS')}
-              className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          <button
+            type="button"
+            onClick={() => setFeedTab('RAIDS')}
+            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              feedTab === 'RAIDS'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
+            <span
+              className={`px-2 py-0.5 rounded font-mono text-xs ${
                 feedTab === 'RAIDS'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
+                  ? 'bg-white text-purple-700 font-black'
+                  : 'bg-surface-card text-purple-400'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
-              <span
-                className={`px-2 py-0.5 rounded font-mono text-xs ${
-                  feedTab === 'RAIDS'
-                    ? 'bg-white text-purple-700 font-black'
-                    : 'bg-surface-card text-purple-400'
-                }`}
-              >
-                {campaigns.length}
-              </span>
-            </button>
-          </div>
-        )}
+              {campaigns.length}
+            </span>
+          </button>
+        </div>
 
-        {!isUnlocked ? (
+        {!isUnlocked && feedTab === 'CALLS' ? (
           <div className="space-y-6 pt-2">
             <LockedTerminal />
             <div className="space-y-3 pt-2">
@@ -1137,7 +1132,18 @@ export const IncubatorHub: React.FC = () => {
               />
             </div>
           </div>
-        ) : feedTab === 'CALLS' ? (
+        ) : feedTab === 'RAIDS' ? (
+          <div className="space-y-4 pt-2">
+            <CampaignSection
+              userWallet={publicKeyBase58}
+              isAdmin={isAdmin}
+              campaigns={campaigns}
+              loading={campaignsLoading}
+              onRefresh={fetchCampaigns}
+              onTogglePin={handleTogglePinCampaign}
+            />
+          </div>
+        ) : (
           <div className="space-y-6">
               {/* 5. ALL CATEGORIZED ALPHA TRADE CALLS (Filterable by Blockchain: SOL, BSC, ETH, BASE, ROBIN, AVAX) */}
               <div className="space-y-4 pt-2">
@@ -1612,15 +1618,6 @@ export const IncubatorHub: React.FC = () => {
           </div>
         </div>
       </div>
-    ) : (
-      <CampaignSection
-        userWallet={publicKeyBase58}
-        isAdmin={isAdmin}
-        campaigns={campaigns}
-        loading={campaignsLoading}
-        onRefresh={fetchCampaigns}
-        onTogglePin={handleTogglePinCampaign}
-      />
     )}
   </div>
 

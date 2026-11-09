@@ -1,1 +1,46 @@
-[]
+[
+  {
+    "id": "camp-1794264836610-207fc4",
+    "title": "ererer",
+    "description": "Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.",
+    "tweetUrl": "https://x.com/solana/status/2119887254965702747?a=iO0ezlTWBNH6dHILVYY&s=20",
+    "rewardAmount": "50,000 $GENESIS",
+    "rewardToken": "$GENESIS",
+    "totalPool": "1,000,000 $GENESIS",
+    "targetActions": [
+      "Like",
+      "Retweet",
+      "Quote with $GENESIS"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2026-11-09T22:53:56.611Z",
+    "expiresAt": "2026-11-23T22:53:53.108Z",
+    "postedBy": "FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e",
+    "submissionsCount": 0,
+    "airdroppedCount": 0,
+    "pinned": true,
+    "pinnedAt": "2026-11-09T22:53:56.611Z"
+  },
+  {
+    "id": "camp-1794263453237-08e44d",
+    "title": "weww",
+    "description": "Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.",
+    "tweetUrl": "https://x.com/pr6spr/status/2119885228558758198?a=KXn7dRZpTG4diAh5ZuE&s=20",
+    "rewardAmount": "50,000 $GENESIS",
+    "rewardToken": "$GENESIS",
+    "totalPool": "1,000,000 $GENESIS",
+    "targetActions": [
+      "Like",
+      "Retweet",
+      "Quote with $GENESIS"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2026-11-09T22:30:53.238Z",
+    "expiresAt": "2026-11-11T22:30:53.238Z",
+    "postedBy": "FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e",
+    "submissionsCount": 0,
+    "airdroppedCount": 0,
+    "pinned": false,
+    "pinnedAt": null
+  }
+]

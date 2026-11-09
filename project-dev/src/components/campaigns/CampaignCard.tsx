@@ -117,14 +117,33 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   const isCompleted = campaign.status === 'COMPLETED';
   const isPaused = campaign.status === 'PAUSED';
 
+  // Format remaining raid duration if expiresAt is provided
+  const durationBadge = React.useMemo(() => {
+    if (!campaign.expiresAt) return null;
+    const diffMs = new Date(campaign.expiresAt).getTime() - Date.now();
+    if (diffMs <= 0) return 'EXPIRED';
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      return `${days}d ${remainingHours}h left`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${mins}m left`;
+    }
+    return `${mins}m left`;
+  }, [campaign.expiresAt]);
+
   return (
     <article
       tabIndex={0}
       aria-label={`X Raid Campaign: ${campaign.title}`}
-      className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-200 p-4 border-2 border-purple-500 shadow-[0_0_22px_rgba(168,85,247,0.35)] ring-1 ring-purple-500/50 hover:border-purple-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+      className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-200 p-4 border border-purple-500 hover:border-purple-400 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
     >
       <div>
-        {/* Top Row: Serial Tag + X Raid Indicator + Status + Participants */}
+        {/* Top Row: Serial Tag + Priority Pin + Admin Pin Button */}
         <div className="flex items-center justify-between gap-2 pb-3 border-b border-line">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded font-mono text-xs font-black bg-purple-500/15 border border-purple-500/80 text-purple-300">
@@ -137,31 +156,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 <span>PRIORITY PIN</span>
               </span>
             )}
-
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[10px] font-black uppercase tracking-wider ${
-                isCompleted
-                  ? 'bg-neutral-800 text-muted border border-neutral-700'
-                  : isPaused
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                  : 'bg-purple-600 text-white shadow-sm'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isCompleted ? 'bg-muted' : isPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'
-                }`}
-              />
-              <span>{campaign.status}</span>
-            </span>
-
-            <span className="px-2 py-0.5 rounded bg-surface-card border border-line font-mono text-[10px] font-bold text-white">
-              ALL TIERS
-            </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
-            {isAdmin && (
+          {isAdmin && (
+            <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
               <button
                 type="button"
                 onClick={(e) => {
@@ -177,22 +175,31 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               >
                 {campaign.pinned ? 'PINNED' : 'PIN'}
               </button>
-            )}
-
-            <div className="flex items-center gap-1">
-              <Gift className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-purple-300 font-bold">
-                {campaign.submissionsCount || 0} Raids
-              </span>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Campaign Title & Target Tweet Link */}
+        {/* Campaign Title & Duration Badge Row */}
         <div className="pt-3 pb-2 space-y-2">
-          <h3 className="font-sans text-base font-extrabold text-white group-hover:text-purple-300 transition-colors leading-tight">
-            {campaign.title}
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-sans text-base font-extrabold text-white group-hover:text-purple-300 transition-colors leading-tight">
+              {campaign.title}
+            </h3>
+
+            {durationBadge && (
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded font-mono text-xs font-bold uppercase tracking-wider shrink-0 ${
+                  durationBadge === 'EXPIRED'
+                    ? 'bg-neutral-800 text-muted border border-neutral-700'
+                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/40 shadow-sm'
+                }`}
+                title={campaign.expiresAt ? `Raid closes at ${new Date(campaign.expiresAt).toLocaleString()}` : undefined}
+              >
+                <Clock className="w-3 h-3 text-purple-400" />
+                <span>{durationBadge}</span>
+              </span>
+            )}
+          </div>
 
           <p className="font-sans text-xs text-muted leading-relaxed line-clamp-3">
             {campaign.description}

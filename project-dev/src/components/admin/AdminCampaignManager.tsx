@@ -39,6 +39,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
   const [formTweetUrl, setFormTweetUrl] = useState('');
   const [formRewardAmount, setFormRewardAmount] = useState('50,000 $GENESIS');
   const [formTotalPool, setFormTotalPool] = useState('1,000,000 $GENESIS');
+  const [formDurationHours, setFormDurationHours] = useState('48');
   const [formDescription, setFormDescription] = useState(
     'Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.'
   );
@@ -151,6 +152,12 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     setFormTweetUrl(camp.tweetUrl);
     setFormRewardAmount(camp.rewardAmount);
     setFormTotalPool(camp.totalPool || '1,000,000 $GENESIS');
+    if (camp.expiresAt) {
+      const remainingHours = Math.max(1, Math.round((new Date(camp.expiresAt).getTime() - Date.now()) / (3600 * 1000)));
+      setFormDurationHours(String(remainingHours));
+    } else {
+      setFormDurationHours('48');
+    }
     setFormDescription(camp.description);
     setFormPinned(camp.pinned ?? true);
     setShowCreateForm(true);
@@ -164,6 +171,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     setFormTweetUrl('');
     setFormRewardAmount('50,000 $GENESIS');
     setFormTotalPool('1,000,000 $GENESIS');
+    setFormDurationHours('48');
     setFormDescription(
       'Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.'
     );
@@ -179,6 +187,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
     setSubmittingCampaign(true);
     try {
+      const hoursNum = parseFloat(formDurationHours);
+      const expiresAt = !isNaN(hoursNum) && hoursNum > 0
+        ? new Date(Date.now() + hoursNum * 3600 * 1000).toISOString()
+        : undefined;
+
       const payload = {
         title: formTitle.trim(),
         description: formDescription.trim(),
@@ -187,6 +200,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
         totalPool: formTotalPool.trim() || undefined,
         targetActions: ['Like', 'Retweet', 'Quote with $GENESIS'],
         pinned: formPinned,
+        expiresAt,
       };
 
       const bodyStr = JSON.stringify(payload);
@@ -467,7 +481,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
-            <div className="md:col-span-6 space-y-1">
+            <div className="md:col-span-4 space-y-1">
               <label className="block font-sans text-[11px] font-bold text-muted uppercase">
                 Airdrop Reward Per User *
               </label>
@@ -481,7 +495,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               />
             </div>
 
-            <div className="md:col-span-6 space-y-1">
+            <div className="md:col-span-4 space-y-1">
               <label className="block font-sans text-[11px] font-bold text-muted uppercase">
                 Total Reward Pool (Optional)
               </label>
@@ -492,6 +506,25 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 placeholder="e.g. 1,000,000 $GENESIS Pool"
                 className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-white focus:outline-none"
               />
+            </div>
+
+            <div className="md:col-span-4 space-y-1">
+              <label className="block font-sans text-[11px] font-bold text-muted uppercase flex items-center justify-between">
+                <span>Raid Duration</span>
+                <span className="text-purple-300 font-mono text-[10px]">{formDurationHours}h window</span>
+              </label>
+              <select
+                value={formDurationHours}
+                onChange={(e) => setFormDurationHours(e.target.value)}
+                className="w-full h-9 px-2.5 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-purple-300 focus:outline-none cursor-pointer"
+              >
+                <option value="12">12 Hours</option>
+                <option value="24">24 Hours (1 Day)</option>
+                <option value="48">48 Hours (2 Days)</option>
+                <option value="72">72 Hours (3 Days)</option>
+                <option value="168">168 Hours (7 Days)</option>
+                <option value="336">336 Hours (14 Days)</option>
+              </select>
             </div>
           </div>
 

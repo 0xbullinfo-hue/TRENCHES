@@ -70,6 +70,9 @@ export async function PATCH(
   if (typeof body.pinned === 'boolean') {
     updates.pinned = body.pinned;
   }
+  if (typeof body.expiresAt === 'string') {
+    updates.expiresAt = body.expiresAt.trim() || undefined;
+  }
 
   try {
     const updated = await updateCampaign(id, updates);
