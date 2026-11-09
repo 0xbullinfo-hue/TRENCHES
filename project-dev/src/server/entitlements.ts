@@ -42,7 +42,8 @@ export interface WalletEntitlement {
     isExpired: boolean;
   };
   price: {
-    usd: number;
+    /** null when the price oracle is unavailable (entitlement is then 'unknown' for non-admin wallets). */
+    usd: number | null;
     source: string;
     isFresh: boolean;
     timestamp: string;
@@ -112,10 +113,15 @@ export async function resolveWalletEntitlement(
   const priceResult = overrides?.mockPriceUsd !== undefined
     ? { priceUsd: overrides.mockPriceUsd, source: 'TEST' as const, isFresh: true, timestamp: new Date().toISOString() }
     : await getGenesisPrice();
-  const priceUsd = priceResult.priceUsd;
+  const priceUsdOrNull = priceResult.priceUsd;
+  // Oracle outage: never substitute a made-up price. USD valuations are unknowable, so non-admin
+  // wallets resolve to 'unknown' (callers keep existing members and reject new staking).
+  const priceUnavailable =
+    priceUsdOrNull === null || !Number.isFinite(priceUsdOrNull) || priceUsdOrNull <= 0;
+  const priceUsd = priceUnavailable ? 0 : (priceUsdOrNull as number);
 
-  // 2. Compute dynamic member threshold in token units
-  const thresholdTokens = priceUsd > 0 ? Math.ceil(MEMBER_USD_THRESHOLD / priceUsd) : 1_219_512;
+  // 2. Compute dynamic member threshold in token units (0 when the price is unavailable)
+  const thresholdTokens = priceUsd > 0 ? Math.ceil(MEMBER_USD_THRESHOLD / priceUsd) : 0;
 
   // 3. Read on-chain $GENESIS token balance
   let balanceTokens = 0;
@@ -216,7 +222,12 @@ export async function resolveWalletEntitlement(
   let tier: UserTier = 'free';
   let downgradeReason: string | undefined;
 
-  if (isAdmin || isProEligible) {
+  if (isAdmin) {
+    tier = 'pro';
+  } else if (priceUnavailable) {
+    tier = 'unknown';
+    downgradeReason = 'Price oracle temporarily unavailable; skipping status changes';
+  } else if (isProEligible) {
     tier = 'pro';
   } else if (isMemberEligible) {
     tier = 'member';
@@ -262,7 +273,7 @@ export async function resolveWalletEntitlement(
       isExpired,
     },
     price: {
-      usd: priceUsd,
+      usd: priceUnavailable ? null : priceUsd,
       source: priceResult.source,
       isFresh: priceResult.isFresh,
       timestamp: priceResult.timestamp,

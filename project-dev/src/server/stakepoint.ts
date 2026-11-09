@@ -204,6 +204,15 @@ export async function verifyAndRecordStakePointPosition(
 
     // 8. Server-side USD valuation check using live price oracle
     const priceResult = await getGenesisPrice();
+    if (priceResult.priceUsd === null || !Number.isFinite(priceResult.priceUsd) || priceResult.priceUsd <= 0) {
+      // Fail closed: without a verified price the stake's USD value is unknowable. Do not accept or
+      // reject on a guessed price; the user can safely retry the same transaction later.
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: 'Price unavailable: $GENESIS price oracle is temporarily unreachable. Your transaction was not recorded; please retry shortly.',
+      };
+    }
     const tokenAmountNumber = Number(amountRaw) / Math.pow(10, TOKEN_DECIMALS);
     const amountUsd = +(tokenAmountNumber * priceResult.priceUsd).toFixed(2);
 

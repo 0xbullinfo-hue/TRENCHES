@@ -5,6 +5,7 @@ import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
 import { getGenesisPrice } from '@/server/price';
+import { DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
 
 export { TOKEN_DECIMALS, TOKEN_SYMBOL };
 
@@ -292,7 +293,13 @@ export async function getTierThresholds(): Promise<{
   priceSource: string;
 }> {
   const priceResult = await getGenesisPrice();
-  const livePrice = priceResult.priceUsd > 0 ? priceResult.priceUsd : 0.0000164;
+  // DISPLAY ONLY: when every oracle fails we still render the landing/stake pages using the static
+  // default, but flag it (stale + priceSource 'unavailable'). Nothing that grants access or accepts a
+  // stake may rely on this value (entitlements.ts / stakepoint.ts fail closed on a null price).
+  const livePrice =
+    priceResult.priceUsd !== null && priceResult.priceUsd > 0
+      ? priceResult.priceUsd
+      : DEFAULT_GENESIS_USD_PRICE;
   const now = new Date().toISOString();
   const validUntil = getNextMondayUtc();
 

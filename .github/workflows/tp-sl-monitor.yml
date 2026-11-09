@@ -64,3 +64,29 @@ jobs:
             }
           '
 
+  trigger-delayed-dispatch:
+    # Separate job so a monitor failure never blocks delivery of delayed Member-tier calls.
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger GET /api/telegram/dispatch-delayed
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.trenchlabshq.xyz' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not configured."
+            exit 1
+          fi
+          TARGET_URL="${SITE_URL%/}/api/telegram/dispatch-delayed"
+          HTTP_STATUS=$(curl -sS -o /tmp/dispatch_response.json -w "%{http_code}" \
+            --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "$TARGET_URL")
+          cat /tmp/dispatch_response.json
+          echo ""
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Delayed dispatch endpoint returned HTTP $HTTP_STATUS"
+            exit 1
+          fi

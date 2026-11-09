@@ -402,11 +402,6 @@ export const IncubatorHub: React.FC = () => {
         }]${formMaxAlpha ? ' [MAX ALPHA 🔥 PRO ONLY]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
       );
       handleCancelEdit();
-      if (!formMaxAlpha) {
-        setTimeout(() => {
-          fetch('/api/telegram/dispatch-delayed', { method: 'POST' }).catch(() => {});
-        }, 5 * 60 * 1000);
-      }
     } else {
       showToast('Failed to post call — ensure Admin Wallet is active.');
     }

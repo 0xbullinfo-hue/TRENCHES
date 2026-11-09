@@ -2,15 +2,13 @@ import { GENESIS_MINT } from '@/lib/config';
 import { getMarketData } from '@/server/market-data';
 
 export interface GenesisPriceResult {
-  priceUsd: number;
-  source: 'coinstats' | 'jupiter' | 'dexscreener' | 'cached' | 'fallback' | 'unavailable';
+  /** null when every oracle failed. Callers MUST treat null as unknown and fail closed (never substitute a made-up price). */
+  priceUsd: number | null;
+  source: 'coinstats' | 'jupiter' | 'dexscreener' | 'cached' | 'unavailable';
   timestamp: string;
   isFresh: boolean;
   error?: string;
 }
-
-// Fallback baseline price if no external oracles are reachable ($0.0000164)
-export const FALLBACK_GENESIS_PRICE = 0.0000164;
 
 // Cache settings
 const PRICE_CACHE_TTL_MS = 60_000; // 1 minute fresh TTL
@@ -55,7 +53,7 @@ async function fetchFromJupiter(mint: string, timeoutMs = 3500): Promise<number 
  * Retrieves the live, verified USD price of $GENESIS from trusted oracles:
  * 1. Central market-data service (CoinStats when enabled -> DexScreener with chain+baseToken validation -> shared Redis/memory cache).
  * 2. Jupiter Price API v2 fallback.
- * 3. Bounded stale cache -> explicit fallback baseline.
+ * 3. Bounded stale cache -> explicit UNAVAILABLE (priceUsd: null).
  */
 export async function getGenesisPrice(): Promise<GenesisPriceResult> {
   const now = Date.now();
@@ -73,11 +71,11 @@ export async function getGenesisPrice(): Promise<GenesisPriceResult> {
   // Avoid repeatedly blocking page renders when the configured mint is not yet indexed by external oracles
   if (!lastGoodPrice && lastFailedLookupAt > 0 && now - lastFailedLookupAt < FAILED_LOOKUP_COOLDOWN_MS) {
     return {
-      priceUsd: FALLBACK_GENESIS_PRICE,
-      source: 'fallback',
+      priceUsd: null,
+      source: 'unavailable',
       timestamp: new Date(lastFailedLookupAt).toISOString(),
       isFresh: false,
-      error: 'All price oracles unavailable; using fallback baseline',
+      error: 'All price oracles unavailable',
     };
   }
 
@@ -135,13 +133,13 @@ export async function getGenesisPrice(): Promise<GenesisPriceResult> {
     };
   }
 
-  // 5. Emergency fallback (explicitly marked not fresh)
+  // 5. No oracle and no usable cache: report UNAVAILABLE. Never invent a price.
   lastFailedLookupAt = now;
   return {
-    priceUsd: FALLBACK_GENESIS_PRICE,
-    source: 'fallback',
+    priceUsd: null,
+    source: 'unavailable',
     timestamp: new Date(now).toISOString(),
     isFresh: false,
-    error: 'All price oracles unavailable; using fallback baseline',
+    error: 'All price oracles unavailable',
   };
 }
