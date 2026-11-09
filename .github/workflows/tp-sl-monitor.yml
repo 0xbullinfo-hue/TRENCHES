@@ -25,9 +25,8 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Accept: application/json" \
             "$TARGET_URL")
-          cat /tmp/monitor_response.json
-          echo ""
           if [ "$HTTP_STATUS" -ne 200 ]; then
+            rm -f /tmp/monitor_response.json
             echo "::error::Monitor endpoint returned HTTP $HTTP_STATUS"
             exit 1
           fi
@@ -36,28 +35,30 @@ jobs:
             let body;
             try {
               body = JSON.parse(fs.readFileSync("/tmp/monitor_response.json", "utf8"));
-            } catch (err) {
-              console.error("::error::Monitor endpoint did not return valid JSON:", err.message);
+            } catch {
+              try { fs.unlinkSync("/tmp/monitor_response.json"); } catch {}
+              console.error("::error::Monitor endpoint did not return valid JSON.");
               process.exit(1);
             }
-            if (!body || body.ok !== true || body.operationalFailure === true) {
-              const reason = body?.failureReason || body?.error || "Operational failure reported by monitor";
-              console.error(`::error::TP/SL Monitor operational failure: ${reason}`);
-              process.exit(1);
-            }
+            try { fs.unlinkSync("/tmp/monitor_response.json"); } catch {}
             const summary = {
-              ok: body.ok,
-              incomplete: Boolean(body.incomplete),
-              evaluated: body.result?.evaluated ?? 0,
-              eventsCreated: body.eventsCreated ?? 0,
-              eventsProcessed: body.eventsProcessed ?? 0,
-              notificationsSent: body.notificationsSent ?? 0,
-              notificationsPending: body.notificationsPending ?? 0,
-              notificationsRetried: body.notificationsRetried ?? 0,
-              notificationsPermanentlyFailed: body.notificationsPermanentlyFailed ?? 0,
-              durationMs: body.durationMs ?? 0,
+              ok: Boolean(body?.ok),
+              operationalFailure: Boolean(body?.operationalFailure),
+              incomplete: Boolean(body?.incomplete),
+              evaluated: Number(body?.result?.evaluated ?? 0),
+              eventsCreated: Number(body?.eventsCreated ?? 0),
+              eventsProcessed: Number(body?.eventsProcessed ?? 0),
+              notificationsSent: Number(body?.notificationsSent ?? 0),
+              notificationsPending: Number(body?.notificationsPending ?? 0),
+              notificationsRetried: Number(body?.notificationsRetried ?? 0),
+              notificationsPermanentlyFailed: Number(body?.notificationsPermanentlyFailed ?? 0),
+              durationMs: Number(body?.durationMs ?? 0),
             };
-            if (body.incomplete) {
+            if (!body || body.ok !== true || body.operationalFailure === true) {
+              console.error("::error::TP/SL Monitor reported an operational failure:", JSON.stringify(summary));
+              process.exit(1);
+            }
+            if (body.incomplete === true) {
               console.warn("::warning::TP/SL Monitor run completed partially (incomplete=true); pending deliveries remain queued in Redis outbox:", JSON.stringify(summary));
             } else {
               console.log("TP/SL Monitor run completed:", JSON.stringify(summary));
@@ -84,9 +85,30 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Accept: application/json" \
             "$TARGET_URL")
-          cat /tmp/dispatch_response.json
-          echo ""
           if [ "$HTTP_STATUS" -ne 200 ]; then
+            rm -f /tmp/dispatch_response.json
             echo "::error::Delayed dispatch endpoint returned HTTP $HTTP_STATUS"
             exit 1
           fi
+          node -e '
+            const fs = require("fs");
+            let body;
+            try {
+              body = JSON.parse(fs.readFileSync("/tmp/dispatch_response.json", "utf8"));
+            } catch {
+              try { fs.unlinkSync("/tmp/dispatch_response.json"); } catch {}
+              console.error("::error::Delayed dispatch endpoint did not return valid JSON.");
+              process.exit(1);
+            }
+            try { fs.unlinkSync("/tmp/dispatch_response.json"); } catch {}
+            const summary = {
+              ok: Boolean(body?.ok),
+              dispatched: Number(body?.dispatched ?? 0),
+              pending: Number(body?.pending ?? 0),
+            };
+            if (!body || body.ok !== true) {
+              console.error("::error::Delayed dispatch reported failure:", JSON.stringify(summary));
+              process.exit(1);
+            }
+            console.log("Delayed dispatch run completed:", JSON.stringify(summary));
+          '

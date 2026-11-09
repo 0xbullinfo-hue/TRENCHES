@@ -302,11 +302,12 @@ function createOutboxRedisSimulator() {
           if (st === 'retry' && typeof rec.nextRetryAt === 'number' && rec.nextRetryAt > now) {
             return null;
           }
+          if (typeof rec.nextTierCheckAt === 'number' && rec.nextTierCheckAt > now) {
+            return null;
+          }
           rec.previousStatus = st;
           rec.status = 'processing';
           rec.processingToken = workerToken;
-          rec.lastAttemptAt = now;
-          rec.attemptCount = (Number(rec.attemptCount) || 0) + 1;
           rec.leaseExpiresAt = now + leaseMs;
           const updated = JSON.stringify(rec);
           subsHash.set(subId, updated);
@@ -335,9 +336,30 @@ function createOutboxRedisSimulator() {
           if (rec.status !== 'processing' || rec.processingToken !== argv[1]) return 0;
           const outcome = JSON.parse(argv[2]);
           rec.status = outcome.status;
-          rec.lastAttemptAt = outcome.lastAttemptAt || rec.lastAttemptAt;
-          rec.nextRetryAt = outcome.nextRetryAt;
-          rec.lastFailureCategory = outcome.lastFailureCategory;
+          if (outcome.isTierCheckFailure === true) {
+            rec.tierCheckAttemptCount =
+              Number(outcome.tierCheckAttemptCount) || (Number(rec.tierCheckAttemptCount) || 0) + 1;
+            rec.nextTierCheckAt = Number(outcome.nextTierCheckAt) || 0;
+            rec.lastTierCheckFailureAt = outcome.lastTierCheckFailureAt ?? null;
+          } else {
+            if (outcome.attemptCount !== undefined && outcome.attemptCount !== null) {
+              rec.attemptCount = Number(outcome.attemptCount);
+            } else {
+              rec.attemptCount = (Number(rec.attemptCount) || 0) + 1;
+            }
+            if (outcome.lastAttemptAt !== undefined && outcome.lastAttemptAt !== null) {
+              rec.lastAttemptAt = outcome.lastAttemptAt;
+            }
+            if (outcome.nextRetryAt !== undefined && outcome.nextRetryAt !== null) {
+              rec.nextRetryAt = Number(outcome.nextRetryAt);
+            }
+            if (outcome.lastFailureCategory !== undefined) {
+              rec.lastFailureCategory = outcome.lastFailureCategory;
+            }
+            if (outcome.nextTierCheckAt !== undefined && outcome.nextTierCheckAt !== null) {
+              rec.nextTierCheckAt = Number(outcome.nextTierCheckAt);
+            }
+          }
           rec.processingToken = null;
           rec.leaseExpiresAt = null;
           subsHash.set(argv[0], JSON.stringify(rec));
@@ -1156,6 +1178,153 @@ test('Outbox [18]: GET /api/telegram/monitor reports incomplete runs and outbox 
       if (prevCronSecret === undefined) delete process.env.CRON_SECRET;
       else process.env.CRON_SECRET = prevCronSecret;
     }
+  });
+});
+
+// ============================================================================
+// 19: Tier-Verification Retry Separation & Resilience (Fix 1)
+// ============================================================================
+test('Outbox [19]: tier RPC failures never increment Telegram delivery attemptCount, never permanently_fail subscribers, survive restarts, and preserve Admin/Pro/Member/Free rules', async () => {
+  await withMockRedis(async (sim) => {
+    const ADMIN_WALLET = 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e';
+    const PRO_WALLET = 'WalletProTierRetry111111111111111111111111';
+    const MEM_WALLET = 'WalletMemTierRetry222222222222222222222222';
+    const FREE_WALLET = 'WalletFreeTierRetry33333333333333333333333';
+
+    sim.seedLinkedSubscribers({
+      [ADMIN_WALLET]: '7000',
+      [PRO_WALLET]: '7001',
+      [MEM_WALLET]: '7002',
+      [FREE_WALLET]: '7003',
+    });
+
+    // Pro-only call: Admin receives immediately even during complete RPC outage;
+    // PRO_WALLET and MEM_WALLET and FREE_WALLET experience 6 consecutive RPC failures (exceeding maxAttempts = 3!)
+    const proCall = makeCall({ id: 'call-tier-retry-pro', minTier: 'PRO', isMaxAlpha: true });
+    const { eventId } = await enqueueOutboxEvent(
+      {
+        call: proCall,
+        triggerType: 'TP',
+        targetId: buildTpTargetId(0, 'TP1 (2x)'),
+        targetLabel: 'TP1 (2x)',
+        marketCapLabel: '$250.0K',
+      },
+      { now: sim.getNow }
+    );
+
+    let rpcOutage = true;
+    const deliveredTo = [];
+
+    // Execute 6 consecutive worker runs during RPC outage with maxAttempts = 3
+    for (let cycle = 1; cycle <= 6; cycle++) {
+      const res = await processNotificationOutbox({
+        now: sim.getNow,
+        maxAttempts: 3,
+        baseRetryDelayMs: 5_000,
+        maxRetryDelayMs: 60_000,
+        workerToken: `worker-restart-${cycle}`,
+        resolveTier: async () => {
+          if (rpcOutage) throw new Error('Solana RPC 503 Service Unavailable');
+          return 'pro';
+        },
+        sendTelegramMessage: async (chatId, text) => {
+          deliveredTo.push({ chatId: String(chatId), text });
+          return { ok: true, status: 200 };
+        },
+      });
+
+      if (cycle === 1) {
+        assert.equal(res.notificationsSent, 1, 'Admin wallet must receive notification even during tier RPC outage');
+        assert.equal(deliveredTo[0].chatId, '7000');
+        assert.ok(deliveredTo[0].text.includes('Ref: <code>#'), 'Message must include non-sensitive eventRef');
+      } else {
+        assert.equal(res.notificationsSent, 0, 'No notification may be sent while tier eligibility is unknown');
+      }
+      assert.equal(
+        res.notificationsPermanentlyFailed,
+        0,
+        `Cycle ${cycle}: tier RPC failure must NEVER permanently fail a subscriber`
+      );
+      assert.equal(res.incomplete, true, 'Event must remain incomplete while subscribers await tier verification');
+
+      const state = await getOutboxEventState(eventId);
+      const proSub = state.subscribers[PRO_WALLET];
+      assert.equal(
+        proSub.attemptCount,
+        0,
+        `Cycle ${cycle}: tier RPC failure must NEVER increment Telegram delivery attemptCount`
+      );
+      assert.equal(proSub.tierCheckAttemptCount, cycle, 'tierCheckAttemptCount must track RPC verification retries');
+      assert.equal(proSub.status, 'pending', 'Subscriber status must remain pending during tier RPC backoff');
+      assert.ok(proSub.nextTierCheckAt > sim.getNow(), 'Subscriber must have bounded nextTierCheckAt backoff');
+      assert.equal(proSub.lastTierCheckFailureAt, sim.getNow());
+
+      // Advance clock past bounded tier check backoff to simulate next scheduled run after restart
+      sim.advanceTime(65_000);
+    }
+
+    // Also simulate a worker crash/interruption mid-lease before tier recovery:
+    // Claim lease for PRO_WALLET and let it expire without completing
+    const { kvOutboxClaimSubscriber } = await import('../../src/server/kv.ts');
+    const claimedBeforeCrash = await kvOutboxClaimSubscriber(
+      outboxSubsKey(eventId),
+      PRO_WALLET,
+      'crashed-worker-token',
+      sim.getNow(),
+      10_000
+    );
+    assert.ok(claimedBeforeCrash, 'Worker claims subscriber before crash');
+    assert.equal(
+      JSON.parse(claimedBeforeCrash).attemptCount,
+      0,
+      'Claiming lease before Telegram send must not inflate attemptCount'
+    );
+    // Advance past the 10s lease so the crashed worker's lease expires
+    sim.advanceTime(15_000);
+
+    // Now the tier RPC service recovers!
+    // - PRO_WALLET resolves to 'pro' -> receives notification (attemptCount becomes 1, status 'delivered')
+    // - MEM_WALLET resolves to 'member' -> excluded from Pro-only call without sending
+    // - FREE_WALLET resolves to 'free' -> excluded without sending
+    // - Event finalizes as 'completed'!
+    rpcOutage = false;
+    const recoveryRes = await processNotificationOutbox({
+      now: sim.getNow,
+      maxAttempts: 3,
+      baseRetryDelayMs: 5_000,
+      workerToken: 'worker-after-recovery',
+      resolveTier: async (wallet) => {
+        if (wallet === PRO_WALLET) return 'pro';
+        if (wallet === MEM_WALLET) return 'member';
+        return 'free';
+      },
+      sendTelegramMessage: async (chatId, text) => {
+        deliveredTo.push({ chatId: String(chatId), text });
+        return { ok: true, status: 200 };
+      },
+    });
+
+    assert.equal(recoveryRes.ok, true);
+    assert.equal(recoveryRes.incomplete, false, 'Event must complete once tier service recovers');
+    assert.equal(recoveryRes.notificationsSent, 1, 'Only PRO_WALLET should receive the Pro-only notification on recovery');
+    assert.equal(recoveryRes.notificationsPending, 0);
+    assert.equal(recoveryRes.notificationsPermanentlyFailed, 0);
+    assert.deepEqual(
+      deliveredTo.map((d) => d.chatId),
+      ['7000', '7001'],
+      'Only Admin (7000) and Pro (7001) receive the Pro-only notification; Member (7002) and Free (7003) are excluded'
+    );
+
+    const finalState = await getOutboxEventState(eventId);
+    assert.equal(finalState.event?.status, 'completed', 'Event must finalize after ineligible subscribers are cleared');
+    assert.equal(finalState.subscribers[PRO_WALLET]?.status, 'delivered');
+    assert.equal(
+      finalState.subscribers[PRO_WALLET]?.attemptCount,
+      1,
+      'Exactly 1 Telegram delivery attempt was used after 6 prior tier RPC failures'
+    );
+    assert.equal(finalState.subscribers[MEM_WALLET], undefined, 'Ineligible member removed from Pro-only subs hash');
+    assert.equal(finalState.subscribers[FREE_WALLET], undefined, 'Ineligible free user removed from subs hash');
   });
 });
 

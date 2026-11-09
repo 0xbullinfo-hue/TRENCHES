@@ -192,11 +192,10 @@ const OUTBOX_CLAIM_SUB_LUA =
   "if st=='delivered' or st=='permanently_failed' then return nil end " +
   "if st=='processing' and rec.leaseExpiresAt and type(rec.leaseExpiresAt)=='number' and rec.leaseExpiresAt>now then return nil end " +
   "if st=='retry' and rec.nextRetryAt and type(rec.nextRetryAt)=='number' and rec.nextRetryAt>now then return nil end " +
+  "if rec.nextTierCheckAt and type(rec.nextTierCheckAt)=='number' and rec.nextTierCheckAt>now then return nil end " +
   "rec.previousStatus=st " +
   "rec.status='processing' " +
   "rec.processingToken=ARGV[4] " +
-  "rec.lastAttemptAt=now " +
-  "rec.attemptCount=(tonumber(rec.attemptCount) or 0)+1 " +
   "rec.leaseExpiresAt=now+leaseMs " +
   "local updated=cjson.encode(rec) " +
   "redis.call('hset',KEYS[1],ARGV[1],updated) " +
@@ -219,9 +218,21 @@ const OUTBOX_COMPLETE_SUB_LUA =
   "if rec.status~='processing' or rec.processingToken~=ARGV[2] then return 0 end " +
   "local outcome=cjson.decode(ARGV[3]) " +
   "rec.status=outcome.status " +
-  "rec.lastAttemptAt=outcome.lastAttemptAt or rec.lastAttemptAt " +
-  "rec.nextRetryAt=outcome.nextRetryAt " +
-  "rec.lastFailureCategory=outcome.lastFailureCategory " +
+  "if outcome.isTierCheckFailure==true then " +
+  "rec.tierCheckAttemptCount=tonumber(outcome.tierCheckAttemptCount) or ((tonumber(rec.tierCheckAttemptCount) or 0)+1) " +
+  "rec.nextTierCheckAt=tonumber(outcome.nextTierCheckAt) or 0 " +
+  "rec.lastTierCheckFailureAt=outcome.lastTierCheckFailureAt " +
+  "else " +
+  "if outcome.attemptCount~=nil and outcome.attemptCount~=cjson.null then " +
+  "rec.attemptCount=tonumber(outcome.attemptCount) " +
+  "else " +
+  "rec.attemptCount=(tonumber(rec.attemptCount) or 0)+1 " +
+  "end " +
+  "if outcome.lastAttemptAt~=nil and outcome.lastAttemptAt~=cjson.null then rec.lastAttemptAt=outcome.lastAttemptAt end " +
+  "if outcome.nextRetryAt~=nil and outcome.nextRetryAt~=cjson.null then rec.nextRetryAt=tonumber(outcome.nextRetryAt) end " +
+  "if outcome.lastFailureCategory~=nil then rec.lastFailureCategory=outcome.lastFailureCategory end " +
+  "if outcome.nextTierCheckAt~=nil and outcome.nextTierCheckAt~=cjson.null then rec.nextTierCheckAt=tonumber(outcome.nextTierCheckAt) end " +
+  "end " +
   "rec.processingToken=cjson.null " +
   "rec.leaseExpiresAt=cjson.null " +
   "redis.call('hset',KEYS[1],ARGV[1],cjson.encode(rec)) " +

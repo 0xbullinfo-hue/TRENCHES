@@ -31,6 +31,35 @@ import {
   type TgCallResult,
 } from '@/server/telegram';
 
+/**
+ * Durable Upstash Redis TP/SL Notification Outbox (`src/server/notification-outbox.ts`).
+ *
+ * DELIVERY GUARANTEE: AT-LEAST-ONCE DELIVERY
+ * ------------------------------------------
+ * This outbox provides **at-least-once** Telegram notification delivery semantics:
+ * - Deterministic event IDs (`tpsl:<callId>:<triggerType>:<targetId>`) and atomic Lua `HSETNX`
+ *   event creation prevent duplicate event records across concurrent monitor workers.
+ * - Per-subscriber delivery leases (`status: 'processing'`, `processingToken`, `leaseExpiresAt`)
+ *   and token-verified Lua acknowledgements prevent concurrent duplicate sends and prevent
+ *   re-sending to any subscriber whose delivery has been acknowledged as `'delivered'`.
+ * - Tier-verification retries (`tierCheckAttemptCount`, `nextTierCheckAt`, `lastTierCheckFailureAt`)
+ *   are tracked separately from Telegram delivery attempts (`attemptCount`), so temporary Solana RPC
+ *   or price-oracle outages never consume Telegram delivery attempts or permanently fail an eligible
+ *   subscriber.
+ *
+ * TELEGRAM ACKNOWLEDGEMENT FAILURE WINDOW (WHY EXACTLY-ONCE IS IMPOSSIBLE):
+ * Because the Telegram Bot HTTP API (`sendMessage`) and Upstash Redis acknowledgement are two separate
+ * network systems without a shared two-phase commit:
+ * 1. Telegram accepts and delivers the `sendMessage` request.
+ * 2. If the serverless worker crashes, times out, or loses network connectivity *before*
+ *    `kvOutboxCompleteSubscriber` records `status = 'delivered'` in Redis,
+ * 3. And the subscriber's processing lease (`leaseExpiresAt`) subsequently expires,
+ * 4. A later worker will reclaim the expired lease and re-send the notification.
+ *
+ * To help subscribers and operators identify any duplicate caused by this narrow crash window without
+ * exposing internal Redis keys, wallet addresses, or secrets, every TP/SL notification carries a stable,
+ * non-sensitive 8-character event reference (`Ref: #<eventRef>`, derived via SHA-256 of `eventId`).
+ */
 export const OUTBOX_EVENTS_HASH = 'trench:tpsl:outbox:events:v1';
 export const OUTBOX_PENDING_SET = 'trench:tpsl:outbox:pending:v1';
 export const outboxSubsKey = (eventId: string): string => `trench:tpsl:outbox:subs:v1:${eventId}`;
@@ -61,6 +90,8 @@ export type DeliveryFailureCategory =
 
 export interface OutboxEventRecord {
   eventId: string;
+  eventRef?: string;
+  deliverySemantics?: 'at-least-once';
   callId: string;
   triggerType: OutboxTriggerType;
   targetId: string;
@@ -84,6 +115,9 @@ export interface OutboxSubscriberDelivery {
   lastAttemptAt: number | null;
   attemptCount: number;
   nextRetryAt: number;
+  tierCheckAttemptCount?: number;
+  nextTierCheckAt?: number;
+  lastTierCheckFailureAt?: number | null;
   status: SubscriberDeliveryStatus;
   lastFailureCategory: DeliveryFailureCategory | null;
   processingToken?: string | null;
@@ -182,6 +216,15 @@ export function buildNotificationEventId(
 }
 
 /**
+ * Generates a short, deterministic, non-sensitive 8-character hex reference for an `eventId`.
+ * Included in TP/SL Telegram notifications (`Ref: #<eventRef>`) so subscribers/operators can identify
+ * duplicate deliveries under at-least-once semantics without exposing internal Redis keys or PII.
+ */
+export function buildNotificationEventRef(eventId: string): string {
+  return crypto.createHash('sha256').update(String(eventId)).digest('hex').slice(0, 8).toUpperCase();
+}
+
+/**
  * Computes bounded exponential backoff in milliseconds, honoring Telegram `retry_after` when present.
  */
 export function computeRetryDelayMs(
@@ -257,9 +300,12 @@ export async function enqueueOutboxEvent(
 
   const nowMs = overrides.now ? overrides.now() : input.nowMs ?? Date.now();
   const eventId = buildNotificationEventId(input.call.id, input.triggerType, input.targetId);
+  const eventRef = buildNotificationEventRef(eventId);
 
   const event: OutboxEventRecord = {
     eventId,
+    eventRef,
+    deliverySemantics: 'at-least-once',
     callId: input.call.id,
     triggerType: input.triggerType,
     targetId: input.targetId,
@@ -314,8 +360,10 @@ export async function rollbackCreatedOutboxEvents(eventIds: string[]): Promise<v
 }
 
 /**
- * Seeds per-subscriber delivery records for an outbox event based on linked subscribers and tier rules.
- * Preserves Member ($20 held) and Pro ($250 staked / Max Alpha) eligibility restrictions.
+ * Seeds per-subscriber delivery records for an outbox event from linked subscribers.
+ * Tier eligibility (`resolveTier`) is verified before every send attempt so temporary tier RPC
+ * failures are tracked via `tierCheckAttemptCount` / `nextTierCheckAt` without consuming
+ * Telegram delivery attempts (`attemptCount`).
  */
 async function seedSubscribersForEvent(
   event: OutboxEventRecord,
@@ -325,7 +373,6 @@ async function seedSubscribersForEvent(
   const subsMap = await deps.loadSubscribers();
   const entries = Object.entries(subsMap || {});
   const subsKey = outboxSubsKey(event.eventId);
-  const proOnly = isProOnlyCall(event.call);
 
   for (const [wallet, chatId] of entries) {
     if (deps.now() + deps.minRequestBudgetMs > deadlineMs) {
@@ -333,19 +380,6 @@ async function seedSubscribersForEvent(
     }
     if (!wallet || !chatId) continue;
 
-    let tier: 'free' | 'member' | 'pro' | 'unknown';
-    try {
-      tier = isAdminWallet(wallet) ? 'pro' : await deps.resolveTier(wallet);
-    } catch {
-      tier = 'unknown';
-    }
-
-    // Free users never receive alerts; Member users never receive Pro-only / Max Alpha alerts.
-    if (tier === 'free') continue;
-    if (tier === 'member' && proOnly) continue;
-
-    // Note: if tier === 'unknown' (temporary RPC failure), we seed the subscriber as 'pending'
-    // and re-verify tier during delivery so an RPC blip never drops an eligible subscriber.
     const nowMs = deps.now();
     const record: OutboxSubscriberDelivery = {
       eventId: event.eventId,
@@ -358,6 +392,9 @@ async function seedSubscribersForEvent(
       lastAttemptAt: null,
       attemptCount: 0,
       nextRetryAt: nowMs,
+      tierCheckAttemptCount: 0,
+      nextTierCheckAt: nowMs,
+      lastTierCheckFailureAt: null,
       status: 'pending',
       lastFailureCategory: null,
     };
@@ -465,10 +502,11 @@ export async function processNotificationOutbox(
       subRecords.sort((a, b) => a.subscriberId.localeCompare(b.subscriberId));
 
       const proOnly = isProOnlyCall(event.call);
+      const eventRef = event.eventRef || buildNotificationEventRef(event.eventId);
       const messageText =
         event.triggerType === 'TP'
-          ? formatTpTriggeredMessage(event.call, event.targetLabel, event.marketCapLabel)
-          : formatSlTriggeredMessage(event.call, event.marketCapLabel);
+          ? formatTpTriggeredMessage(event.call, event.targetLabel, event.marketCapLabel, eventRef)
+          : formatSlTriggeredMessage(event.call, event.marketCapLabel, eventRef);
 
       let budgetExhaustedDuringEvent = false;
 
@@ -498,6 +536,12 @@ export async function processNotificationOutbox(
             continue;
           }
           if (
+            typeof sub.nextTierCheckAt === 'number' &&
+            sub.nextTierCheckAt > nowBeforeSub
+          ) {
+            continue;
+          }
+          if (
             sub.status === 'processing' &&
             typeof sub.leaseExpiresAt === 'number' &&
             sub.leaseExpiresAt > nowBeforeSub
@@ -518,7 +562,6 @@ export async function processNotificationOutbox(
           }
 
           const claimed = JSON.parse(claimedRaw) as OutboxSubscriberDelivery;
-          const wasRetryAttempt = claimed.previousStatus === 'retry' || claimed.attemptCount > 1;
 
           // Verify tier eligibility before sending (protects Pro-only calls and handles previously 'unknown' tiers)
           let tier: 'free' | 'member' | 'pro' | 'unknown';
@@ -531,39 +574,54 @@ export async function processNotificationOutbox(
           }
 
           if (tier === 'free' || (proOnly && tier === 'member')) {
-            // Ineligible tier: remove from required subscriber deliveries without sending
+            // Confirmed ineligible tier: remove from required subscriber deliveries without sending
             await kvHDel(subsKey, claimed.subscriberId);
             continue;
           }
 
           if (tier === 'unknown') {
-            const isPermanent = claimed.attemptCount >= deps.maxAttempts;
-            const nextRetryAt = isPermanent
-              ? 0
-              : deps.now() +
-                computeRetryDelayMs(
-                  claimed.attemptCount,
-                  undefined,
-                  deps.baseRetryDelayMs,
-                  deps.maxRetryDelayMs
-                );
+            // Temporary tier-verification failure:
+            // - Keep subscriber record durable in Redis ('pending' or 'retry' if prior Telegram attempts existed)
+            // - NEVER increment Telegram delivery `attemptCount`
+            // - NEVER transition to `permanently_failed` due to tier RPC unavailability
+            // - Schedule bounded backoff via `tierCheckAttemptCount` and `nextTierCheckAt`
+            const tierCheckAttemptCount = (claimed.tierCheckAttemptCount ?? 0) + 1;
+            const tierFailedAt = deps.now();
+            const nextTierCheckAt =
+              tierFailedAt +
+              computeRetryDelayMs(
+                tierCheckAttemptCount,
+                undefined,
+                deps.baseRetryDelayMs,
+                deps.maxRetryDelayMs
+              );
+            const revertStatus: SubscriberDeliveryStatus =
+              claimed.previousStatus === 'retry' && (claimed.attemptCount || 0) > 0
+                ? 'retry'
+                : 'pending';
             const acked = await kvOutboxCompleteSubscriber(
               subsKey,
               claimed.subscriberId,
               workerToken,
               JSON.stringify({
-                status: isPermanent ? 'permanently_failed' : 'retry',
-                lastAttemptAt: deps.now(),
-                nextRetryAt,
-                lastFailureCategory: 'network' as DeliveryFailureCategory,
+                status: revertStatus,
+                isTierCheckFailure: true,
+                tierCheckAttemptCount,
+                nextTierCheckAt,
+                lastTierCheckFailureAt: tierFailedAt,
               })
             );
             if (acked) {
-              if (isPermanent) result.notificationsPermanentlyFailed++;
-              else result.notificationsRetried++;
+              result.notificationsRetried++;
             }
             continue;
           }
+
+          const deliveryAttemptCount = (claimed.attemptCount || 0) + 1;
+          const wasRetryAttempt =
+            claimed.previousStatus === 'retry' ||
+            deliveryAttemptCount > 1 ||
+            (claimed.tierCheckAttemptCount ?? 0) > 0;
 
           const reqTimeoutMs = Math.max(
             50,
@@ -619,8 +677,10 @@ export async function processNotificationOutbox(
               workerToken,
               JSON.stringify({
                 status: 'delivered' as SubscriberDeliveryStatus,
+                attemptCount: deliveryAttemptCount,
                 lastAttemptAt: completedAt,
                 nextRetryAt: 0,
+                nextTierCheckAt: 0,
                 lastFailureCategory: null,
               })
             );
@@ -643,8 +703,10 @@ export async function processNotificationOutbox(
               workerToken,
               JSON.stringify({
                 status: 'permanently_failed' as SubscriberDeliveryStatus,
+                attemptCount: deliveryAttemptCount,
                 lastAttemptAt: completedAt,
                 nextRetryAt: 0,
+                nextTierCheckAt: 0,
                 lastFailureCategory: 'blocked' as DeliveryFailureCategory,
               })
             );
@@ -661,8 +723,10 @@ export async function processNotificationOutbox(
               workerToken,
               JSON.stringify({
                 status: 'permanently_failed' as SubscriberDeliveryStatus,
+                attemptCount: deliveryAttemptCount,
                 lastAttemptAt: completedAt,
                 nextRetryAt: 0,
+                nextTierCheckAt: 0,
                 lastFailureCategory: 'invalid_recipient' as DeliveryFailureCategory,
               })
             );
@@ -682,12 +746,12 @@ export async function processNotificationOutbox(
                   ? 'network'
                   : 'unknown';
 
-          const exhausted = claimed.attemptCount >= deps.maxAttempts;
+          const exhausted = deliveryAttemptCount >= deps.maxAttempts;
           const nextRetryAt = exhausted
             ? 0
             : completedAt +
               computeRetryDelayMs(
-                claimed.attemptCount,
+                deliveryAttemptCount,
                 sendRes.retryAfter,
                 deps.baseRetryDelayMs,
                 deps.maxRetryDelayMs
@@ -699,8 +763,10 @@ export async function processNotificationOutbox(
             workerToken,
             JSON.stringify({
               status: (exhausted ? 'permanently_failed' : 'retry') as SubscriberDeliveryStatus,
+              attemptCount: deliveryAttemptCount,
               lastAttemptAt: completedAt,
               nextRetryAt,
+              nextTierCheckAt: 0,
               lastFailureCategory: category,
             })
           );

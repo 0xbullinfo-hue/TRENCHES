@@ -223,6 +223,23 @@ Query: `balance` (number, demo path) **or** `wallet` (base58, server-verified pa
 - **Pinned Priority Calls Section:**
   - Dedicated **PINNED PRIORITY CALLS** banner & grid at the top of `/dashboard` for calls pinned by the Admin.
 
+### M23–M25 — 3-Tier StakePoint Architecture, Durable Upstash Redis TP/SL Notification Outbox, & At-Least-Once Delivery Reliability Patch ✅
+- **3-Tier Access System (`src/server/entitlements.ts`, `src/server/stakepoint.ts`, `src/server/price.ts`):**
+  - `Free` ($0): closed calls + P&L ledger.
+  - `Member` ($20 `$GENESIS` held on-chain): open standard calls, Member Telegram group, 5-minute delayed call alerts.
+  - `Pro` ($250 `$GENESIS` staked for 90 days on StakePoint Pool `159`): Max Alpha (`PRO`) calls, real-time Telegram call alerts, automated TP/SL alerts.
+  - Fail-closed price oracle: when `getGenesisPrice()` returns `priceUsd: null` (`source: 'unavailable'`), non-admin wallets resolve to `tier: 'unknown'` (never falsely promoted or evicted by sweeps) and stake confirmation is rejected (`503`).
+- **Durable Upstash Redis TP/SL Notification Outbox (`src/server/notification-outbox.ts`, `src/server/kv.ts`):**
+  - Events stored in `trench:tpsl:outbox:events:v1`, pending event IDs in `trench:tpsl:outbox:pending:v1`, and per-subscriber delivery states in `trench:tpsl:outbox:subs:v1:<eventId>`.
+  - **Delivery Guarantee — At-Least-Once Delivery:**
+    - Deterministic event IDs (`tpsl:<callId>:<triggerType>:<targetId>`) + atomic Lua `HSETNX` creation prevent duplicate events.
+    - Per-subscriber processing leases (`status = 'processing'`, `processingToken`, `leaseExpiresAt`) and token-verified Lua completions prevent concurrent duplicate sends and never re-send after `status = 'delivered'` is recorded in Redis.
+    - **Telegram Acknowledgement Failure Window:** Because Telegram `sendMessage` and Upstash Redis state updates are independent network calls without two-phase commit, if a worker crashes *after* Telegram accepts `sendMessage` but *before* `kvOutboxCompleteSubscriber` writes `status = 'delivered'` to Redis, a subsequent worker may re-send the message once `leaseExpiresAt` expires. Each TP/SL message includes a non-sensitive 8-char reference (`Ref: #<eventRef>`, SHA-256 prefix of `eventId`) to help identify duplicates without exposing Redis keys or PII.
+  - **Separated Tier-Verification Retries vs. Telegram Delivery Retries:**
+    - Temporary tier RPC failures (`resolveTier` returning `'unknown'` or throwing) increment `tierCheckAttemptCount`, record `lastTierCheckFailureAt`, and schedule bounded exponential backoff via `nextTierCheckAt` while keeping `attemptCount` (Telegram delivery attempts) untouched and never transitioning the subscriber to `permanently_failed`.
+  - **Real Redis Lua Integration Suite (`npm run test:integration`):**
+    - `tests/integration/redis-lua-outbox.test.mjs` runs all `src/server/kv.ts` Lua scripts against a real `redis-server` process via a local HTTP-to-RESP TCP bridge using isolated per-test namespaces.
+
 
 ---
 
@@ -236,3 +253,6 @@ Query: `balance` (number, demo path) **or** `wallet` (base58, server-verified pa
 | B-09 | Generic lime green (`#7CFF5E`) instead of Pump.fun mint/pill green (`#55FF99` / `#86EFAC`) | Updated `tailwind.config.ts`, `globals.css`, and all components/SVGs to use the exact Pump.fun brand palette (`#55FF99`, `#86EFAC`, `#0A0E13`, `#11161D`, `#161C24`) |
 | B-10 | Hero image bottom floated above the `FOLLOW ON X` button due to radial bottom mask + `items-center` | Changed hero grid to `lg:items-end` and updated image mask to feather only top/left/right while keeping `black 100%` at the bottom (`object-bottom`), aligning the hero image bottom flush with the `FOLLOW ON X` button |
 | B-11 | Unwanted glow on lines, cards, and buttons | Overhauled theme to Hard Flat Toxic (`#4DFE15` / `#76FF32`, `#1C3D12` 1px flat hairlines, `#0E1A0C` flat badge fills, `boxShadow: none`) and replaced hero image with true 32-bit transparent cutout `trenchlabs-hero-removebg.png` |
+| B-12 | Temporary tier RPC failures in outbox consumed Telegram `attemptCount` and could permanently fail eligible subscribers | Separated tier-verification retries (`tierCheckAttemptCount`, `nextTierCheckAt`, `lastTierCheckFailureAt`) from Telegram delivery attempts (`attemptCount`) in `src/server/kv.ts` and `src/server/notification-outbox.ts` |
+| B-13 | Outbox Lua scripts were only tested against a JS simulator | Added `tests/integration/redis-lua-outbox.test.mjs` (`npm run test:integration`) executing actual `src/server/kv.ts` Lua scripts against a real `redis-server` instance |
+| B-14 | `.github/workflows/tp-sl-monitor.yml` printed raw response JSON (`cat /tmp/monitor_response.json`) | Removed all raw response printing; workflow logs only explicitly approved boolean/numeric summary fields |

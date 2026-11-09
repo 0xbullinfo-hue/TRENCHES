@@ -749,24 +749,35 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
   return result;
 }
 
-export function formatTpTriggeredMessage(r: AlphaRecord, targetLabel: string, currentMcStr: string): string {
+export function formatTpTriggeredMessage(
+  r: AlphaRecord,
+  targetLabel: string,
+  currentMcStr: string,
+  eventRef?: string
+): string {
   const lines = [
-    `🎯 <b>TAKE-PROFIT HIT — ${esc(r.ticker)} (${targetLabel})</b>`,
+    `🎯 <b>TAKE-PROFIT HIT — ${esc(r.ticker)} (${esc(targetLabel)})</b>`,
     `Current MC: <b>${esc(currentMcStr)}</b> (Entry: ${esc(r.entryMarketCap)})`,
     `Chain: ${esc(r.chain)}`,
     r.ca ? `CA: <code>${esc(r.ca)}</code>` : '',
     '<i>Target hit. Protect capital & manage risk.</i>',
+    eventRef ? `Ref: <code>#${esc(eventRef)}</code>` : '',
   ];
   return lines.filter(Boolean).join('\n');
 }
 
-export function formatSlTriggeredMessage(r: AlphaRecord, currentMcStr: string): string {
+export function formatSlTriggeredMessage(
+  r: AlphaRecord,
+  currentMcStr: string,
+  eventRef?: string
+): string {
   const lines = [
     `🛑 <b>STOP-LOSS TRIGGERED — ${esc(r.ticker)}</b>`,
     `Current MC: <b>${esc(currentMcStr)}</b> (Stop-Loss: ${esc(r.stopLoss)})`,
     `Chain: ${esc(r.chain)}`,
     r.ca ? `CA: <code>${esc(r.ca)}</code>` : '',
     '<i>Invalidation condition reached. Position closed.</i>',
+    eventRef ? `Ref: <code>#${esc(eventRef)}</code>` : '',
   ];
   return lines.filter(Boolean).join('\n');
 }
