@@ -4,8 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
-import { PUBLIC_DASHBOARD_ENABLED, SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, LogOut, Send, Wallet } from 'lucide-react';
+import { SOCIAL_LINKS } from '@/lib/config';
+import { ArrowUpRight, LogOut, Wallet } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const { connected, shortAddress, disconnectDemoOrWallet } = useGenesisBalance();
@@ -54,9 +54,9 @@ export const PublicHeader: React.FC = () => {
           </a>
         </nav>
 
-        {/* Right: Primary Soft-Launch CTA (or Dashboard when public access is enabled) & Disconnect */}
+        {/* Right: CONNECT Button (Disabled — LIVE SOON) & Disconnect */}
         <div className="flex items-center gap-2 shrink-0">
-          {connected && PUBLIC_DASHBOARD_ENABLED ? (
+          {connected ? (
             <Link
               href="/dashboard"
               className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
@@ -65,16 +65,16 @@ export const PublicHeader: React.FC = () => {
               <span>DASHBOARD ({shortAddress})</span>
             </Link>
           ) : (
-            <a
-              href={SOCIAL_LINKS.telegram}
-              target="_blank"
-              rel="noreferrer"
-              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="Wallet connection coming soon"
+              className="h-10 sm:h-11 px-3 sm:px-6 rounded-lg bg-surface border border-toxic-border/60 text-muted font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none"
             >
-              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-              <span>JOIN THE SOFT LAUNCH</span>
-              <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-            </a>
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-muted" />
+              <span>CONNECT WALLET · LIVE SOON</span>
+            </button>
           )}
           {connected && (
             <button

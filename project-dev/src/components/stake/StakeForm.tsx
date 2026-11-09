@@ -161,20 +161,19 @@ export function StakeForm({
         </div>
       </div>
 
-      {/* Primary CTA: Stake on StakePoint (Disabled — LIVE SOON) */}
-      <div className="space-y-3" data-stakepoint-url={stakepointUrl}>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          title="Explore StakePoint — Live Soon"
-          className="w-full h-12 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 cursor-not-allowed opacity-75 select-none shadow-sm"
+      {/* Primary CTA: Stake on StakePoint */}
+      <div className="space-y-3">
+        <a
+          href={stakepointUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
         >
-          <span>EXPLORE STAKEPOINT · LIVE SOON</span>
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5] text-toxic" />
-        </button>
-        <p className="text-center font-sans text-2xs text-muted uppercase">
-          Official $GENESIS pool on StakePoint · Live Soon
+          <span>Stake $GENESIS on StakePoint →</span>
+          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+        </a>
+        <p className="text-center font-sans text-2xs text-muted">
+          Opens the official $GENESIS pool on StakePoint. Lock for 90 days to qualify for Pro.
         </p>
       </div>
 
