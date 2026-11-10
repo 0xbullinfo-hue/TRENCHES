@@ -52,17 +52,17 @@ export const HeroTerminal: React.FC = () => {
       className="relative border-b border-toxic-border bg-canvas overflow-hidden"
     >
       <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-14">
-        {/* Main Aligned 12-Column Hero Grid — Bottom-Aligned (items-end) so Hero Image Bottom matches X Button Bottom */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-end">
+        {/* Main Aligned 12-Column Hero Grid — Aligned with Full Height */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
           {/* Left Column (6 cols): Display Headline + Subtext + Buy Button + 2 Social Buttons */}
-          <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
-            <h1 className="font-display uppercase text-white text-4xl sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[86px] leading-[0.94] tracking-[0.015em]">
+          <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
+            <h1 className="font-display uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[84px] leading-[0.96] tracking-[0.015em] break-words">
               <span className="block">BUILDING THE STRONGEST</span>
               <span className="block">COMMUNITY IN THE</span>
               <span className="block text-toxic">TRENCHES</span>
             </h1>
 
-            <p className="font-sans text-base sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
+            <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
               Building, experimenting, and shipping together. A multi-chain lab running live
               experiments — <span className="text-toxic-bright font-bold">$GENESIS</span> is
               the incubator token, <span className="text-white font-bold">TRENCHLABS</span>{' '}
@@ -70,26 +70,26 @@ export const HeroTerminal: React.FC = () => {
               there&apos;s a trench, we&apos;re in it.
             </p>
 
-            {/* Primary Buy Button (Pump.fun) + 2 Community Buttons Underneath (Hard Flat Toxic Theme) */}
+            {/* Primary Buy Button (Pump.fun) + 2 Community Buttons Underneath (Flat Emerald Theme) */}
             <div className="w-full space-y-3 pt-2">
               <a
                 href={BUY_LINKS.pump}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full h-14 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors"
+                className="w-full h-12 sm:h-[52px] px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors"
               >
                 <span>BUY $GENESIS ON PUMP.FUN</span>
                 <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
               </a>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                 <a
                   href={SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-11 sm:h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Send className="w-4 h-4 text-toxic" />
+                  <Send className="w-4 h-4 text-toxic shrink-0" />
                   <span>JOIN THE LAB</span>
                 </a>
 
@@ -97,26 +97,26 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-11 sm:h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <XIcon className="w-4 h-4 text-toxic" />
+                  <XIcon className="w-4 h-4 text-toxic shrink-0" />
                   <span>FOLLOW ON X</span>
                 </a>
               </div>
             </div>
           </div>
 
-          {/* Right Column (6 cols): Transparent Cutout Hero Rat Image with Toxic Beaker Green Glow Effect (Theme Emerald/Mint #34D399) */}
-          <div className="lg:col-span-6 flex items-end justify-center">
-            <div className="relative w-full flex items-end justify-center">
+          {/* Right Column (6 cols): Studio Clean Mascot filling the full hero zone */}
+          <div className="lg:col-span-6 flex items-center justify-center w-full min-w-0">
+            <div className="relative w-full max-w-[320px] xs:max-w-[380px] sm:max-w-[460px] lg:max-w-none flex items-center justify-center">
               <Image
                 src="/images/trenchlabs-hero-removebg.png"
-                alt="TrenchLabs Rat Scientist holding toxic green Erlenmeyer flask"
-                width={480}
-                height={500}
+                alt="TrenchLabs Mascot"
+                width={620}
+                height={620}
                 priority
                 unoptimized
-                className="relative z-10 w-full h-auto max-h-[500px] object-contain object-bottom block select-none"
+                className="relative z-10 w-full h-auto max-h-[320px] xs:max-h-[380px] sm:max-h-[460px] lg:max-h-[580px] xl:max-h-[630px] object-contain block select-none"
               />
             </div>
           </div>
@@ -127,7 +127,7 @@ export const HeroTerminal: React.FC = () => {
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-6 rounded bg-surface border border-toxic-border hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
+              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
             >
               <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 {m.label}

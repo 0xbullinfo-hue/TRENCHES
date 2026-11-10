@@ -18,7 +18,7 @@ export function StakeSuccessToast({
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg bg-surface border border-toxic text-white shadow-lg animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg bg-surface border border-toxic text-white shadow-none animate-in slide-in-from-bottom-5 duration-150">
       <CheckCircle2 className="w-5 h-5 text-toxic shrink-0" />
       <span className="font-sans text-sm font-semibold">{message}</span>
       <button

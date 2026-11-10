@@ -84,7 +84,7 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
       </div>
 
       {/* Table Container */}
-      <div className="rounded-lg bg-neutral-900 border border-neutral-800 overflow-hidden shadow-sm">
+      <div className="rounded-xl bg-surface border border-border-default overflow-hidden shadow-none">
         {entries.length === 0 ? (
           <div className="py-16 text-center space-y-3">
             <p className="font-sans text-sm text-muted">No ledger entries posted yet.</p>
@@ -170,7 +170,7 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
       {/* Delete Confirmation Modal (§1 Acceptance Criteria #7) */}
       {deleteModalEntry && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg max-w-md w-full p-6 space-y-4 shadow-xl">
+          <div className="bg-surface border border-border-default rounded-xl max-w-md w-full p-6 space-y-4 shadow-none">
             <h3 className="font-sans text-lg font-black uppercase text-white tracking-tight">
               Delete Ledger Entry for ${deleteModalEntry.ticker}?
             </h3>

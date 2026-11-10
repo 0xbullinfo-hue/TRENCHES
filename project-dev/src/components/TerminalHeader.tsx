@@ -25,9 +25,9 @@ export const TerminalHeader: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border overflow-hidden">
-      <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark (Matches Landing Page) */}
+    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border">
+      <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
+        {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link
             href="/"
@@ -35,14 +35,14 @@ export const TerminalHeader: React.FC = () => {
             title="Go to TrenchLabs Landing Page"
           >
             <HexCubeLogo />
-            <span className="font-sans font-extrabold tracking-tight text-lg sm:text-2xl text-white">
+            <span className="font-sans font-extrabold tracking-tight text-base sm:text-2xl text-white">
               Trench<span className="text-toxic">Labs</span>HQ
             </span>
           </Link>
         </div>
 
-        {/* Center: LEDGER Link, JOIN THE LAB Button & Search Calls Input */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Center: LEDGER Link, JOIN THE LAB Button & Search Calls Input (Hidden or condensed on mobile) */}
+        <div className="hidden md:flex items-center gap-2 sm:gap-3 flex-1 max-w-xl mx-4">
           <a
             href="#ledger-embed"
             className="h-9 sm:h-10 px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
@@ -61,7 +61,7 @@ export const TerminalHeader: React.FC = () => {
             <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
           </a>
 
-          <div className="relative w-36 sm:w-56 md:w-72 lg:w-80">
+          <div className="relative flex-1 min-w-[160px]">
             <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
@@ -73,8 +73,8 @@ export const TerminalHeader: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Wallet & Disconnect (SOL wallet balance completely removed) */}
-        <div className="flex items-center gap-2.5">
+        {/* Right: Wallet & Disconnect */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {connected ? (
             <div className="flex items-center gap-1.5 shrink-0">
               <button
@@ -104,13 +104,33 @@ export const TerminalHeader: React.FC = () => {
             <button
               type="button"
               onClick={connectWallet}
-              className="h-9 sm:h-11 px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-pointer shrink-0"
+              className="h-9 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               <span>CONNECT</span>
             </button>
           )}
         </div>
+      </div>
+
+      {/* Mobile Sub-bar: Search Input on Mobile */}
+      <div className="md:hidden px-3 py-2 border-t border-toxic-border/40 bg-surface-primary flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search calls (token, CA, chain)..."
+            className="w-full h-8 pl-8 pr-3 rounded-lg bg-surface border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none font-sans"
+          />
+        </div>
+        <a
+          href="#ledger-embed"
+          className="h-8 px-2.5 rounded-lg bg-surface border border-border-default text-white font-sans text-[11px] font-bold uppercase inline-flex items-center shrink-0"
+        >
+          Ledger
+        </a>
       </div>
     </header>
   );

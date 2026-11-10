@@ -92,7 +92,7 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
           onStakeSuccess={handleStakeSuccess}
         />
       ) : (
-        <div className="rounded-lg bg-surface border border-toxic p-6 sm:p-8 shadow-sm text-center space-y-6">
+        <div className="rounded-xl bg-surface border border-toxic p-6 sm:p-8 shadow-none text-center space-y-6">
           <div className="space-y-2">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-toxic/15 text-toxic border border-toxic/30">
               PRO MEMBERSHIP ACTIVE

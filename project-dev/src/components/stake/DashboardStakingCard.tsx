@@ -84,7 +84,7 @@ export function TelegramVerificationCard({
               type="button"
               onClick={start}
               disabled={!connected || !publicKeyBase58 || status === 'working' || status === 'waiting'}
-              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-default"
+              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none disabled:opacity-60 disabled:cursor-default"
             >
               <Send className="w-3.5 h-3.5 fill-current" />
               <span>
@@ -428,7 +428,7 @@ export function DashboardStakingCard({
               href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+              className="h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
             >
               <span>STAKE ADDITIONAL</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -537,7 +537,7 @@ export function DashboardStakingCard({
             href={stakePointPoolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
           >
             <span>STAKE $GENESIS</span>
             <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />

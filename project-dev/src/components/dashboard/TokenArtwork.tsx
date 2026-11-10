@@ -359,7 +359,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
           <img
             src={effectiveLogoUrl}
             alt={ticker ? `${ticker} logo` : 'Token logo'}
-            className="w-full h-full object-cover rounded-lg shadow-sm"
+            className="w-full h-full object-cover rounded-lg shadow-none"
             onError={() => setImgError(true)}
             loading="lazy"
           />

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   ExternalLink,
-  Gift,
   CheckCircle2,
   Clock,
   Sparkles,
@@ -41,6 +40,21 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     campaign.userSubmission || null
   );
   const [copiedWallet, setCopiedWallet] = useState(false);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  // Client-side timer initialization
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentTime(Date.now());
+    }, 0);
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Keep wallet input in sync if userWallet connects later
   React.useEffect(() => {
@@ -48,7 +62,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     if (userWallet) {
       queueMicrotask(() => {
         if (active) {
-          setWalletInput((prev) => prev || userWallet);
+          setWalletInput((prev) => (!prev ? userWallet : prev));
         }
       });
     }
@@ -56,6 +70,21 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       active = false;
     };
   }, [userWallet]);
+
+  // Keep submission state synced if props refresh
+  React.useEffect(() => {
+    let active = true;
+    if (campaign.userSubmission) {
+      queueMicrotask(() => {
+        if (active) {
+          setUserSubmission(campaign.userSubmission || null);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [campaign.userSubmission]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,15 +96,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     const cleanRetweet = retweetLinkInput.trim();
 
     if (!cleanWallet) {
-      setErrorMsg('Please enter your Solana wallet address to receive the airdrop.');
+      setErrorMsg('Please enter your Solana wallet address for the airdrop.');
       return;
     }
     if (!cleanHandle) {
-      setErrorMsg('Please enter your X / Twitter handle.');
+      setErrorMsg('Please enter your @X (Twitter) handle.');
       return;
     }
     if (!cleanRetweet) {
-      setErrorMsg('Please provide the URL of your retweet or quote tweet.');
+      setErrorMsg('Please paste the URL link to your retweet/quote.');
       return;
     }
 
@@ -115,12 +144,12 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   };
 
   const isCompleted = campaign.status === 'COMPLETED';
-  const isPaused = campaign.status === 'PAUSED';
 
-  // Format remaining raid duration if expiresAt is provided
+  // Format remaining raid duration safely
   const durationBadge = React.useMemo(() => {
     if (!campaign.expiresAt) return null;
-    const diffMs = new Date(campaign.expiresAt).getTime() - Date.now();
+    if (currentTime === null) return null;
+    const diffMs = new Date(campaign.expiresAt).getTime() - currentTime;
     if (diffMs <= 0) return 'EXPIRED';
     const totalMinutes = Math.floor(diffMs / 60000);
     const hours = Math.floor(totalMinutes / 60);
@@ -134,24 +163,25 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       return `${hours}h ${mins}m left`;
     }
     return `${mins}m left`;
-  }, [campaign.expiresAt]);
+  }, [campaign.expiresAt, currentTime]);
 
   return (
     <article
       tabIndex={0}
       aria-label={`X Raid Campaign: ${campaign.title}`}
-      className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-200 p-4 border border-purple-500 hover:border-purple-400 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
+      className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-150 p-4 sm:p-5 border border-raid-border hover:border-raid-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-raid-primary shadow-none"
     >
       <div>
-        {/* Top Row: Serial Tag + Priority Pin + Admin Pin Button */}
-        <div className="flex items-center justify-between gap-2 pb-3 border-b border-line">
+        {/* Top Row: Category Tag + Priority Pin + Admin Pin Button */}
+        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border-default">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="px-2 py-0.5 rounded font-mono text-xs font-black bg-purple-500/15 border border-purple-500/80 text-purple-300">
-              ⚡ X RAID
+            <span className="inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-raid-text">
+              <Sparkles className="w-3 h-3 text-raid-primary" />
+              <span>SOCIAL RAID</span>
             </span>
 
             {campaign.pinned && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-600 text-white font-mono text-[10px] font-black uppercase shadow-sm">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-raid-strong text-white font-mono text-[10px] font-black uppercase">
                 <Pin className="w-2.5 h-2.5" />
                 <span>PRIORITY PIN</span>
               </span>
@@ -166,10 +196,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   e.stopPropagation();
                   onTogglePin?.(campaign.id, !campaign.pinned);
                 }}
-                className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer transition-colors ${
+                className={`px-2 py-0.5 rounded-md border text-[10px] font-mono cursor-pointer transition-colors ${
                   campaign.pinned
-                    ? 'bg-purple-600 text-white border-purple-500 font-black shadow-sm'
-                    : 'bg-surface-card hover:bg-surface-3 border-line text-muted hover:text-white'
+                    ? 'bg-raid-strong text-white border-raid-border font-black'
+                    : 'bg-surface-card hover:bg-surface-3 border-border-default text-muted hover:text-white'
                 }`}
                 title={campaign.pinned ? 'Unpin Priority Raid' : 'Pin Raid as Priority'}
               >
@@ -182,20 +212,20 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         {/* Campaign Title & Duration Badge Row */}
         <div className="pt-3 pb-2 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="font-sans text-base font-extrabold text-white group-hover:text-purple-300 transition-colors leading-tight">
+            <h3 className="font-sans text-base font-extrabold text-white group-hover:text-raid-text transition-colors leading-tight">
               {campaign.title}
             </h3>
 
             {durationBadge && (
               <span
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded font-mono text-xs font-bold uppercase tracking-wider shrink-0 ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-bold uppercase tracking-wider shrink-0 ${
                   durationBadge === 'EXPIRED'
-                    ? 'bg-neutral-800 text-muted border border-neutral-700'
-                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/40 shadow-sm'
+                    ? 'bg-surface-card text-muted border border-border-default'
+                    : 'bg-raid-bg text-raid-text border border-raid-border'
                 }`}
                 title={campaign.expiresAt ? `Raid closes at ${new Date(campaign.expiresAt).toLocaleString()}` : undefined}
               >
-                <Clock className="w-3 h-3 text-purple-400" />
+                <Clock className="w-3 h-3 text-raid-primary" />
                 <span>{durationBadge}</span>
               </span>
             )}
@@ -211,7 +241,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               {campaign.targetActions.map((action, i) => (
                 <span
                   key={i}
-                  className="px-2 py-0.5 rounded bg-surface-card border border-line text-[10px] font-mono font-semibold text-muted"
+                  className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default text-[10px] font-mono font-semibold text-muted"
                 >
                   ✓ {action}
                 </span>
@@ -219,30 +249,30 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             </div>
           )}
 
-          {/* Primary Action Button: Open X Tweet */}
+          {/* Primary Action Button: Open X Tweet (Standard 40px height) */}
           <a
             href={campaign.tweetUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-between w-full px-3 py-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/40 text-purple-300 font-sans text-xs font-bold transition-colors mt-2"
+            className="inline-flex items-center justify-between w-full h-10 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-raid-border text-white font-sans text-xs font-bold transition-colors mt-2"
           >
             <span className="flex items-center gap-2">
-              <Twitter className="w-4 h-4 text-purple-400" />
+              <Twitter className="w-4 h-4 text-raid-primary" />
               <span>Open Target Post on X (Twitter)</span>
             </span>
-            <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
+            <ExternalLink className="w-3.5 h-3.5 text-raid-primary" />
           </a>
         </div>
 
         {/* Reward Callout Banner */}
-        <div className="my-2 p-2.5 rounded-lg bg-surface-card border border-purple-500/30 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+        <div className="my-2 p-3 rounded-lg bg-surface-card border border-raid-border/40 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-raid-primary shrink-0" />
             <div>
               <div className="font-sans text-[10px] font-bold text-muted uppercase tracking-wider">
                 AIRDROP REWARD PER USER
               </div>
-              <div className="font-sans text-sm font-black text-purple-300">
+              <div className="font-sans text-sm font-black text-raid-primary">
                 {campaign.rewardAmount}
               </div>
             </div>
@@ -261,20 +291,20 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       </div>
 
       {/* Bottom Area: Submission Form or Submission Status */}
-      <div className="pt-3 border-t border-line mt-2">
+      <div className="pt-3 border-t border-border-default mt-2">
         {userSubmission ? (
           /* User has already submitted */
-          <div className="rounded-lg bg-surface-card border border-line p-3 space-y-2">
+          <div className="rounded-lg bg-surface-card border border-border-default p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 font-sans">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-toxic font-sans">
+                <CheckCircle2 className="w-4 h-4 text-toxic" />
                 <span>Raid Proof Submitted</span>
               </span>
               <span
-                className={`px-2 py-0.5 rounded font-mono text-[10px] font-extrabold uppercase ${
+                className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-extrabold uppercase ${
                   userSubmission.status === 'AIRDROPPED'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                    ? 'bg-toxic-bg text-toxic border border-toxic-border'
+                    : 'bg-amber/15 text-amber border border-amber/40'
                 }`}
               >
                 {userSubmission.status === 'AIRDROPPED' ? '✓ AIRDROPPED' : 'PENDING AIRDROP'}
@@ -288,7 +318,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   href={`https://x.com/${userSubmission.xHandle.replace(/^@/, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-purple-300 hover:underline font-bold"
+                  className="text-raid-primary hover:underline font-bold"
                 >
                   {userSubmission.xHandle}
                 </a>
@@ -298,7 +328,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 <button
                   type="button"
                   onClick={() => handleCopyWallet(userSubmission.walletAddress)}
-                  className="inline-flex items-center gap-1 text-white hover:text-purple-300 font-mono"
+                  className="inline-flex items-center gap-1 text-white hover:text-raid-primary font-mono"
                   title="Click to copy wallet"
                 >
                   <span>
@@ -306,20 +336,20 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     {userSubmission.walletAddress.slice(-4)}
                   </span>
                   {copiedWallet ? (
-                    <Check className="w-3 h-3 text-emerald-400" />
+                    <Check className="w-3 h-3 text-toxic" />
                   ) : (
                     <Copy className="w-3 h-3 text-muted" />
                   )}
                 </button>
               </div>
               {userSubmission.airdropTx && (
-                <div className="flex items-center justify-between gap-1 pt-1 border-t border-neutral-800">
-                  <span className="text-emerald-400">Tx Hash:</span>
+                <div className="flex items-center justify-between gap-1 pt-1 border-t border-border-default">
+                  <span className="text-toxic">Tx Hash:</span>
                   <a
                     href={`https://solscan.io/tx/${userSubmission.airdropTx}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-purple-300 hover:underline inline-flex items-center gap-0.5"
+                    className="text-raid-primary hover:underline inline-flex items-center gap-0.5"
                   >
                     <span>View Tx ↗</span>
                   </a>
@@ -334,20 +364,20 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         ) : (
           /* Submission Form */
           <form onSubmit={handleSubmit} className="space-y-2">
-            <div className="font-sans text-[11px] font-extrabold uppercase text-purple-300 flex items-center justify-between">
+            <div className="font-sans text-[11px] font-extrabold uppercase text-raid-primary flex items-center justify-between">
               <span>Submit Proof for Airdrop</span>
               <span className="text-muted font-normal text-[10px]">Open to Free &amp; Pro</span>
             </div>
 
             {errorMsg && (
-              <div className="p-2 rounded bg-danger/10 border border-danger/30 text-danger text-[11px] font-sans flex items-start gap-1.5">
+              <div className="p-2 rounded-md bg-danger/10 border border-danger/30 text-danger text-[11px] font-sans flex items-start gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
             {successMsg && (
-              <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-sans flex items-start gap-1.5">
+              <div className="p-2 rounded-md bg-toxic-bg border border-toxic-border text-toxic text-[11px] font-sans flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{successMsg}</span>
               </div>
@@ -360,7 +390,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   value={walletInput}
                   onChange={(e) => setWalletInput(e.target.value)}
                   placeholder="Your Solana wallet address..."
-                  className="w-full h-8 px-2.5 rounded bg-surface-card border border-line focus:border-purple-400 font-mono text-[11px] text-white placeholder:text-neutral-500 focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                 />
               </div>
 
@@ -370,14 +400,14 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   value={xHandleInput}
                   onChange={(e) => setXHandleInput(e.target.value)}
                   placeholder="Your @XHandle..."
-                  className="h-8 px-2.5 rounded bg-surface-card border border-line focus:border-purple-400 font-mono text-[11px] text-white placeholder:text-neutral-500 focus:outline-none"
+                  className="h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                 />
                 <input
                   type="text"
                   value={retweetLinkInput}
                   onChange={(e) => setRetweetLinkInput(e.target.value)}
                   placeholder="Retweet Link URL..."
-                  className="h-8 px-2.5 rounded bg-surface-card border border-line focus:border-purple-400 font-mono text-[11px] text-white placeholder:text-neutral-500 focus:outline-none"
+                  className="h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                 />
               </div>
             </div>
@@ -385,7 +415,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full h-8 px-3 rounded bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-sm disabled:opacity-50"
+              className="w-full h-10 px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{submitting ? 'Submitting...' : 'Claim Raid Airdrop'}</span>

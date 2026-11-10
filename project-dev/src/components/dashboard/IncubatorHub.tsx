@@ -695,23 +695,25 @@ export const IncubatorHub: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAdminDeskTab('CALLS')}
-                className={`px-3 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                className={`px-3 py-1 rounded-md font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                   adminDeskTab === 'CALLS'
-                    ? 'bg-pump text-canvas shadow-sm'
+                    ? 'bg-alpha-strong text-white border border-alpha-border'
                     : 'text-muted hover:text-white'
                 }`}
               >
-                Alpha Calls Desk
+                <Target className="w-3.5 h-3.5" />
+                <span>Alpha Calls Desk</span>
               </button>
               <button
                 type="button"
                 onClick={() => setAdminDeskTab('CAMPAIGNS')}
                 className={`px-3 py-1 rounded-md font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                   adminDeskTab === 'CAMPAIGNS'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-purple-400 hover:text-purple-300'
+                    ? 'bg-raid-strong text-white border border-raid-border'
+                    : 'text-muted hover:text-white'
                 }`}
               >
+                <Sparkles className="w-3.5 h-3.5" />
                 <span>⚡ X Raid Campaigns &amp; Airdrops</span>
               </button>
             </div>
@@ -1043,8 +1045,8 @@ export const IncubatorHub: React.FC = () => {
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded bg-pump text-canvas font-mono text-xs font-black uppercase inline-flex items-center gap-1 shadow-sm">
-                <Pin className="w-3.5 h-3.5" />
+              <span className="px-3 py-1 rounded-md bg-surface-card border border-border-default text-white font-mono text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none">
+                <Pin className="w-3.5 h-3.5 text-toxic" />
                 <span>PINNED PRIORITY ({isUnlocked ? totalPinned : pinnedCampaigns.length})</span>
               </span>
               <span className="font-sans text-xs text-muted">
@@ -1072,22 +1074,22 @@ export const IncubatorHub: React.FC = () => {
 
       {/* MAIN FEED TABS: CALLS OR RAIDS (Available to all signed-in users) */}
       <div className="space-y-4 pt-2">
-        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line">
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default">
           <button
             type="button"
             onClick={() => setFeedTab('CALLS')}
             className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               feedTab === 'CALLS'
-                ? 'bg-pump text-canvas shadow-md'
+                ? 'bg-alpha-strong text-white border border-alpha-border'
                 : 'text-muted hover:text-white hover:bg-surface-card'
             }`}
           >
-            <Target className="w-4 h-4" />
+            <Target className="w-4 h-4 text-alpha-primary" />
             <span>ALPHA TRADE CALLS</span>
             <span
-              className={`px-2 py-0.5 rounded font-mono text-xs ${
+              className={`px-2 py-0.5 rounded-md font-mono text-xs ${
                 feedTab === 'CALLS'
-                  ? 'bg-canvas text-pump font-black'
+                  ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
                   : 'bg-surface-card text-muted'
               }`}
             >
@@ -1100,17 +1102,17 @@ export const IncubatorHub: React.FC = () => {
             onClick={() => setFeedTab('RAIDS')}
             className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               feedTab === 'RAIDS'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-purple-400 hover:text-purple-300 hover:bg-surface-card'
+                ? 'bg-raid-strong text-white border border-raid-border'
+                : 'text-muted hover:text-white hover:bg-surface-card'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 text-raid-primary" />
             <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
             <span
-              className={`px-2 py-0.5 rounded font-mono text-xs ${
+              className={`px-2 py-0.5 rounded-md font-mono text-xs ${
                 feedTab === 'RAIDS'
-                  ? 'bg-white text-purple-700 font-black'
-                  : 'bg-surface-card text-purple-400'
+                  ? 'bg-raid-bg text-raid-text border border-raid-border'
+                  : 'bg-surface-card text-muted'
               }`}
             >
               {campaigns.length}
@@ -1489,10 +1491,10 @@ export const IncubatorHub: React.FC = () => {
                                   toggleMaxAlpha(token.id, !token.isMaxAlpha);
                                   showToast(`${token.isMaxAlpha ? 'Removed Max Alpha from' : 'Marked as Max Alpha:'} ${token.ticker}`);
                                 }}
-                                className={`p-1.5 rounded border cursor-pointer transition-colors ${
+                                className={`p-1.5 rounded-md border cursor-pointer transition-colors ${
                                   token.isMaxAlpha
-                                    ? 'bg-orange-500 text-black border-orange-500 shadow-sm'
-                                    : 'bg-surface-card text-muted hover:text-orange-400 border-line'
+                                    ? 'bg-alpha-strong text-white border-alpha-border'
+                                    : 'bg-surface-card text-muted hover:text-alpha-primary border-border-default'
                                 }`}
                                 title="Toggle Max Alpha"
                               >
@@ -1675,7 +1677,7 @@ export const IncubatorHub: React.FC = () => {
             )}
 
             {/* Telegram Access Card (§7.3) */}
-            <div className="rounded-lg bg-surface border border-toxic-border/60 p-5 shadow-sm space-y-3">
+            <div className="rounded-xl bg-surface border border-border-default p-5 space-y-3">
               <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
                 TELEGRAM ACCESS
               </div>

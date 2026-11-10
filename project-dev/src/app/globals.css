@@ -4,24 +4,64 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Brand */
+  --brand-primary: #34D399;
+  --brand-hover: #6EE7B7;
+
+  /* Backgrounds */
+  --background-main: #0A0E13;
+  --surface-primary: #11161D;
+  --surface-elevated: #161C24;
+  --surface-secondary: #1C232D;
+
+  /* Text */
+  --text-primary: #F8FAFC;
+  --text-secondary: #848E9C;
+
+  /* Borders */
+  --border-default: #252D38;
+
+  /* Category colours: Alpha Calls */
+  --alpha-primary: #A78BFA;
+  --alpha-strong: #8B5CF6;
+  --alpha-background: #1E1533;
+  --alpha-border: #5B3A91;
+  --alpha-text: #EDE9FE;
+
+  /* Category colours: Social Raids */
+  --raid-primary: #FB923C;
+  --raid-strong: #F97316;
+  --raid-background: #2B1B10;
+  --raid-border: #9A4D1C;
+  --raid-text: #FFEDD5;
+
+  /* Status */
+  --status-danger: #F6465D;
+}
+
 @layer base {
   html {
     color-scheme: dark;
     scroll-behavior: smooth;
     scroll-padding-top: 80px;
+    overflow-x: hidden;
+    max-width: 100%;
   }
   body {
     @apply bg-canvas text-ink font-sans antialiased;
+    overflow-x: hidden;
+    max-width: 100%;
     font-feature-settings: 'cv11', 'ss01', 'tnum';
     font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: #065F46;
-    color: #eaecef;
+    color: #F8FAFC;
   }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #0A0E13; }
-  ::-webkit-scrollbar-thumb { background: #163A2D; }
+  ::-webkit-scrollbar-thumb { background: #252D38; }
   ::-webkit-scrollbar-thumb:hover { background: #34D399; }
 }
 
@@ -35,58 +75,78 @@
 }
 
 @layer components {
-  /* Card shell: flat 1px hairline (#163A2D), 2px radius, zero glow, zero shadow */
+  /* Standard card: flat 1px border (#252D38), 12px radius, zero glow, zero shadow */
   .card {
-    @apply bg-surface border border-toxic-border rounded-sm transition-colors duration-150 shadow-none;
+    @apply bg-surface border border-border-default rounded-xl transition-colors duration-150 shadow-none;
   }
   .card-hover:hover {
-    @apply border-toxic;
+    @apply border-brand;
   }
   .card-head {
-    @apply flex h-9 items-center justify-between gap-2 border-b border-toxic-border px-3 font-mono text-2xs uppercase tracking-[0.08em] text-muted;
+    @apply flex h-10 items-center justify-between gap-2 border-b border-border-default px-4 font-mono text-2xs uppercase tracking-[0.08em] text-muted;
   }
   .label {
     @apply font-mono text-2xs uppercase tracking-[0.08em] text-dim;
   }
 
+  /* Standard button hierarchy */
   .btn {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-sm px-4 font-sans text-xs font-bold uppercase tracking-[0.04em] transition-colors duration-150 shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 font-sans text-xs font-bold uppercase tracking-wide transition-colors duration-150 shadow-none focus:outline-none focus-visible:ring-1 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50 select-none;
   }
   .btn-sm {
-    @apply h-7 px-2.5 text-2xs;
+    @apply h-8 px-3 text-2xs gap-1.5;
+  }
+  .btn-cta {
+    @apply h-11 sm:h-12 px-6 text-sm font-extrabold tracking-wider;
+  }
+  .btn-lg {
+    @apply h-[52px] px-8 text-base font-extrabold tracking-wider;
   }
   .btn-primary {
-    @apply bg-toxic text-canvas hover:bg-toxic-bright shadow-none;
+    @apply bg-brand text-canvas hover:bg-brand-hover shadow-none;
   }
   .btn-secondary {
-    @apply border border-toxic-border bg-surface-card text-ink hover:border-toxic hover:bg-surface-3 shadow-none;
+    @apply border border-border-default bg-surface-card text-ink hover:border-brand hover:bg-surface-3 shadow-none;
   }
   .btn-ghost {
     @apply text-muted hover:bg-surface-card hover:text-ink shadow-none;
   }
+  .btn-danger {
+    @apply bg-danger text-white hover:opacity-90 shadow-none;
+  }
 
+  /* Standard category badges */
+  .badge-alpha {
+    @apply inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 text-xs font-semibold text-alpha-text tracking-wide;
+  }
+  .badge-raid {
+    @apply inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 text-xs font-semibold text-raid-text tracking-wide;
+  }
+
+  /* Chip filter */
   .chip {
-    @apply inline-flex h-6 items-center rounded-sm border border-toxic-border bg-surface-card px-2 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
+    @apply inline-flex h-7 items-center rounded-md border border-border-default bg-surface-card px-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
   }
   .chip-active {
-    @apply border-toxic bg-toxic-bg text-toxic hover:text-toxic-bright shadow-none;
+    @apply border-brand bg-toxic-bg text-brand hover:text-brand-hover shadow-none;
   }
 
+  /* Form inputs */
   .input {
-    @apply h-8 w-full rounded-sm border border-toxic-border bg-surface-card px-2.5 font-mono text-xs text-ink placeholder:text-dim focus:border-toxic focus:outline-none shadow-none;
+    @apply h-10 w-full rounded-lg border border-border-default bg-surface-card px-3 font-mono text-xs text-ink placeholder:text-dim focus:border-brand focus:outline-none shadow-none;
   }
 }
 
-/* ── Solana wallet-adapter overrides (flat 1px theme, zero glow, 2px radius) ─── */
+/* ── Solana wallet-adapter overrides (flat 1px theme, zero glow, 8px button radius) ─── */
 .wallet-adapter-button {
-  height: 32px !important;
-  padding: 0 12px !important;
-  border-radius: 2px !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
   font-family: var(--font-mono), monospace !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   letter-spacing: 0.04em;
-  line-height: 32px !important;
+  line-height: 36px !important;
   background: #34D399 !important;
   color: #0A0E13 !important;
   box-shadow: none !important;
@@ -106,19 +166,19 @@
 }
 .wallet-adapter-dropdown-list {
   background: #11161D !important;
-  border: 1px solid #163A2D;
-  border-radius: 8px !important;
+  border: 1px solid #252D38 !important;
+  border-radius: 12px !important;
   box-shadow: none !important;
-  padding: 4px !important;
+  padding: 6px !important;
   font-family: var(--font-mono), monospace !important;
 }
 .wallet-adapter-dropdown-list-item {
-  height: 32px !important;
+  height: 34px !important;
   padding: 0 10px !important;
   border-radius: 6px !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #EAECEF !important;
+  color: #F8FAFC !important;
 }
 .wallet-adapter-dropdown-list-item:not([disabled]):hover {
   background: #161C24 !important;
@@ -126,19 +186,19 @@
 }
 .wallet-adapter-modal-wrapper {
   background: #11161D !important;
-  border: 1px solid #163A2D;
-  border-radius: 12px !important;
+  border: 1px solid #252D38 !important;
+  border-radius: 16px !important;
   box-shadow: none !important;
   font-family: var(--font-inter), sans-serif !important;
 }
 .wallet-adapter-modal-title {
   font-size: 18px !important;
   font-weight: 600 !important;
-  color: #EAECEF !important;
+  color: #F8FAFC !important;
 }
 .wallet-adapter-modal-list .wallet-adapter-button {
   background: transparent !important;
-  color: #EAECEF !important;
+  color: #F8FAFC !important;
   box-shadow: none !important;
   height: 44px !important;
   line-height: 44px !important;
@@ -150,7 +210,7 @@
   color: #34D399 !important;
 }
 .wallet-adapter-modal-list li:not(:first-of-type) {
-  margin-top: 2px !important;
+  margin-top: 4px !important;
 }
 .wallet-adapter-modal-overlay {
   background: #0A0E13 !important;
@@ -158,6 +218,7 @@
 }
 .wallet-adapter-modal-button-close {
   background: #161C24 !important;
+  border-radius: 6px !important;
 }
 .wallet-adapter-modal-list-more {
   color: #848E9C !important;

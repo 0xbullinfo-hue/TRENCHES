@@ -3,22 +3,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
-  Plus,
-  Trash2,
+  AlertCircle,
+  Check,
   CheckCircle2,
   Clock,
-  Sparkles,
-  ExternalLink,
   Copy,
-  Check,
-  RefreshCw,
+  ExternalLink,
   Gift,
   Pencil,
   Pin,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 interface AdminCampaignManagerProps {
-  onToast: (msg: string) => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
   getAdminHeaders?: (method: string, path: string, body: string) => Promise<Record<string, string>>;
 }
 
@@ -28,82 +29,74 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 }) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<CampaignSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
-  // Create Campaign Form State
+  // Form states (Create / Edit)
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formTweetUrl, setFormTweetUrl] = useState('');
-  const [formRewardAmount, setFormRewardAmount] = useState('50,000 $GENESIS');
-  const [formTotalPool, setFormTotalPool] = useState('1,000,000 $GENESIS');
-  const [formDurationHours, setFormDurationHours] = useState('48');
-  const [formDescription, setFormDescription] = useState(
-    'Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.'
-  );
-  const [formPinned, setFormPinned] = useState(true);
+  const [formRewardAmount, setFormRewardAmount] = useState('');
+  const [formTotalPool, setFormTotalPool] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formDurationHours, setFormDurationHours] = useState('24');
+  const [formPinned, setFormPinned] = useState(false);
   const [submittingCampaign, setSubmittingCampaign] = useState(false);
 
-  // Submissions management
+  // Quick Action feedback
   const [updatingSubId, setUpdatingSubId] = useState<string | null>(null);
   const [copiedWallets, setCopiedWallets] = useState(false);
   const [copiedSingleWallet, setCopiedSingleWallet] = useState<string | null>(null);
 
-  const fetchCampaigns = useCallback(async () => {
-    try {
-      const res = await fetch('/api/campaigns');
-      const json = await res.json();
-      if (res.ok && json.ok && Array.isArray(json.campaigns)) {
-        setCampaigns(json.campaigns);
-        setSelectedCampaignId((prev) => prev || (json.campaigns.length > 0 ? json.campaigns[0].id : null));
-      }
-    } catch (err) {
-      console.error('[AdminCampaignManager] fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchSubmissions = useCallback(
-    async (campId: string) => {
-      setLoadingSubmissions(true);
-      try {
-        let headers: Record<string, string> = {};
-        if (getAdminHeaders) {
-          try {
-            headers = await getAdminHeaders('GET', `/api/admin/campaigns/${campId}/submissions`, '');
-          } catch {
-            // fallback
-          }
+  const getHeaders = useCallback(
+    async (method: string, path: string, body = ''): Promise<Record<string, string>> => {
+      if (getAdminHeaders) {
+        try {
+          return await getAdminHeaders(method, path, body);
+        } catch {
+          return {};
         }
-        const res = await fetch(`/api/admin/campaigns/${campId}/submissions`, { headers });
-        const json = await res.json();
-        if (res.ok && json.ok && Array.isArray(json.submissions)) {
-          setSubmissions(json.submissions);
-        }
-      } catch (err) {
-        console.error('[AdminCampaignManager] fetch submissions error:', err);
-      } finally {
-        setLoadingSubmissions(false);
       }
+      return {};
     },
     [getAdminHeaders]
   );
+
+  const fetchCampaigns = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/campaigns');
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.campaigns)) {
+        setCampaigns(data.campaigns);
+        if (data.campaigns.length > 0 && !selectedCampaignId) {
+          setSelectedCampaignId(data.campaigns[0].id);
+        }
+      }
+    } catch {
+      onToast('Failed to load campaigns', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [onToast, selectedCampaignId]);
 
   useEffect(() => {
     let active = true;
     const run = async () => {
       try {
+        setLoading(true);
         const res = await fetch('/api/campaigns');
-        const json = await res.json();
-        if (active && res.ok && json.ok && Array.isArray(json.campaigns)) {
-          setCampaigns(json.campaigns);
-          setSelectedCampaignId((prev) => prev || (json.campaigns.length > 0 ? json.campaigns[0].id : null));
+        const data = await res.json();
+        if (active && data.ok && Array.isArray(data.campaigns)) {
+          setCampaigns(data.campaigns);
+          if (data.campaigns.length > 0) {
+            setSelectedCampaignId((prev) => prev || data.campaigns[0].id);
+          }
         }
-      } catch (err) {
-        console.error('[AdminCampaignManager] fetch error:', err);
+      } catch {
+        if (active) onToast('Failed to load campaigns', 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -112,56 +105,116 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     return () => {
       active = false;
     };
-  }, []);
+  }, [onToast]);
+
+  const fetchSubmissions = useCallback(
+    async (campaignId: string) => {
+      setLoadingSubmissions(true);
+      try {
+        const headers = await getHeaders('GET', `/api/admin/campaigns/${campaignId}/submissions`, '');
+        const res = await fetch(`/api/admin/campaigns/${campaignId}/submissions`, {
+          headers,
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.submissions)) {
+          setSubmissions(data.submissions);
+        } else {
+          setSubmissions([]);
+        }
+      } catch {
+        onToast('Failed to load campaign submissions', 'error');
+        setSubmissions([]);
+      } finally {
+        setLoadingSubmissions(false);
+      }
+    },
+    [getHeaders, onToast]
+  );
 
   useEffect(() => {
     if (selectedCampaignId) {
-      let active = true;
-      const run = async () => {
-        setLoadingSubmissions(true);
-        try {
-          let headers: Record<string, string> = {};
-          if (getAdminHeaders) {
-            try {
-              headers = await getAdminHeaders('GET', `/api/admin/campaigns/${selectedCampaignId}/submissions`, '');
-            } catch {
-              // fallback
-            }
-          }
-          const res = await fetch(`/api/admin/campaigns/${selectedCampaignId}/submissions`, { headers });
-          const json = await res.json();
-          if (active && res.ok && json.ok && Array.isArray(json.submissions)) {
-            setSubmissions(json.submissions);
-          }
-        } catch (err) {
-          console.error('[AdminCampaignManager] fetch submissions error:', err);
-        } finally {
-          if (active) setLoadingSubmissions(false);
-        }
-      };
-      run();
-      return () => {
-        active = false;
-      };
+      const timer = setTimeout(() => {
+        void fetchSubmissions(selectedCampaignId);
+      }, 0);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => {
+        setSubmissions([]);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [selectedCampaignId, getAdminHeaders]);
+  }, [selectedCampaignId, fetchSubmissions]);
+
+  const handleCreateCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formTitle.trim() || !formTweetUrl.trim() || !formRewardAmount.trim()) {
+      onToast('Please fill in all required fields (*)', 'error');
+      return;
+    }
+
+    setSubmittingCampaign(true);
+    try {
+      const isEditing = Boolean(editingCampaign);
+      const url = isEditing
+        ? `/api/admin/campaigns/${editingCampaign?.id}`
+        : '/api/admin/campaigns';
+      const method = isEditing ? 'PATCH' : 'POST';
+      const bodyStr = JSON.stringify({
+        title: formTitle.trim(),
+        tweetUrl: formTweetUrl.trim(),
+        rewardAmount: formRewardAmount.trim(),
+        totalPool: formTotalPool.trim() || undefined,
+        description: formDescription.trim(),
+        durationHours: Number(formDurationHours) || 24,
+        pinned: formPinned,
+      });
+
+      const authHeaders = await getHeaders(method, url, bodyStr);
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: bodyStr,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to save campaign');
+      }
+
+      onToast(isEditing ? 'Campaign updated successfully!' : 'Campaign published live!');
+      setShowCreateForm(false);
+      setEditingCampaign(null);
+      setFormTitle('');
+      setFormTweetUrl('');
+      setFormRewardAmount('');
+      setFormTotalPool('');
+      setFormDescription('');
+      setFormDurationHours('24');
+      setFormPinned(false);
+      fetchCampaigns();
+      if (data.campaign?.id) {
+        setSelectedCampaignId(data.campaign.id);
+      }
+    } catch (err) {
+      onToast((err as Error).message, 'error');
+    } finally {
+      setSubmittingCampaign(false);
+    }
+  };
 
   const handleStartEditCampaign = (camp: Campaign) => {
     setEditingCampaign(camp);
     setFormTitle(camp.title);
     setFormTweetUrl(camp.tweetUrl);
     setFormRewardAmount(camp.rewardAmount);
-    setFormTotalPool(camp.totalPool || '1,000,000 $GENESIS');
-    if (camp.expiresAt) {
-      const remainingHours = Math.max(1, Math.round((new Date(camp.expiresAt).getTime() - Date.now()) / (3600 * 1000)));
-      setFormDurationHours(String(remainingHours));
-    } else {
-      setFormDurationHours('48');
-    }
+    setFormTotalPool(camp.totalPool || '');
     setFormDescription(camp.description);
-    setFormPinned(camp.pinned ?? true);
+    setFormPinned(Boolean(camp.pinned));
     setShowCreateForm(true);
-    window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
   const handleCancelCampaignForm = () => {
@@ -169,228 +222,137 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     setEditingCampaign(null);
     setFormTitle('');
     setFormTweetUrl('');
-    setFormRewardAmount('50,000 $GENESIS');
-    setFormTotalPool('1,000,000 $GENESIS');
-    setFormDurationHours('48');
-    setFormDescription(
-      'Like, Retweet, and Quote tweet with your bullish take on TrenchLabs. Submit your proof below to receive the verified airdrop.'
-    );
-    setFormPinned(true);
+    setFormRewardAmount('');
+    setFormTotalPool('');
+    setFormDescription('');
+    setFormDurationHours('24');
+    setFormPinned(false);
   };
 
-  const handleCreateCampaign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formTitle.trim() || !formTweetUrl.trim() || !formRewardAmount.trim()) {
-      alert('Please fill out all required fields (Title, Tweet URL, Reward Amount).');
-      return;
-    }
-
-    setSubmittingCampaign(true);
+  const handleTogglePin = async (camp: Campaign) => {
     try {
-      const hoursNum = parseFloat(formDurationHours);
-      const expiresAt = !isNaN(hoursNum) && hoursNum > 0
-        ? new Date(Date.now() + hoursNum * 3600 * 1000).toISOString()
-        : undefined;
-
-      const payload = {
-        title: formTitle.trim(),
-        description: formDescription.trim(),
-        tweetUrl: formTweetUrl.trim(),
-        rewardAmount: formRewardAmount.trim(),
-        totalPool: formTotalPool.trim() || undefined,
-        targetActions: ['Like', 'Retweet', 'Quote with $GENESIS'],
-        pinned: formPinned,
-        expiresAt,
-      };
-
-      const bodyStr = JSON.stringify(payload);
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const method = editingCampaign ? 'PATCH' : 'POST';
-      const endpoint = editingCampaign ? `/api/campaigns/${editingCampaign.id}` : '/api/campaigns';
-
-      if (getAdminHeaders) {
-        try {
-          headers = await getAdminHeaders(method, endpoint, bodyStr);
-        } catch {
-          // fallback to default headers
-        }
-      }
-
-      const res = await fetch(endpoint, {
-        method,
-        headers,
+      const url = `/api/admin/campaigns/${camp.id}`;
+      const bodyStr = JSON.stringify({ pinned: !camp.pinned });
+      const authHeaders = await getHeaders('PATCH', url, bodyStr);
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: bodyStr,
       });
-
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `Failed to ${editingCampaign ? 'update' : 'create'} campaign`);
+      const data = await res.json();
+      if (data.ok) {
+        onToast(camp.pinned ? 'Raid unpinned' : 'Raid pinned as priority!');
+        fetchCampaigns();
       }
-
-      onToast(`Campaign "${payload.title}" ${editingCampaign ? 'updated' : 'created'} successfully!`);
-      handleCancelCampaignForm();
-      fetchCampaigns();
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setSubmittingCampaign(false);
+    } catch {
+      onToast('Failed to toggle pin state', 'error');
     }
   };
 
   const handleToggleStatus = async (camp: Campaign) => {
     const nextStatus = camp.status === 'ACTIVE' ? 'COMPLETED' : 'ACTIVE';
     try {
+      const url = `/api/admin/campaigns/${camp.id}`;
       const bodyStr = JSON.stringify({ status: nextStatus });
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (getAdminHeaders) {
-        try {
-          headers = await getAdminHeaders('PATCH', `/api/campaigns/${camp.id}`, bodyStr);
-        } catch {
-          // fallback
-        }
-      }
-
-      const res = await fetch(`/api/campaigns/${camp.id}`, {
+      const authHeaders = await getHeaders('PATCH', url, bodyStr);
+      const res = await fetch(url, {
         method: 'PATCH',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: bodyStr,
       });
-
-      if (res.ok) {
-        onToast(`Campaign status updated to ${nextStatus}`);
+      const data = await res.json();
+      if (data.ok) {
+        onToast(`Campaign status changed to ${nextStatus}`);
         fetchCampaigns();
       }
-    } catch (err) {
-      alert((err as Error).message);
-    }
-  };
-
-  const handleTogglePin = async (camp: Campaign) => {
-    const nextPinned = !camp.pinned;
-    try {
-      const bodyStr = JSON.stringify({ pinned: nextPinned });
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (getAdminHeaders) {
-        try {
-          headers = await getAdminHeaders('PATCH', `/api/campaigns/${camp.id}`, bodyStr);
-        } catch {
-          // fallback
-        }
-      }
-
-      const res = await fetch(`/api/campaigns/${camp.id}`, {
-        method: 'PATCH',
-        headers,
-        body: bodyStr,
-      });
-
-      if (res.ok) {
-        onToast(`${nextPinned ? 'Pinned' : 'Unpinned'} campaign "${camp.title}"`);
-        fetchCampaigns();
-      }
-    } catch (err) {
-      alert((err as Error).message);
+    } catch {
+      onToast('Failed to update campaign status', 'error');
     }
   };
 
   const handleDeleteCampaign = async (camp: Campaign) => {
-    if (!window.confirm(`Are you sure you want to delete campaign "${camp.title}"?`)) {
+    if (!confirm(`Are you sure you want to permanently delete campaign "${camp.title}"?`)) {
       return;
     }
-
     try {
-      let headers: Record<string, string> = {};
-      if (getAdminHeaders) {
-        try {
-          headers = await getAdminHeaders('DELETE', `/api/campaigns/${camp.id}`, '');
-        } catch {
-          // fallback
-        }
-      }
-
-      const res = await fetch(`/api/campaigns/${camp.id}`, {
+      const url = `/api/admin/campaigns/${camp.id}`;
+      const authHeaders = await getHeaders('DELETE', url, '');
+      const res = await fetch(url, {
         method: 'DELETE',
-        headers,
+        headers: authHeaders,
       });
-
-      if (res.ok) {
-        onToast(`Campaign "${camp.title}" deleted.`);
+      const data = await res.json();
+      if (data.ok) {
+        onToast('Campaign deleted successfully');
+        if (selectedCampaignId === camp.id) {
+          setSelectedCampaignId(null);
+        }
         fetchCampaigns();
       }
-    } catch (err) {
-      alert((err as Error).message);
+    } catch {
+      onToast('Failed to delete campaign', 'error');
     }
   };
 
   const handleMarkAirdropped = async (sub: CampaignSubmission) => {
-    const nextStatus = sub.status === 'AIRDROPPED' ? 'PENDING' : 'AIRDROPPED';
-    let txHash: string | undefined = undefined;
-    if (nextStatus === 'AIRDROPPED') {
-      const inputTx = window.prompt(
-        `Mark airdrop sent to ${sub.walletAddress.slice(0, 6)}...${sub.walletAddress.slice(-4)} (${sub.xHandle})\nOptional: enter Solana transaction hash/signature:`,
-        ''
-      );
-      if (inputTx === null) return; // cancelled
-      if (inputTx.trim()) txHash = inputTx.trim();
-    }
-
     setUpdatingSubId(sub.id);
+    const nextStatus = sub.status === 'AIRDROPPED' ? 'PENDING' : 'AIRDROPPED';
     try {
-      const bodyStr = JSON.stringify({ status: nextStatus, airdropTx: txHash });
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (getAdminHeaders) {
-        try {
-          headers = await getAdminHeaders(
-            'PATCH',
-            `/api/admin/campaigns/submissions/${sub.id}`,
-            bodyStr
-          );
-        } catch {
-          // fallback
-        }
-      }
-
-      const res = await fetch(`/api/admin/campaigns/submissions/${sub.id}`, {
+      const url = `/api/admin/campaigns/submissions/${sub.id}`;
+      const bodyStr = JSON.stringify({
+        status: nextStatus,
+        airdropTx: nextStatus === 'AIRDROPPED' ? 'MANUAL_DISPATCH' : undefined,
+      });
+      const authHeaders = await getHeaders('PATCH', url, bodyStr);
+      const res = await fetch(url, {
         method: 'PATCH',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: bodyStr,
       });
-
-      if (res.ok) {
-        onToast(
-          nextStatus === 'AIRDROPPED'
-            ? `Marked ${sub.xHandle} as Airdropped ✓`
-            : `Reverted ${sub.xHandle} to Pending`
-        );
+      const data = await res.json();
+      if (data.ok) {
+        onToast(nextStatus === 'AIRDROPPED' ? 'Marked as Airdropped ✓' : 'Reverted to Pending');
         if (selectedCampaignId) {
           fetchSubmissions(selectedCampaignId);
-          fetchCampaigns();
         }
       }
-    } catch (err) {
-      alert((err as Error).message);
+    } catch {
+      onToast('Failed to update submission status', 'error');
     } finally {
       setUpdatingSubId(null);
     }
   };
 
   const handleCopyPendingWallets = () => {
-    const pendingSubs = submissions.filter((s) => s.status === 'PENDING');
-    if (pendingSubs.length === 0) {
-      alert('No pending submissions to copy.');
+    const pendingWallets = submissions
+      .filter((s) => s.status === 'PENDING')
+      .map((s) => s.walletAddress.trim())
+      .filter(Boolean);
+
+    if (pendingWallets.length === 0) {
+      onToast('No pending wallets to copy', 'error');
       return;
     }
-    const walletList = pendingSubs.map((s) => s.walletAddress).join('\n');
-    navigator.clipboard.writeText(walletList);
+
+    navigator.clipboard.writeText(pendingWallets.join('\n'));
     setCopiedWallets(true);
-    onToast(`Copied ${pendingSubs.length} pending Solana wallet addresses!`);
     setTimeout(() => setCopiedWallets(false), 2000);
+    onToast(`Copied ${pendingWallets.length} pending wallets to clipboard!`);
   };
 
-  const handleCopySingleWallet = (wallet: string) => {
-    navigator.clipboard.writeText(wallet);
-    setCopiedSingleWallet(wallet);
-    setTimeout(() => setCopiedSingleWallet(null), 1500);
+  const handleCopySingleWallet = (addr: string) => {
+    navigator.clipboard.writeText(addr);
+    setCopiedSingleWallet(addr);
+    setTimeout(() => setCopiedSingleWallet(null), 1800);
   };
 
   const currentCamp = campaigns.find((c) => c.id === selectedCampaignId);
@@ -400,10 +362,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
   return (
     <div className="p-5 space-y-6">
       {/* Top action row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-line">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-default">
         <div>
-          <div className="font-sans text-xs font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
-            <Gift className="w-4 h-4 text-purple-400" />
+          <div className="font-sans text-xs font-black uppercase tracking-widest text-raid-primary flex items-center gap-2">
+            <Gift className="w-4 h-4 text-raid-primary" />
             <span>X RAID CAMPAIGNS &amp; AIRDROP REWARD DESK</span>
           </div>
           <p className="font-sans text-xs text-muted mt-0.5">
@@ -415,7 +377,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           <button
             type="button"
             onClick={fetchCampaigns}
-            className="px-3 py-1.5 rounded bg-surface border border-line hover:border-purple-500 font-sans text-xs text-muted hover:text-white cursor-pointer inline-flex items-center gap-1.5"
+            className="h-9 px-3.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary font-sans text-xs text-muted hover:text-white cursor-pointer inline-flex items-center gap-1.5 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -424,7 +386,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           <button
             type="button"
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-3.5 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-black uppercase cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-sm"
+            className="h-9 px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-none"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>{showCreateForm ? 'Hide Form' : '+ Post New Raid Campaign'}</span>
@@ -436,15 +398,15 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
       {showCreateForm && (
         <form
           onSubmit={handleCreateCampaign}
-          className="p-4 rounded-xl bg-surface-card border border-purple-500/40 space-y-3"
+          className="p-5 rounded-xl bg-surface-card border border-raid-border/60 space-y-4 shadow-none"
         >
           <div className="font-sans text-xs font-extrabold text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <Sparkles className="w-3.5 h-3.5 text-raid-primary" />
               <span>{editingCampaign ? `EDIT RAID: ${editingCampaign.title}` : 'CREATE NEW X RAID CAMPAIGN'}</span>
             </div>
             {editingCampaign && (
-              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-raid-bg text-raid-text border border-raid-border text-[10px] font-mono">
                 EDITING MODE
               </span>
             )}
@@ -460,7 +422,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
                 placeholder="e.g. X RAID: TrenchLabs v2 & $GENESIS Ecosystem Announcement"
-                className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-sans text-xs text-white placeholder:text-neutral-500 focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none"
                 required
               />
             </div>
@@ -474,7 +436,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTweetUrl}
                 onChange={(e) => setFormTweetUrl(e.target.value)}
                 placeholder="https://x.com/TrenchLabsHQ/status/..."
-                className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-white placeholder:text-neutral-500 focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                 required
               />
             </div>
@@ -490,7 +452,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formRewardAmount}
                 onChange={(e) => setFormRewardAmount(e.target.value)}
                 placeholder="e.g. 50,000 $GENESIS or 0.25 SOL"
-                className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-purple-300 focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none"
                 required
               />
             </div>
@@ -504,19 +466,19 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTotalPool}
                 onChange={(e) => setFormTotalPool(e.target.value)}
                 placeholder="e.g. 1,000,000 $GENESIS Pool"
-                className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-white focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white focus:outline-none"
               />
             </div>
 
             <div className="md:col-span-4 space-y-1">
               <label className="block font-sans text-[11px] font-bold text-muted uppercase flex items-center justify-between">
                 <span>Raid Duration</span>
-                <span className="text-purple-300 font-mono text-[10px]">{formDurationHours}h window</span>
+                <span className="text-raid-primary font-mono text-[10px]">{formDurationHours}h window</span>
               </label>
               <select
                 value={formDurationHours}
                 onChange={(e) => setFormDurationHours(e.target.value)}
-                className="w-full h-9 px-2.5 rounded bg-surface border border-line focus:border-purple-400 font-mono text-xs text-purple-300 focus:outline-none cursor-pointer"
+                className="w-full h-10 px-2.5 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none cursor-pointer"
               >
                 <option value="12">12 Hours</option>
                 <option value="24">24 Hours (1 Day)</option>
@@ -537,19 +499,19 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="Like, Retweet, and Quote tweet with your bullish take on TrenchLabs..."
-              className="w-full h-9 px-3 rounded bg-surface border border-line focus:border-purple-400 font-sans text-xs text-white placeholder:text-neutral-500 focus:outline-none"
+              className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none"
             />
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-            <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-purple-300 cursor-pointer select-none">
+            <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-raid-text cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={formPinned}
                 onChange={(e) => setFormPinned(e.target.checked)}
-                className="accent-purple-500 w-4 h-4 cursor-pointer"
+                className="accent-raid-strong w-4 h-4 cursor-pointer"
               />
-              <Pin className="w-3.5 h-3.5 text-purple-400" />
+              <Pin className="w-3.5 h-3.5 text-raid-primary" />
               <span>Pin Priority Raid (Show in Pinned Priority section)</span>
             </label>
 
@@ -557,14 +519,14 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               <button
                 type="button"
                 onClick={handleCancelCampaignForm}
-                className="px-4 py-2 rounded bg-surface border border-line text-xs font-sans text-muted hover:text-white cursor-pointer"
+                className="h-10 px-4 rounded-lg bg-surface border border-border-default text-xs font-sans text-muted hover:text-white cursor-pointer transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submittingCampaign}
-                className="px-5 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-black uppercase cursor-pointer transition-colors shadow-sm disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="h-10 px-5 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase cursor-pointer transition-colors shadow-none disabled:opacity-50 inline-flex items-center gap-1.5"
               >
                 {submittingCampaign ? (
                   <span>Processing...</span>
@@ -596,17 +558,17 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               onClick={() => setSelectedCampaignId(camp.id)}
               className={`px-3.5 py-2 rounded-lg border font-sans text-xs font-bold shrink-0 transition-colors cursor-pointer inline-flex items-center gap-2 ${
                 selectedCampaignId === camp.id
-                  ? 'bg-purple-500/20 border-purple-500 text-white'
-                  : 'bg-surface-card border-line text-muted hover:text-white'
+                  ? 'bg-raid-bg border-raid-border text-raid-text'
+                  : 'bg-surface-card border-border-default text-muted hover:text-white'
               }`}
             >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  camp.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-neutral-500'
+                  camp.status === 'ACTIVE' ? 'bg-toxic' : 'bg-idle'
                 }`}
               />
               <span className="truncate max-w-[200px]">{camp.title}</span>
-              <span className="px-1.5 py-0.2 rounded bg-surface border border-line font-mono text-[10px] text-purple-300">
+              <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default font-mono text-[10px] text-raid-primary">
                 {camp.submissionsCount || 0}
               </span>
             </button>
@@ -614,12 +576,12 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
         </div>
 
         {currentCamp && (
-          <div className="rounded-xl bg-surface border border-purple-500/30 overflow-hidden shadow-sm">
+          <div className="rounded-xl bg-surface border border-raid-border/40 overflow-hidden shadow-none">
             {/* Header: Selected Campaign Summary */}
-            <div className="p-4 bg-surface-card border-b border-line flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="p-4 bg-surface-card border-b border-border-default flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-black text-purple-400">
+                  <span className="font-mono text-xs font-black text-raid-primary">
                     {currentCamp.rewardAmount}
                   </span>
                   <span className="text-muted">•</span>
@@ -627,7 +589,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                     href={currentCamp.tweetUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono text-xs text-muted hover:text-purple-300 inline-flex items-center gap-1"
+                    className="font-mono text-xs text-muted hover:text-raid-primary inline-flex items-center gap-1 transition-colors"
                   >
                     <span>View Tweet</span>
                     <ExternalLink className="w-3 h-3" />
@@ -642,10 +604,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => handleTogglePin(currentCamp)}
-                  className={`px-3 py-1.5 rounded font-mono text-xs font-bold border cursor-pointer transition-colors inline-flex items-center gap-1 ${
+                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border cursor-pointer transition-colors inline-flex items-center gap-1 ${
                     currentCamp.pinned
-                      ? 'bg-purple-600 text-white border-purple-500 font-black shadow-sm'
-                      : 'bg-surface border-line text-muted hover:text-white'
+                      ? 'bg-raid-strong text-white border-raid-border font-black'
+                      : 'bg-surface border-border-default text-muted hover:text-white'
                   }`}
                   title={currentCamp.pinned ? 'Unpin Priority Raid' : 'Pin Raid as Priority'}
                 >
@@ -656,7 +618,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => handleStartEditCampaign(currentCamp)}
-                  className="px-3 py-1.5 rounded font-mono text-xs font-bold border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 cursor-pointer transition-colors inline-flex items-center gap-1"
+                  className="h-9 px-3 rounded-lg font-mono text-xs font-bold border border-raid-border/60 bg-raid-bg text-raid-text hover:bg-surface-3 cursor-pointer transition-colors inline-flex items-center gap-1"
                   title="Edit Raid Campaign"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -666,10 +628,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => handleToggleStatus(currentCamp)}
-                  className={`px-3 py-1.5 rounded font-mono text-xs font-bold border cursor-pointer transition-colors ${
+                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border cursor-pointer transition-colors ${
                     currentCamp.status === 'ACTIVE'
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                      : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                      ? 'bg-toxic-bg text-toxic border-toxic-border'
+                      : 'bg-surface text-muted border-border-default'
                   }`}
                 >
                   {currentCamp.status === 'ACTIVE' ? 'STATUS: ACTIVE' : 'STATUS: COMPLETED'}
@@ -678,7 +640,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => handleDeleteCampaign(currentCamp)}
-                  className="p-1.5 rounded bg-surface border border-line hover:border-danger text-muted hover:text-danger cursor-pointer"
+                  className="h-9 w-9 rounded-lg bg-surface border border-border-default hover:border-danger text-muted hover:text-danger flex items-center justify-center cursor-pointer transition-colors"
                   title="Delete Campaign"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -687,15 +649,15 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             {/* Campaign Metrics & Batch Action Bar */}
-            <div className="p-4 bg-surface flex flex-wrap items-center justify-between gap-3 border-b border-line">
+            <div className="p-4 bg-surface flex flex-wrap items-center justify-between gap-3 border-b border-border-default">
               <div className="flex items-center gap-4 text-xs font-mono">
                 <div className="text-white">
-                  Total Submissions: <strong className="text-purple-300">{submissions.length}</strong>
+                  Total Submissions: <strong className="text-raid-primary">{submissions.length}</strong>
                 </div>
-                <div className="text-amber-400">
+                <div className="text-amber">
                   Pending Airdrop: <strong>{pendingCount}</strong>
                 </div>
-                <div className="text-emerald-400">
+                <div className="text-toxic">
                   Airdropped: <strong>{airdroppedCount}</strong>
                 </div>
               </div>
@@ -703,13 +665,13 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               <button
                 type="button"
                 onClick={handleCopyPendingWallets}
-                className="px-3.5 py-1.5 rounded bg-surface-card hover:bg-surface-3 border border-purple-500/50 text-purple-300 font-sans text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="h-9 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-raid-border/60 text-raid-text font-sans text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 title="Copies list of all pending Solana wallet addresses separated by newline"
               >
                 {copiedWallets ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <Check className="w-3.5 h-3.5 text-toxic" />
                 ) : (
-                  <Copy className="w-3.5 h-3.5 text-purple-400" />
+                  <Copy className="w-3.5 h-3.5 text-raid-primary" />
                 )}
                 <span>
                   {copiedWallets ? 'Copied to Clipboard!' : `Copy All Unpaid Wallets (${pendingCount})`}
@@ -730,7 +692,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-line bg-surface-card font-sans text-[11px] text-muted uppercase">
+                    <tr className="border-b border-border-default bg-surface-card font-sans text-[11px] text-muted uppercase">
                       <th className="py-3 px-4">User Wallet</th>
                       <th className="py-3 px-4">X Handle</th>
                       <th className="py-3 px-4">Retweet Proof</th>
@@ -739,7 +701,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                       <th className="py-3 px-4 text-right">Airdrop Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line font-mono text-xs">
+                  <tbody className="divide-y divide-border-default font-mono text-xs">
                     {submissions.map((sub) => (
                       <tr key={sub.id} className="hover:bg-surface-card transition-colors">
                         <td className="py-3 px-4">
@@ -750,11 +712,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => handleCopySingleWallet(sub.walletAddress)}
-                              className="p-1 rounded hover:bg-surface-card text-muted hover:text-purple-300"
+                              className="p-1 rounded-md hover:bg-surface-card text-muted hover:text-raid-primary transition-colors"
                               title="Copy wallet"
                             >
                               {copiedSingleWallet === sub.walletAddress ? (
-                                <Check className="w-3 h-3 text-emerald-400" />
+                                <Check className="w-3 h-3 text-toxic" />
                               ) : (
                                 <Copy className="w-3 h-3" />
                               )}
@@ -763,7 +725,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                               href={`https://solscan.io/account/${sub.walletAddress}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-muted hover:text-purple-300"
+                              className="text-muted hover:text-raid-primary transition-colors"
                               title="View on Solscan"
                             >
                               <ExternalLink className="w-3 h-3" />
@@ -776,7 +738,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                             href={`https://x.com/${sub.xHandle.replace(/^@/, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-purple-300 hover:underline font-bold inline-flex items-center gap-1"
+                            className="text-raid-primary hover:underline font-bold inline-flex items-center gap-1"
                           >
                             <span>{sub.xHandle}</span>
                             <ExternalLink className="w-2.5 h-2.5 text-muted" />
@@ -788,7 +750,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                             href={sub.xRetweetLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-line text-white hover:text-purple-300 inline-flex items-center gap-1"
+                            className="h-8 px-2.5 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default text-white hover:text-raid-primary inline-flex items-center gap-1 transition-colors"
                           >
                             <span>Inspect Retweet ↗</span>
                           </a>
@@ -800,10 +762,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase inline-flex items-center gap-1 ${
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase inline-flex items-center gap-1 ${
                               sub.status === 'AIRDROPPED'
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                                : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                                ? 'bg-toxic-bg text-toxic border border-toxic-border'
+                                : 'bg-amber/15 text-amber border border-amber/40'
                             }`}
                           >
                             {sub.status === 'AIRDROPPED' ? (
@@ -825,10 +787,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                             type="button"
                             disabled={updatingSubId === sub.id}
                             onClick={() => handleMarkAirdropped(sub)}
-                            className={`px-2.5 py-1 rounded text-[11px] font-sans font-bold cursor-pointer transition-colors ${
+                            className={`h-8 px-3 rounded-md text-[11px] font-sans font-bold cursor-pointer transition-colors ${
                               sub.status === 'AIRDROPPED'
-                                ? 'bg-surface-card hover:bg-neutral-800 text-muted hover:text-white border border-line'
-                                : 'bg-purple-600 hover:bg-purple-500 text-white shadow-sm'
+                                ? 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border border-border-default'
+                                : 'bg-raid-strong hover:bg-raid-primary text-white shadow-none'
                             }`}
                           >
                             {sub.status === 'AIRDROPPED' ? 'Revert to Pending' : 'Mark Airdropped ✓'}

@@ -228,7 +228,7 @@ export function TelegramConnectButton({
         >
           Connect Telegram — verify wallet first
         </button>
-        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-xs text-white bg-[#141b24] border border-toxic-border/40 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-xs text-white bg-surface-card border border-border-default rounded-md shadow-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
           Verify your wallet to unlock Telegram access.
         </span>
       </div>
@@ -243,12 +243,12 @@ export function TelegramConnectButton({
       <button
         onClick={handleConnectClick}
         disabled={opening || polling}
-        className={`rounded-md font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toxic ${
+        className={`rounded-lg font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
           compact ? 'h-9 px-4 text-xs' : 'h-11 px-6 text-sm'
         } ${
           opening || polling
-            ? 'bg-[#1b2533] border border-toxic-border text-toxic cursor-wait'
-            : 'bg-toxic hover:bg-toxic-bright text-canvas font-black cursor-pointer shadow-sm'
+            ? 'bg-[#1b2533] border border-border-default text-toxic cursor-wait'
+            : 'bg-toxic hover:bg-toxic-bright text-canvas font-black cursor-pointer shadow-none'
         }`}
       >
         {opening ? (

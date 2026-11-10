@@ -6,8 +6,8 @@ import { ArrowUp } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="w-full bg-canvas border-t border-line font-sans text-xs text-muted mt-auto">
-      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 h-14 flex flex-col sm:flex-row items-center justify-between gap-2">
+    <footer className="w-full bg-canvas border-t border-border-default font-sans text-xs text-muted mt-auto">
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 min-h-[56px] py-4 sm:py-0 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-pump" />
           <span className="text-white font-semibold">

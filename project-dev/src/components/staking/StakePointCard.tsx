@@ -179,7 +179,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href={pool.poolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
           >
             <span>Stake on StakePoint →</span>
           </a>

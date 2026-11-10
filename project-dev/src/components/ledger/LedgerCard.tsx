@@ -54,7 +54,7 @@ function getXShareUrl(entry: LedgerCardData): string {
 
 export function LedgerCard({ entry }: { entry: LedgerCardData }) {
   return (
-    <div className="relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-all duration-150 bg-surface-card border border-toxic-border hover:border-toxic shadow-sm min-h-[350px]">
+    <div className="relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-all duration-150 bg-surface-card border border-border-default hover:border-toxic shadow-none min-h-[350px]">
       <div className="space-y-4">
         {/* Top Header: Ticker, Chain Pill, and Closed / Verification Badge */}
         <div className="flex items-center justify-between gap-2">

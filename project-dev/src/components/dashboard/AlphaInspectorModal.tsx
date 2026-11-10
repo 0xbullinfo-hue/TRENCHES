@@ -119,20 +119,20 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
       aria-labelledby="modal-token-name"
     >
       <div
-        className={`w-full max-w-2xl rounded bg-surface overflow-hidden transition-all ${
+        className={`w-full max-w-2xl rounded-xl bg-surface overflow-hidden transition-all shadow-none ${
           token.isMaxAlpha
-            ? 'border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.35)] ring-1 ring-orange-500/50'
-            : 'border border-line shadow-none'
+            ? 'border-2 border-alpha-strong'
+            : 'border border-border-default'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
-        <div className="px-5 py-3.5 bg-surface-card border-b border-line flex items-center justify-between gap-2">
+        <div className="px-5 py-3.5 bg-surface-card border-b border-border-default flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 font-sans text-xs font-bold">
             {token.isMaxAlpha && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-orange-500 text-black font-extrabold uppercase shadow-sm">
-                <Flame className="w-3 h-3 fill-black" />
-                <span>MAX ALPHA</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-alpha-bg text-alpha-text border border-alpha-border font-extrabold uppercase">
+                <Flame className="w-3 h-3 text-alpha-primary" />
+                <span>ALPHA CALL · PRO MAX</span>
               </span>
             )}
             {token.pinned && (
@@ -345,12 +345,12 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleMaxAlpha(token.id, !token.isMaxAlpha)}
-                  className={`px-3 py-1.5 rounded border font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg border font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     token.isMaxAlpha
-                      ? 'bg-orange-500 text-black border-orange-500 shadow-sm'
-                      : 'bg-surface text-white border-line hover:border-orange-400 hover:text-orange-400'
+                      ? 'bg-alpha-strong text-white border-alpha-border'
+                      : 'bg-surface text-white border-border-default hover:border-alpha-primary hover:text-alpha-primary'
                   }`}
-                  title="Toggle Max Alpha (Orange highlight)"
+                  title="Toggle Max Alpha (Purple highlight)"
                 >
                   <Flame className="w-3.5 h-3.5" />
                   <span>{token.isMaxAlpha ? 'Max Alpha Active' : 'Mark as Max Alpha'}</span>

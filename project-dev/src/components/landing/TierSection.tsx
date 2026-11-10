@@ -94,8 +94,8 @@ export async function TierSection() {
           </p>
         </div>
 
-        {/* Unified Single Card (Same outer structure as the Join the Lab card) */}
-        <div className="rounded-2xl bg-surface border border-toxic-border p-6 sm:p-8 lg:p-10">
+        {/* Unified Single Card */}
+        <div className="rounded-2xl bg-surface border border-border-default p-6 sm:p-8 lg:p-10 shadow-none">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column (4 cols): $GENESIS Intro Text & Buy Actions */}
             <div className="lg:col-span-4 space-y-6 lg:pr-2">
@@ -126,7 +126,7 @@ export async function TierSection() {
                   href={BUY_LINKS.pump}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-12 px-6 rounded-xl bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="w-full h-12 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
                 >
                   <span>BUY $GENESIS ON PUMP.FUN</span>
                   <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -136,7 +136,7 @@ export async function TierSection() {
                   href={communityUrl || SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-11 px-6 rounded-xl bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="w-full h-11 px-6 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
                 >
                   <Send className="w-4 h-4 text-toxic" />
                   <span>JOIN TELEGRAM</span>

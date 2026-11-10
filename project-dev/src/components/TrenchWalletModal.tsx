@@ -113,7 +113,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-md rounded-xl bg-surface border border-toxic-border overflow-hidden shadow-2xl shadow-toxic/10 animate-in zoom-in-95 duration-150"
+        className="w-full max-w-md rounded-xl bg-surface border border-border-default overflow-hidden shadow-none animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

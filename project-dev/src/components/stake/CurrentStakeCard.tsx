@@ -29,7 +29,7 @@ export function CurrentStakeCard({
     : null;
 
   return (
-    <div className="rounded-lg bg-surface border border-toxic-border/60 p-6 shadow-sm space-y-2">
+    <div className="rounded-xl bg-surface border border-border-default p-6 shadow-none space-y-2">
       <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
         CURRENT STAKE
       </div>

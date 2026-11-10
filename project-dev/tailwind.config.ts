@@ -5,28 +5,39 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: "#0A0E13", // Flat opaque obsidian background
+        // Base canvas & surfaces
+        canvas: "#0A0E13", // Main background
         surface: {
-          DEFAULT: "#11161D", // Flat opaque card background (NO opacity)
-          card: "#161C24",
+          DEFAULT: "#11161D", // Primary card surface
+          card: "#161C24",    // Elevated surface
+          elevated: "#161C24",
           2: "#161C24",
-          3: "#1C232D",
+          3: "#1C232D",       // Secondary surface
+          secondary: "#1C232D",
         },
-        "surface-card": "#161C24", // Flat nested card background
+        "surface-card": "#161C24",
+        "surface-elevated": "#161C24",
+        "surface-secondary": "#1C232D",
+
+        // Primary brand emerald
+        brand: {
+          DEFAULT: "#34D399",
+          primary: "#34D399",
+          hover: "#6EE7B7",
+        },
         toxic: {
-          DEFAULT: "#34D399",     // Vibrant mint/emerald green from screenshots
+          DEFAULT: "#34D399",     // Vibrant emerald green
           bright: "#6EE7B7",      // Hover active state
           muted: "#10B981",       // Medium green
-          border: "#163A2D",      // Hairline resting border
-          bg: "#0D281E",          // Flat dark-tinted badge fill (NO alpha blur)
+          border: "#252D38",      // Standard hairline border
+          bg: "#0D281E",          // Flat dark-tinted badge fill
         },
-        // Alias tokens mapped to emerald/mint green palette
         pump: {
           DEFAULT: "#34D399",
           pill: "#6EE7B7",
           dim: "#065F46",
           hover: "#6EE7B7",
-          border: "#163A2D",
+          border: "#252D38",
           glow: "transparent",
           bg: "#0D281E",
         },
@@ -36,8 +47,36 @@ const config: Config = {
           pill: "#6EE7B7",
           ink: "#0A0E13",
         },
-        line: "#163A2D",
-        ink: "#EAECEF",
+
+        // Category colours: Alpha Calls (Permanently Purple)
+        alpha: {
+          DEFAULT: "#A78BFA",
+          primary: "#A78BFA",
+          strong: "#8B5CF6",
+          bg: "#1E1533",
+          background: "#1E1533",
+          border: "#5B3A91",
+          text: "#EDE9FE",
+        },
+
+        // Category colours: Social Raids (Permanently Orange)
+        raid: {
+          DEFAULT: "#FB923C",
+          primary: "#FB923C",
+          strong: "#F97316",
+          bg: "#2B1B10",
+          background: "#2B1B10",
+          border: "#9A4D1C",
+          text: "#FFEDD5",
+        },
+
+        // Borders & Semantics
+        border: {
+          DEFAULT: "#252D38",
+          default: "#252D38",
+        },
+        line: "#252D38",
+        ink: "#F8FAFC",
         muted: "#848E9C",
         dim: "#8E9BAE",
         amber: "#F59E0B",
@@ -56,12 +95,20 @@ const config: Config = {
         "pump-pill": "none",
       },
       borderColor: {
-        hairline: "#163A2D",
-        "hairline-hover": "#10B981",
+        DEFAULT: "#252D38",
+        default: "#252D38",
+        hairline: "#252D38",
+        "hairline-hover": "#34D399",
       },
       borderRadius: {
-        DEFAULT: "2px",
-        sm: "2px",
+        none: "0px",
+        sm: "4px",
+        DEFAULT: "8px",
+        md: "6px",
+        lg: "8px",
+        xl: "12px",
+        "2xl": "16px",
+        full: "9999px",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],

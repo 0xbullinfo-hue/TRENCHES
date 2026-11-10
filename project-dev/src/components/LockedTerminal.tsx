@@ -52,8 +52,8 @@ export const LockedTerminal: React.FC = () => {
 
   if (!connected) {
     return (
-      <div className="rounded border border-line bg-surface max-w-2xl mx-auto overflow-hidden">
-        <div className="px-6 py-4 bg-surface-card border-b border-line flex items-center justify-between font-sans text-xs font-bold text-muted">
+      <div className="rounded-xl border border-border-default bg-surface max-w-2xl mx-auto overflow-hidden shadow-none">
+        <div className="px-6 py-4 bg-surface-card border-b border-border-default flex items-center justify-between font-sans text-xs font-bold text-muted">
           <div className="flex items-center gap-2 text-white">
             <Lock className="w-4 h-4 text-pump" />
             <span>WALLET AUTHENTICATION REQUIRED</span>
@@ -62,7 +62,7 @@ export const LockedTerminal: React.FC = () => {
         </div>
 
         <div className="p-6 sm:p-8 text-center space-y-5">
-          <div className="w-12 h-12 rounded bg-surface-card border border-line mx-auto flex items-center justify-center text-pump">
+          <div className="w-12 h-12 rounded-lg bg-surface-card border border-border-default mx-auto flex items-center justify-center text-pump">
             <Wallet className="w-5 h-5" />
           </div>
 
@@ -77,7 +77,7 @@ export const LockedTerminal: React.FC = () => {
             </p>
           </div>
 
-          <div className="bg-canvas border border-line rounded p-3 font-mono text-xs flex items-center justify-between gap-2 max-w-md mx-auto">
+          <div className="bg-canvas border border-border-default rounded-lg p-3 font-mono text-xs flex items-center justify-between gap-2 max-w-md mx-auto">
             <div className="truncate">
               <span className="text-muted block text-2xs uppercase">Token Contract</span>
               <span className="text-white font-semibold truncate block tnum">{GENESIS_MINT}</span>
@@ -93,7 +93,7 @@ export const LockedTerminal: React.FC = () => {
           </div>
 
           {apiError && (
-            <div className="p-3 rounded bg-danger/10 border border-danger/40 text-danger text-xs font-mono text-center max-w-md mx-auto">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/40 text-danger text-xs font-mono text-center max-w-md mx-auto">
               {apiError}
             </div>
           )}
@@ -102,7 +102,7 @@ export const LockedTerminal: React.FC = () => {
             <button
               type="button"
               onClick={connectWallet}
-              className="w-full h-11 px-6 rounded bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              className="w-full h-11 px-6 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-none"
             >
               <Wallet className="w-4 h-4" />
               <span>Connect Solana Wallet</span>

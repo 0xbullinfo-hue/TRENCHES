@@ -27,11 +27,11 @@ export function DashboardLedgerEmbed() {
     <section id="ledger-embed" className="pt-8 border-t border-toxic-border/30">
       {/* Closed State: Sleek banner with View Full Ledger button */}
       {!isOpen ? (
-        <div className="rounded-xl bg-surface-card border border-toxic-border hover:border-toxic p-6 sm:p-7 transition-all duration-200 shadow-sm">
+        <div className="rounded-xl bg-surface-card border border-border-default hover:border-toxic p-6 sm:p-7 transition-all duration-150 shadow-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-2xs font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 uppercase font-bold flex items-center gap-1">
+                <span className="text-2xs font-mono px-2 py-0.5 rounded-md bg-toxic/15 text-toxic border border-toxic/30 uppercase font-bold flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" />
                   <span>Closed Calls Showcase</span>
                 </span>
@@ -51,7 +51,7 @@ export function DashboardLedgerEmbed() {
               <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="w-full sm:w-auto h-12 px-7 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+                className="w-full sm:w-auto h-12 px-7 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
               >
                 <span>View full ledger</span>
                 <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />

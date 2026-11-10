@@ -99,7 +99,7 @@ export function StakeForm({
   };
 
   return (
-    <div className="rounded-xl bg-surface border border-toxic/40 p-6 sm:p-8 shadow-sm space-y-6">
+    <div className="rounded-xl bg-surface border border-border-default p-6 sm:p-8 shadow-none space-y-6">
       <div className="flex items-center justify-between pb-4 border-b border-line">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-toxic" />
@@ -167,7 +167,7 @@ export function StakeForm({
           href={stakepointUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+          className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
         >
           <span>Stake $GENESIS on StakePoint →</span>
           <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />

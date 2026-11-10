@@ -116,10 +116,10 @@ export function LedgerGrid({
           <button
             type="button"
             onClick={() => handleFilterChain('all')}
-            className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+            className={`h-8 px-3 rounded-lg font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
               currentChain === 'all'
-                ? 'bg-toxic text-canvas font-black shadow-sm'
-                : 'bg-surface border border-toxic-border/40 text-muted hover:text-white hover:border-toxic'
+                ? 'bg-toxic text-canvas font-black shadow-none'
+                : 'bg-surface border border-border-default text-muted hover:text-white hover:border-toxic'
             }`}
           >
             All
@@ -129,10 +129,10 @@ export function LedgerGrid({
               key={c.value}
               type="button"
               onClick={() => handleFilterChain(c.value)}
-              className={`h-8 px-3 rounded-md font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              className={`h-8 px-3 rounded-lg font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                 currentChain === c.value
-                  ? 'bg-toxic text-canvas font-black shadow-sm'
-                  : 'bg-surface border border-toxic-border/40 text-muted hover:text-white hover:border-toxic'
+                  ? 'bg-toxic text-canvas font-black shadow-none'
+                  : 'bg-surface border border-border-default text-muted hover:text-white hover:border-toxic'
               }`}
             >
               {c.label}
