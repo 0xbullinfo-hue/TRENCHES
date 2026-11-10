@@ -70,7 +70,7 @@ export const HeroTerminal: React.FC = () => {
               there&apos;s a trench, we&apos;re in it.
             </p>
 
-            {/* Primary Buy Button (Pump.fun) + 2 Community Buttons Underneath (Flat Emerald Theme) */}
+            {/* Primary Buy Button (Pump.fun) + 2 Community Buttons Underneath (Split 50/50, Same Size) */}
             <div className="w-full space-y-3 pt-2">
               <a
                 href={BUY_LINKS.pump}
@@ -82,12 +82,12 @@ export const HeroTerminal: React.FC = () => {
                 <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
               </a>
 
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <a
                   href={SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-11 sm:h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 sm:h-[52px] px-2 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-toxic shrink-0" />
                   <span>JOIN THE LAB</span>
@@ -97,7 +97,7 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-11 sm:h-12 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 sm:h-[52px] px-2 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-4 h-4 text-toxic shrink-0" />
                   <span>FOLLOW ON X</span>
