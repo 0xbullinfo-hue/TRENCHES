@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Target, Shield, Copy, ExternalLink, Activity, Info } from 'lucide-react';
+import { Target, Shield, Activity, Info } from 'lucide-react';
 
 export const AlphaIntelligencePreview: React.FC = () => {
   return (
@@ -41,7 +41,7 @@ export const AlphaIntelligencePreview: React.FC = () => {
                   <span>Risk Parameter &amp; Invalidation (SL)</span>
                 </div>
                 <p className="font-sans text-xs text-muted leading-relaxed">
-                  Standardized Risk Level (1 to 5), calculated Risk:Reward ratio, and exact invalidation stop-loss percentage (-25% SL) to protect capital.
+                  Standardized Risk Level (1 to 5), calculated 1:4 Risk:Reward ratio, and exact invalidation stop-loss percentage (-25% SL) to protect capital.
                 </p>
               </div>
 
@@ -57,22 +57,21 @@ export const AlphaIntelligencePreview: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Representative Visual Card (Explicitly labeled as Example) */}
+          {/* Right: Representative Visual Card (Explicitly labeled as Illustrative Example) */}
           <div className="lg:col-span-6">
             <div className="relative rounded-2xl bg-surface border-2 border-alpha-border p-6 shadow-none space-y-5">
-              {/* Watermark / Example Badge */}
+              {/* Illustrative Example Header Strip */}
               <div className="flex items-center justify-between pb-3 border-b border-border-default">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-md bg-alpha-bg border border-alpha-border text-alpha-text font-mono text-xs font-bold">
-                    ALPHA CALL · EXAMPLE FORMAT
+                    ILLUSTRATIVE EXAMPLE
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default text-white font-mono text-[10px] font-bold">
                     SOL CHAIN
                   </span>
                 </div>
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] text-toxic bg-toxic-bg px-2 py-0.5 rounded border border-toxic-border">
-                  <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
-                  <span>DATA: LIVE</span>
+                <span className="font-mono text-[10px] text-muted bg-surface-card px-2 py-0.5 rounded border border-border-default uppercase">
+                  SAMPLE ANATOMY
                 </span>
               </div>
 
@@ -80,19 +79,19 @@ export const AlphaIntelligencePreview: React.FC = () => {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-sans font-black text-xl text-white">
-                    SYNAPSE LABS <span className="text-alpha-primary font-mono text-base">($SYN)</span>
+                    SYNTHETIC LAB PROTOCOL <span className="text-alpha-primary font-mono text-base">($SAMPLE)</span>
                   </h3>
                   <p className="font-sans text-xs text-muted mt-0.5">
-                    Solana AI agent infrastructure protocol • Incubator Early Call
+                    Illustrative early-stage token model • Standardized Call Anatomy
                   </p>
                 </div>
                 <div className="text-right font-mono">
                   <div className="text-[10px] text-muted uppercase font-bold">ENTRY MC</div>
-                  <div className="text-base font-black text-white">$420K</div>
+                  <div className="text-base font-black text-white">$400K</div>
                 </div>
               </div>
 
-              {/* 2x2 Parameters */}
+              {/* 2x2 Parameters: Mathematically Consistent (25% risk vs 100% gain = 1:4 R:R) */}
               <div className="grid grid-cols-2 gap-2.5 font-mono text-xs">
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">RISK RATING</div>
@@ -101,30 +100,30 @@ export const AlphaIntelligencePreview: React.FC = () => {
 
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">STOP LOSS (SL)</div>
-                  <div className="text-amber font-extrabold">-20% SL ($336K MC)</div>
+                  <div className="text-amber font-extrabold">-25% SL ($300K MC)</div>
                 </div>
 
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">TARGET 1 &amp; 2</div>
-                  <div className="text-toxic font-bold">2x ($840K) • 5x ($2.1M)</div>
+                  <div className="text-toxic font-bold">2x ($800K) • 5x ($2.0M)</div>
                 </div>
 
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">TARGET 3</div>
-                  <div className="text-toxic-bright font-black">10x ($4.2M MC)</div>
+                  <div className="text-toxic-bright font-black">10x ($4.0M MC)</div>
                 </div>
               </div>
 
               {/* CA Row */}
               <div className="px-3 py-2 rounded-lg bg-surface-card border border-border-default flex items-center justify-between font-mono text-xs">
-                <span className="text-muted text-[11px]">CA: 7xKX...pump</span>
-                <span className="text-alpha-primary text-[11px] font-bold">VERIFIED ON-CHAIN</span>
+                <span className="text-muted text-[11px]">CA: SAMPLE1111111111111111111111111111111111111</span>
+                <span className="text-alpha-primary text-[11px] font-bold">FORMAT SPEC</span>
               </div>
 
               {/* Bottom Notice */}
               <div className="pt-2 flex items-center gap-2 text-[11px] font-sans text-muted">
                 <Info className="w-3.5 h-3.5 text-muted shrink-0" />
-                <span>Representative interface preview. Real live calls require verified membership access.</span>
+                <span>Illustrative call anatomy representation. Not live advice or active recommendations.</span>
               </div>
             </div>
           </div>
@@ -133,4 +132,3 @@ export const AlphaIntelligencePreview: React.FC = () => {
     </section>
   );
 };
-

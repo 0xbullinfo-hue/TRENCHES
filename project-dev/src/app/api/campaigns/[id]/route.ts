@@ -73,6 +73,9 @@ export async function PATCH(
   if (typeof body.expiresAt === 'string') {
     updates.expiresAt = body.expiresAt.trim() || undefined;
   }
+  if (typeof body.durationHours === 'number' && Number.isFinite(body.durationHours) && body.durationHours > 0) {
+    updates.durationHours = body.durationHours;
+  }
 
   try {
     const updated = await updateCampaign(id, updates);

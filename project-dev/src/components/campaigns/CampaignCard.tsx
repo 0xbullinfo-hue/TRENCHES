@@ -24,27 +24,55 @@ interface CampaignCardProps {
 }
 
 /**
- * Section 6.2 Strict Requirement:
- * Display CONFIGURED DURATION ONLY (e.g. 12 HOURS, 24 HOURS, 48 HOURS, 3 DAYS, 7 DAYS, 14 DAYS).
- * No countdown timers, no "left" strings, no tooltips revealing exact closing dates.
+ * Section 4.2 & 4.3:
+ * Display CONFIGURED DURATION ONLY (e.g. 12 HOURS, 24 HOURS, 48 HOURS, 3 DAYS, 7 DAYS, 14 DAYS, N WEEKS).
+ * Persisted durationHours is authoritative. Legacy records fall back safely or report "Duration unavailable".
+ * Strictly NO countdown timers, no remaining hours/minutes, no tooltips revealing exact closing dates.
  */
-function getConfiguredDurationLabel(createdAt?: string, expiresAt?: string): string {
-  if (!expiresAt) return '24 HOURS';
-  try {
-    const end = new Date(expiresAt).getTime();
-    const start = createdAt ? new Date(createdAt).getTime() : end - 24 * 3600 * 1000;
-    const diffHours = Math.round(Math.max(1, (end - start) / (1000 * 60 * 60)));
-    if (diffHours <= 14) return '12 HOURS';
-    if (diffHours <= 28) return '24 HOURS';
-    if (diffHours <= 54) return '48 HOURS';
-    if (diffHours <= 84) return '3 DAYS';
-    if (diffHours <= 180) return '7 DAYS';
-    if (diffHours <= 360) return '14 DAYS';
-    const weeks = Math.round(diffHours / 168);
-    return `${weeks} ${weeks === 1 ? 'WEEK' : 'WEEKS'}`;
-  } catch {
-    return '24 HOURS';
+function getConfiguredDurationLabel(
+  durationHours?: number,
+  createdAt?: string,
+  expiresAt?: string
+): string {
+  if (typeof durationHours === 'number' && Number.isFinite(durationHours) && durationHours > 0) {
+    if (durationHours % 168 === 0) {
+      const weeks = durationHours / 168;
+      return `${weeks} ${weeks === 1 ? 'WEEK' : 'WEEKS'}`;
+    }
+    if (durationHours % 24 === 0 && durationHours >= 48) {
+      return `${durationHours / 24} DAYS`;
+    }
+    if (durationHours === 24) return '24 HOURS';
+    return `${durationHours} HOURS`;
   }
+
+  // Safe fallback for legacy records
+  if (expiresAt && createdAt) {
+    try {
+      const end = new Date(expiresAt).getTime();
+      const start = new Date(createdAt).getTime();
+      const diffHours = Math.round((end - start) / (1000 * 60 * 60));
+      if (diffHours > 0) {
+        if (diffHours % 168 === 0) {
+          const weeks = diffHours / 168;
+          return `${weeks} ${weeks === 1 ? 'WEEK' : 'WEEKS'}`;
+        }
+        if (diffHours % 24 === 0 && diffHours >= 48) {
+          return `${diffHours / 24} DAYS`;
+        }
+        if (diffHours <= 14) return '12 HOURS';
+        if (diffHours <= 28) return '24 HOURS';
+        if (diffHours <= 54) return '48 HOURS';
+        if (diffHours <= 84) return '3 DAYS';
+        if (diffHours <= 180) return '7 DAYS';
+        if (diffHours <= 360) return '14 DAYS';
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return 'Duration unavailable';
 }
 
 export const CampaignCard: React.FC<CampaignCardProps> = ({
@@ -64,6 +92,9 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     campaign.userSubmission || null
   );
   const [copiedWallet, setCopiedWallet] = useState(false);
+  const [currentTime] = useState<number>(() =>
+    typeof window !== 'undefined' ? Date.now() : 0
+  );
 
   // Keep wallet input in sync if userWallet connects later
   React.useEffect(() => {
@@ -98,6 +129,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+    if (isCompleted || isPaused || isExpired) {
+      setErrorMsg(`Submissions are closed for this campaign (${statusLabel}).`);
+      return;
+    }
     setErrorMsg(null);
     setSuccessMsg(null);
 
@@ -153,11 +188,26 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     setTimeout(() => setCopiedWallet(false), 1800);
   };
 
-  // Section 6.3: Authoritative Campaign Status
+  // Section 4.4: Authoritative Campaign Status (PAUSED and EXPIRED must be distinct)
   const isCompleted = campaign.status === 'COMPLETED';
-  const isExpired = campaign.status === 'PAUSED';
-  const statusLabel = isCompleted ? 'COMPLETED' : isExpired ? 'EXPIRED' : 'ACTIVE';
-  const configuredDuration = getConfiguredDurationLabel(campaign.createdAt, campaign.expiresAt);
+  const isPaused = campaign.status === 'PAUSED';
+  const isExpired =
+    !isCompleted &&
+    !isPaused &&
+    !!campaign.expiresAt &&
+    Boolean(currentTime && new Date(campaign.expiresAt).getTime() <= currentTime);
+  const statusLabel = isCompleted
+    ? 'COMPLETED'
+    : isPaused
+    ? 'PAUSED'
+    : isExpired
+    ? 'EXPIRED'
+    : 'ACTIVE';
+  const configuredDuration = getConfiguredDurationLabel(
+    campaign.durationHours,
+    campaign.createdAt,
+    campaign.expiresAt
+  );
 
   return (
     <article
@@ -174,11 +224,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               <span>SOCIAL RAID</span>
             </span>
 
-            {/* Campaign Status (Section 6.3) */}
+            {/* Campaign Status (Section 4.4) */}
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
                 isCompleted
                   ? 'bg-surface-card border border-border-default text-muted'
+                  : isPaused
+                  ? 'bg-amber/15 text-amber border border-amber/40'
                   : isExpired
                   ? 'bg-danger/20 text-danger border border-danger/40'
                   : 'bg-raid-bg text-raid-text border border-raid-border'
@@ -186,7 +238,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  isCompleted ? 'bg-muted' : isExpired ? 'bg-danger' : 'bg-raid-primary'
+                  isCompleted
+                    ? 'bg-muted'
+                    : isPaused
+                    ? 'bg-amber'
+                    : isExpired
+                    ? 'bg-danger'
+                    : 'bg-raid-primary'
                 }`}
               />
               <span>{statusLabel}</span>
@@ -361,9 +419,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               )}
             </div>
           </div>
-        ) : isCompleted || isExpired ? (
-          <div className="py-3 text-center text-xs font-sans text-muted bg-surface-card rounded-lg border border-border-default">
-            This raid campaign has concluded ({statusLabel}).
+        ) : isCompleted || isExpired || isPaused ? (
+          <div className="py-3 px-4 text-center text-xs font-sans text-muted bg-surface-card rounded-lg border border-border-default">
+            {isPaused
+              ? 'This raid campaign is currently paused. Submissions are temporarily closed.'
+              : isExpired
+              ? 'This raid campaign has expired. Submissions are closed.'
+              : `This raid campaign has concluded (${statusLabel}).`}
           </div>
         ) : (
           /* Submission Form (Section 6.4) */

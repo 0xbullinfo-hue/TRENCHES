@@ -91,7 +91,16 @@ export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: b
     fs.mkdirSync(path.dirname(CAMPAIGNS_FILE_PATH), { recursive: true });
     const tmp = `${CAMPAIGNS_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(campaigns, null, 2), 'utf-8');
-    fs.renameSync(tmp, CAMPAIGNS_FILE_PATH);
+    try {
+      fs.renameSync(tmp, CAMPAIGNS_FILE_PATH);
+    } catch {
+      fs.writeFileSync(CAMPAIGNS_FILE_PATH, JSON.stringify(campaigns, null, 2), 'utf-8');
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        // ignore
+      }
+    }
     return { success: true };
   } catch (err) {
     const msg = (err as Error).message || 'Failed to write campaigns file';
@@ -142,7 +151,16 @@ export async function saveSubmissions(submissions: CampaignSubmission[]): Promis
     fs.mkdirSync(path.dirname(SUBMISSIONS_FILE_PATH), { recursive: true });
     const tmp = `${SUBMISSIONS_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(submissions, null, 2), 'utf-8');
-    fs.renameSync(tmp, SUBMISSIONS_FILE_PATH);
+    try {
+      fs.renameSync(tmp, SUBMISSIONS_FILE_PATH);
+    } catch {
+      fs.writeFileSync(SUBMISSIONS_FILE_PATH, JSON.stringify(submissions, null, 2), 'utf-8');
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        // ignore
+      }
+    }
     return { success: true };
   } catch (err) {
     const msg = (err as Error).message || 'Failed to write submissions file';
@@ -203,11 +221,22 @@ export async function createCampaign(data: {
   totalPool?: string;
   targetActions?: string[];
   expiresAt?: string;
+  durationHours?: number;
   postedBy: string;
   pinned?: boolean;
 }): Promise<Campaign> {
   return withCampaignsLock(async () => {
     const campaigns = await loadCampaigns();
+    const durationHours =
+      typeof data.durationHours === 'number' && Number.isFinite(data.durationHours) && data.durationHours > 0
+        ? data.durationHours
+        : undefined;
+
+    let expiresAt = data.expiresAt;
+    if (!expiresAt && durationHours) {
+      expiresAt = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+    }
+
     const newCampaign: Campaign = {
       id: `camp-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
       title: data.title.trim(),
@@ -219,7 +248,8 @@ export async function createCampaign(data: {
       targetActions: data.targetActions && data.targetActions.length > 0 ? data.targetActions : ['Like', 'Retweet', 'Comment'],
       status: 'ACTIVE',
       createdAt: new Date().toISOString(),
-      expiresAt: data.expiresAt,
+      expiresAt,
+      durationHours,
       postedBy: data.postedBy,
       submissionsCount: 0,
       airdroppedCount: 0,
@@ -235,7 +265,7 @@ export async function createCampaign(data: {
 
 export async function updateCampaign(
   id: string,
-  updates: Partial<Pick<Campaign, 'title' | 'description' | 'tweetUrl' | 'rewardAmount' | 'status' | 'expiresAt' | 'pinned' | 'pinnedAt'>>
+  updates: Partial<Pick<Campaign, 'title' | 'description' | 'tweetUrl' | 'rewardAmount' | 'status' | 'expiresAt' | 'durationHours' | 'pinned' | 'pinnedAt'>>
 ): Promise<Campaign | null> {
   return withCampaignsLock(async () => {
     const campaigns = await loadCampaigns();
@@ -281,8 +311,14 @@ export async function submitCampaignCompletion(payload: {
     if (!campaign) {
       return { ok: false, error: 'Campaign not found' };
     }
+    if (campaign.status === 'PAUSED') {
+      return { ok: false, error: 'This campaign is currently paused' };
+    }
     if (campaign.status !== 'ACTIVE') {
       return { ok: false, error: 'This campaign is no longer active' };
+    }
+    if (campaign.expiresAt && new Date(campaign.expiresAt).getTime() <= Date.now()) {
+      return { ok: false, error: 'This campaign has expired' };
     }
 
     const cleanWallet = payload.walletAddress.trim();

@@ -245,8 +245,20 @@ test('AC 24: Non-pro user attempting to create pro session returns 403 not_eligi
 });
 
 test('AC 20 & 32: Pro user verification session creation and 10-minute expiry', async () => {
-  const freshProWallet = `ProWallet_${Date.now()}_11111111111111111111111`;
+  const freshProWallet = ADMIN_WALLET;
   seedStakeDirect(freshProWallet, '25000000000000000');
+
+  // Clear previous sessions for freshProWallet to guarantee a new session test
+  const dbPath = path.join(process.cwd(), 'data', 'db.json');
+  if (fs.existsSync(dbPath)) {
+    const raw = fs.readFileSync(dbPath, 'utf8');
+    const db = JSON.parse(raw);
+    db.verification_sessions = (db.verification_sessions || []).filter(
+      (s) => s.wallet_address !== freshProWallet
+    );
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8');
+  }
+
   const cookie = makeSessionCookie(freshProWallet);
   const res = await fetch(`${BASE_URL}/api/verification/session`, {
     method: 'POST',

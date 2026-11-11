@@ -215,6 +215,7 @@ export interface Campaign {
   status: CampaignStatus;
   createdAt: string;
   expiresAt?: string;
+  durationHours?: number;
   postedBy: string;
   submissionsCount?: number;
   airdroppedCount?: number;

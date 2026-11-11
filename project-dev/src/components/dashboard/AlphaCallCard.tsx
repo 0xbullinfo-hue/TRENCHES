@@ -100,7 +100,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-toxic animate-pulse'
+                  isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-toxic'
                 }`}
               />
               <span>{isCompleted ? 'PROFIT ✓' : isLoss ? 'LOSS ✕' : 'ACTIVE'}</span>

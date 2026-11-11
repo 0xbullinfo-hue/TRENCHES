@@ -2,14 +2,13 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { BUY_LINKS, GENESIS_MINT } from '@/lib/config';
+import { BUY_LINKS } from '@/lib/config';
 import {
   ArrowUpRight,
   Check,
   Copy,
   Flame,
   Gift,
-  ShieldCheck,
   Sparkles,
   Star,
   Target,
@@ -28,6 +27,8 @@ interface DashboardOverviewProps {
   isUnlocked: boolean;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
+  onSelectFilter?: (filter: 'all' | 'new' | 'watchlist') => void;
+  onSelectTab?: (tab: 'alphas' | 'raids') => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -42,6 +43,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   isUnlocked,
   onCopyGenesisCa,
   copiedGenesisCa,
+  onSelectFilter,
+  onSelectTab,
 }) => {
   const isPro = tier.id === 'PRO';
   const isMember = tier.id === 'MEMBER' || tier.id === 'LAB_MEMBER';
@@ -53,11 +56,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-toxic">
+            <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-toxic shrink-0">
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="font-sans text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
                   Welcome to the Lab
                 </h1>
@@ -121,7 +124,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
             <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center justify-between">
               <span>VERIFIED BALANCE</span>
-              <span className="text-toxic font-mono">SPL</span>
+              <span className="text-toxic font-mono text-[10px]">SPL</span>
             </div>
             <div className="text-white font-black tnum">
               {formattedBalance} $GENESIS
@@ -138,50 +141,87 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center justify-between">
+          <Link
+            href="/dashboard/stake"
+            className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-toxic"
+            title="Explore StakePoint 90-day staking for Pro Tier"
+          >
+            <div className="text-[10px] text-muted group-hover:text-toxic uppercase font-bold tracking-wider flex items-center justify-between">
               <span>PRO STAKING STATUS</span>
-              <Sparkles className="w-3.5 h-3.5 text-toxic" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
             </div>
             <div className="text-toxic-bright font-black">
-              {isPro ? 'Pro Eligible (Active Stake)' : 'Eligible via StakePoint'}
+              {isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}
             </div>
-          </div>
+          </Link>
         </div>
 
-        {/* 3. Activity Summary (Section 4.2 C) */}
+        {/* 3. Interactive Activity Summary (Section 7.2) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 border-t border-border-default font-mono text-xs">
-          <div className="p-3 rounded-lg bg-surface-card/60 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab?.('alphas');
+              onSelectFilter?.('all');
+            }}
+            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-alpha-primary"
+            title="View all active Alpha Calls"
+          >
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted uppercase font-bold">ACTIVE CALLS</div>
               <div className="text-base font-black text-white tnum">{alphasCount}</div>
             </div>
             <Target className="w-4 h-4 text-alpha-primary" />
-          </div>
+          </button>
 
-          <div className="p-3 rounded-lg bg-surface-card/60 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab?.('alphas');
+              onSelectFilter?.('new');
+            }}
+            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-toxic flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-toxic"
+            title="Filter by new Alpha Calls"
+          >
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted uppercase font-bold">NEW CALLS</div>
               <div className="text-base font-black text-toxic tnum">{newCallsCount}</div>
             </div>
             <Sparkles className="w-4 h-4 text-toxic" />
-          </div>
+          </button>
 
-          <div className="p-3 rounded-lg bg-surface-card/60 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab?.('raids');
+              const raidsEl = document.getElementById('raids-section');
+              if (raidsEl) raidsEl.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-raid-primary"
+            title="Jump to Social Raids section"
+          >
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted uppercase font-bold">ACTIVE RAIDS</div>
               <div className="text-base font-black text-raid-primary tnum">{raidsCount}</div>
             </div>
             <Gift className="w-4 h-4 text-raid-primary" />
-          </div>
+          </button>
 
-          <div className="p-3 rounded-lg bg-surface-card/60 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab?.('alphas');
+              onSelectFilter?.('watchlist');
+            }}
+            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-amber"
+            title="View saved Watchlist tokens"
+          >
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted uppercase font-bold">WATCHLIST</div>
               <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
             </div>
             <Star className="w-4 h-4 text-amber" />
-          </div>
+          </button>
         </div>
       </div>
     </div>

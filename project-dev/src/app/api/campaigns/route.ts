@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
   const rewardAmount = typeof body.rewardAmount === 'string' ? body.rewardAmount.trim() : '';
   const totalPool = typeof body.totalPool === 'string' ? body.totalPool.trim() : undefined;
   const expiresAt = typeof body.expiresAt === 'string' && body.expiresAt.trim() ? body.expiresAt.trim() : undefined;
+  const durationHours =
+    typeof body.durationHours === 'number' && Number.isFinite(body.durationHours) && body.durationHours > 0
+      ? body.durationHours
+      : undefined;
   const pinned = Boolean(body.pinned);
   const targetActions = Array.isArray(body.targetActions)
     ? (body.targetActions.filter((a) => typeof a === 'string') as string[])
@@ -95,6 +99,7 @@ export async function POST(req: NextRequest) {
       postedBy: ADMIN_WALLET,
       pinned,
       expiresAt,
+      durationHours,
     });
 
     const allCampaigns = await getCampaignsWithUserStatus();

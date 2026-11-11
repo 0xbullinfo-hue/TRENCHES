@@ -140,3 +140,91 @@ test('Campaigns & Rewards: Complete lifecycle, duplicate submission prevention, 
   await deleteCampaign(campaign.id);
 });
 
+test('Campaign Duration & Status: Persists and returns configured durationHours', async () => {
+  const camp = await createCampaign({
+    title: 'Duration Test Campaign',
+    description: 'Testing configured duration persistence',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/1850000000000000001',
+    rewardAmount: '10,000 $GENESIS',
+    durationHours: 48,
+    postedBy: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+  });
+
+  try {
+    assert.ok(camp.id);
+    assert.equal(camp.durationHours, 48);
+    assert.ok(camp.expiresAt);
+
+    // Verify retrieval returns persisted duration
+    const all = await getCampaignsWithUserStatus();
+    const found = all.find((c) => c.id === camp.id);
+    assert.ok(found);
+    assert.equal(found.durationHours, 48);
+
+    // Verify editing duration preserves and updates field
+    const updated = await updateCampaign(camp.id, { durationHours: 72 });
+    assert.ok(updated);
+    assert.equal(updated.durationHours, 72);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Campaign Status: PAUSED campaigns must remain PAUSED and never be treated as EXPIRED', async () => {
+  const camp = await createCampaign({
+    title: 'Paused Status Campaign',
+    description: 'Testing paused vs expired state isolation',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/1850000000000000002',
+    rewardAmount: '10,000 $GENESIS',
+    durationHours: 24,
+    postedBy: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+  });
+
+  try {
+    // Pause the campaign
+    const paused = await updateCampaign(camp.id, { status: 'PAUSED' });
+    assert.ok(paused);
+    assert.equal(paused.status, 'PAUSED');
+
+    // Verify submission to paused campaign is strictly rejected
+    const subResult = await submitCampaignCompletion({
+      campaignId: camp.id,
+      walletAddress: '11111111111111111111111111111111',
+      xHandle: '@paused_tester',
+      xRetweetLink: 'https://x.com/tester/status/12345',
+    });
+
+    assert.equal(subResult.ok, false);
+    assert.match(subResult.error || '', /paused/i);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Campaign Status: Submissions to expired campaigns are rejected', async () => {
+  // Create campaign with expired timestamp in the past
+  const pastExpires = new Date(Date.now() - 3600 * 1000).toISOString();
+  const camp = await createCampaign({
+    title: 'Expired Timestamp Campaign',
+    description: 'Testing expired submission rejection',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/1850000000000000003',
+    rewardAmount: '10,000 $GENESIS',
+    expiresAt: pastExpires,
+    postedBy: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+  });
+
+  try {
+    const subResult = await submitCampaignCompletion({
+      campaignId: camp.id,
+      walletAddress: '11111111111111111111111111111111',
+      xHandle: '@expired_tester',
+      xRetweetLink: 'https://x.com/tester/status/54321',
+    });
+
+    assert.equal(subResult.ok, false);
+    assert.match(subResult.error || '', /expired/i);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+

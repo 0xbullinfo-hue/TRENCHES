@@ -570,6 +570,17 @@ export const IncubatorHub: React.FC = () => {
         isUnlocked={isUnlocked}
         onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
         copiedGenesisCa={copiedId === 'hero-gen-ca'}
+        onSelectFilter={(f) => {
+          setFeedTab('CALLS');
+          if (f === 'all') setActiveFilter('ALL');
+          else if (f === 'new') setActiveFilter('NEW');
+          else if (f === 'watchlist') setActiveFilter('WATCHLIST');
+        }}
+        onSelectTab={(tab) => {
+          setFeedTab(tab === 'raids' ? 'RAIDS' : 'CALLS');
+          const listEl = document.getElementById('feed-tabs');
+          if (listEl) listEl.scrollIntoView({ behavior: 'smooth' });
+        }}
       />
 
       {/* 3. STAKING & TELEGRAM SUMMARY ROW */}
@@ -872,7 +883,7 @@ export const IncubatorHub: React.FC = () => {
       )}
 
       {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
-      <div className="space-y-4 pt-2">
+      <div id="feed-tabs" className="space-y-4 pt-2">
         <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default">
           <button
             type="button"
