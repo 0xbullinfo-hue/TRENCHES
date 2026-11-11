@@ -169,7 +169,9 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
             sortedWallets.map((w) => {
               const isDetected =
                 w.readyState === WalletReadyState.Installed ||
-                w.readyState === WalletReadyState.Loadable;
+                (typeof window !== 'undefined' &&
+                  ((w.adapter.name === 'Solflare' && 'solflare' in window) ||
+                    (w.adapter.name === 'Phantom' && ('phantom' in window || 'solana' in window))));
               const isConnectingThis = connectingWalletName === w.adapter.name;
 
               return (

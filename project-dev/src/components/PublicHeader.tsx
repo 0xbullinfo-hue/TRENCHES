@@ -19,8 +19,19 @@ export const PublicHeader: React.FC = () => {
   const pathname = usePathname();
   const isHome = pathname === '/';
   const isPerformanceActive = pathname === '/ledger';
-  const { connected, shortAddress, disconnectDemoOrWallet } = useGenesisBalance();
+  const { connected, shortAddress, connectWallet, disconnectDemoOrWallet } = useGenesisBalance();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '0.0.0.0');
+
+  const enableWalletConnect =
+    isLocalhost ||
+    process.env.NODE_ENV !== 'production' ||
+    process.env.NEXT_PUBLIC_ENABLE_WALLET === 'true';
   const [activeSection, setActiveSection] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');
@@ -284,6 +295,16 @@ export const PublicHeader: React.FC = () => {
               <span className="hidden xl:inline">DASHBOARD ({shortAddress})</span>
               <span className="xl:hidden">{shortAddress}</span>
             </Link>
+          ) : enableWalletConnect ? (
+            <button
+              type="button"
+              onClick={connectWallet}
+              className="h-9 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0"
+              title="Connect Solana Wallet"
+            >
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+              <span>CONNECT</span>
+            </button>
           ) : (
             <button
               type="button"

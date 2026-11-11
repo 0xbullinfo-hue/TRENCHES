@@ -43,7 +43,13 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xW
 
 export type DemoPreset = 'disconnected' | '0' | '1m' | 'admin' | 'live';
 
-export const DEMO_ENABLED = false;
+export const DEMO_ENABLED =
+  process.env.NODE_ENV !== 'production' ||
+  process.env.NEXT_PUBLIC_ALLOW_DEMO === 'true' ||
+  (typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '0.0.0.0'));
 
 const DEMO_WALLETS: Record<Exclude<DemoPreset, 'disconnected' | 'live'>, string> = {
   '0': 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
@@ -246,10 +252,13 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       clearPendingUnlockWatcher();
       setWalletConnectError(null);
 
-      if (
-        targetWallet.readyState !== WalletReadyState.Installed &&
-        targetWallet.readyState !== WalletReadyState.Loadable
-      ) {
+      const isExtensionPresent =
+        targetWallet.readyState === WalletReadyState.Installed ||
+        (typeof window !== 'undefined' &&
+          ((targetWallet.adapter.name === 'Solflare' && 'solflare' in window) ||
+            (targetWallet.adapter.name === 'Phantom' && ('phantom' in window || 'solana' in window))));
+
+      if (!isExtensionPresent) {
         if (targetWallet.adapter.url) {
           try {
             window.open(targetWallet.adapter.url, '_blank', 'noopener,noreferrer');
