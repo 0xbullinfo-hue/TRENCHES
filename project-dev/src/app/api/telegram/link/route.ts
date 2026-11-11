@@ -31,16 +31,20 @@ async function authed(req: NextRequest): Promise<{ wallet: string } | NextRespon
 /** GET — is this wallet linked? Authoritative server check. */
 export async function GET(req: NextRequest) {
   if (!telegramConfigured()) return fail(503, 'NOT_CONFIGURED', 'Telegram alerts are not enabled.');
+
   const queryWallet = req.nextUrl.searchParams.get('wallet')?.trim();
-  if (queryWallet && isBase58Address(queryWallet)) {
-    try {
-      return NextResponse.json({ ok: true, linked: await isLinked(queryWallet) }, { headers: NO_STORE });
-    } catch {
-      return fail(502, 'STORE_UNAVAILABLE', 'Store unavailable.');
-    }
+  if (queryWallet && !isBase58Address(queryWallet)) {
+    return fail(400, 'BAD_REQUEST', 'Invalid Solana wallet address format.');
   }
+
   const a = await authed(req);
-  if (a instanceof NextResponse) return a;
+  if (a instanceof NextResponse) return a; // returns 401 if unauthenticated
+
+  // Reject mismatched wallet
+  if (queryWallet && queryWallet !== a.wallet) {
+    return fail(403, 'FORBIDDEN', 'Authenticated wallet does not match requested wallet.');
+  }
+
   try {
     return NextResponse.json({ ok: true, linked: await isLinked(a.wallet) }, { headers: NO_STORE });
   } catch {
@@ -50,8 +54,20 @@ export async function GET(req: NextRequest) {
 
 /** POST — start linking: returns a one-time t.me deep link (holders only). */
 export async function POST(req: NextRequest) {
+  if (!telegramConfigured()) return fail(503, 'NOT_CONFIGURED', 'Telegram alerts are not enabled.');
+
+  const queryWallet = req.nextUrl.searchParams.get('wallet')?.trim();
+  if (queryWallet && !isBase58Address(queryWallet)) {
+    return fail(400, 'BAD_REQUEST', 'Invalid Solana wallet address format.');
+  }
+
   const a = await authed(req);
   if (a instanceof NextResponse) return a;
+
+  if (queryWallet && queryWallet !== a.wallet) {
+    return fail(403, 'FORBIDDEN', 'Authenticated wallet does not match requested wallet.');
+  }
+
   try {
     if (!isAdminWallet(a.wallet)) {
       const userTier = await resolveTier(a.wallet);

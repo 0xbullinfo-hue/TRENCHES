@@ -157,6 +157,8 @@ const GenesisContext = createContext<GenesisContextValue | undefined>(undefined)
 
 const EVM_STORAGE_KEY = 'trenchlabs_bound_evm_v2';
 const WATCHLIST_STORAGE_KEY = 'trenchlabs_watchlist_v3';
+const getWatchlistStorageKey = (addr: string | null) =>
+  addr ? `trenchlabs_watchlist_v4:${addr}` : 'trenchlabs_watchlist_anon_v4';
 const DEMO_PRESET_STORAGE_KEY = 'trenchlabs_demo_preset_v1';
 const ACCESS_STORAGE_KEY = 'trenchlabs_access_v1';
 
@@ -409,11 +411,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       }
       const savedEvm = window.localStorage.getItem(EVM_STORAGE_KEY);
       if (savedEvm) queueMicrotask(() => setBoundEvmAddressState(savedEvm));
-      const savedWatch = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      if (savedWatch) {
-        const parsed = JSON.parse(savedWatch);
-        if (Array.isArray(parsed)) queueMicrotask(() => setWatchlist(parsed));
-      }
     } catch {
       // ignore storage errors
     }
@@ -431,19 +428,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     return true;
-  }, []);
-
-  const toggleWatchlist = useCallback((tokenId: string) => {
-    setWatchlist((prev) => {
-      const exists = prev.includes(tokenId);
-      const next = exists ? prev.filter((id) => id !== tokenId) : [...prev, tokenId];
-      try {
-        window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
   }, []);
 
   // P1-4: Never fabricate blockchain transaction signatures. Label clearly as simulated/illustrative.
@@ -550,12 +534,59 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setAlphas([]);
           setCallers([]);
           setPortfolio(null);
+          setWatchlist([]);
           setApiError(null);
           setVerificationState(connected ? 'CONNECTED_UNVERIFIED' : 'DISCONNECTED');
         });
       }
     }
   }, [publicKeyBase58, connected]);
+
+  // Load and isolate personal watchlist per connected wallet, migrating legacy once
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const key = getWatchlistStorageKey(publicKeyBase58);
+      const saved = window.localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          queueMicrotask(() => setWatchlist(parsed));
+          return;
+        }
+      }
+
+      // Legacy Watchlist migration occurs only once:
+      const legacy = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
+      if (legacy && publicKeyBase58) {
+        const parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          window.localStorage.setItem(key, JSON.stringify(parsed));
+          window.localStorage.removeItem(WATCHLIST_STORAGE_KEY);
+          queueMicrotask(() => setWatchlist(parsed));
+          return;
+        }
+      }
+
+      queueMicrotask(() => setWatchlist([]));
+    } catch {
+      queueMicrotask(() => setWatchlist([]));
+    }
+  }, [publicKeyBase58]);
+
+  const toggleWatchlist = useCallback((tokenId: string) => {
+    setWatchlist((prev) => {
+      const exists = prev.includes(tokenId);
+      const next = exists ? prev.filter((id) => id !== tokenId) : [...prev, tokenId];
+      try {
+        const key = getWatchlistStorageKey(publicKeyBase58);
+        window.localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, [publicKeyBase58]);
 
   const isAdmin = useMemo(
     () => Boolean(connected && publicKeyBase58 && isAdminWallet(publicKeyBase58)),

@@ -287,7 +287,14 @@ export async function resolveWalletEntitlement(
 /**
  * Evaluates whether a wallet should be transitioned or demoted, recording the lifecycle transition.
  */
-export async function evaluateWalletDowngrade(walletAddress: string): Promise<{
+export async function evaluateWalletDowngrade(
+  walletAddress: string,
+  overrides?: {
+    mockHoldingTokens?: number;
+    mockStakedTokens?: number;
+    mockPriceUsd?: number;
+  }
+): Promise<{
   previousTier?: UserTier;
   newTier: UserTier;
   changed: boolean;
@@ -297,10 +304,11 @@ export async function evaluateWalletDowngrade(walletAddress: string): Promise<{
   const memberRow = (db.telegram_members || []).find((m) => m.wallet_address === walletAddress);
   const previousTier = memberRow?.tier;
 
-  const currentEntitlement = await resolveWalletEntitlement(walletAddress);
+  const currentEntitlement = await resolveWalletEntitlement(walletAddress, overrides);
   const newTier = currentEntitlement.tier;
 
-  const changed = previousTier !== undefined && previousTier !== newTier;
+  // Never trigger downgrade / eviction when tier is 'unknown' due to temporary network or oracle outage
+  const changed = previousTier !== undefined && newTier !== 'unknown' && previousTier !== newTier;
 
   return {
     previousTier,
