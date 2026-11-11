@@ -2,12 +2,29 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS, SOLSCAN } from '@/lib/config';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { ArrowUp, ArrowUpRight } from 'lucide-react';
 
 export const Footer: React.FC = () => {
+  const pathname = usePathname();
+  const isHomePage = pathname === '/';
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
+
+  const handleBackToTop = (e: React.MouseEvent) => {
+    if (isHomePage) {
+      e.preventDefault();
+      const el = document.getElementById('hero-section');
+      if (el) {
+        const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
+        window.history.pushState(null, '', '#hero-section');
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
 
   return (
     <footer className="w-full bg-canvas border-t border-border-default font-sans text-xs text-muted mt-auto">
@@ -153,13 +170,14 @@ export const Footer: React.FC = () => {
             </span>
           </div>
 
-          <a
-            href="#hero-section"
+          <Link
+            href={isHomePage ? '#hero-section' : '/#hero-section'}
+            onClick={handleBackToTop}
             className="inline-flex items-center gap-1 text-muted hover:text-toxic font-bold uppercase transition-colors"
           >
             <span>BACK TO TOP</span>
             <ArrowUp className="w-3.5 h-3.5" />
-          </a>
+          </Link>
         </div>
       </div>
     </footer>

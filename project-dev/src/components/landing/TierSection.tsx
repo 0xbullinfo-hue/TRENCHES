@@ -141,7 +141,7 @@ export async function TierSection() {
   ];
 
   return (
-    <section id="choose-your-access" className="bg-canvas py-16 border-b border-toxic-border">
+    <section id="choose-your-access" className="bg-canvas py-16 border-b border-toxic-border scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="pb-6 border-b border-toxic-border">

@@ -51,7 +51,7 @@ export const HeroTerminal: React.FC = () => {
   return (
     <section
       id="hero-section"
-      className="relative border-b border-toxic-border bg-canvas overflow-hidden"
+      className="relative border-b border-toxic-border bg-canvas overflow-hidden scroll-mt-20 sm:scroll-mt-24"
     >
       <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-14">
         {/* Soft-Launch Status Strip */}

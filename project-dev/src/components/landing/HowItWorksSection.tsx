@@ -36,7 +36,7 @@ const STAGES = [
 
 export const HowItWorksSection: React.FC = () => {
   return (
-    <section id="how-it-works" className="border-b border-toxic-border bg-canvas py-16">
+    <section id="how-it-works" className="border-b border-toxic-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
         <div className="pb-6 border-b border-toxic-border">

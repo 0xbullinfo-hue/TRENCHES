@@ -44,13 +44,25 @@
   html {
     color-scheme: dark;
     scroll-behavior: smooth;
-    scroll-padding-top: 80px;
-    overflow-x: hidden;
+    scroll-padding-top: 88px;
+    overflow-x: clip;
     max-width: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto !important;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
   body {
     @apply bg-canvas text-ink font-sans antialiased;
-    overflow-x: hidden;
+    overflow-x: clip;
     max-width: 100%;
     font-feature-settings: 'cv11', 'ss01', 'tnum';
     font-variant-numeric: tabular-nums;

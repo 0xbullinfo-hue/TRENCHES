@@ -125,7 +125,7 @@ export const PipelineGrid: React.FC = () => {
   };
 
   return (
-    <section id="pipeline-section" className="border-b border-toxic-border bg-canvas py-16">
+    <section id="pipeline-section" className="border-b border-toxic-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-toxic-border">

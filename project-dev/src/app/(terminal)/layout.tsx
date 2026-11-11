@@ -9,7 +9,7 @@ export default function TerminalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col bg-canvas text-ink overflow-x-hidden w-full">
+    <div className="min-h-screen flex flex-col bg-canvas text-ink overflow-x-clip w-full">
       <TerminalHeader />
       <TelegramStatusBanner />
       <main className="flex-1 flex flex-col">{children}</main>
