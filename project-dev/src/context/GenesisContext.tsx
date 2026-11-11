@@ -31,6 +31,7 @@ import {
 import type {
   AlphaItem,
   AlphasResponse,
+  CallType,
   Chain,
   Portfolio,
   SyndicateCaller,
@@ -70,6 +71,7 @@ export interface CreateCallPayload {
   stopLoss: string;
   takeProfitInput: string;
   pinned: boolean;
+  callType?: CallType;
   isMaxAlpha?: boolean;
   minTier?: TierId;
   summary?: string;
@@ -110,6 +112,7 @@ interface GenesisContextValue {
   updateAlphaCall: (id: string, updates: Record<string, unknown>) => Promise<boolean>;
   togglePinCall: (id: string, nextPinned: boolean) => Promise<boolean>;
   toggleMaxAlpha: (id: string, isMaxAlpha: boolean) => Promise<boolean>;
+  updateCallCategory: (id: string, callType: CallType) => Promise<boolean>;
   toggleTpHit: (id: string, tpIndex: number) => Promise<boolean>;
   setCallOutcome: (id: string, outcome: 'PROFIT' | 'LOSS' | 'PENDING') => Promise<boolean>;
   updateCallMarketCap: (id: string, marketCap: string) => Promise<boolean>;
@@ -974,6 +977,30 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     [getAdminHeaders]
   );
 
+  const updateCallCategory = useCallback(
+    async (id: string, callType: CallType): Promise<boolean> => {
+      try {
+        const bodyStr = JSON.stringify({ id, callType });
+        const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
+        const res = await fetch('/api/alphas', {
+          method: 'PATCH',
+          headers,
+          body: bodyStr,
+        });
+        const json = await res.json();
+        if (res.ok && json.ok && Array.isArray(json.items)) {
+          setAlphas(json.items);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[TrenchLabs] updateCallCategory error:', err);
+        return false;
+      }
+    },
+    [getAdminHeaders]
+  );
+
   const toggleTpHit = useCallback(
     async (id: string, tpIndex: number): Promise<boolean> => {
       try {
@@ -1157,6 +1184,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     updateAlphaCall,
     togglePinCall,
     toggleMaxAlpha,
+    updateCallCategory,
     toggleTpHit,
     setCallOutcome,
     updateCallMarketCap,

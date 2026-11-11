@@ -28,7 +28,7 @@ interface DashboardOverviewProps {
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
   onSelectFilter?: (filter: 'all' | 'new' | 'watchlist') => void;
-  onSelectTab?: (tab: 'alphas' | 'raids') => void;
+  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'alphas' | 'raids') => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -161,7 +161,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => {
-              onSelectTab?.('alphas');
+              onSelectTab?.('ALPHA');
               onSelectFilter?.('all');
             }}
             className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-alpha-primary"
@@ -177,7 +177,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => {
-              onSelectTab?.('alphas');
+              onSelectTab?.('ALPHA');
               onSelectFilter?.('new');
             }}
             className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-toxic flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-toxic"
@@ -193,7 +193,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => {
-              onSelectTab?.('raids');
+              onSelectTab?.('SOCIAL');
               const raidsEl = document.getElementById('raids-section');
               if (raidsEl) raidsEl.scrollIntoView({ behavior: 'smooth' });
             }}
@@ -210,11 +210,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => {
-              onSelectTab?.('alphas');
+              onSelectTab?.('WATCHLIST');
               onSelectFilter?.('watchlist');
             }}
             className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-amber"
-            title="View saved Watchlist tokens"
+            title="View Watchlist projects"
           >
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted uppercase font-bold">WATCHLIST</div>

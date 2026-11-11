@@ -28,6 +28,7 @@ import type {
   AlphasErr,
   AlphasOk,
   ArtMotif,
+  CallType,
   Chain,
   QuoteToken,
 } from '@/lib/types';
@@ -117,6 +118,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const requestedCallType = req.nextUrl.searchParams.get('callType')?.toUpperCase() as CallType | undefined;
+  if (requestedCallType && !isAdmin) {
+    if (requestedCallType === 'WATCHLIST' || requestedCallType === 'MAX_ALPHA') {
+      if (userTier !== 'pro') {
+        return err(403, 'FORBIDDEN', `Access restricted. PRO membership is required to access ${requestedCallType}.`);
+      }
+    }
+  }
+
   const effectiveBalance = Math.max(
     balance,
     isAdmin ? calculateRequiredTokens(PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE) : 0
@@ -132,7 +142,10 @@ export async function GET(req: NextRequest) {
 
   // Wire validated market telemetry into calls. Every item is labelled LIVE / CACHED / STALE /
   // UNAVAILABLE / MANUAL so the UI never presents recorded or stale numbers as live provider data.
-  const items = await hydrateAlphaItems(baseItems);
+  let items = await hydrateAlphaItems(baseItems);
+  if (requestedCallType) {
+    items = items.filter((it) => it.callType === requestedCallType);
+  }
 
   let verifiedUsersCount = 0;
   try {
@@ -278,7 +291,13 @@ export async function POST(req: NextRequest) {
     const takeProfits = buildTakeProfits(entryMcUsd, currentMcUsd, multipliers);
 
     const pinned = Boolean(payload.pinned);
-    const isMaxAlpha = Boolean(payload.isMaxAlpha);
+    let callType: CallType = 'ALPHA';
+    if (payload.callType === 'ALPHA' || payload.callType === 'MAX_ALPHA' || payload.callType === 'WATCHLIST') {
+      callType = payload.callType;
+    } else if (payload.isMaxAlpha) {
+      callType = 'MAX_ALPHA';
+    }
+    const isMaxAlpha = callType === 'MAX_ALPHA' || Boolean(payload.isMaxAlpha);
     const quoteMap: Record<Chain, QuoteToken> = {
       SOL: 'SOL',
       BSC: 'BNB',
@@ -342,6 +361,7 @@ export async function POST(req: NextRequest) {
       takeProfits,
       pinned,
       pinnedAt: pinned ? new Date().toISOString() : null,
+      callType,
       isMaxAlpha,
       logoUrl:
         typeof payload.logoUrl === 'string' && payload.logoUrl.trim().startsWith('http')
@@ -349,7 +369,12 @@ export async function POST(req: NextRequest) {
           : liveLogoUrl || undefined,
       entryMarketCap: formatCompactUsd(entryMcUsd),
       entryMarketCapUsd: entryMcUsd,
-      minTier: isMaxAlpha || payload.minTier === 'PRO' ? 'PRO' : (payload.minTier === 'LOCKED' ? 'LOCKED' : 'LAB_MEMBER'),
+      minTier:
+        callType === 'MAX_ALPHA' || callType === 'WATCHLIST' || isMaxAlpha || payload.minTier === 'PRO'
+          ? 'PRO'
+          : payload.minTier === 'LOCKED'
+          ? 'LOCKED'
+          : 'LAB_MEMBER',
       ca,
       links,
       summary:
@@ -583,11 +608,30 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      if (typeof payload.isMaxAlpha === 'boolean') {
+      if (typeof payload.callType === 'string') {
+        const ct = payload.callType.toUpperCase() as CallType;
+        if (ct === 'ALPHA' || ct === 'MAX_ALPHA' || ct === 'WATCHLIST') {
+          target.callType = ct;
+          if (ct === 'MAX_ALPHA') {
+            target.isMaxAlpha = true;
+            target.minTier = 'PRO';
+          } else if (ct === 'WATCHLIST') {
+            target.isMaxAlpha = false;
+            target.minTier = 'PRO';
+          } else if (ct === 'ALPHA') {
+            target.isMaxAlpha = false;
+            if (!payload.minTier) {
+              target.minTier = 'LAB_MEMBER';
+            }
+          }
+        }
+      } else if (typeof payload.isMaxAlpha === 'boolean') {
         target.isMaxAlpha = payload.isMaxAlpha;
         if (payload.isMaxAlpha) {
+          target.callType = 'MAX_ALPHA';
           target.minTier = 'PRO';
-        } else if (!payload.minTier) {
+        } else if (target.callType === 'MAX_ALPHA') {
+          target.callType = 'ALPHA';
           target.minTier = 'LAB_MEMBER';
         }
       }

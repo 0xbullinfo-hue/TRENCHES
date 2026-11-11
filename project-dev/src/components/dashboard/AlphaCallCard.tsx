@@ -86,7 +86,13 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-alpha-text">
               <Target className="w-3 h-3 text-alpha-primary" />
-              <span>{coin.isMaxAlpha ? 'ALPHA CALL · PRO MAX' : 'ALPHA CALL'}</span>
+              <span>
+                {coin.callType === 'WATCHLIST'
+                  ? 'WATCHLIST · RESEARCH'
+                  : coin.callType === 'MAX_ALPHA' || coin.isMaxAlpha
+                  ? 'ALPHA CALL · PRO MAX'
+                  : 'ALPHA CALL'}
+              </span>
             </span>
 
             <span

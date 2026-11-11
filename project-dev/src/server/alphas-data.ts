@@ -19,6 +19,7 @@ import type {
   AlphaItem,
   AlphaLink,
   AlphaStatus,
+  CallType,
   Chain,
   Portfolio,
   QuoteToken,
@@ -76,6 +77,8 @@ export interface AlphaRecord {
   serialTag?: string;
   /** Admin outcome classification: PROFIT made (achieved), LOSS made, or PENDING */
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
+  /** Admin destination tab classification: ALPHA | MAX_ALPHA | WATCHLIST */
+  callType?: CallType;
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
   /** Direct onchain or DexScreener token logo image URL */
@@ -440,6 +443,16 @@ function nextBoundary(now: number, cycleMin: number, phaseMin: number): string {
   return new Date(t).toISOString();
 }
 
+export function getCallType(r: { callType?: CallType; isMaxAlpha?: boolean }): CallType {
+  if (r.callType === 'ALPHA' || r.callType === 'MAX_ALPHA' || r.callType === 'WATCHLIST') {
+    return r.callType;
+  }
+  if (r.isMaxAlpha) {
+    return 'MAX_ALPHA';
+  }
+  return 'ALPHA';
+}
+
 /** Project registry onto a viewer's tier, masking anything above it, sorting pinned calls first. */
 export async function alphasForTier(
   tier: TierId,
@@ -448,6 +461,15 @@ export async function alphasForTier(
   isAdmin = false
 ): Promise<AlphaItem[]> {
   const rank = TIERS[tier].rank;
+  const isProViewer = rank >= TIERS.PRO.rank || isAdmin;
+  const isMemberViewer = rank >= TIERS.LAB_MEMBER.rank || isAdmin;
+
+  // Section 7 Backend Membership Enforcement:
+  // A FREE user must never receive ALPHA, WATCHLIST or MAX ALPHA records from the backend.
+  if (!isMemberViewer) {
+    return [];
+  }
+
   const registry = preloaded ?? (await loadCallsRegistry());
   const winRateByCaller = new Map<string, string>();
   for (const c of new Set(registry.map((r) => r.caller))) {
@@ -465,16 +487,19 @@ export async function alphasForTier(
     return a.ageMinutes - b.ageMinutes;
   });
 
-  const isProViewer = rank >= TIERS.PRO.rank || isAdmin;
   const filtered = sorted.filter((r) => {
-    // Only Admin and Pro users can see MAX ALPHA cards
-    if (r.isMaxAlpha && !isProViewer) {
-      return false;
+    const callType = getCallType(r);
+    // Section 7: A MEMBER must never receive WATCHLIST or MAX ALPHA records.
+    if (!isProViewer) {
+      if (callType === 'MAX_ALPHA' || callType === 'WATCHLIST' || r.isMaxAlpha || r.minTier === 'PRO') {
+        return false;
+      }
     }
     return true;
   });
 
   return filtered.map((r, idx) => {
+    const callType = getCallType(r);
     const locked = TIERS[r.minTier].rank > rank;
     const minBalanceRequired = TIERS[r.minTier].min;
     const serialTag = r.serialTag || `EXP${String(idx + 1).padStart(2, '0')}`;
@@ -525,7 +550,8 @@ export async function alphasForTier(
       spotlightRank: r.spotlightRank,
       serialTag,
       outcome: r.outcome ?? (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
-      isMaxAlpha: Boolean(r.isMaxAlpha),
+      callType,
+      isMaxAlpha: callType === 'MAX_ALPHA' || Boolean(r.isMaxAlpha),
       logoUrl: r.logoUrl,
       sparkline: r.sparkline,
       art: r.art,

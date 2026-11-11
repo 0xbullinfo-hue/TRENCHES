@@ -4,6 +4,7 @@ export type Chain = 'SOL' | 'BSC' | 'ETH' | 'BASE' | 'ROBIN' | 'AVAX';
 export type QuoteToken = 'PUMP' | 'SOL' | 'ETH' | 'USDC' | 'WBTC' | 'ZEC' | 'BNB' | 'AVAX' | 'ROBIN';
 export type AlphaStatus = 'LIVE' | 'INCUBATING' | 'UPCOMING' | 'CLOSED';
 export type AlphaCategory = 'MOVERS' | 'NEW' | 'HOLDER_REWARDS' | 'AI_AGENT' | 'STEALTH' | 'CHARITY';
+export type CallType = 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST';
 export type ArtMotif =
   | 'pill'
   | 'baton'
@@ -103,6 +104,8 @@ export interface AlphaItem {
   serialTag?: string;
   /** Admin outcome classification: profit made (achieved), loss made, or open */
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING';
+  /** Admin destination tab classification: ALPHA | MAX_ALPHA | WATCHLIST */
+  callType: CallType;
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
   /** Direct onchain or DexScreener token logo image URL */
@@ -174,6 +177,7 @@ export interface AlphasErr {
   error:
     | 'BAD_REQUEST'
     | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
     | 'ACCESS_DENIED_ZERO_BALANCE'
     | 'UNAUTHORIZED_ADMIN'
     | 'RPC_UNAVAILABLE'

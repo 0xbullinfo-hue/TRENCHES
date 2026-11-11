@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AlphaItem, Chain, Campaign } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
+import {
+  MembershipRestrictionScreen,
+  type UserMembershipTier,
+  type RestrictedCategory,
+} from './MembershipRestrictionScreen';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import {
   BUY_LINKS,
@@ -34,6 +40,7 @@ import {
   Flame,
   LayoutGrid,
   List,
+  Lock,
   Pencil,
   Pin,
   Plus,
@@ -48,6 +55,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
+export type DashboardTab = 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA';
 type FilterTab = 'ALL' | 'PINNED' | 'MAX_ALPHA' | 'MOVERS' | 'NEW' | 'WATCHLIST';
 type SortKey = 'PRIORITY' | 'MCAP' | 'CHANGE' | 'NEWEST';
 type ViewMode = 'GRID' | 'TABLE';
@@ -55,6 +63,7 @@ type ViewMode = 'GRID' | 'TABLE';
 const ALL_CHAINS: (Chain | 'ALL')[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
 
 export const IncubatorHub: React.FC = () => {
+  const router = useRouter();
   const {
     connected,
     isUnlocked,
@@ -80,6 +89,7 @@ export const IncubatorHub: React.FC = () => {
     apiLoading,
     apiError,
     refreshAll,
+    requestUnlockSignature,
     searchQuery,
     setSearchQuery,
   } = useGenesisBalance();
@@ -89,9 +99,30 @@ export const IncubatorHub: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
   const [adminDeskTab, setAdminDeskTab] = useState<'CALLS' | 'CAMPAIGNS'>('CALLS');
-  const [feedTab, setFeedTab] = useState<'CALLS' | 'RAIDS'>(() => {
-    return isUnlocked ? 'CALLS' : 'RAIDS';
+  const [currentTab, setCurrentTab] = useState<DashboardTab>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab')?.toUpperCase();
+      if (
+        tabParam === 'ALPHA' ||
+        tabParam === 'SOCIAL' ||
+        tabParam === 'WATCHLIST' ||
+        tabParam === 'MAX_ALPHA'
+      ) {
+        return tabParam as DashboardTab;
+      }
+    }
+    return 'ALPHA';
   });
+
+  const handleSelectTab = (tab: DashboardTab) => {
+    setCurrentTab(tab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
 
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -115,6 +146,7 @@ export const IncubatorHub: React.FC = () => {
   const [formStopLoss, setFormStopLoss] = useState('-25% SL');
   const [formTakeProfits, setFormTakeProfits] = useState('2x, 5x, 10x');
   const [formPinned, setFormPinned] = useState(true);
+  const [formCallType, setFormCallType] = useState<CallType>('ALPHA');
   const [formMaxAlpha, setFormMaxAlpha] = useState(false);
   const [formSummary, setFormSummary] = useState('');
   const [formSerialTag, setFormSerialTag] = useState('');
@@ -305,7 +337,9 @@ export const IncubatorHub: React.FC = () => {
         : '2x, 5x, 10x'
     );
     setFormPinned(call.pinned || false);
-    setFormMaxAlpha(call.isMaxAlpha || false);
+    const initialCallType: CallType = call.callType || (call.isMaxAlpha ? 'MAX_ALPHA' : 'ALPHA');
+    setFormCallType(initialCallType);
+    setFormMaxAlpha(initialCallType === 'MAX_ALPHA' || Boolean(call.isMaxAlpha));
     setFormSummary(call.summary || '');
     setFormSerialTag(call.serialTag || '');
     setShowAdminForm(true);
@@ -322,6 +356,7 @@ export const IncubatorHub: React.FC = () => {
     setFormEntryMc('$250K');
     setFormSummary('');
     setFormSerialTag('');
+    setFormCallType('ALPHA');
     setFormMaxAlpha(false);
     setFormPinned(true);
   };
@@ -346,14 +381,15 @@ export const IncubatorHub: React.FC = () => {
         stopLoss: formStopLoss.trim(),
         takeProfitInput: formTakeProfits.trim(),
         pinned: formPinned,
-        isMaxAlpha: formMaxAlpha,
-        minTier: formMaxAlpha ? 'PRO' : 'LAB_MEMBER',
+        callType: formCallType,
+        isMaxAlpha: formCallType === 'MAX_ALPHA',
+        minTier: formCallType === 'ALPHA' ? 'LAB_MEMBER' : 'PRO',
         summary: formSummary.trim(),
         logoUrl: formLogoUrl.trim() || undefined,
       });
       setSubmittingCall(false);
       if (ok) {
-        showToast(`Saved changes to live call for ${formTicker.toUpperCase()}`);
+        showToast(`Saved changes: moved ${formTicker.toUpperCase()} to ${formCallType}`);
         handleCancelEdit();
         if (inspectedToken?.id === editingCall.id) {
           setInspectedToken(null);
@@ -375,8 +411,9 @@ export const IncubatorHub: React.FC = () => {
       stopLoss: formStopLoss.trim() || '-25% SL',
       takeProfitInput: formTakeProfits.trim() || '2x, 5x, 10x',
       pinned: formPinned,
-      isMaxAlpha: formMaxAlpha,
-      minTier: formMaxAlpha ? 'PRO' : 'LAB_MEMBER',
+      callType: formCallType,
+      isMaxAlpha: formCallType === 'MAX_ALPHA',
+      minTier: formCallType === 'ALPHA' ? 'LAB_MEMBER' : 'PRO',
       summary: formSummary.trim(),
       serialTag: formSerialTag.trim() || nextSerialTag,
       logoUrl: formLogoUrl.trim() || undefined,
@@ -384,9 +421,7 @@ export const IncubatorHub: React.FC = () => {
     setSubmittingCall(false);
     if (ok) {
       showToast(
-        `Posted ${formTicker.toUpperCase()} (${formChain}) [${
-          formSerialTag.trim() || nextSerialTag
-        }]${formMaxAlpha ? ' [MAX ALPHA 🔥 PRO ONLY]' : ''}${formPinned ? ' as PINNED PRIORITY CALL' : ''}`
+        `Published ${formTicker.toUpperCase()} (${formChain}) to ${formCallType}${formPinned ? ' as PINNED PRIORITY' : ''}`
       );
       handleCancelEdit();
     } else {
@@ -407,19 +442,57 @@ export const IncubatorHub: React.FC = () => {
     }
   };
 
-  const isProOrAdmin = tier.id === 'PRO' || isAdmin;
+  const currentMembershipTier: UserMembershipTier = useMemo(() => {
+    if (!connected) return 'FREE';
+    if (isAdmin || tier.id === 'PRO') return 'PRO';
+    if (tier.id === 'LAB_MEMBER') return 'MEMBER';
+    return 'FREE';
+  }, [connected, isAdmin, tier.id]);
+
+  const isCurrentTabAuthorized = useMemo(() => {
+    switch (currentTab) {
+      case 'SOCIAL':
+        return true;
+      case 'ALPHA':
+        return currentMembershipTier === 'MEMBER' || currentMembershipTier === 'PRO';
+      case 'WATCHLIST':
+      case 'MAX_ALPHA':
+        return currentMembershipTier === 'PRO';
+      default:
+        return false;
+    }
+  }, [currentTab, currentMembershipTier]);
+
+  const alphaCallsCount = useMemo(() => {
+    if (currentMembershipTier === 'FREE') return 0;
+    return alphas.filter((a) => a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha)).length;
+  }, [alphas, currentMembershipTier]);
+
+  const watchlistCallsCount = useMemo(() => {
+    if (currentMembershipTier !== 'PRO') return 0;
+    return alphas.filter((a) => a.callType === 'WATCHLIST').length;
+  }, [alphas, currentMembershipTier]);
+
+  const maxAlphaCallsCount = useMemo(() => {
+    if (currentMembershipTier !== 'PRO') return 0;
+    return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha)).length;
+  }, [alphas, currentMembershipTier]);
+
+  const isProOrAdmin = currentMembershipTier === 'PRO';
 
   const pinnedCalls = useMemo(
     () =>
-      isUnlocked
-        ? alphas.filter(
-            (a) =>
-              a.pinned &&
-              (selectedChain === 'ALL' || a.chain === selectedChain) &&
-              (!a.isMaxAlpha || isProOrAdmin)
-          )
+      isCurrentTabAuthorized
+        ? alphas.filter((a) => {
+            if (!a.pinned) return false;
+            if (selectedChain !== 'ALL' && a.chain !== selectedChain) return false;
+            if (currentTab === 'ALPHA') return a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha);
+            if (currentTab === 'MAX_ALPHA') return a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha);
+            if (currentTab === 'WATCHLIST') return a.callType === 'WATCHLIST';
+            return true;
+          })
         : [],
-    [alphas, selectedChain, isUnlocked, isProOrAdmin]
+    [alphas, selectedChain, isCurrentTabAuthorized, currentTab]
   );
 
   const pinnedCampaigns = useMemo(
@@ -429,9 +502,23 @@ export const IncubatorHub: React.FC = () => {
 
   const totalPinned = pinnedCalls.length + pinnedCampaigns.length;
 
+  const currentTabBaseAlphas = useMemo(() => {
+    if (!isCurrentTabAuthorized) return [];
+    if (currentTab === 'ALPHA') {
+      return alphas.filter((a) => a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha));
+    }
+    if (currentTab === 'MAX_ALPHA') {
+      return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha));
+    }
+    if (currentTab === 'WATCHLIST') {
+      return alphas.filter((a) => a.callType === 'WATCHLIST' || watchlist.includes(a.id));
+    }
+    return alphas;
+  }, [alphas, currentTab, isCurrentTabAuthorized, watchlist]);
+
   const visibleAlphas = useMemo(
-    () => alphas.filter((a) => !a.isMaxAlpha || isProOrAdmin),
-    [alphas, isProOrAdmin]
+    () => currentTabBaseAlphas,
+    [currentTabBaseAlphas]
   );
 
   const newCallsCount = useMemo(
@@ -448,10 +535,8 @@ export const IncubatorHub: React.FC = () => {
   }, [visibleAlphas]);
 
   const filteredTokens = useMemo(() => {
-    return alphas
+    return visibleAlphas
       .filter((item) => {
-        // Only Admin and Pro users can see MAX ALPHA cards
-        if (item.isMaxAlpha && !isProOrAdmin) return false;
         if (selectedChain !== 'ALL' && item.chain !== selectedChain) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -467,13 +552,13 @@ export const IncubatorHub: React.FC = () => {
           case 'PINNED':
             return item.pinned;
           case 'MAX_ALPHA':
-            return Boolean(item.isMaxAlpha);
+            return Boolean(item.isMaxAlpha || item.callType === 'MAX_ALPHA');
           case 'MOVERS':
             return item.change24hPct !== null && item.change24hPct >= 200;
           case 'NEW':
             return item.ageMinutes <= 180;
           case 'WATCHLIST':
-            return watchlist.includes(item.id);
+            return watchlist.includes(item.id) || item.callType === 'WATCHLIST';
           case 'ALL':
           default:
             return true;
@@ -489,7 +574,7 @@ export const IncubatorHub: React.FC = () => {
         if (sortBy === 'CHANGE') return compareChangeDesc(a, b);
         return a.ageMinutes - b.ageMinutes;
       });
-  }, [alphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy, isProOrAdmin]);
+  }, [visibleAlphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy]);
 
   const topWinningCoins = useMemo(
     () =>
@@ -563,21 +648,25 @@ export const IncubatorHub: React.FC = () => {
         shortAddress={shortAddress}
         tier={tier}
         formattedBalance={formattedBalance}
-        alphasCount={visibleAlphas.length}
+        alphasCount={alphaCallsCount}
         newCallsCount={newCallsCount}
         raidsCount={campaigns.length}
-        watchlistCount={watchlist.length}
+        watchlistCount={watchlistCallsCount}
         isUnlocked={isUnlocked}
         onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
         copiedGenesisCa={copiedId === 'hero-gen-ca'}
         onSelectFilter={(f) => {
-          setFeedTab('CALLS');
           if (f === 'all') setActiveFilter('ALL');
           else if (f === 'new') setActiveFilter('NEW');
-          else if (f === 'watchlist') setActiveFilter('WATCHLIST');
+          else if (f === 'watchlist') {
+            handleSelectTab('WATCHLIST');
+          }
         }}
         onSelectTab={(tab) => {
-          setFeedTab(tab === 'raids' ? 'RAIDS' : 'CALLS');
+          if (tab === 'ALPHA' || tab === 'alphas') handleSelectTab('ALPHA');
+          else if (tab === 'SOCIAL' || tab === 'raids') handleSelectTab('SOCIAL');
+          else if (tab === 'WATCHLIST') handleSelectTab('WATCHLIST');
+          else if (tab === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
           const listEl = document.getElementById('feed-tabs');
           if (listEl) listEl.scrollIntoView({ behavior: 'smooth' });
         }}
@@ -814,37 +903,89 @@ export const IncubatorHub: React.FC = () => {
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-4">
-                      <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-white cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={formMaxAlpha}
-                          onChange={(e) => setFormMaxAlpha(e.target.checked)}
-                          className="w-4 h-4 rounded border-border-default text-alpha-primary"
-                        />
-                        <Flame className="w-3.5 h-3.5 text-alpha-primary" />
-                        <span>Max Alpha (Pro Only)</span>
-                      </label>
+                  {/* Section 5: Admin Post Classification — Single Source of Truth */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                      Destination Tab Classification * (Single Source of Truth)
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormCallType('ALPHA');
+                          setFormMaxAlpha(false);
+                        }}
+                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                          formCallType === 'ALPHA'
+                            ? 'bg-purple-950/40 border-purple-500 text-white'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans text-xs font-black uppercase text-purple-400">ALPHA</span>
+                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">MEMBER+</span>
+                        </div>
+                        <p className="text-[11px] text-muted mt-1 leading-snug">Curated Alpha trade calls with TP/SL risk telemetry.</p>
+                      </button>
 
-                      <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-white cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={formPinned}
-                          onChange={(e) => setFormPinned(e.target.checked)}
-                          className="w-4 h-4 rounded border-border-default text-toxic"
-                        />
-                        <Pin className="w-3.5 h-3.5 text-toxic" />
-                        <span>Pin Priority</span>
-                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormCallType('MAX_ALPHA');
+                          setFormMaxAlpha(true);
+                        }}
+                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                          formCallType === 'MAX_ALPHA'
+                            ? 'bg-amber-950/40 border-amber-500 text-white'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans text-xs font-black uppercase text-amber-400">MAX ALPHA</span>
+                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
+                        </div>
+                        <p className="text-[11px] text-muted mt-1 leading-snug">High-conviction premium Alpha reserved for PRO members.</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormCallType('WATCHLIST');
+                          setFormMaxAlpha(false);
+                        }}
+                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                          formCallType === 'WATCHLIST'
+                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans text-xs font-black uppercase text-emerald-400">WATCHLIST</span>
+                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
+                        </div>
+                        <p className="text-[11px] text-muted mt-1 leading-snug">Curated long-term projects for ongoing research.</p>
+                      </button>
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <label className="inline-flex items-center gap-2 font-sans text-xs font-bold text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formPinned}
+                        onChange={(e) => setFormPinned(e.target.checked)}
+                        className="w-4 h-4 rounded border-border-default text-toxic"
+                      />
+                      <Pin className="w-3.5 h-3.5 text-toxic" />
+                      <span>Pin Priority to Top</span>
+                    </label>
 
                     <button
                       type="submit"
                       disabled={submittingCall}
                       className="h-10 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors"
                     >
-                      {submittingCall ? 'Processing...' : editingCall ? 'Save Changes' : '+ Publish Alpha Call'}
+                      {submittingCall ? 'Processing...' : editingCall ? 'Save Changes' : '+ Publish Call'}
                     </button>
                   </div>
                 </form>
@@ -884,43 +1025,52 @@ export const IncubatorHub: React.FC = () => {
 
       {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
       <div id="feed-tabs" className="space-y-4 pt-2">
-        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default">
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default overflow-x-auto no-scrollbar scroll-smooth">
+          {/* TAB 1: ALPHA */}
           <button
             type="button"
-            onClick={() => setFeedTab('CALLS')}
-            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              feedTab === 'CALLS'
+            onClick={() => handleSelectTab('ALPHA')}
+            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'ALPHA'
                 ? 'bg-alpha-strong text-white border border-alpha-border'
-                : 'text-muted hover:text-white hover:bg-surface-card'
+                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
             }`}
           >
-            <Target className="w-4 h-4 text-alpha-primary" />
-            <span>ALPHA TRADE CALLS</span>
-            <span
-              className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                feedTab === 'CALLS'
-                  ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
-                  : 'bg-surface-card text-muted'
-              }`}
-            >
-              {alphas.length}
-            </span>
+            <Target className="w-4 h-4 text-alpha-primary shrink-0" />
+            <span>ALPHA</span>
+            {currentMembershipTier === 'FREE' ? (
+              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
+                <Lock className="w-3 h-3 text-toxic" />
+                <span>MEMBER</span>
+              </span>
+            ) : (
+              <span
+                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
+                  currentTab === 'ALPHA'
+                    ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
+                    : 'bg-surface-card text-muted'
+                }`}
+              >
+                {alphaCallsCount}
+              </span>
+            )}
           </button>
 
+          {/* TAB 2: SOCIAL */}
           <button
             type="button"
-            onClick={() => setFeedTab('RAIDS')}
-            className={`flex-1 py-3 px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              feedTab === 'RAIDS'
+            onClick={() => handleSelectTab('SOCIAL')}
+            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'SOCIAL'
                 ? 'bg-raid-strong text-white border border-raid-border'
-                : 'text-muted hover:text-white hover:bg-surface-card'
+                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-raid-primary" />
-            <span>⚡ X RAID CAMPAIGNS &amp; REWARDS</span>
+            <Sparkles className="w-4 h-4 text-raid-primary shrink-0" />
+            <span>SOCIAL</span>
             <span
               className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                feedTab === 'RAIDS'
+                currentTab === 'SOCIAL'
                   ? 'bg-raid-bg text-raid-text border border-raid-border'
                   : 'bg-surface-card text-muted'
               }`}
@@ -928,23 +1078,70 @@ export const IncubatorHub: React.FC = () => {
               {campaigns.length}
             </span>
           </button>
+
+          {/* TAB 3: WATCHLIST */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('WATCHLIST')}
+            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'WATCHLIST'
+                ? 'bg-surface-card text-white border border-border-muted ring-1 ring-amber/50'
+                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
+            }`}
+          >
+            <Star className="w-4 h-4 text-amber shrink-0" />
+            <span>WATCHLIST</span>
+            {currentMembershipTier !== 'PRO' ? (
+              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
+                <Lock className="w-3 h-3 text-alpha-primary" />
+                <span>PRO</span>
+              </span>
+            ) : (
+              <span
+                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
+                  currentTab === 'WATCHLIST'
+                    ? 'bg-surface-card text-amber border border-border-muted'
+                    : 'bg-surface-card text-muted'
+                }`}
+              >
+                {watchlistCallsCount}
+              </span>
+            )}
+          </button>
+
+          {/* TAB 4: MAX ALPHA */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('MAX_ALPHA')}
+            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'MAX_ALPHA'
+                ? 'bg-alpha-strong text-white border border-alpha-border ring-1 ring-alpha-primary/50'
+                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
+            }`}
+          >
+            <Flame className="w-4 h-4 text-alpha-primary shrink-0" />
+            <span>MAX ALPHA</span>
+            {currentMembershipTier !== 'PRO' ? (
+              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
+                <Lock className="w-3 h-3 text-alpha-primary" />
+                <span>PRO</span>
+              </span>
+            ) : (
+              <span
+                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
+                  currentTab === 'MAX_ALPHA'
+                    ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
+                    : 'bg-surface-card text-muted'
+                }`}
+              >
+                {maxAlphaCallsCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {!isUnlocked && feedTab === 'CALLS' ? (
-          <div className="space-y-6 pt-2">
-            <LockedTerminal />
-            <div className="space-y-3 pt-2">
-              <CampaignSection
-                userWallet={publicKeyBase58}
-                isAdmin={isAdmin}
-                campaigns={campaigns}
-                loading={campaignsLoading}
-                onRefresh={fetchCampaigns}
-                onTogglePin={handleTogglePinCampaign}
-              />
-            </div>
-          </div>
-        ) : feedTab === 'RAIDS' ? (
+        {/* TAB CONTENT ROUTING */}
+        {currentTab === 'SOCIAL' ? (
           <div className="space-y-4 pt-2">
             <CampaignSection
               userWallet={publicKeyBase58}
@@ -955,9 +1152,21 @@ export const IncubatorHub: React.FC = () => {
               onTogglePin={handleTogglePinCampaign}
             />
           </div>
+        ) : !isCurrentTabAuthorized ? (
+          <MembershipRestrictionScreen
+            category={currentTab as RestrictedCategory}
+            userTier={currentMembershipTier}
+            onUpgradeClick={() => {
+              if (!connected) {
+                requestUnlockSignature?.();
+              } else {
+                router.push('/dashboard/stake');
+              }
+            }}
+          />
         ) : (
           <div className="space-y-6">
-            {/* 7. ALL CATEGORIZED ALPHA CALLS */}
+            {/* 7. ALL CATEGORIZED ALPHA / WATCHLIST / MAX ALPHA CALLS */}
             <div className="space-y-4 pt-2">
               {apiError && (
                 <div className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
@@ -978,7 +1187,11 @@ export const IncubatorHub: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h2 className="font-sans text-lg sm:text-xl font-extrabold text-white">
-                    All Alpha Trade Calls by Blockchain
+                    {currentTab === 'ALPHA'
+                      ? 'Curated Alpha Trade Calls'
+                      : currentTab === 'WATCHLIST'
+                      ? 'Curated Watchlist & Research Projects'
+                      : 'Max Alpha Premium High-Conviction Calls'}
                   </h2>
                   <p className="font-sans text-xs text-muted">
                     Showing <strong className="text-toxic font-mono">{filteredTokens.length}</strong> calls
@@ -1119,9 +1332,19 @@ export const IncubatorHub: React.FC = () => {
                     <div className="w-10 h-10 rounded-full bg-surface-card border border-border-default mx-auto flex items-center justify-center text-muted">
                       <Search className="w-4 h-4" />
                     </div>
-                    <h3 className="font-sans text-base font-bold text-white">No trade calls found</h3>
+                    <h3 className="font-sans text-base font-bold text-white">
+                      {currentTab === 'ALPHA'
+                        ? 'No Alpha Calls Found'
+                        : currentTab === 'WATCHLIST'
+                        ? 'No Watchlist Projects Found'
+                        : 'No Max Alpha Calls Found'}
+                    </h3>
                     <p className="font-sans text-xs text-muted max-w-sm mx-auto">
-                      No alpha calls match your active filter or search query. Try switching blockchains or reset filters.
+                      {currentTab === 'ALPHA'
+                        ? 'No active Alpha trade calls match your active filter or search query. Try switching blockchains or reset filters.'
+                        : currentTab === 'WATCHLIST'
+                        ? 'No curated Watchlist research projects match your active filter. Check back shortly for new team research.'
+                        : 'No premium Max Alpha calls currently match your active filter.'}
                     </p>
                     <button
                       type="button"
