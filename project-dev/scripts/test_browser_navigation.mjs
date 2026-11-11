@@ -82,9 +82,9 @@ async function runBrowserTests() {
     await cdp.send('DOM.enable');
 
     // ------------------------------------------------------------------------
-    // TEST 1: Viewports audit (Sticky Header & Responsive Dimensions)
+    // TEST 1: Viewports audit (Real Sticky Position & Scroll Overlap Verification)
     // ------------------------------------------------------------------------
-    console.log('\n--- 1. Testing Sticky Header at Viewport Widths ---');
+    console.log('\n--- 1. Testing Sticky Header at Viewport Widths (Initial, Scroll 500px, Scroll 1500px, Overlap check) ---');
     for (const w of VIEWPORTS) {
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: w,
@@ -93,10 +93,11 @@ async function runBrowserTests() {
         mobile: w < 1024,
       });
 
+      // 1. Load homepage and record initial position
       await cdp.send('Page.navigate', { url: `${BASE_URL}/` });
       await new Promise((r) => setTimeout(r, 1200));
 
-      const headerInfo = await cdp.eval(`
+      const initialInfo = await cdp.eval(`
         (() => {
           const header = document.querySelector('header');
           if (!header) return null;
@@ -105,20 +106,75 @@ async function runBrowserTests() {
           return {
             exists: true,
             position: style.position,
-            top: style.top,
+            top: rect.top,
             zIndex: style.zIndex,
             height: rect.height,
             width: rect.width,
-            isSticky: style.position === 'sticky' && style.top === '0px'
+            isSticky: style.position === 'sticky' && Math.abs(rect.top) < 1
           };
         })()
       `);
 
-      assert.ok(headerInfo?.exists, `Header must exist at ${w}px`);
-      assert.equal(headerInfo.position, 'sticky', `Header position must be sticky at ${w}px`);
-      assert.equal(headerInfo.top, '0px', `Header top must be 0px at ${w}px`);
-      assert.ok(headerInfo.height >= 56 && headerInfo.height <= 88, `Header height must be within bounds at ${w}px (got: ${headerInfo.height})`);
-      console.log(`  ✓ ${w}px: position=${headerInfo.position}, top=${headerInfo.top}, z-index=${headerInfo.zIndex}, height=${headerInfo.height}px`);
+      assert.ok(initialInfo?.exists, `Header must exist at ${w}px`);
+      assert.equal(initialInfo.position, 'sticky', `Header position must be sticky at ${w}px`);
+      assert.ok(Math.abs(initialInfo.top) < 1, `Header top must be ~0 at ${w}px`);
+      assert.ok(initialInfo.height >= 56 && initialInfo.height <= 88, `Header height must be within bounds at ${w}px (got: ${initialInfo.height})`);
+
+      // 2. Scroll approximately 500px and verify header remains visible and pinned at top: 0
+      await cdp.eval(`window.scrollTo({ top: 500, behavior: 'instant' });`);
+      await new Promise((r) => setTimeout(r, 300));
+
+      const scroll500 = await cdp.eval(`
+        (() => {
+          const header = document.querySelector('header');
+          if (!header) return null;
+          const rect = header.getBoundingClientRect();
+          const midX = Math.floor(rect.width / 2);
+          const midY = Math.floor(rect.height / 2);
+          const topEl = document.elementFromPoint(midX, midY);
+          return {
+            scrollY: window.scrollY,
+            top: rect.top,
+            height: rect.height,
+            isSticky: Math.abs(rect.top) < 1,
+            noOverlap: header.contains(topEl),
+            topElTag: topEl ? topEl.tagName : null,
+          };
+        })()
+      `);
+
+      assert.ok(scroll500.scrollY >= 400, `Window must be scrolled at 500px test for ${w}px (got: ${scroll500.scrollY})`);
+      assert.ok(scroll500.isSticky, `Header top must remain ~0 at scroll 500px for ${w}px (got: ${scroll500.top})`);
+      assert.ok(scroll500.noOverlap, `No content must overlap header at scroll 500px for ${w}px`);
+
+      // 3. Scroll further down (~1500px) and repeat assertions
+      await cdp.eval(`window.scrollTo({ top: 1500, behavior: 'instant' });`);
+      await new Promise((r) => setTimeout(r, 300));
+
+      const scroll1500 = await cdp.eval(`
+        (() => {
+          const header = document.querySelector('header');
+          if (!header) return null;
+          const rect = header.getBoundingClientRect();
+          const midX = Math.floor(rect.width / 2);
+          const midY = Math.floor(rect.height / 2);
+          const topEl = document.elementFromPoint(midX, midY);
+          return {
+            scrollY: window.scrollY,
+            top: rect.top,
+            height: rect.height,
+            isSticky: Math.abs(rect.top) < 1,
+            noOverlap: header.contains(topEl),
+            topElTag: topEl ? topEl.tagName : null,
+          };
+        })()
+      `);
+
+      assert.ok(scroll1500.scrollY >= 1000, `Window must be scrolled further at 1500px test for ${w}px (got: ${scroll1500.scrollY})`);
+      assert.ok(scroll1500.isSticky, `Header top must remain ~0 at scroll 1500px for ${w}px (got: ${scroll1500.top})`);
+      assert.ok(scroll1500.noOverlap, `No content must overlap header at scroll 1500px for ${w}px`);
+
+      console.log(`  ✓ ${w}px: initial top=${initialInfo.top}px, scroll 500px top=${scroll500.top}px (no overlap), scroll 1500px top=${scroll1500.top}px (no overlap)`);
     }
 
     // ------------------------------------------------------------------------
@@ -271,6 +327,58 @@ async function runBrowserTests() {
     `);
     assert.equal(returnedIncubator.pathname, '/', 'Must return to homepage');
     console.log('  ✓ Returned to /#pipeline-section from /ledger successfully');
+
+    // Test Navigation from /dashboard
+    console.log('\n--- 2b. Testing Navigation from /dashboard ---');
+    await cdp.send('Page.navigate', { url: `${BASE_URL}/dashboard` });
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const dashboardState = await cdp.eval(`
+      (() => {
+        return {
+          pathname: window.location.pathname,
+          headerExists: Boolean(document.querySelector('header')),
+        };
+      })()
+    `);
+    assert.equal(dashboardState.pathname, '/dashboard', 'Must load /dashboard successfully');
+    assert.ok(dashboardState.headerExists, 'Header must exist on /dashboard');
+
+    // Click logo on /dashboard to return to landing page
+    await cdp.eval(`
+      (() => {
+        const logoLink = document.querySelector('header a[href="/"]');
+        logoLink?.click();
+      })()
+    `);
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const returnFromDashLogo = await cdp.eval(`window.location.pathname`);
+    assert.equal(returnFromDashLogo, '/', 'Must navigate from /dashboard to / when clicking logo');
+    console.log('  ✓ Navigated from /dashboard to / via header logo');
+
+    // Navigate to /dashboard again and test footer navigation back to landing section
+    await cdp.send('Page.navigate', { url: `${BASE_URL}/dashboard` });
+    await new Promise((r) => setTimeout(r, 1500));
+
+    await cdp.eval(`
+      (() => {
+        const footerLink = Array.from(document.querySelectorAll('footer a')).find(a => a.textContent.includes('HOW IT WORKS') || a.getAttribute('href')?.includes('#how-it-works'));
+        footerLink?.click();
+      })()
+    `);
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const returnFromDashFooter = await cdp.eval(`
+      (() => {
+        return {
+          pathname: window.location.pathname,
+          hash: window.location.hash
+        };
+      })()
+    `);
+    assert.equal(returnFromDashFooter.pathname, '/', 'Must navigate from /dashboard back to homepage via footer link');
+    console.log('  ✓ Navigated from /dashboard to homepage section via footer link');
 
     // ------------------------------------------------------------------------
     // TEST 3: Mobile Navigation Drawer (375px)
