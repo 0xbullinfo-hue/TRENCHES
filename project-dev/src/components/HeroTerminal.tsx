@@ -73,10 +73,6 @@ export const HeroTerminal: React.FC = () => {
             <span className="text-muted">DASHBOARD:</span>
             <span className="text-amber">COMING SOON</span>
           </div>
-
-          <span className="text-muted text-xs font-sans hidden md:inline ml-1">
-            Controlled Soft-Launch Phase
-          </span>
         </div>
 
         {/* Main Aligned 12-Column Hero Grid */}
