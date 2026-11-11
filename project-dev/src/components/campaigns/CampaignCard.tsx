@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   ExternalLink,
@@ -23,6 +23,30 @@ interface CampaignCardProps {
   onTogglePin?: (campaignId: string, pinned: boolean) => void;
 }
 
+/**
+ * Section 6.2 Strict Requirement:
+ * Display CONFIGURED DURATION ONLY (e.g. 12 HOURS, 24 HOURS, 48 HOURS, 3 DAYS, 7 DAYS, 14 DAYS).
+ * No countdown timers, no "left" strings, no tooltips revealing exact closing dates.
+ */
+function getConfiguredDurationLabel(createdAt?: string, expiresAt?: string): string {
+  if (!expiresAt) return '24 HOURS';
+  try {
+    const end = new Date(expiresAt).getTime();
+    const start = createdAt ? new Date(createdAt).getTime() : end - 24 * 3600 * 1000;
+    const diffHours = Math.round(Math.max(1, (end - start) / (1000 * 60 * 60)));
+    if (diffHours <= 14) return '12 HOURS';
+    if (diffHours <= 28) return '24 HOURS';
+    if (diffHours <= 54) return '48 HOURS';
+    if (diffHours <= 84) return '3 DAYS';
+    if (diffHours <= 180) return '7 DAYS';
+    if (diffHours <= 360) return '14 DAYS';
+    const weeks = Math.round(diffHours / 168);
+    return `${weeks} ${weeks === 1 ? 'WEEK' : 'WEEKS'}`;
+  } catch {
+    return '24 HOURS';
+  }
+}
+
 export const CampaignCard: React.FC<CampaignCardProps> = ({
   campaign,
   userWallet,
@@ -40,21 +64,6 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     campaign.userSubmission || null
   );
   const [copiedWallet, setCopiedWallet] = useState(false);
-  const [currentTime, setCurrentTime] = useState<number | null>(null);
-
-  // Client-side timer initialization
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCurrentTime(Date.now());
-    }, 0);
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, []);
 
   // Keep wallet input in sync if userWallet connects later
   React.useEffect(() => {
@@ -88,6 +97,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setErrorMsg(null);
     setSuccessMsg(null);
 
@@ -143,27 +153,11 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     setTimeout(() => setCopiedWallet(false), 1800);
   };
 
+  // Section 6.3: Authoritative Campaign Status
   const isCompleted = campaign.status === 'COMPLETED';
-
-  // Format remaining raid duration safely
-  const durationBadge = React.useMemo(() => {
-    if (!campaign.expiresAt) return null;
-    if (currentTime === null) return null;
-    const diffMs = new Date(campaign.expiresAt).getTime() - currentTime;
-    if (diffMs <= 0) return 'EXPIRED';
-    const totalMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    if (hours >= 24) {
-      const days = Math.floor(hours / 24);
-      const remainingHours = hours % 24;
-      return `${days}d ${remainingHours}h left`;
-    }
-    if (hours > 0) {
-      return `${hours}h ${mins}m left`;
-    }
-    return `${mins}m left`;
-  }, [campaign.expiresAt, currentTime]);
+  const isExpired = campaign.status === 'PAUSED';
+  const statusLabel = isCompleted ? 'COMPLETED' : isExpired ? 'EXPIRED' : 'ACTIVE';
+  const configuredDuration = getConfiguredDurationLabel(campaign.createdAt, campaign.expiresAt);
 
   return (
     <article
@@ -172,12 +166,30 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-150 p-4 sm:p-5 border border-raid-border hover:border-raid-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-raid-primary shadow-none"
     >
       <div>
-        {/* Top Row: Category Tag + Priority Pin + Admin Pin Button */}
+        {/* Top Row: Category Tag + Platform + Campaign Status + Priority Pin */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border-default">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-raid-text">
               <Sparkles className="w-3 h-3 text-raid-primary" />
               <span>SOCIAL RAID</span>
+            </span>
+
+            {/* Campaign Status (Section 6.3) */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
+                isCompleted
+                  ? 'bg-surface-card border border-border-default text-muted'
+                  : isExpired
+                  ? 'bg-danger/20 text-danger border border-danger/40'
+                  : 'bg-raid-bg text-raid-text border border-raid-border'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isCompleted ? 'bg-muted' : isExpired ? 'bg-danger' : 'bg-raid-primary'
+                }`}
+              />
+              <span>{statusLabel}</span>
             </span>
 
             {campaign.pinned && (
@@ -209,26 +221,18 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           )}
         </div>
 
-        {/* Campaign Title & Duration Badge Row */}
+        {/* Campaign Title & Configured Duration Row (Section 6.2) */}
         <div className="pt-3 pb-2 space-y-2">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <h3 className="font-sans text-base font-extrabold text-white group-hover:text-raid-text transition-colors leading-tight">
               {campaign.title}
             </h3>
 
-            {durationBadge && (
-              <span
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-bold uppercase tracking-wider shrink-0 ${
-                  durationBadge === 'EXPIRED'
-                    ? 'bg-surface-card text-muted border border-border-default'
-                    : 'bg-raid-bg text-raid-text border border-raid-border'
-                }`}
-                title={campaign.expiresAt ? `Raid closes at ${new Date(campaign.expiresAt).toLocaleString()}` : undefined}
-              >
-                <Clock className="w-3 h-3 text-raid-primary" />
-                <span>{durationBadge}</span>
-              </span>
-            )}
+            {/* Configured Duration Badge ONLY (Section 6.2 - no countdowns, no closing timestamps) */}
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-card border border-border-default font-mono text-xs font-bold text-muted uppercase tracking-wider shrink-0">
+              <Clock className="w-3 h-3 text-raid-primary" />
+              <span>{configuredDuration}</span>
+            </span>
           </div>
 
           <p className="font-sans text-xs text-muted leading-relaxed line-clamp-3">
@@ -249,16 +253,16 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             </div>
           )}
 
-          {/* Primary Action Button: Open X Tweet (Standard 40px height) */}
+          {/* Primary Action Button: Open X Tweet */}
           <a
             href={campaign.tweetUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-between w-full h-10 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-raid-border text-white font-sans text-xs font-bold transition-colors mt-2"
+            className="inline-flex items-center justify-between w-full h-11 min-h-[44px] px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-raid-border text-white font-sans text-xs font-bold transition-colors mt-2"
           >
             <span className="flex items-center gap-2">
               <Twitter className="w-4 h-4 text-raid-primary" />
-              <span>Open Target Post on X (Twitter)</span>
+              <span>View Raid Post on X</span>
             </span>
             <ExternalLink className="w-3.5 h-3.5 text-raid-primary" />
           </a>
@@ -357,16 +361,16 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               )}
             </div>
           </div>
-        ) : isCompleted ? (
-          <div className="py-2 text-center text-xs font-sans text-muted">
-            This raid campaign has concluded.
+        ) : isCompleted || isExpired ? (
+          <div className="py-3 text-center text-xs font-sans text-muted bg-surface-card rounded-lg border border-border-default">
+            This raid campaign has concluded ({statusLabel}).
           </div>
         ) : (
-          /* Submission Form */
-          <form onSubmit={handleSubmit} className="space-y-2">
+          /* Submission Form (Section 6.4) */
+          <form onSubmit={handleSubmit} className="space-y-2.5">
             <div className="font-sans text-[11px] font-extrabold uppercase text-raid-primary flex items-center justify-between">
               <span>Submit Proof for Airdrop</span>
-              <span className="text-muted font-normal text-[10px]">Open to Free &amp; Pro</span>
+              <span className="text-muted font-normal text-[10px]">Open to All Wallets</span>
             </div>
 
             {errorMsg && (
@@ -383,42 +387,52 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <div>
+                <label className="sr-only" htmlFor={`wallet-${campaign.id}`}>Solana Wallet Address</label>
                 <input
+                  id={`wallet-${campaign.id}`}
                   type="text"
                   value={walletInput}
                   onChange={(e) => setWalletInput(e.target.value)}
                   placeholder="Your Solana wallet address..."
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
-                <input
-                  type="text"
-                  value={xHandleInput}
-                  onChange={(e) => setXHandleInput(e.target.value)}
-                  placeholder="Your @XHandle..."
-                  className="h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
-                />
-                <input
-                  type="text"
-                  value={retweetLinkInput}
-                  onChange={(e) => setRetweetLinkInput(e.target.value)}
-                  placeholder="Retweet Link URL..."
-                  className="h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="sr-only" htmlFor={`xhandle-${campaign.id}`}>X Handle</label>
+                  <input
+                    id={`xhandle-${campaign.id}`}
+                    type="text"
+                    value={xHandleInput}
+                    onChange={(e) => setXHandleInput(e.target.value)}
+                    placeholder="Your @XHandle..."
+                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="sr-only" htmlFor={`retweet-${campaign.id}`}>Retweet Link</label>
+                  <input
+                    id={`retweet-${campaign.id}`}
+                    type="text"
+                    value={retweetLinkInput}
+                    onChange={(e) => setRetweetLinkInput(e.target.value)}
+                    placeholder="Retweet Link URL..."
+                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full h-10 px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50"
+              className="w-full h-11 min-h-[44px] px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>{submitting ? 'Submitting...' : 'Claim Raid Airdrop'}</span>
+              <span>{submitting ? 'Submitting Proof...' : 'Claim Raid Airdrop'}</span>
             </button>
           </form>
         )}

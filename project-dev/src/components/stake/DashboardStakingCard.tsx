@@ -67,7 +67,7 @@ export function TelegramVerificationCard({
       <div className="pt-5 mt-auto space-y-3">
         {status === 'linked' ? (
           <div className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
-            <span className="inline-flex items-center gap-1.5 text-pump font-bold uppercase text-[11px]">
+            <span className="inline-flex items-center gap-1.5 text-toxic font-bold uppercase text-[11px]">
               <Check className="w-4 h-4 stroke-[2.5]" /> Telegram alerts on
             </span>
             <button
@@ -103,7 +103,7 @@ export function TelegramVerificationCard({
           <p className="font-sans text-xs text-danger font-semibold">{message}</p>
         )}
 
-        <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
+        <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
           Direct bot verification via @Trenchlabs_bot • Member &amp; Pro channels
         </p>
       </div>
@@ -124,7 +124,7 @@ function StakePointLiveSection({
 }) {
   if (loading) {
     return (
-      <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-2 animate-pulse">
+      <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-2 animate-pulse">
         <div className="h-3 w-28 bg-surface rounded" />
         <div className="h-7 w-24 bg-surface rounded" />
       </div>
@@ -138,7 +138,7 @@ function StakePointLiveSection({
         <button
           type="button"
           onClick={onRetry}
-          className="text-pump hover:text-pump-hover underline font-bold cursor-pointer inline-flex items-center gap-1"
+          className="text-toxic hover:text-toxic-bright underline font-bold cursor-pointer inline-flex items-center gap-1"
         >
           <RefreshCw className="w-3 h-3" />
           <span>[Retry]</span>
@@ -149,7 +149,7 @@ function StakePointLiveSection({
 
   if (!pools || pools.length === 0) {
     return (
-      <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-1">
+      <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-1">
         <div className="font-sans text-xs font-bold text-white">
           No staking pool is currently active for $GENESIS.
         </div>
@@ -167,13 +167,13 @@ function StakePointLiveSection({
   const lock = formatLockPeriodDisplay(pool.lockPeriod);
 
   return (
-    <div className="rounded-lg bg-surface-card border border-line p-3.5 space-y-2">
+    <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-2">
       <div className="flex items-center justify-between">
         <span className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
           LIVE STAKEPOINT APR
         </span>
         {pool.status && (
-          <span className="font-sans text-[11px] font-bold text-pump uppercase">
+          <span className="font-sans text-[11px] font-bold text-toxic uppercase">
             ● {pool.status}
           </span>
         )}
@@ -181,14 +181,14 @@ function StakePointLiveSection({
 
       <div
         className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${
-          aprIsPositive ? 'text-pump' : 'text-muted'
+          aprIsPositive ? 'text-toxic' : 'text-muted'
         }`}
       >
         {aprValue !== null ? `${aprValue.toFixed(1)}%` : '0.0%'}
       </div>
 
       {(tvl || lock) && (
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-line/60">
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border-default/60">
           {tvl && (
             <div>
               <span className="block font-sans text-2xs uppercase text-muted font-bold tracking-wider">
@@ -303,7 +303,7 @@ export function DashboardStakingCard({
   // 1. Free Tier / Not Connected: Combined Staking & Requirement Card
   if (!connected || (isFreeTier && !hasActiveStake)) {
     const freeCard = (
-      <div className="rounded-xl bg-surface border border-line p-5 sm:p-6 transition-all flex flex-col justify-between h-full">
+      <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 transition-all flex flex-col justify-between h-full">
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
@@ -317,7 +317,7 @@ export function DashboardStakingCard({
                 href={stakePointPoolUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted hover:text-pump transition-colors"
+                className="text-muted hover:text-toxic transition-colors"
                 title="Open Pool on StakePoint"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -356,7 +356,7 @@ export function DashboardStakingCard({
           </div>
 
           {/* Powered by StakePoint. */}
-          <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
+          <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
             Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
@@ -394,7 +394,7 @@ export function DashboardStakingCard({
                 href={stakePointPoolUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted hover:text-pump transition-colors"
+                className="text-muted hover:text-toxic transition-colors"
                 title="Open Pool on StakePoint"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -437,7 +437,7 @@ export function DashboardStakingCard({
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="h-10 sm:h-11 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="h-10 sm:h-11 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <span>Details</span>
               {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -446,12 +446,12 @@ export function DashboardStakingCard({
 
           {/* Expanded Progress / Details */}
           {expanded && (
-            <div className="pt-3 border-t border-line space-y-2 font-sans text-xs">
+            <div className="pt-3 border-t border-border-default space-y-2 font-sans text-xs">
               <div className="flex justify-between text-2xs font-mono text-muted">
                 <span>Lock Duration</span>
                 <span>{progressPct}% elapsed</span>
               </div>
-              <div className="w-full h-2 bg-canvas rounded-full overflow-hidden border border-line">
+              <div className="w-full h-2 bg-canvas rounded-full overflow-hidden border border-border-default">
                 <div
                   className="h-full bg-toxic rounded-full transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
@@ -461,7 +461,7 @@ export function DashboardStakingCard({
           )}
 
           {/* Powered by StakePoint. */}
-          <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
+          <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
             Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
@@ -503,7 +503,7 @@ export function DashboardStakingCard({
               href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted hover:text-pump transition-colors"
+              className="text-muted hover:text-toxic transition-colors"
               title="Open Pool on StakePoint"
             >
               <ArrowUpRight className="w-4 h-4" />
@@ -545,12 +545,12 @@ export function DashboardStakingCard({
         </div>
 
         {pools && pools.length > 1 && (
-          <div className="pt-1.5 border-t border-line/40">
+          <div className="pt-1.5 border-t border-border-default/40">
             <a
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-pump hover:text-pump-hover inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-bold text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
             >
               <span>View all pools →</span>
             </a>
@@ -558,7 +558,7 @@ export function DashboardStakingCard({
         )}
 
         {/* Powered by StakePoint. */}
-        <p className="font-sans text-2xs text-dim pt-2.5 border-t border-line/40">
+        <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
           Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
         </p>
       </div>
@@ -579,3 +579,4 @@ export function DashboardStakingCard({
     </div>
   );
 }
+

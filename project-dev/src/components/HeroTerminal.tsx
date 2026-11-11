@@ -3,31 +3,31 @@
 import React from 'react';
 import Image from 'next/image';
 import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, Send } from 'lucide-react';
+import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
-    label: 'ACCESS REQUIREMENT',
+    label: 'MEMBER ACCESS',
     value: 'HOLD OR STAKE',
-    sub: '$GENESIS REQUIRED FOR MEMBER ACCESS',
+    sub: 'HOLD ~$20 OR STAKE $250 FOR ACCESS',
     highlight: true,
   },
   {
-    label: 'CALL DETAILS',
-    value: 'CA · RISK · TP',
-    sub: 'TRADE SETUP INFORMATION IN EACH CALL',
+    label: 'TRADE INTELLIGENCE',
+    value: 'ENTRY · RISK · TP',
+    sub: 'CURATED RESEARCH WITH STRUCTURED SL/TP',
     highlight: true,
   },
   {
-    label: 'SUPPORTED NETWORKS',
+    label: 'MULTI-CHAIN COVERAGE',
     value: '6 CHAINS',
-    sub: 'SOL · BNB · ETH · BASE · ROBIN · AVAX',
+    sub: 'SOL · BSC · ETH · BASE · ROBIN · AVAX',
     highlight: false,
   },
   {
-    label: 'EXECUTION',
-    value: 'YOUR CHOICE',
-    sub: 'INFORMATION ONLY — YOU CONTROL EVERY TRADE',
+    label: 'NON-CUSTODIAL EXECUTION',
+    value: 'INDEPENDENT',
+    sub: 'YOU CONTROL & EXECUTE EVERY TRADE',
     highlight: false,
   },
 ];
@@ -46,17 +46,44 @@ function XIcon({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 export const HeroTerminal: React.FC = () => {
+  const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
+
   return (
     <section
       id="hero-section"
       className="relative border-b border-toxic-border bg-canvas overflow-hidden"
     >
-      <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-14">
-        {/* Main Aligned 12-Column Hero Grid — Aligned with Full Height */}
+      <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-14">
+        {/* Soft-Launch Status Strip */}
+        <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
+            <span className="text-muted">TOKEN:</span>
+            <span className="text-white">LIVE</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
+            <span className="text-muted">COMMUNITY:</span>
+            <span className="text-white">OPEN</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber" />
+            <span className="text-muted">DASHBOARD:</span>
+            <span className="text-amber">COMING SOON</span>
+          </div>
+
+          <span className="text-muted text-xs font-sans hidden md:inline ml-1">
+            Controlled Soft-Launch Phase
+          </span>
+        </div>
+
+        {/* Main Aligned 12-Column Hero Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
-          {/* Left Column (6 cols): Display Headline + Subtext + Buy Button + 2 Social Buttons */}
+          {/* Left Column (6 cols): Headline + Subtext + Soft-Launch CTAs */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
-            <h1 className="font-display uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[84px] leading-[0.96] tracking-[0.015em] break-words">
+            <h1 className="font-display uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[74px] xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
               <span className="block">BUILDING THE STRONGEST</span>
               <span className="block">COMMUNITY IN THE</span>
               <span className="block text-toxic">TRENCHES</span>
@@ -70,43 +97,51 @@ export const HeroTerminal: React.FC = () => {
               there&apos;s a trench, we&apos;re in it.
             </p>
 
-            {/* Primary Buy Button (Pump.fun) + 2 Community Buttons Underneath (Split 50/50, Same Size) */}
+            {/* Primary Soft-Launch Conversion Unit */}
             <div className="w-full space-y-3 pt-2">
-              <a
-                href={BUY_LINKS.pump}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full h-12 sm:h-[52px] px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors"
-              >
-                <span>BUY $GENESIS ON PUMP.FUN</span>
-                <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
-              </a>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div>
                 <a
-                  href={SOCIAL_LINKS.telegram}
+                  href={communityUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 sm:h-[52px] px-2 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
                 >
-                  <Send className="w-4 h-4 text-toxic shrink-0" />
-                  <span>JOIN THE LAB</span>
+                  <Send className="w-4 h-4 fill-current" />
+                  <span>JOIN THE SOFT LAUNCH</span>
+                  <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
                 </a>
+                <p className="font-sans text-xs text-muted text-center pt-2">
+                  Get early access updates, launch announcements and community access.
+                </p>
+              </div>
 
+              {/* Secondary Actions: FOLLOW ON X + VIEW $GENESIS */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
                 <a
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 sm:h-[52px] px-2 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-4 h-4 text-toxic shrink-0" />
                   <span>FOLLOW ON X</span>
+                </a>
+
+                <a
+                  href={BUY_LINKS.pump}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <span className="text-toxic">⚡</span>
+                  <span>VIEW $GENESIS</span>
+                  <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2]" />
                 </a>
               </div>
             </div>
           </div>
 
-          {/* Right Column (6 cols): Studio Clean Mascot filling the full hero zone */}
+          {/* Right Column (6 cols): Mascot Illustration */}
           <div className="lg:col-span-6 flex items-center justify-center w-full min-w-0">
             <div className="relative w-full max-w-[320px] xs:max-w-[380px] sm:max-w-[460px] lg:max-w-none flex items-center justify-center">
               <Image
@@ -116,13 +151,13 @@ export const HeroTerminal: React.FC = () => {
                 height={620}
                 priority
                 unoptimized
-                className="relative z-10 w-full h-auto max-h-[320px] xs:max-h-[380px] sm:max-h-[460px] lg:max-h-[580px] xl:max-h-[630px] object-contain block select-none"
+                className="relative z-10 w-full h-auto max-h-[320px] xs:max-h-[380px] sm:max-h-[460px] lg:max-h-[560px] xl:max-h-[620px] object-contain block select-none"
               />
             </div>
           </div>
         </div>
 
-        {/* 4 Aligned Metric Cards */}
+        {/* 4 Aligned Information Cards */}
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TRUST_METRICS.map((m) => (
             <div

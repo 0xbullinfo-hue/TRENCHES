@@ -4,7 +4,9 @@ import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
 import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
 import {
   ArrowUpRight,
+  Check,
   FlaskConical,
+  Minus,
   Send,
 } from 'lucide-react';
 
@@ -39,6 +41,64 @@ function formatDate(isoString?: string): string {
   }
 }
 
+interface MatrixRow {
+  feature: string;
+  free: boolean | string;
+  member: boolean | string;
+  pro: boolean | string;
+}
+
+const COMPARISON_MATRIX: MatrixRow[] = [
+  {
+    feature: 'Public Track Record & Performance Ledger',
+    free: true,
+    member: true,
+    pro: true,
+  },
+  {
+    feature: 'Community Reward Social Raids & Airdrops',
+    free: true,
+    member: true,
+    pro: true,
+  },
+  {
+    feature: 'Standard Alpha Calls & Invalidation Parameters',
+    free: false,
+    member: true,
+    pro: true,
+  },
+  {
+    feature: 'Telegram Signal Delivery',
+    free: 'Public Channel',
+    member: '5m Delayed Alerts',
+    pro: 'Instant Real-Time Signals',
+  },
+  {
+    feature: 'Max Alpha High-Conviction Research',
+    free: false,
+    member: false,
+    pro: true,
+  },
+  {
+    feature: 'Automated Take-Profit & Stop-Loss Push Alerts',
+    free: false,
+    member: false,
+    pro: true,
+  },
+  {
+    feature: 'Exclusive Pro Syndicate Group Access',
+    free: false,
+    member: false,
+    pro: true,
+  },
+  {
+    feature: 'Eligibility Requirement',
+    free: 'Free ($0)',
+    member: 'Hold ~$20 $GENESIS in Wallet',
+    pro: 'Stake ~$250 on StakePoint (90 Days)',
+  },
+];
+
 export async function TierSection() {
   let memberTokenFormatted = '1.2M $GENESIS';
   let proTokenFormatted = '15.2M $GENESIS';
@@ -61,26 +121,28 @@ export async function TierSection() {
   const freeFeatures = [
     'Closed calls + P&L ledger',
     'Public results channel',
+    'Community Social Raids',
     'Education content',
   ];
 
   const memberFeatures = [
-    'Open calls (Limited)',
+    'Open calls (Standard)',
     'Member Telegram group',
     'Incubator dashboard access',
+    '5-minute delayed signals',
   ];
 
   const proFeatures = [
     'Everything in Member',
-    'Real-time Telegram signals',
-    'Push alerts on TP/SL hits',
-    'Analyst commentary',
-    'Early call execution',
+    'Max Alpha high-conviction calls',
+    'Real-time instant Telegram signals',
+    'Automated TP/SL push alerts',
+    'Pro Syndicate group access',
   ];
 
   return (
-    <section id="choose-your-access" className="bg-canvas py-16">
-      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section id="choose-your-access" className="bg-canvas py-16 border-b border-toxic-border">
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="pb-6 border-b border-toxic-border">
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
@@ -94,7 +156,7 @@ export async function TierSection() {
           </p>
         </div>
 
-        {/* Unified Single Card */}
+        {/* Unified Cards Grid */}
         <div className="rounded-2xl bg-surface border border-border-default p-6 sm:p-8 lg:p-10 shadow-none">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column (4 cols): $GENESIS Intro Text & Buy Actions */}
@@ -116,7 +178,7 @@ export async function TierSection() {
                   <span className="font-mono text-xs text-white break-all">
                     {GENESIS_MINT}
                   </span>{' '}
-                  in your wallet to enter the incubator dashboard.
+                  in your wallet (or stake $250 for 90 days on StakePoint) to enter the incubator dashboard.
                 </p>
               </div>
 
@@ -145,7 +207,7 @@ export async function TierSection() {
               </div>
             </div>
 
-            {/* Right Column (8 cols): 3 Simple Tier Cards */}
+            {/* Right Column (8 cols): 3 Tier Cards */}
             <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-4 h-full items-stretch">
               {/* FREE */}
               <TierCard
@@ -187,6 +249,122 @@ export async function TierSection() {
                 badge="Recommended"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Responsive Comparison Matrix Table (Section 3.7) */}
+        <div className="space-y-4 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="font-sans text-lg sm:text-xl font-extrabold text-white uppercase tracking-tight">
+              TIER FEATURE COMPARISON
+            </h3>
+            <span className="text-xs font-sans text-muted">
+              USD-indexed thresholds evaluated on-chain
+            </span>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block rounded-xl bg-surface border border-border-default overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border-default bg-surface-card font-sans text-xs uppercase tracking-wider text-muted">
+                  <th className="py-3.5 px-6 font-bold">Feature</th>
+                  <th className="py-3.5 px-4 font-bold text-center w-36">Free</th>
+                  <th className="py-3.5 px-4 font-bold text-center w-48 text-white">Member</th>
+                  <th className="py-3.5 px-4 font-bold text-center w-56 text-toxic">Pro</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default font-sans text-xs">
+                {COMPARISON_MATRIX.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-surface-card/60 transition-colors">
+                    <td className="py-3.5 px-6 font-medium text-white">{row.feature}</td>
+
+                    {/* Free */}
+                    <td className="py-3.5 px-4 text-center">
+                      {typeof row.free === 'boolean' ? (
+                        row.free ? (
+                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-muted/40 mx-auto" />
+                        )
+                      ) : (
+                        <span className="font-mono text-muted">{row.free}</span>
+                      )}
+                    </td>
+
+                    {/* Member */}
+                    <td className="py-3.5 px-4 text-center">
+                      {typeof row.member === 'boolean' ? (
+                        row.member ? (
+                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-muted/40 mx-auto" />
+                        )
+                      ) : (
+                        <span className="font-mono text-white font-semibold">{row.member}</span>
+                      )}
+                    </td>
+
+                    {/* Pro */}
+                    <td className="py-3.5 px-4 text-center bg-toxic-bg/10">
+                      {typeof row.pro === 'boolean' ? (
+                        row.pro ? (
+                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-muted/40 mx-auto" />
+                        )
+                      ) : (
+                        <span className="font-mono text-toxic font-bold">{row.pro}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Stacked Cards Comparison */}
+          <div className="md:hidden space-y-3">
+            {COMPARISON_MATRIX.map((row, idx) => (
+              <div
+                key={idx}
+                className="p-4 rounded-xl bg-surface border border-border-default space-y-2.5 font-sans text-xs"
+              >
+                <div className="font-bold text-white leading-tight">{row.feature}</div>
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border-default font-mono text-[11px] text-center">
+                  <div className="p-2 rounded bg-surface-card">
+                    <div className="text-[10px] text-muted uppercase font-bold">FREE</div>
+                    <div className="mt-1 flex items-center justify-center">
+                      {typeof row.free === 'boolean' ? (
+                        row.free ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                      ) : (
+                        <span className="truncate">{row.free}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded bg-surface-card border border-border-default">
+                    <div className="text-[10px] text-white uppercase font-bold">MEMBER</div>
+                    <div className="mt-1 flex items-center justify-center">
+                      {typeof row.member === 'boolean' ? (
+                        row.member ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                      ) : (
+                        <span className="truncate text-white font-semibold">{row.member}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded bg-toxic-bg border border-toxic-border">
+                    <div className="text-[10px] text-toxic uppercase font-bold">PRO</div>
+                    <div className="mt-1 flex items-center justify-center">
+                      {typeof row.pro === 'boolean' ? (
+                        row.pro ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                      ) : (
+                        <span className="truncate text-toxic font-bold">{row.pro}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

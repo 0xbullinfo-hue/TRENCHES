@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, LogOut, Menu, Wallet, X } from 'lucide-react';
+import { ArrowUpRight, LogOut, Menu, Send, Wallet, X } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const { connected, shortAddress, disconnectDemoOrWallet } = useGenesisBalance();
@@ -25,6 +25,8 @@ export const PublicHeader: React.FC = () => {
     await disconnectDemoOrWallet();
   };
 
+  const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
+
   return (
     <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border">
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
@@ -36,44 +38,66 @@ export const PublicHeader: React.FC = () => {
           </span>
         </Link>
 
-        {/* Center: Enlarged Navigation Menu Tabs (Desktop) */}
+        {/* Center: Clean Navigation Menu Tabs (Desktop) */}
         <nav
           aria-label="Public Navigation"
-          className="hidden md:flex items-center gap-6 lg:gap-8 font-sans text-base lg:text-lg font-extrabold uppercase tracking-wide"
+          className="hidden lg:flex items-center gap-1 xl:gap-2 font-sans text-xs xl:text-sm font-extrabold uppercase tracking-wide"
         >
           <a
             href="#hero-section"
-            className="px-4 py-2 rounded-lg text-white hover:text-toxic hover:bg-surface uppercase transition-colors"
+            className="px-3 py-2 rounded-lg text-white hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
             HOME
           </a>
           <a
-            href="#pipeline-section"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
+            href="#how-it-works"
+            className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
-            EXPERIMENTS
+            HOW IT WORKS
           </a>
           <a
-            href={SOCIAL_LINKS.telegram}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors inline-flex items-center gap-1.5"
+            href="#pipeline-section"
+            className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
-            <span>JOIN THE LAB</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
+            INCUBATOR
           </a>
+          <a
+            href="#choose-your-access"
+            className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
+          >
+            MEMBERSHIP
+          </a>
+          <Link
+            href="/ledger"
+            className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
+          >
+            PERFORMANCE
+          </Link>
         </nav>
 
-        {/* Right: CONNECT Button & Mobile Hamburger Toggle */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Right: Primary Community CTA, Wallet Connect & Mobile Hamburger Toggle */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Primary CTA: JOIN COMMUNITY */}
+          <a
+            href={communityUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 sm:h-11 px-3 sm:px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide transition-colors cursor-pointer shrink-0"
+          >
+            <Send className="w-3.5 h-3.5 fill-current" />
+            <span>JOIN COMMUNITY</span>
+            <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+          </a>
+
+          {/* Wallet State (Controlled Soft-Launch: disabled with LIVE SOON or active when connected) */}
           {connected ? (
             <Link
               href="/dashboard"
-              className="h-9 sm:h-11 px-2.5 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0"
+              className="h-9 sm:h-11 px-2.5 sm:px-4 rounded-lg bg-surface border border-toxic hover:border-toxic-bright text-white font-sans text-xs sm:text-sm font-bold uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0"
             >
-              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">DASHBOARD ({shortAddress})</span>
-              <span className="sm:hidden">{shortAddress}</span>
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-toxic" />
+              <span className="hidden xl:inline">DASHBOARD ({shortAddress})</span>
+              <span className="xl:hidden">{shortAddress}</span>
             </Link>
           ) : (
             <button
@@ -81,11 +105,11 @@ export const PublicHeader: React.FC = () => {
               disabled
               aria-disabled="true"
               title="Wallet connection coming soon"
-              className="h-9 sm:h-11 px-2.5 sm:px-6 rounded-lg bg-surface border border-toxic-border/60 text-muted font-sans text-[11px] sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
+              className="h-9 sm:h-11 px-2.5 sm:px-4 rounded-lg bg-surface border border-toxic-border/60 text-muted font-sans text-[11px] sm:text-xs font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-muted shrink-0" />
-              <span className="hidden sm:inline">CONNECT WALLET · LIVE SOON</span>
-              <span className="sm:hidden">LIVE SOON</span>
+              <span className="hidden md:inline">CONNECT WALLET · LIVE SOON</span>
+              <span className="md:hidden">LIVE SOON</span>
             </button>
           )}
 
@@ -105,7 +129,7 @@ export const PublicHeader: React.FC = () => {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden h-9 w-9 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white flex items-center justify-center transition-colors shrink-0"
+            className="lg:hidden h-10 w-10 sm:h-11 sm:w-11 min-h-[44px] min-w-[44px] rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white flex items-center justify-center transition-colors shrink-0"
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
           >
@@ -116,31 +140,57 @@ export const PublicHeader: React.FC = () => {
 
       {/* Mobile Collapsible Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border-default bg-surface-primary px-4 py-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="lg:hidden border-t border-border-default bg-surface px-4 py-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
           <a
             href="#hero-section"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center h-11 px-4 rounded-lg text-white font-sans font-bold text-sm hover:bg-surface-elevated hover:text-toxic transition-colors uppercase tracking-wider"
+            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-white font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
             HOME
           </a>
           <a
-            href="#pipeline-section"
+            href="#how-it-works"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center h-11 px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-elevated hover:text-toxic transition-colors uppercase tracking-wider"
+            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
-            EXPERIMENTS
+            HOW IT WORKS
           </a>
           <a
-            href={SOCIAL_LINKS.telegram}
-            target="_blank"
-            rel="noreferrer"
+            href="#pipeline-section"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center justify-between h-11 px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-elevated hover:text-toxic transition-colors uppercase tracking-wider"
+            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
-            <span>JOIN THE LAB</span>
-            <ArrowUpRight className="w-4 h-4 text-toxic" />
+            INCUBATOR
           </a>
+          <a
+            href="#choose-your-access"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
+          >
+            MEMBERSHIP
+          </a>
+          <Link
+            href="/ledger"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
+          >
+            PERFORMANCE
+          </Link>
+          <div className="pt-2">
+            <a
+              href={communityUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between h-12 min-h-[44px] px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wider transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Send className="w-4 h-4 fill-current" />
+                <span>JOIN COMMUNITY</span>
+              </span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            </a>
+          </div>
         </div>
       )}
     </header>

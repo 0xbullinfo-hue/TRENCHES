@@ -5,7 +5,7 @@ import type { AlphaItem } from '@/lib/types';
 import { CHAIN_METADATA } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
 import { getPrimaryMarketUrl } from './AlphaInspectorModal';
-import { MarketDataBadge } from './MarketDataBadge';
+import { MarketDataBadge, formatChangePct } from './MarketDataBadge';
 import {
   Check,
   Copy,
@@ -15,6 +15,8 @@ import {
   Star,
   Target,
   Trash2,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
 
 interface AlphaCallCardProps {
@@ -53,6 +55,11 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
 
   const isCompleted = coin.outcome === 'PROFIT';
   const isLoss = coin.outcome === 'LOSS';
+  const isPending = !isCompleted && !isLoss;
+
+  // Distinguish Entry MC and Current MC visually
+  const entryMcDisplay = coin.entryMarketCap || '—';
+  const currentMcDisplay = coin.marketCap || '—';
 
   return (
     <article
@@ -72,9 +79,9 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           : 'border border-alpha-border hover:border-alpha-primary'
       }`}
     >
-      {/* 1. Top Section: Badges, Token Identity, Thesis & DexScreener Button */}
+      {/* 1. TOP SECTION: Badges, Token Identity, Thesis & DexScreener Button */}
       <div className="space-y-3">
-        {/* Top Row: Clean Alpha Badges */}
+        {/* Top Header Row */}
         <div className="flex items-center justify-between gap-1.5 pb-2.5 border-b border-border-default text-xs font-mono">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-alpha-text">
@@ -119,6 +126,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                 }}
                 className="px-2 py-0.5 rounded-md border border-border-default bg-surface-card hover:bg-surface-3 text-[10px] text-muted hover:text-alpha-primary cursor-pointer transition-colors inline-flex items-center gap-1"
                 title="Edit Call"
+                aria-label="Edit Call"
               >
                 <Pencil className="w-2.5 h-2.5" />
                 <span>EDIT</span>
@@ -132,8 +140,9 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   e.stopPropagation();
                   onDelete(coin);
                 }}
-                className="w-6 h-6 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default hover:border-danger text-muted hover:text-danger flex items-center justify-center cursor-pointer transition-colors"
+                className="w-7 h-7 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default hover:border-danger text-muted hover:text-danger flex items-center justify-center cursor-pointer transition-colors"
                 title="Delete Call"
+                aria-label="Delete Call"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -147,8 +156,9 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   e.stopPropagation();
                   onToggleWatchlist(coin.id);
                 }}
-                className="w-6 h-6 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default flex items-center justify-center cursor-pointer"
+                className="w-7 h-7 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default flex items-center justify-center cursor-pointer"
                 title="Toggle Watchlist"
+                aria-label={isStarred ? 'Remove from Watchlist' : 'Add to Watchlist'}
               >
                 <Star
                   className={`w-3.5 h-3.5 ${
@@ -171,17 +181,22 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             quoteToken={coin.quoteToken}
             locked={coin.locked}
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h3 className="font-sans font-extrabold text-base text-white truncate leading-tight group-hover:text-alpha-primary transition-colors">
               {coin.name}
             </h3>
-            <p className="font-mono text-xs text-alpha-primary font-bold">
-              {coin.ticker} • {chainMeta.label}
-            </p>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="font-mono text-xs text-alpha-primary font-bold">
+                {coin.ticker} • {chainMeta.label}
+              </p>
+              {coin.age && (
+                <span className="font-mono text-[11px] text-muted">{coin.age}</span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Call Summary / Thesis (Consistent vertical rhythm) */}
+        {/* Call Summary / Thesis */}
         {coin.summary ? (
           <p className="font-sans text-xs text-muted leading-relaxed line-clamp-2 min-h-[32px]">
             {coin.summary}
@@ -190,14 +205,14 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           <div className="min-h-[32px]" />
         )}
 
-        {/* Primary Action Button: Open Chart on DexScreener (Standard 40px height) */}
+        {/* Primary Action Button: Open Chart on DexScreener */}
         {marketUrl && !coin.locked ? (
           <a
             href={marketUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-between w-full h-10 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-alpha-border text-white font-sans text-xs font-bold transition-colors"
+            className="inline-flex items-center justify-between w-full h-11 min-h-[44px] px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-alpha-border text-white font-sans text-xs font-bold transition-colors"
           >
             <span className="flex items-center gap-1.5">
               <ExternalLink className="w-3.5 h-3.5 text-alpha-primary" />
@@ -206,54 +221,49 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             <span className="text-alpha-primary">↗</span>
           </a>
         ) : (
-          <div className="h-10 w-full rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-xs font-mono text-muted">
+          <div className="h-11 min-h-[44px] w-full rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-xs font-mono text-muted">
             {coin.locked ? '🔒 Chart Locked' : '— Direct DEX Call —'}
           </div>
         )}
       </div>
 
-      {/* 2. Bottom Section: 2x2 Metric Grid + Contract Address + Admin Outcome */}
+      {/* 2. MIDDLE & BOTTOM SECTION: Distinguishable Valuations + Risk & TP Telemetry */}
       <div className="mt-4 pt-1 space-y-2">
-        {/* 2x2 Clean Metric Grid */}
+        {/* Entry MC vs Current MC: Visually Distinguishable per Section 5.1 */}
         <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-          {/* 1. Entry Market Cap */}
-          <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+          {/* Entry Market Cap */}
+          <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
             <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
               ENTRY MC
             </div>
             <div className="text-base font-extrabold text-white truncate tnum">
-              {coin.entryMarketCap || coin.marketCap || '—'}
+              {entryMcDisplay}
             </div>
           </div>
 
-          {/* 2. Target Take Profits */}
-          <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-            <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center gap-1">
-              <Target className="w-3 h-3 text-alpha-primary" />
-              <span>TARGET TP</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              {coin.takeProfits && coin.takeProfits.length > 0 ? (
-                coin.takeProfits.slice(0, 3).map((tp) => (
-                  <span
-                    key={tp.label}
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
-                      tp.hit
-                        ? 'bg-toxic text-canvas border-toxic'
-                        : 'bg-surface text-white border-border-default'
-                    }`}
-                  >
-                    {tp.label}
-                    {tp.hit ? ' ✓' : ''}
-                  </span>
-                ))
-              ) : (
-                <span className="text-muted text-[11px]">2x • 5x • 10x</span>
+          {/* Current Market Cap + 24h Change */}
+          <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+            <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
+              <span>CURRENT MC</span>
+              {coin.change24hPct !== null && (
+                <span
+                  className={`text-[10px] font-bold ${
+                    coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                  }`}
+                >
+                  {formatChangePct(coin.change24hPct)}
+                </span>
               )}
             </div>
+            <div className="text-base font-black text-toxic-bright truncate tnum">
+              {currentMcDisplay}
+            </div>
           </div>
+        </div>
 
-          {/* 3. Risk Ratio */}
+        {/* 2x2 Clean Metric Grid: Risk, Stop Loss, Take Profits */}
+        <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+          {/* Risk Ratio */}
           <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
             <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
               RISK RATIO
@@ -268,7 +278,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             </div>
           </div>
 
-          {/* 4. Stop Loss (SL) */}
+          {/* Stop Loss (SL) */}
           <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
             <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
               STOP LOSS (SL)
@@ -279,68 +289,54 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           </div>
         </div>
 
-        {/* Contract Address Bar (Uniform Height & Clean Alignment) */}
+        {/* Target Take Profits Row */}
+        <div className="p-2.5 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
+          <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center gap-1 shrink-0">
+            <Target className="w-3 h-3 text-alpha-primary" />
+            <span>TARGET TP:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1 justify-end">
+            {coin.takeProfits && coin.takeProfits.length > 0 ? (
+              coin.takeProfits.slice(0, 3).map((tp) => (
+                <span
+                  key={tp.label}
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                    tp.hit
+                      ? 'bg-toxic text-canvas border-toxic'
+                      : 'bg-surface text-white border-border-default'
+                  }`}
+                >
+                  {tp.label}
+                  {tp.hit ? ' ✓' : ''}
+                </span>
+              ))
+            ) : (
+              <span className="text-muted text-[11px]">2x • 5x • 10x</span>
+            )}
+          </div>
+        </div>
+
+        {/* Contract Address Bar */}
         {coin.locked ? (
-          <div className="h-10 px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-center gap-1.5 font-sans text-xs text-amber font-semibold">
+          <div className="h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-center gap-1.5 font-sans text-xs text-amber font-semibold">
             <Lock className="w-3.5 h-3.5" />
             <span>Connect Wallet to Reveal CA</span>
           </div>
         ) : coin.ca ? (
-          <div className="h-10 px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
+          <div className="h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
             <span className="text-muted text-[11px] shrink-0 font-bold">CA:</span>
             <span className="text-white truncate tnum">{coin.ca}</span>
             <button
               type="button"
               onClick={handleCopyCa}
-              className="text-alpha-primary hover:text-white font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+              className="text-alpha-primary hover:text-white font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors px-2 py-1"
+              aria-label={`Copy ${coin.ticker} contract address`}
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span className="text-[11px]">{copied ? 'COPIED' : 'COPY'}</span>
             </button>
           </div>
-        ) : (
-          <div className="h-10 px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-between font-mono text-xs text-muted">
-            <span>CA:</span>
-            <span className="italic text-[11px]">Unreleased</span>
-          </div>
-        )}
-
-        {/* Admin Quick Outcome Selector */}
-        {isAdmin && onSetOutcome && (
-          <div className="pt-2 border-t border-border-default flex items-center justify-between gap-1.5 font-mono text-xs">
-            <span className="text-[10px] uppercase font-bold text-muted">OUTCOME:</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSetOutcome(coin.id, 'PROFIT');
-                }}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                  coin.outcome === 'PROFIT'
-                    ? 'bg-toxic text-canvas font-black'
-                    : 'bg-surface-card hover:bg-surface-3 border border-border-default text-muted hover:text-toxic'
-                }`}
-              >
-                PROFIT ✓
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSetOutcome(coin.id, 'LOSS');
-                }}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                  coin.outcome === 'LOSS'
-                    ? 'bg-danger text-white font-black'
-                    : 'bg-surface-card hover:bg-surface-3 border border-border-default text-muted hover:text-danger'
-                }`}
-              >
-                LOSS ✕
-              </button>
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
     </article>
   );
