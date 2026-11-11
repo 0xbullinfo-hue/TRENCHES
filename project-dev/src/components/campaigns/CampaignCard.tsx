@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   ExternalLink,
@@ -82,6 +83,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   onSubmissionSuccess,
   onTogglePin,
 }) => {
+  const wallet = useWallet();
   const [walletInput, setWalletInput] = useState(userWallet || '');
   const [xHandleInput, setXHandleInput] = useState('');
   const [retweetLinkInput, setRetweetLinkInput] = useState('');
@@ -92,12 +94,47 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     campaign.userSubmission || null
   );
   const [copiedWallet, setCopiedWallet] = useState(false);
-  const [currentTime] = useState<number>(() =>
+  const [now, setNow] = useState<number>(() =>
     typeof window !== 'undefined' ? Date.now() : 0
   );
 
+  // Expiration boundary trigger and visibilitychange refresh (no polling, no decorative countdown)
+  useEffect(() => {
+    if (!campaign.expiresAt || campaign.status === 'COMPLETED' || campaign.status === 'PAUSED') {
+      return;
+    }
+    const expiresAtMs = new Date(campaign.expiresAt).getTime();
+    if (!Number.isFinite(expiresAtMs)) return;
+
+    let timer: NodeJS.Timeout | null = null;
+    const remainingMs = expiresAtMs - Date.now();
+    if (remainingMs > 0) {
+      // Clamp delay to max 32-bit signed int (~24.8 days)
+      const delay = Math.min(remainingMs, 2_147_483_647);
+      timer = setTimeout(() => {
+        setNow(Date.now());
+      }, delay);
+    } else {
+      queueMicrotask(() => {
+        setNow(Date.now());
+      });
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setNow(Date.now());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [campaign.expiresAt, campaign.status]);
+
   // Keep wallet input in sync if userWallet connects later
-  React.useEffect(() => {
+  useEffect(() => {
     let active = true;
     if (userWallet) {
       queueMicrotask(() => {
@@ -112,7 +149,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   }, [userWallet]);
 
   // Keep submission state synced if props refresh
-  React.useEffect(() => {
+  useEffect(() => {
     let active = true;
     if (campaign.userSubmission) {
       queueMicrotask(() => {
@@ -155,6 +192,36 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
     setSubmitting(true);
     try {
+      let signatureHex: string | undefined;
+      let signatureTs: number | undefined;
+
+      const activeAdapter = wallet.wallet?.adapter;
+      const activeSignMessage =
+        wallet.signMessage ||
+        (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+          ? (activeAdapter as any).signMessage.bind(activeAdapter)
+          : null);
+
+      // Verify wallet ownership with cryptographic challenge signature
+      if (activeSignMessage && wallet.publicKey && wallet.publicKey.toBase58() === cleanWallet) {
+        signatureTs = Date.now();
+        const challenge = `TrenchLabs Raid Submission|${campaign.id}|${cleanWallet}|${signatureTs}`;
+        try {
+          const sigBytes = await activeSignMessage(new TextEncoder().encode(challenge));
+          signatureHex = Array.from(sigBytes)
+            .map((b) => (b as number).toString(16).padStart(2, '0'))
+            .join('');
+        } catch (signErr) {
+          const signErrMsg = (signErr as Error)?.message || '';
+          if (/user rejected|window closed|cancelled|canceled|denied/i.test(signErrMsg)) {
+            setErrorMsg('Signature cancelled. Wallet verification is required to submit.');
+            setSubmitting(false);
+            return;
+          }
+          throw signErr;
+        }
+      }
+
       const res = await fetch(`/api/campaigns/${campaign.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,6 +229,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           walletAddress: cleanWallet,
           xHandle: cleanHandle,
           xRetweetLink: cleanRetweet,
+          signature: signatureHex,
+          timestamp: signatureTs,
         }),
       });
 
@@ -195,7 +264,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     !isCompleted &&
     !isPaused &&
     !!campaign.expiresAt &&
-    Boolean(currentTime && new Date(campaign.expiresAt).getTime() <= currentTime);
+    Boolean(now && new Date(campaign.expiresAt).getTime() <= now);
   const statusLabel = isCompleted
     ? 'COMPLETED'
     : isPaused

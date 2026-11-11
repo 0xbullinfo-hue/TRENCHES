@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE, TIERS } from '@/lib/tiers';
+import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE, TIERS, TierId } from '@/lib/tiers';
 import { resolveTier } from '@/server/db';
 import {
   ADMIN_WALLET,
@@ -127,11 +127,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveBalance = Math.max(
-    balance,
-    isAdmin ? calculateRequiredTokens(PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE) : 0
-  );
-  const tier = isAdmin ? TIERS.PRO : tierFor(effectiveBalance);
+  const resolvedTierId: TierId = isAdmin || userTier === 'pro' ? 'PRO' : userTier === 'member' ? 'LAB_MEMBER' : 'LOCKED';
+  const tier = TIERS[resolvedTierId];
   let registry;
   try {
     registry = await loadCallsRegistry();

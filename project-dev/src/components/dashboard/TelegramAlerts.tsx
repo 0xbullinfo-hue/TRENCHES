@@ -29,12 +29,29 @@ export function useTelegramLink() {
     stopPolling();
     queueMicrotask(() => {
       setMessage(null);
-      try {
-        setStatus(publicKeyBase58 && localStorage.getItem(hintKey(publicKeyBase58)) === 'true' ? 'linked' : 'idle');
-      } catch {
-        setStatus('idle');
-      }
     });
+    if (!publicKeyBase58) {
+      queueMicrotask(() => {
+        setStatus('idle');
+      });
+      return;
+    }
+
+    let active = true;
+    // Server-authoritative status query; never trust stale localStorage on wallet switch
+    fetch(`${LINK_PATH}?wallet=${encodeURIComponent(publicKeyBase58)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!active || !json) return;
+        setStatus(json.linked ? 'linked' : 'idle');
+      })
+      .catch(() => {
+        if (active) setStatus('idle');
+      });
+
+    return () => {
+      active = false;
+    };
   }, [publicKeyBase58]);
 
   const call = useCallback(

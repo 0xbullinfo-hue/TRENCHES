@@ -22,6 +22,7 @@ import {
   MEMBER_USD_TARGET,
   calculateRequiredTokens,
   DEFAULT_GENESIS_USD_PRICE,
+  TIERS,
   Tier,
   TierId,
   allocationCap,
@@ -30,6 +31,7 @@ import {
 } from '@/lib/tiers';
 import type {
   AlphaItem,
+  AlphasErr,
   AlphasResponse,
   CallType,
   Chain,
@@ -85,6 +87,14 @@ export interface CreateCallPayload {
   logoUrl?: string;
 }
 
+export type VerificationState =
+  | 'DISCONNECTED'
+  | 'CONNECTED_UNVERIFIED'
+  | 'VERIFYING'
+  | 'VERIFIED'
+  | 'VERIFICATION_FAILED'
+  | 'INSUFFICIENT_MEMBERSHIP';
+
 interface GenesisContextValue {
   connected: boolean;
   publicKeyBase58: string | null;
@@ -109,6 +119,7 @@ interface GenesisContextValue {
   apiLoading: boolean;
   apiError: string | null;
   needsSignature: boolean;
+  verificationState: VerificationState;
   refreshAll: () => Promise<void>;
   requestUnlockSignature: () => Promise<void>;
   /** Wallet-signed headers for an arbitrary API call (message bound to method + path). Cached ~4 min. */
@@ -172,6 +183,8 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
   const [apiLoading, setApiLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [needsSignature, setNeedsSignature] = useState<boolean>(false);
+  const [serverTier, setServerTier] = useState<TierId | null>(null);
+  const [verificationState, setVerificationState] = useState<VerificationState>('DISCONNECTED');
 
   const [boundEvmAddress, setBoundEvmAddressState] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -533,14 +546,16 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         queueMicrotask(() => {
           setOnChainBalance(0);
+          setServerTier(null);
           setAlphas([]);
           setCallers([]);
           setPortfolio(null);
           setApiError(null);
+          setVerificationState(connected ? 'CONNECTED_UNVERIFIED' : 'DISCONNECTED');
         });
       }
     }
-  }, [publicKeyBase58]);
+  }, [publicKeyBase58, connected]);
 
   const isAdmin = useMemo(
     () => Boolean(connected && publicKeyBase58 && isAdminWallet(publicKeyBase58)),
@@ -554,9 +569,6 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
 
   const balance = useMemo(() => {
     if (wallet.connected && wallet.publicKey) {
-      if (isAdmin && onChainBalance < DEFAULT_MEMBER_TOKENS) {
-        return DEFAULT_MEMBER_TOKENS;
-      }
       return onChainBalance;
     }
     if (!connected) return 0;
@@ -564,20 +576,29 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       return DEMO_BALANCES[demoPreset];
     }
     return 0;
-  }, [connected, demoPreset, onChainBalance, isAdmin, wallet.connected, wallet.publicKey]);
+  }, [connected, demoPreset, onChainBalance, wallet.connected, wallet.publicKey]);
 
   const formattedBalance = useMemo(
     () => new Intl.NumberFormat('en-US').format(balance),
     [balance]
   );
 
-  const tier = useMemo(() => tierFor(balance), [balance]);
+  const tier = useMemo(() => {
+    if (isAdmin) return TIERS.PRO;
+    if (serverTier && (serverTier === 'PRO' || serverTier === 'LAB_MEMBER')) {
+      const serverTierObj = TIERS[serverTier];
+      const balanceTierObj = tierFor(balance);
+      return serverTierObj.rank >= balanceTierObj.rank ? serverTierObj : balanceTierObj;
+    }
+    return tierFor(balance);
+  }, [balance, serverTier, isAdmin]);
+
   const multiplier = tier.multiplier;
   const capSol = useMemo(() => allocationCap(tier), [tier]);
   const points = useMemo(() => longevityPoints(balance), [balance]);
 
-  const isZeroBalance = connected && !isAdmin && balance < DEFAULT_MEMBER_TOKENS;
-  const isUnlocked = connected && !needsSignature && (isAdmin || balance >= DEFAULT_MEMBER_TOKENS);
+  const isZeroBalance = connected && !isAdmin && serverTier !== 'PRO' && serverTier !== 'LAB_MEMBER' && balance < DEFAULT_MEMBER_TOKENS;
+  const isUnlocked = connected && !needsSignature && (isAdmin || serverTier === 'PRO' || serverTier === 'LAB_MEMBER' || balance >= DEFAULT_MEMBER_TOKENS);
 
   /**
    * Patch 1: Request or retrieve cached ed25519 signature headers proving wallet ownership.
@@ -687,6 +708,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         setPortfolio(null);
         setApiError(null);
         setNeedsSignature(false);
+        setVerificationState('DISCONNECTED');
         return;
       }
 
@@ -702,6 +724,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
             setPortfolio(data.portfolio || null);
             setApiError(null);
             setNeedsSignature(false);
+            setVerificationState('VERIFIED');
             setApiLoading(false);
             return;
           }
@@ -716,10 +739,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       if (typeof generation === 'number' && generation !== requestGenerationRef.current) return;
       if (!headers) {
         setOnChainBalance(0);
+        setServerTier(null);
         setAlphas([]);
         setCallers([]);
         setPortfolio(null);
         setNeedsSignature(true);
+        setVerificationState('CONNECTED_UNVERIFIED');
         return;
       }
       setNeedsSignature(false);
@@ -748,20 +773,31 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
           setCallers([]);
           setPortfolio(null);
           setVerifiedUsersCount(0);
-          setApiError(!data.ok ? data.message || data.error : 'ACCESS_DENIED_ZERO_BALANCE');
+          const errData = data as AlphasErr;
+          if (errData.error === 'ACCESS_DENIED_ZERO_BALANCE') {
+            setVerificationState('INSUFFICIENT_MEMBERSHIP');
+          } else {
+            setVerificationState('VERIFICATION_FAILED');
+          }
+          setApiError(!data.ok ? errData.message || errData.error : 'ACCESS_DENIED_ZERO_BALANCE');
         } else {
-          // Patch 7: Read verified balance from server response
+          // Read verified balance and server tier from authoritative server response
           setOnChainBalance(data.balance);
+          if (data.tier) {
+            setServerTier(data.tier);
+          }
           setAlphas(data.items);
           setCallers(data.callers ?? []);
           setPortfolio(data.portfolio);
           setVerifiedUsersCount(typeof data.verifiedUsersCount === 'number' ? data.verifiedUsersCount : 0);
           setApiError(null);
+          setVerificationState('VERIFIED');
         }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           if (typeof generation !== 'number' || generation === requestGenerationRef.current) {
             setApiError((err as Error).message || 'Solana RPC network unavailable');
+            setVerificationState('VERIFICATION_FAILED');
           }
         }
       } finally {
@@ -781,6 +817,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     // If in demo preset mode, automatically unlock without requiring a cryptographic extension signature
     if (DEMO_ENABLED && demoPreset !== 'live') {
       setNeedsSignature(false);
+      setVerificationState('VERIFIED');
       const gen = ++requestGenerationRef.current;
       await fetchAlphasFromBackend(true, gen);
       return;
@@ -791,6 +828,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     if (!pubKey) {
       console.warn('[TrenchLabs] Cannot sign: no active wallet public key');
       setApiError('No active wallet connected. Please connect your Solana wallet.');
+      setVerificationState('CONNECTED_UNVERIFIED');
       return;
     }
     const addr = pubKey.toBase58();
@@ -806,10 +844,12 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
       setApiError(
         'Connected wallet does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.'
       );
+      setVerificationState('VERIFICATION_FAILED');
       return;
     }
 
     try {
+      setVerificationState('VERIFYING');
       setApiLoading(true);
       const ts = Date.now();
       const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
@@ -823,15 +863,18 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
         'x-signature': sigHex,
       };
       sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
+      fetch('/api/auth/session', { method: 'POST', headers }).catch(() => { });
       setNeedsSignature(false);
       const gen = ++requestGenerationRef.current;
       await fetchAlphasFromBackend(true, gen);
     } catch (err: unknown) {
       const errMsg = (err as { message?: string })?.message || '';
       if (/user rejected|window closed|cancelled|canceled|denied/i.test(errMsg)) {
+        setVerificationState('CONNECTED_UNVERIFIED');
         return;
       }
       console.warn('[TrenchLabs] Sign to unlock error:', err);
+      setVerificationState('VERIFICATION_FAILED');
       setApiError(errMsg || 'Failed to sign message. Please unlock your wallet and try again.');
     } finally {
       setApiLoading(false);
@@ -1187,6 +1230,7 @@ export function GenesisProvider({ children }: { children: React.ReactNode }) {
     apiLoading,
     apiError,
     needsSignature,
+    verificationState,
     refreshAll,
     requestUnlockSignature,
     createAlphaCall,

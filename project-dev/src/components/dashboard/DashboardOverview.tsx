@@ -217,7 +217,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             title="View Watchlist projects"
           >
             <div className="space-y-0.5">
-              <div className="text-[10px] text-muted uppercase font-bold">WATCHLIST</div>
+              <div className="text-[10px] text-muted uppercase font-bold">PLATFORM WATCHLIST</div>
               <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
             </div>
             <Star className="w-4 h-4 text-amber" />

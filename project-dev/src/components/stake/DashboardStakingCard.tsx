@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
@@ -220,10 +220,11 @@ export function DashboardStakingCard({
 }: {
   showTelegram?: boolean;
 } = {}) {
-  const { connected, tier } = useGenesisBalance();
+  const { connected, tier, publicKeyBase58 } = useGenesisBalance();
 
   const [statusData, setStatusData] = useState<StakeStatusResponse | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const fetchGenRef = useRef(0);
 
   // Live StakePoint API pools
   const [pools, setPools] = useState<StakePointPool[] | null>(null);
@@ -254,31 +255,44 @@ export function DashboardStakingCard({
   }, [loadPools]);
 
   const refreshStakeStatus = useCallback(async () => {
+    if (!connected || !publicKeyBase58) {
+      setStatusData(null);
+      return;
+    }
+    const currentGen = ++fetchGenRef.current;
     try {
-      const res = await fetch('/api/stake/status');
+      const res = await fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`);
       if (res.ok) {
         const json = await res.json();
-        setStatusData(json);
+        if (currentGen === fetchGenRef.current) {
+          setStatusData(json);
+        }
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [connected, publicKeyBase58]);
 
   useEffect(() => {
-    if (!connected) return;
+    // Immediately clear old wallet data when active wallet changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatusData(null);
+    if (!connected || !publicKeyBase58) return;
+
     let active = true;
-    fetch('/api/stake/status')
+    const currentGen = ++fetchGenRef.current;
+    fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (!active || !json) return;
+        if (!active || currentGen !== fetchGenRef.current || !json) return;
         setStatusData(json);
       })
       .catch(() => undefined);
+
     return () => {
       active = false;
     };
-  }, [connected]);
+  }, [connected, publicKeyBase58]);
 
   const isPro = statusData?.current_tier === 'pro';
   const hasActiveStake = statusData?.stake?.status === 'active';

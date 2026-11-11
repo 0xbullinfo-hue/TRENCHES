@@ -38,6 +38,7 @@ import {
   ExternalLink,
   Filter,
   Flame,
+  KeyRound,
   LayoutGrid,
   List,
   Lock,
@@ -89,6 +90,8 @@ export const IncubatorHub: React.FC = () => {
     verifiedUsersCount,
     apiLoading,
     apiError,
+    needsSignature,
+    verificationState,
     refreshAll,
     requestUnlockSignature,
     searchQuery,
@@ -523,6 +526,14 @@ export const IncubatorHub: React.FC = () => {
 
   const totalPinned = pinnedCalls.length + pinnedCampaigns.length;
 
+  const activeRaidsCount = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
+    const now = Date.now();
+    return campaigns.filter(
+      (c) => c.status === 'ACTIVE' && (!c.expiresAt || new Date(c.expiresAt).getTime() > now)
+    ).length;
+  }, [campaigns]);
+
   const currentTabBaseAlphas = useMemo(() => {
     if (!isCurrentTabAuthorized) return [];
     if (currentTab === 'ALPHA') {
@@ -532,10 +543,10 @@ export const IncubatorHub: React.FC = () => {
       return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha));
     }
     if (currentTab === 'WATCHLIST') {
-      return alphas.filter((a) => a.callType === 'WATCHLIST' || watchlist.includes(a.id));
+      return alphas.filter((a) => a.callType === 'WATCHLIST');
     }
     return alphas;
-  }, [alphas, currentTab, isCurrentTabAuthorized, watchlist]);
+  }, [alphas, currentTab, isCurrentTabAuthorized]);
 
   const visibleAlphas = useMemo(
     () => currentTabBaseAlphas,
@@ -579,7 +590,7 @@ export const IncubatorHub: React.FC = () => {
           case 'NEW':
             return item.ageMinutes <= 180;
           case 'WATCHLIST':
-            return watchlist.includes(item.id) || item.callType === 'WATCHLIST';
+            return watchlist.includes(item.id);
           case 'ALL':
           default:
             return true;
@@ -663,6 +674,51 @@ export const IncubatorHub: React.FC = () => {
         </p>
       </div>
 
+      {/* WALLET SIGNATURE / VERIFICATION BANNER */}
+      {connected && (needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED') && (
+        <div className="rounded-xl bg-surface border-2 border-toxic p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-surface-card border border-toxic flex items-center justify-center text-toxic shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-sans text-xs font-black uppercase text-toxic tracking-wide">
+                  CRYPTOGRAPHIC VERIFICATION REQUIRED
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 font-bold">
+                  {verificationState === 'VERIFICATION_FAILED' ? 'SIGNATURE FAILED' : 'ACTION REQUIRED'}
+                </span>
+              </div>
+              <p className="font-sans text-xs text-muted leading-relaxed">
+                Sign a one-time message in your wallet to verify ownership of <strong className="text-white tnum">{shortAddress}</strong> and unlock your membership access & trade calls. No transaction fee.
+              </p>
+              {apiError && verificationState === 'VERIFICATION_FAILED' && (
+                <p className="font-mono text-xs text-danger font-semibold">{apiError}</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => requestUnlockSignature()}
+            disabled={apiLoading || verificationState === 'VERIFYING'}
+            className="h-11 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors shrink-0 shadow-none disabled:opacity-50"
+          >
+            {apiLoading || verificationState === 'VERIFYING' ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>VERIFYING...</span>
+              </>
+            ) : (
+              <>
+                <KeyRound className="w-4 h-4" />
+                <span>VERIFY WALLET</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* 2. DASHBOARD OVERVIEW SECTION (Section 4.2) */}
       <DashboardOverview
         connected={connected}
@@ -671,7 +727,7 @@ export const IncubatorHub: React.FC = () => {
         formattedBalance={formattedBalance}
         alphasCount={alphaCallsCount}
         newCallsCount={newCallsCount}
-        raidsCount={campaigns.length}
+        raidsCount={activeRaidsCount}
         watchlistCount={watchlistCallsCount}
         isUnlocked={isUnlocked}
         onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
@@ -1184,6 +1240,8 @@ export const IncubatorHub: React.FC = () => {
           <MembershipRestrictionScreen
             category={currentTab as RestrictedCategory}
             userTier={currentMembershipTier}
+            needsVerification={needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED'}
+            onVerifyClick={requestUnlockSignature}
             onUpgradeClick={() => {
               if (!connected) {
                 connectWallet();

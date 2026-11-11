@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { submitCampaignCompletion } from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
+import { isBase58Address } from '@/lib/config';
+import { getAuthSession, verifySolanaSignature, MAX_TIMESTAMP_DRIFT_MS } from '@/server/auth';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -53,6 +55,41 @@ export async function POST(
     return NextResponse.json(
       { ok: false, error: 'X Retweet or Quote link is required' },
       { status: 400, headers: NO_STORE }
+    );
+  }
+
+  if (!isBase58Address(walletAddress)) {
+    return NextResponse.json(
+      { ok: false, error: 'Invalid Solana wallet address format' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  // Verify wallet ownership: require active session or cryptographic challenge signature
+  const session = await getAuthSession(req);
+  const isSessionAuthed = Boolean(session && session.wallet === walletAddress);
+
+  let isSigAuthed = false;
+  const signature = typeof body.signature === 'string' ? body.signature.trim() : req.headers.get('x-signature')?.trim();
+  const timestamp = Number(body.timestamp) || Number(req.headers.get('x-timestamp'));
+
+  if (signature && Number.isFinite(timestamp)) {
+    if (Math.abs(Date.now() - timestamp) <= MAX_TIMESTAMP_DRIFT_MS) {
+      const challengeMsg = `TrenchLabs Raid Submission|${id}|${walletAddress}|${timestamp}`;
+      const fallbackMsg = ['TrenchLabs Access', req.method, new URL(req.url).pathname, timestamp].join('|');
+      if (
+        verifySolanaSignature(walletAddress, signature, challengeMsg) ||
+        verifySolanaSignature(walletAddress, signature, fallbackMsg)
+      ) {
+        isSigAuthed = true;
+      }
+    }
+  }
+
+  if (!isSessionAuthed && !isSigAuthed) {
+    return NextResponse.json(
+      { ok: false, error: 'Cryptographic wallet signature verification required to prove wallet ownership.' },
+      { status: 401, headers: NO_STORE }
     );
   }
 

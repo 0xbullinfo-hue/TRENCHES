@@ -11,6 +11,8 @@ export interface MembershipRestrictionScreenProps {
   category: RestrictedCategory;
   userTier: UserMembershipTier;
   onUpgradeClick?: () => void;
+  onVerifyClick?: () => void;
+  needsVerification?: boolean;
 }
 
 interface RestrictionContent {
@@ -106,6 +108,8 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
   category,
   userTier,
   onUpgradeClick,
+  onVerifyClick,
+  needsVerification,
 }) => {
   const content = getRestrictionContent(category, userTier);
 
@@ -183,6 +187,15 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
 
       {/* Action CTA Button */}
       <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+        {needsVerification && onVerifyClick && (
+          <button
+            type="button"
+            onClick={onVerifyClick}
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-surface border border-toxic text-toxic hover:bg-surface-3 font-sans text-xs sm:text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <span>VERIFY WALLET OWNERSHIP</span>
+          </button>
+        )}
         {onUpgradeClick ? (
           <button
             type="button"
