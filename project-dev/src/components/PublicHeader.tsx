@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUpRight, LogOut, Menu, Send, Wallet, X } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
+  const pathname = usePathname();
   const { connected, shortAddress, disconnectDemoOrWallet } = useGenesisBalance();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -43,33 +45,41 @@ export const PublicHeader: React.FC = () => {
           aria-label="Public Navigation"
           className="hidden lg:flex items-center gap-1 xl:gap-2 font-sans text-xs xl:text-sm font-extrabold uppercase tracking-wide"
         >
-          <a
-            href="#hero-section"
-            className="px-3 py-2 rounded-lg text-white hover:text-toxic hover:bg-surface uppercase transition-colors"
+          <Link
+            href="/#hero-section"
+            className={`px-3 py-2 rounded-lg uppercase transition-colors ${
+              pathname === '/'
+                ? 'text-white hover:text-toxic hover:bg-surface'
+                : 'text-muted hover:text-toxic hover:bg-surface'
+            }`}
           >
             HOME
-          </a>
-          <a
-            href="#how-it-works"
+          </Link>
+          <Link
+            href="/#how-it-works"
             className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
             HOW IT WORKS
-          </a>
-          <a
-            href="#pipeline-section"
+          </Link>
+          <Link
+            href="/#pipeline-section"
             className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
             INCUBATOR
-          </a>
-          <a
-            href="#choose-your-access"
+          </Link>
+          <Link
+            href="/#choose-your-access"
             className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
           >
             MEMBERSHIP
-          </a>
+          </Link>
           <Link
             href="/ledger"
-            className="px-3 py-2 rounded-lg text-muted hover:text-toxic hover:bg-surface uppercase transition-colors"
+            className={`px-3 py-2 rounded-lg uppercase transition-colors ${
+              pathname === '/ledger'
+                ? 'text-toxic bg-surface font-black'
+                : 'text-muted hover:text-toxic hover:bg-surface'
+            }`}
           >
             PERFORMANCE
           </Link>
@@ -141,38 +151,42 @@ export const PublicHeader: React.FC = () => {
       {/* Mobile Collapsible Navigation Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-border-default bg-surface px-4 py-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          <a
-            href="#hero-section"
+          <Link
+            href="/#hero-section"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-white font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
+            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider ${
+              pathname === '/' ? 'text-white' : 'text-muted'
+            }`}
           >
             HOME
-          </a>
-          <a
-            href="#how-it-works"
+          </Link>
+          <Link
+            href="/#how-it-works"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
             HOW IT WORKS
-          </a>
-          <a
-            href="#pipeline-section"
+          </Link>
+          <Link
+            href="/#pipeline-section"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
             INCUBATOR
-          </a>
-          <a
-            href="#choose-your-access"
+          </Link>
+          <Link
+            href="/#choose-your-access"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
           >
             MEMBERSHIP
-          </a>
+          </Link>
           <Link
             href="/ledger"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center h-12 min-h-[44px] px-4 rounded-lg text-muted font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider"
+            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider ${
+              pathname === '/ledger' ? 'text-toxic bg-surface-card' : 'text-muted'
+            }`}
           >
             PERFORMANCE
           </Link>

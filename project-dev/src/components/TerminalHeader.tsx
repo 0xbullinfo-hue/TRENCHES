@@ -2,12 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { ArrowUpRight, LogOut, Search, Send, Sparkles, Target, Wallet, X } from 'lucide-react';
 
 export const TerminalHeader: React.FC = () => {
+  const pathname = usePathname();
   const {
     connected,
     shortAddress,
@@ -67,12 +69,27 @@ export const TerminalHeader: React.FC = () => {
             )}
           </div>
 
-          <a
-            href="#ledger-embed"
-            className="h-10 px-3.5 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
+          <Link
+            href="/dashboard"
+            className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+              pathname === '/dashboard'
+                ? 'bg-surface-card border-toxic text-toxic font-black'
+                : 'bg-surface hover:bg-surface-card border-border-default hover:border-toxic text-white'
+            }`}
+          >
+            <span>Dashboard</span>
+          </Link>
+
+          <Link
+            href="/ledger"
+            className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+              pathname === '/ledger'
+                ? 'bg-surface-card border-toxic text-toxic font-black'
+                : 'bg-surface hover:bg-surface-card border-border-default hover:border-toxic text-white'
+            }`}
           >
             <span>Ledger</span>
-          </a>
+          </Link>
 
           <a
             href={communityUrl}
@@ -157,12 +174,26 @@ export const TerminalHeader: React.FC = () => {
             </button>
           )}
         </div>
-        <a
-          href="#ledger-embed"
-          className="h-9 px-3 rounded-lg bg-surface-card border border-border-default text-white font-sans text-xs font-bold uppercase inline-flex items-center shrink-0"
+        <Link
+          href="/dashboard"
+          className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
+            pathname === '/dashboard'
+              ? 'bg-surface-card border-toxic text-toxic'
+              : 'bg-surface-card border-border-default text-white'
+          }`}
+        >
+          Dashboard
+        </Link>
+        <Link
+          href="/ledger"
+          className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
+            pathname === '/ledger'
+              ? 'bg-surface-card border-toxic text-toxic'
+              : 'bg-surface-card border-border-default text-white'
+          }`}
         >
           Ledger
-        </a>
+        </Link>
       </div>
     </header>
   );

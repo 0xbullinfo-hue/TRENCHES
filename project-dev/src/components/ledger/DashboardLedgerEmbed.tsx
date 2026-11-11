@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { LedgerGrid } from './LedgerGrid';
 import { LedgerCardSkeleton } from './LedgerCardSkeleton';
 import { ShieldCheck, ArrowUpRight, ChevronUp, BarChart3 } from 'lucide-react';
@@ -47,15 +48,21 @@ export function DashboardLedgerEmbed() {
               </p>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col sm:flex-row items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="w-full sm:w-auto h-12 px-7 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-elevated border border-border-default hover:border-toxic text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Preview Inline</span>
+              </button>
+              <Link
+                href="/ledger"
+                className="w-full sm:w-auto h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
               >
                 <span>View full ledger</span>
                 <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -80,6 +87,13 @@ export function DashboardLedgerEmbed() {
             </div>
 
             <div className="flex items-center gap-3">
+              <Link
+                href="/ledger"
+                className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-elevated border border-toxic text-white hover:text-toxic font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Full Ledger Page</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}

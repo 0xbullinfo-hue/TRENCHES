@@ -38,24 +38,24 @@ export const Footer: React.FC = () => {
             </div>
             <ul className="space-y-2">
               <li>
-                <a href="#hero-section" className="hover:text-toxic transition-colors">
+                <Link href="/#hero-section" className="hover:text-toxic transition-colors">
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#how-it-works" className="hover:text-toxic transition-colors">
+                <Link href="/#how-it-works" className="hover:text-toxic transition-colors">
                   How The Lab Works
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#pipeline-section" className="hover:text-toxic transition-colors">
+                <Link href="/#pipeline-section" className="hover:text-toxic transition-colors">
                   Incubator Pipeline
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#choose-your-access" className="hover:text-toxic transition-colors">
+                <Link href="/#choose-your-access" className="hover:text-toxic transition-colors">
                   Membership Tiers
-                </a>
+                </Link>
               </li>
               <li>
                 <Link href="/ledger" className="hover:text-toxic transition-colors inline-flex items-center gap-1">

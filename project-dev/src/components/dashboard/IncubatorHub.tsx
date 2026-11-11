@@ -66,6 +66,7 @@ export const IncubatorHub: React.FC = () => {
   const router = useRouter();
   const {
     connected,
+    connectWallet,
     isUnlocked,
     publicKeyBase58,
     shortAddress,
@@ -120,9 +121,29 @@ export const IncubatorHub: React.FC = () => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tab);
-      window.history.replaceState({}, '', url.toString());
+      window.history.pushState({ tab }, '', url.toString());
     }
   };
+
+  // Synchronize tab state on browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab')?.toUpperCase();
+      if (
+        tabParam === 'ALPHA' ||
+        tabParam === 'SOCIAL' ||
+        tabParam === 'WATCHLIST' ||
+        tabParam === 'MAX_ALPHA'
+      ) {
+        setCurrentTab(tabParam as DashboardTab);
+      } else {
+        setCurrentTab('ALPHA');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -996,39 +1017,37 @@ export const IncubatorHub: React.FC = () => {
       )}
 
       {/* 5. PINNED PRIORITY OPPORTUNITIES (Section 4.2 D) */}
-      {totalPinned > 0 && activeFilter === 'ALL' && (
+      {pinnedCalls.length > 0 && activeFilter === 'ALL' && currentTab === 'ALPHA' && isUnlocked && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-md bg-surface border border-border-default text-white font-mono text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none">
               <Pin className="w-3.5 h-3.5 text-toxic" />
-              <span>PINNED PRIORITY ({isUnlocked ? totalPinned : pinnedCampaigns.length})</span>
+              <span>PINNED PRIORITY ({pinnedCalls.length})</span>
             </span>
             <span className="font-sans text-xs text-muted">
-              High-priority trade setups &amp; community raids pinned by Admin
+              High-priority trade setups pinned by Admin
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-            {isUnlocked && pinnedCalls.map(renderAlphaCard)}
-            {pinnedCampaigns.map((camp) => (
-              <CampaignCard
-                key={camp.id}
-                campaign={camp}
-                userWallet={publicKeyBase58}
-                isAdmin={isAdmin}
-                onTogglePin={handleTogglePinCampaign}
-              />
-            ))}
+            {pinnedCalls.map(renderAlphaCard)}
           </div>
         </div>
       )}
 
       {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
       <div id="feed-tabs" className="space-y-4 pt-2">
-        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default overflow-x-auto no-scrollbar scroll-smooth">
+        <div
+          role="tablist"
+          aria-label="Dashboard Content Categories"
+          className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default overflow-x-auto no-scrollbar scroll-smooth"
+        >
           {/* TAB 1: ALPHA */}
           <button
             type="button"
+            role="tab"
+            aria-selected={currentTab === 'ALPHA'}
+            data-testid="tab-alpha"
             onClick={() => handleSelectTab('ALPHA')}
             className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               currentTab === 'ALPHA'
@@ -1059,6 +1078,9 @@ export const IncubatorHub: React.FC = () => {
           {/* TAB 2: SOCIAL */}
           <button
             type="button"
+            role="tab"
+            aria-selected={currentTab === 'SOCIAL'}
+            data-testid="tab-social"
             onClick={() => handleSelectTab('SOCIAL')}
             className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               currentTab === 'SOCIAL'
@@ -1082,6 +1104,9 @@ export const IncubatorHub: React.FC = () => {
           {/* TAB 3: WATCHLIST */}
           <button
             type="button"
+            role="tab"
+            aria-selected={currentTab === 'WATCHLIST'}
+            data-testid="tab-watchlist"
             onClick={() => handleSelectTab('WATCHLIST')}
             className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               currentTab === 'WATCHLIST'
@@ -1112,6 +1137,9 @@ export const IncubatorHub: React.FC = () => {
           {/* TAB 4: MAX ALPHA */}
           <button
             type="button"
+            role="tab"
+            aria-selected={currentTab === 'MAX_ALPHA'}
+            data-testid="tab-max-alpha"
             onClick={() => handleSelectTab('MAX_ALPHA')}
             className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               currentTab === 'MAX_ALPHA'
@@ -1158,7 +1186,7 @@ export const IncubatorHub: React.FC = () => {
             userTier={currentMembershipTier}
             onUpgradeClick={() => {
               if (!connected) {
-                requestUnlockSignature?.();
+                connectWallet();
               } else {
                 router.push('/dashboard/stake');
               }
