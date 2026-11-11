@@ -193,7 +193,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     setSubmitting(true);
     try {
       let signatureHex: string | undefined;
-      let signatureTs: number | undefined;
+      let activeChallengeId: string | undefined;
 
       const activeAdapter = wallet.wallet?.adapter;
       const activeSignMessage =
@@ -202,12 +202,24 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           ? (activeAdapter as any).signMessage.bind(activeAdapter)
           : null);
 
-      // Verify wallet ownership with cryptographic challenge signature
+      // Verify wallet ownership with server-generated cryptographic challenge signature
       if (activeSignMessage && wallet.publicKey && wallet.publicKey.toBase58() === cleanWallet) {
-        signatureTs = Date.now();
-        const challenge = `TrenchLabs Raid Submission|${campaign.id}|${cleanWallet}|${signatureTs}`;
+        // 1. Request server-issued challenge
+        const challengeRes = await fetch(`/api/campaigns/${campaign.id}/challenge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress: cleanWallet }),
+        });
+        const challengeData = await challengeRes.json();
+        if (!challengeRes.ok || !challengeData.ok || !challengeData.challengeId || !challengeData.message) {
+          throw new Error(challengeData.error || 'Failed to request raid verification challenge.');
+        }
+
+        activeChallengeId = challengeData.challengeId;
+
+        // 2. Sign exact server challenge message
         try {
-          const sigBytes = await activeSignMessage(new TextEncoder().encode(challenge));
+          const sigBytes = await activeSignMessage(new TextEncoder().encode(challengeData.message));
           signatureHex = Array.from(sigBytes)
             .map((b) => (b as number).toString(16).padStart(2, '0'))
             .join('');
@@ -226,11 +238,11 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          challengeId: activeChallengeId,
           walletAddress: cleanWallet,
           xHandle: cleanHandle,
           xRetweetLink: cleanRetweet,
           signature: signatureHex,
-          timestamp: signatureTs,
         }),
       });
 

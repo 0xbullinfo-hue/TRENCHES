@@ -1,37 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { submitCampaignCompletion } from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
-import { getAuthSession, verifySolanaSignature, MAX_TIMESTAMP_DRIFT_MS } from '@/server/auth';
-import { KV_CONFIGURED, kvLock } from '@/server/kv';
+import { verifySolanaSignature } from '@/server/auth';
+import { getRaidChallenge, consumeRaidChallenge } from '@/server/raid-challenges';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
-
-// In-memory mutex and replay set for atomic consumption under concurrency
-const seenChallengeSignatures = new Set<string>();
-let replayChain = Promise.resolve();
-
-async function consumeChallengeSignature(signature: string): Promise<boolean> {
-  // If distributed KV (Upstash Redis) is configured, enforce atomic distributed lock
-  if (KV_CONFIGURED) {
-    const replayKey = `raid-submit-replay:${crypto.createHash('sha256').update(signature).digest('hex')}`;
-    return await kvLock(replayKey, '1', Math.ceil(MAX_TIMESTAMP_DRIFT_MS / 1000));
-  }
-  // Atomically serialize in-process checks to guarantee concurrent race condition safety
-  return new Promise((resolve) => {
-    replayChain = replayChain.then(async () => {
-      if (seenChallengeSignatures.has(signature)) {
-        resolve(false);
-      } else {
-        seenChallengeSignatures.add(signature);
-        setTimeout(() => seenChallengeSignatures.delete(signature), MAX_TIMESTAMP_DRIFT_MS);
-        resolve(true);
-      }
-    });
-  });
-}
 
 export async function POST(
   req: NextRequest,
@@ -59,9 +34,22 @@ export async function POST(
     );
   }
 
+  const challengeId = typeof body.challengeId === 'string' ? body.challengeId.trim() : '';
   const walletAddress = typeof body.walletAddress === 'string' ? body.walletAddress.trim() : '';
   const xHandle = typeof body.xHandle === 'string' ? body.xHandle.trim() : '';
   const xRetweetLink = typeof body.xRetweetLink === 'string' ? body.xRetweetLink.trim() : '';
+  const signature = typeof body.signature === 'string' ? body.signature.trim() : '';
+
+  // Mandatory server-generated challenge requirement: reject timestamp-only legacy signatures
+  if (!challengeId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Server-issued challenge required. Legacy timestamp-only signatures are rejected.',
+      },
+      { status: 401, headers: NO_STORE }
+    );
+  }
 
   if (!walletAddress) {
     return NextResponse.json(
@@ -91,45 +79,86 @@ export async function POST(
     );
   }
 
-  // Verify wallet ownership via strict campaign-bound cryptographic challenge signature
-  const signature = typeof body.signature === 'string' ? body.signature.trim() : req.headers.get('x-signature')?.trim();
-  const timestamp = Number(body.timestamp) || Number(req.headers.get('x-timestamp'));
-
-  if (!signature || !Number.isFinite(timestamp)) {
+  if (!signature) {
     return NextResponse.json(
-      { ok: false, error: 'Cryptographic challenge signature required to verify wallet ownership.' },
+      { ok: false, error: 'Cryptographic challenge signature is required' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // 1. Clock drift and expiration validation (< 5 minutes, <= 30s future clock skew)
+  // 1. Load the challenge from server storage
+  let challenge;
+  try {
+    challenge = await getRaidChallenge(challengeId);
+  } catch (err) {
+    console.error('[API /api/campaigns/[id]/submit POST] Challenge storage lookup error:', err);
+    return NextResponse.json(
+      { ok: false, error: 'Challenge storage unavailable. Retry shortly.' },
+      { status: 502, headers: NO_STORE }
+    );
+  }
+
+  // 2. Verify existence
+  if (!challenge) {
+    return NextResponse.json(
+      { ok: false, error: 'Unknown challenge ID or challenge already consumed.' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  // 3. Verify server-side expiration (never trust client-supplied expiry)
   const now = Date.now();
-  if (now - timestamp > MAX_TIMESTAMP_DRIFT_MS || timestamp - now > 30_000) {
+  if (now > challenge.expiresAt) {
     return NextResponse.json(
-      { ok: false, error: 'Challenge expired or timestamp drift exceeded.' },
+      { ok: false, error: 'Challenge expired. Please request a fresh challenge.' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // 2. Strict campaign-bound challenge verification (binds campaign ID and wallet address)
-  const challengeMsg = `TrenchLabs Raid Submission|${id}|${walletAddress}|${timestamp}`;
-  if (!verifySolanaSignature(walletAddress, signature, challengeMsg)) {
+  // 4. Verify campaign binding
+  if (challenge.campaignId !== id) {
     return NextResponse.json(
-      { ok: false, error: 'Invalid challenge signature, campaign mismatch, or wrong wallet.' },
+      { ok: false, error: 'Challenge campaign mismatch.' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // 3. Atomic consumption / replay prevention (protects against concurrent and sequential replays)
-  const consumed = await consumeChallengeSignature(signature);
+  // 5. Verify wallet binding
+  if (challenge.walletAddress !== walletAddress) {
+    return NextResponse.json(
+      { ok: false, error: 'Challenge wallet mismatch. Wrong wallet.' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  // 6. Verify Ed25519 signature over exact server-issued challenge message
+  if (!verifySolanaSignature(challenge.walletAddress, signature, challenge.message)) {
+    return NextResponse.json(
+      { ok: false, error: 'Invalid challenge signature.' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  // 7. Atomically consume the challenge (guarantees concurrent single-use replay protection)
+  let consumed = false;
+  try {
+    consumed = await consumeRaidChallenge(challengeId);
+  } catch (err) {
+    console.error('[API /api/campaigns/[id]/submit POST] Atomic consume error:', err);
+    return NextResponse.json(
+      { ok: false, error: 'Challenge storage unavailable during consumption. Retry shortly.' },
+      { status: 502, headers: NO_STORE }
+    );
+  }
+
   if (!consumed) {
     return NextResponse.json(
-      { ok: false, error: 'Challenge signature has already been consumed or replayed.' },
+      { ok: false, error: 'Challenge has already been consumed or replayed.' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // Rate limit per wallet: 5 submissions per 60s
+  // 8. Continue the submission only after successful atomic consumption
   const walletLimit = await rateLimit(`submit-camp:wallet:${walletAddress}`, 5, 60);
   if (!walletLimit.ok) {
     return NextResponse.json(
@@ -161,4 +190,3 @@ export async function POST(
     { status: 201, headers: NO_STORE }
   );
 }
-

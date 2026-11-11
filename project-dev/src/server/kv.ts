@@ -124,6 +124,21 @@ export async function kvDel(key: string): Promise<void> {
   await cmd(['DEL', key]);
 }
 
+const CONSUME_CHALLENGE_LUA =
+  "local val = redis.call('get', KEYS[1]) " +
+  "if not val then return 0 end " +
+  "redis.call('del', KEYS[1]) " +
+  "return 1";
+
+/**
+ * Atomically consumes a challenge key in Redis (guaranteeing exactly-once execution under concurrency).
+ * Returns true if the challenge was present and deleted, false if already consumed/expired.
+ */
+export async function kvConsumeChallenge(key: string): Promise<boolean> {
+  const res = await cmd(['EVAL', CONSUME_CHALLENGE_LUA, 1, key]);
+  return Number(res) === 1;
+}
+
 export async function kvHGet(key: string, field: string): Promise<string | null> {
   return ((await cmd(['HGET', key, field])) as string | null) ?? null;
 }

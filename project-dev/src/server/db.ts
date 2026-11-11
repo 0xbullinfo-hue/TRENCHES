@@ -81,6 +81,17 @@ export interface AuditLogRow {
   timestamp: string;
 }
 
+export interface RaidChallengeRow {
+  challenge_id: string;
+  nonce: string;
+  campaign_id: string;
+  wallet_address: string;
+  created_at: string;
+  expires_at: string;
+  message: string;
+  consumed_at: string | null;
+}
+
 interface TrenchDatabaseSchema {
   tier_thresholds: TierThresholdRow[];
   stakes: StakeRow[];
@@ -88,6 +99,7 @@ interface TrenchDatabaseSchema {
   telegram_members: TelegramMemberRow[];
   ledger_entries: LedgerEntryRow[];
   audit_logs: AuditLogRow[];
+  raid_challenges?: RaidChallengeRow[];
 }
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
@@ -171,6 +183,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
     telegram_members: [],
     ledger_entries: [],
     audit_logs: [],
+    raid_challenges: [],
   };
 }
 
@@ -220,6 +233,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
       if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
       if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
       if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
+      if (!Array.isArray(parsed.raid_challenges)) parsed.raid_challenges = [];
       return parsed;
     } catch (err) {
       console.error('[TrenchLabs DB] Stored database is unreadable:', err);
@@ -239,6 +253,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
           if (!Array.isArray(parsed.verification_sessions)) parsed.verification_sessions = [];
           if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
           if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
+          if (!Array.isArray(parsed.raid_challenges)) parsed.raid_challenges = [];
           inMemoryDb = parsed;
           return inMemoryDb;
         }
@@ -588,6 +603,57 @@ export async function releaseVerificationSession(sessionId: string): Promise<voi
       session.telegram_user_id = null;
       await saveDb(db);
     }
+  });
+}
+
+// -------------------------------------------------------------
+// Database Operations: Raid Nonce Challenges
+// -------------------------------------------------------------
+
+export async function createRaidChallengeRow(
+  challenge: Omit<RaidChallengeRow, 'consumed_at'>
+): Promise<RaidChallengeRow> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.raid_challenges)) db.raid_challenges = [];
+    const nowMs = Date.now();
+    // Prune expired challenges older than 1 hour to prevent unbounded growth
+    const pruneBefore = nowMs - 60 * 60 * 1000;
+    db.raid_challenges = db.raid_challenges.filter(
+      (c) => new Date(c.expires_at).getTime() > pruneBefore
+    );
+
+    const row: RaidChallengeRow = {
+      ...challenge,
+      consumed_at: null,
+    };
+    db.raid_challenges.push(row);
+    await saveDb(db);
+    return row;
+  });
+}
+
+export async function getRaidChallengeRow(
+  challengeId: string
+): Promise<RaidChallengeRow | null> {
+  const db = await loadDb();
+  if (!Array.isArray(db.raid_challenges)) return null;
+  return db.raid_challenges.find((c) => c.challenge_id === challengeId) || null;
+}
+
+export async function consumeRaidChallengeRow(
+  challengeId: string
+): Promise<boolean> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.raid_challenges)) return false;
+    const row = db.raid_challenges.find((c) => c.challenge_id === challengeId);
+    if (!row) return false;
+    if (row.consumed_at) return false;
+    if (new Date(row.expires_at).getTime() <= Date.now()) return false;
+    row.consumed_at = new Date().toISOString();
+    await saveDb(db);
+    return true;
   });
 }
 

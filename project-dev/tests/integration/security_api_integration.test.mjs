@@ -13,7 +13,10 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'mock-redis-token';
 
 import { GENESIS_MINT, ADMIN_WALLET } from '../../src/lib/config.ts';
 
-// Mock only external network infrastructure (Jupiter oracle & Upstash Redis HTTP API)
+// In-memory backing store for mock Redis engine
+const mockRedisStore = new Map();
+
+// Mock only external network infrastructure (Jupiter oracle, Solana RPC, and Upstash Redis REST)
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => {
   const urlStr = String(url);
@@ -29,6 +32,8 @@ globalThis.fetch = async (url, options) => {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   }
+
+  // Mock Jupiter price oracle
   if (urlStr.includes('api.jup.ag/price')) {
     return new Response(
       JSON.stringify({
@@ -40,16 +45,16 @@ globalThis.fetch = async (url, options) => {
     );
   }
 
-  // Mock Upstash Redis REST
+  // Mock Upstash Redis REST with atomic Lua evaluation
   if (urlStr.includes('mock-redis.io')) {
     const bodyText = options?.body ? String(options.body) : '[]';
-    let cmd = '';
+    let args = [];
     try {
-      const parsed = JSON.parse(bodyText);
-      cmd = String(parsed[0]).toUpperCase();
+      args = JSON.parse(bodyText);
     } catch {
-      cmd = '';
+      args = [];
     }
+    const cmd = String(args[0]).toUpperCase();
 
     if (cmd === 'HGETALL') {
       return new Response(JSON.stringify({ result: {} }), {
@@ -57,12 +62,52 @@ globalThis.fetch = async (url, options) => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    if (cmd === 'SET' || cmd === 'SETEX' || cmd === 'DEL' || cmd === 'HDEL') {
+
+    if (cmd === 'SET' || cmd === 'SETEX') {
+      const key = String(args[1]);
+      const val = String(cmd === 'SETEX' ? args[2] : args[2]);
+      mockRedisStore.set(key, val);
       return new Response(JSON.stringify({ result: 'OK' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    if (cmd === 'GET') {
+      const key = String(args[1]);
+      const val = mockRedisStore.get(key) ?? null;
+      return new Response(JSON.stringify({ result: val }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (cmd === 'DEL') {
+      const key = String(args[1]);
+      const count = mockRedisStore.delete(key) ? 1 : 0;
+      return new Response(JSON.stringify({ result: count }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (cmd === 'EVAL') {
+      // Atomic Lua consumption script execution simulation
+      const key = String(args[2]);
+      if (mockRedisStore.has(key)) {
+        mockRedisStore.delete(key);
+        return new Response(JSON.stringify({ result: 1 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        return new Response(JSON.stringify({ result: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ result: null }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -75,6 +120,7 @@ globalThis.fetch = async (url, options) => {
 // Actual application route handlers
 import { GET as getStakeStatus } from '../../src/app/api/stake/status/route.ts';
 import { GET as getTelegramLink, POST as postTelegramLink } from '../../src/app/api/telegram/link/route.ts';
+import { POST as requestChallenge } from '../../src/app/api/campaigns/[id]/challenge/route.ts';
 import { POST as submitCampaign } from '../../src/app/api/campaigns/[id]/submit/route.ts';
 import { GET as getAlphas } from '../../src/app/api/alphas/route.ts';
 
@@ -82,6 +128,8 @@ import { GET as getAlphas } from '../../src/app/api/alphas/route.ts';
 import { signSession, SESSION_COOKIE_NAME } from '../../src/server/auth.ts';
 import { createCampaign, deleteCampaign } from '../../src/server/campaigns-data.ts';
 import { resolveWalletEntitlement, evaluateWalletDowngrade } from '../../src/server/entitlements.ts';
+import { issueRaidChallenge, getRaidChallenge, consumeRaidChallenge } from '../../src/server/raid-challenges.ts';
+import { consumeRaidChallengeRow, createRaidChallengeRow } from '../../src/server/db.ts';
 
 function signEd25519(keypair, message) {
   const messageBytes = Buffer.from(message, 'utf-8');
@@ -265,27 +313,65 @@ test('Telegram API [6/6]: Authenticated admin POST generates link code URL (200)
 });
 
 // ---------------------------------------------------------------------------
-// 3. SOCIAL RAID SECURITY SCENARIOS
+// 3. SOCIAL RAID SECURITY SCENARIOS (V2.1 SERVER NONCE CHALLENGE LIFECYCLE)
 // ---------------------------------------------------------------------------
-test('Social Raid [1/7]: Valid campaign-bound challenge succeeds (201)', async () => {
-  const camp = await createTestCampaign({ title: 'Valid Challenge Raid' });
 
+test('Social Raid [1/12]: Successful challenge issuance (201)', async () => {
+  const camp = await createTestCampaign({ title: 'Challenge Issuance Test' });
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const ts = Date.now();
-    const challengeMsg = `TrenchLabs Raid Submission|${camp.id}|${wallet}|${ts}`;
-    const sigHex = signEd25519(kp, challengeMsg);
 
+    const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletAddress: wallet }),
+    });
+
+    const res = await requestChallenge(req, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res.status, 201);
+    const json = await res.json();
+    assert.equal(json.ok, true);
+    assert.match(json.challengeId, /^rc_[0-9a-f]{32}$/);
+    assert.equal(json.campaignId, camp.id);
+    assert.equal(json.walletAddress, wallet);
+    assert.match(json.nonce, /^[0-9a-f]{48}$/);
+    assert.ok(json.expiresAt > Date.now());
+    assert.match(json.message, /^TrenchLabs Raid Challenge\|/);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Social Raid [2/12]: Correct signature and valid submission (201)', async () => {
+  const camp = await createTestCampaign({ title: 'Valid Challenge Submission' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    // 1. Issue challenge
+    const chReq = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletAddress: wallet }),
+    });
+    const chRes = await requestChallenge(chReq, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(chRes.status, 201);
+    const chJson = await chRes.json();
+
+    // 2. Sign exact server message
+    const sigHex = signEd25519(kp, chJson.message);
+
+    // 3. Submit completion
     const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        challengeId: chJson.challengeId,
         walletAddress: wallet,
         xHandle: '@test_hero',
         xRetweetLink: 'https://x.com/test_hero/status/987654321',
         signature: sigHex,
-        timestamp: ts,
       }),
     });
 
@@ -299,162 +385,166 @@ test('Social Raid [1/7]: Valid campaign-bound challenge succeeds (201)', async (
   }
 });
 
-test('Social Raid [2/7]: Expired challenge is rejected (401)', async () => {
-  const camp = await createTestCampaign({ title: 'Expired Challenge Raid' });
-
+test('Social Raid [3/12]: Expired challenge is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Expired Challenge Test' });
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const expiredTs = Date.now() - 6 * 60 * 1000; // 6 minutes ago (> 5m threshold)
-    const challengeMsg = `TrenchLabs Raid Submission|${camp.id}|${wallet}|${expiredTs}`;
-    const sigHex = signEd25519(kp, challengeMsg);
+
+    // Issue expired challenge row directly in server storage
+    const challengeId = `rc_${crypto.randomBytes(16).toString('hex')}`;
+    const nonce = crypto.randomBytes(24).toString('hex');
+    const pastTime = Date.now() - 10 * 60 * 1000;
+    const msg = `TrenchLabs Raid Challenge|${challengeId}|${camp.id}|${wallet}|${nonce}|${pastTime}`;
+    await createRaidChallengeRow({
+      challenge_id: challengeId,
+      nonce,
+      campaign_id: camp.id,
+      wallet_address: wallet,
+      created_at: new Date(pastTime - 60000).toISOString(),
+      expires_at: new Date(pastTime).toISOString(),
+      message: msg,
+    });
+
+    const sigHex = signEd25519(kp, msg);
 
     const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        challengeId,
         walletAddress: wallet,
-        xHandle: '@test_hero',
-        xRetweetLink: 'https://x.com/test_hero/status/987654321',
+        xHandle: '@expired_user',
+        xRetweetLink: 'https://x.com/expired_user/status/111',
         signature: sigHex,
-        timestamp: expiredTs,
       }),
     });
 
     const res = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
     assert.equal(res.status, 401);
     const json = await res.json();
-    assert.match(json.error, /Challenge expired/i);
+    assert.match(json.error, /expired/i);
   } finally {
     await deleteCampaign(camp.id);
   }
 });
 
-test('Social Raid [3/7]: Replayed challenge is rejected (401)', async () => {
-  const camp = await createTestCampaign({ title: 'Replay Challenge Raid' });
-
+test('Social Raid [4/12]: Unknown challenge ID is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Unknown Challenge Test' });
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const ts = Date.now();
-    const challengeMsg = `TrenchLabs Raid Submission|${camp.id}|${wallet}|${ts}`;
-    const sigHex = signEd25519(kp, challengeMsg);
 
-    const makeReq = () =>
-      new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: wallet,
-          xHandle: '@test_hero',
-          xRetweetLink: 'https://x.com/test_hero/status/987654321',
-          signature: sigHex,
-          timestamp: ts,
-        }),
-      });
+    const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: 'rc_unknown_random_id_999999999',
+        walletAddress: wallet,
+        xHandle: '@unknown_id',
+        xRetweetLink: 'https://x.com/unknown_id/status/111',
+        signature: 'deadbeef',
+      }),
+    });
 
-    // First submission succeeds
-    const res1 = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
-    assert.equal(res1.status, 201);
-
-    // Second sequential submission of exact same challenge signature is rejected
-    const res2 = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
-    assert.equal(res2.status, 401);
-    const json2 = await res2.json();
-    assert.match(json2.error, /already been consumed or replayed/i);
+    const res = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res.status, 401);
+    const json = await res.json();
+    assert.match(json.error, /Unknown challenge ID/i);
   } finally {
     await deleteCampaign(camp.id);
   }
 });
 
-test('Social Raid [4/7]: Wrong campaign is rejected (401)', async () => {
+test('Social Raid [5/12]: Wrong campaign is rejected (401)', async () => {
   const campA = await createTestCampaign({ title: 'Campaign A' });
   const campB = await createTestCampaign({ title: 'Campaign B' });
 
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const ts = Date.now();
-    // Signed strictly for Campaign A
-    const challengeMsgA = `TrenchLabs Raid Submission|${campA.id}|${wallet}|${ts}`;
-    const sigHexA = signEd25519(kp, challengeMsgA);
 
-    // Attempt to submit against Campaign B
+    // Challenge issued strictly for Campaign A
+    const ch = await issueRaidChallenge({ campaignId: campA.id, walletAddress: wallet });
+    const sigHex = signEd25519(kp, ch.message);
+
+    // Attempted submission against Campaign B
     const req = new NextRequest(`http://localhost:3000/api/campaigns/${campB.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        challengeId: ch.challengeId,
         walletAddress: wallet,
-        xHandle: '@test_hero',
-        xRetweetLink: 'https://x.com/test_hero/status/987654321',
-        signature: sigHexA,
-        timestamp: ts,
+        xHandle: '@wrong_campaign',
+        xRetweetLink: 'https://x.com/wrong_campaign/status/111',
+        signature: sigHex,
       }),
     });
 
     const res = await submitCampaign(req, { params: Promise.resolve({ id: campB.id }) });
     assert.equal(res.status, 401);
     const json = await res.json();
-    assert.match(json.error, /Invalid challenge signature, campaign mismatch/i);
+    assert.match(json.error, /Challenge campaign mismatch/i);
   } finally {
     await deleteCampaign(campA.id);
     await deleteCampaign(campB.id);
   }
 });
 
-test('Social Raid [5/7]: Wrong wallet is rejected (401)', async () => {
-  const camp = await createTestCampaign({ title: 'Wrong Wallet Raid' });
-
+test('Social Raid [6/12]: Wrong wallet is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Wrong Wallet Test' });
   try {
     const kpA = Keypair.generate();
     const kpB = Keypair.generate();
     const walletA = kpA.publicKey.toBase58();
     const walletB = kpB.publicKey.toBase58();
-    const ts = Date.now();
 
-    // Challenge signed by Wallet A
-    const challengeMsg = `TrenchLabs Raid Submission|${camp.id}|${walletA}|${ts}`;
-    const sigHex = signEd25519(kpA, challengeMsg);
+    // Challenge issued for Wallet A
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: walletA });
+    const sigHexA = signEd25519(kpA, ch.message);
 
-    // Impersonator submits with Wallet B
+    // Submitted claiming to be Wallet B
     const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        challengeId: ch.challengeId,
         walletAddress: walletB,
-        xHandle: '@impersonator',
-        xRetweetLink: 'https://x.com/impersonator/status/987654321',
-        signature: sigHex,
-        timestamp: ts,
+        xHandle: '@wrong_wallet',
+        xRetweetLink: 'https://x.com/wrong_wallet/status/111',
+        signature: sigHexA,
       }),
     });
 
     const res = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
     assert.equal(res.status, 401);
     const json = await res.json();
-    assert.match(json.error, /Invalid challenge signature, campaign mismatch, or wrong wallet/i);
+    assert.match(json.error, /Challenge wallet mismatch/i);
   } finally {
     await deleteCampaign(camp.id);
   }
 });
 
-test('Social Raid [6/7]: Invalid signature is rejected (401)', async () => {
-  const camp = await createTestCampaign({ title: 'Invalid Signature Raid' });
-
+test('Social Raid [7/12]: Invalid signature is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Invalid Signature Test' });
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const ts = Date.now();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+
+    // Corrupted signature
+    const badSig = '00'.repeat(64);
 
     const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        challengeId: ch.challengeId,
         walletAddress: wallet,
         xHandle: '@bad_sig',
-        xRetweetLink: 'https://x.com/bad_sig/status/987654321',
-        signature: 'deadbeef00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
-        timestamp: ts,
+        xRetweetLink: 'https://x.com/bad_sig/status/111',
+        signature: badSig,
       }),
     });
 
@@ -467,41 +557,186 @@ test('Social Raid [6/7]: Invalid signature is rejected (401)', async () => {
   }
 });
 
-test('Social Raid [7/7]: Two concurrent submissions cannot both consume the same challenge successfully', async () => {
-  const camp = await createTestCampaign({ title: 'Concurrent Race Raid' });
-
+test('Social Raid [8/12]: Reused challenge is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Reused Challenge Test' });
   try {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
-    const ts = Date.now();
-    const challengeMsg = `TrenchLabs Raid Submission|${camp.id}|${wallet}|${ts}`;
-    const sigHex = signEd25519(kp, challengeMsg);
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sigHex = signEd25519(kp, ch.message);
 
     const makeReq = () =>
       new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          challengeId: ch.challengeId,
           walletAddress: wallet,
-          xHandle: '@concurrent_hero',
-          xRetweetLink: 'https://x.com/concurrent_hero/status/987654321',
+          xHandle: '@reused_user',
+          xRetweetLink: 'https://x.com/reused_user/status/111',
           signature: sigHex,
-          timestamp: ts,
         }),
       });
 
-    // Fire two requests concurrently with identical challenge signatures
+    // First submission succeeds
+    const res1 = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res1.status, 201);
+
+    // Second sequential submission of exact same challenge is rejected
+    const res2 = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res2.status, 401);
+    const json2 = await res2.json();
+    assert.match(json2.error, /already been consumed or replayed/i);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Social Raid [9/12]: Two concurrent submissions cannot both consume the same challenge successfully', async () => {
+  const camp = await createTestCampaign({ title: 'Concurrent Replay Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sigHex = signEd25519(kp, ch.message);
+
+    const makeReq = () =>
+      new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challengeId: ch.challengeId,
+          walletAddress: wallet,
+          xHandle: '@concurrent_hero',
+          xRetweetLink: 'https://x.com/concurrent_hero/status/111',
+          signature: sigHex,
+        }),
+      });
+
+    // Fire two simultaneous requests
     const [resA, resB] = await Promise.all([
       submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) }),
       submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) }),
     ]);
 
     const statuses = [resA.status, resB.status].sort();
-    // Exactly ONE must succeed (201) and the other must be rejected (401)
     assert.deepEqual(statuses, [201, 401]);
   } finally {
     await deleteCampaign(camp.id);
   }
+});
+
+test('Social Raid [10/12]: Missing challenge is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Missing Challenge Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: wallet,
+        xHandle: '@missing_challenge',
+        xRetweetLink: 'https://x.com/missing_challenge/status/111',
+        signature: 'deadbeef',
+      }),
+    });
+
+    const res = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res.status, 401);
+    const json = await res.json();
+    assert.match(json.error, /Server-issued challenge required/i);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Social Raid [11/12]: Attempted timestamp-only legacy signature is rejected (401)', async () => {
+  const camp = await createTestCampaign({ title: 'Legacy Timestamp Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+    const ts = Date.now();
+
+    // Legacy signature attempted without challengeId
+    const legacyMsg = `TrenchLabs Raid Submission|${camp.id}|${wallet}|${ts}`;
+    const sigHex = signEd25519(kp, legacyMsg);
+
+    const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: wallet,
+        xHandle: '@legacy_attacker',
+        xRetweetLink: 'https://x.com/legacy_attacker/status/111',
+        signature: sigHex,
+        timestamp: ts,
+      }),
+    });
+
+    const res = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res.status, 401);
+    const json = await res.json();
+    assert.match(json.error, /Legacy timestamp-only signatures are rejected/i);
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Social Raid [12/12]: Challenge storage failure returns 502', async () => {
+  const camp = await createTestCampaign({ title: 'Storage Failure Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    // Point Upstash URL to an endpoint that throws
+    const origUrl = process.env.UPSTASH_REDIS_REST_URL;
+    process.env.UPSTASH_REDIS_REST_URL = 'https://broken-store.internal';
+
+    try {
+      const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: wallet }),
+      });
+
+      const res = await requestChallenge(req, { params: Promise.resolve({ id: camp.id }) });
+      assert.equal(res.status, 502);
+      const json = await res.json();
+      assert.match(json.error, /Challenge storage unavailable/i);
+    } finally {
+      process.env.UPSTASH_REDIS_REST_URL = origUrl;
+    }
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Social Raid Concurrency: Database transaction atomic consumption (consumeRaidChallengeRow)', async () => {
+  const challengeId = `rc_db_atomic_${crypto.randomBytes(8).toString('hex')}`;
+  const now = Date.now();
+  await createRaidChallengeRow({
+    challenge_id: challengeId,
+    nonce: 'atomic_test_nonce',
+    campaign_id: 'camp_db_test',
+    wallet_address: '11111111111111111111111111111111',
+    created_at: new Date(now).toISOString(),
+    expires_at: new Date(now + 300000).toISOString(),
+    message: 'test message',
+  });
+
+  // Execute two concurrent database consume attempts
+  const [winA, winB] = await Promise.all([
+    consumeRaidChallengeRow(challengeId),
+    consumeRaidChallengeRow(challengeId),
+  ]);
+
+  const results = [winA, winB].sort();
+  // Exactly one true, one false
+  assert.deepEqual(results, [false, true]);
 });
 
 // ---------------------------------------------------------------------------
