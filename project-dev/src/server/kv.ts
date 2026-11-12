@@ -124,19 +124,48 @@ export async function kvDel(key: string): Promise<void> {
   await cmd(['DEL', key]);
 }
 
-const CONSUME_CHALLENGE_LUA =
-  "local val = redis.call('get', KEYS[1]) " +
-  "if not val then return 0 end " +
-  "redis.call('del', KEYS[1]) " +
+export type KvChallengeConsumeStatus =
+  | 'CONSUMED'
+  | 'ALREADY_CONSUMED'
+  | 'EXPIRED'
+  | 'NOT_FOUND';
+
+export const CONSUME_CHALLENGE_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return 0 end " +
+  "if string.find(raw, '\"status\":\"consumed\"') or string.find(raw, '\"consumed\":true') then return 2 end " +
+  "if ARGV[1] then " +
+  "  local nowMs = tonumber(ARGV[1]) " +
+  "  local expStart, expEnd, expStr = string.find(raw, '\"expiresAt\":(%d+)') " +
+  "  if expStr then " +
+  "    local expMs = tonumber(expStr) " +
+  "    if expMs and nowMs and nowMs > expMs then return 3 end " +
+  "  end " +
+  "end " +
+  "local nowMsStr = ARGV[1] or '0' " +
+  "local tombstone = '{\"status\":\"consumed\",\"consumedAt\":' .. nowMsStr .. '}' " +
+  "local ttl = redis.call('ttl', KEYS[1]) " +
+  "local tombstoneTtl = ttl " +
+  "local minRetention = tonumber(ARGV[2]) or 120 " +
+  "if not tombstoneTtl or tombstoneTtl < minRetention then tombstoneTtl = minRetention end " +
+  "redis.call('set', KEYS[1], tombstone, 'EX', tombstoneTtl) " +
   "return 1";
 
 /**
- * Atomically consumes a challenge key in Redis (guaranteeing exactly-once execution under concurrency).
- * Returns true if the challenge was present and deleted, false if already consumed/expired.
+ * Atomically consumes a challenge key in Redis with deterministic tombstoning.
+ * Guarantees exactly-once execution across instances and bounded tombstone retention for deterministic replay responses.
  */
-export async function kvConsumeChallenge(key: string): Promise<boolean> {
-  const res = await cmd(['EVAL', CONSUME_CHALLENGE_LUA, 1, key]);
-  return Number(res) === 1;
+export async function kvConsumeChallenge(
+  key: string,
+  nowMs = Date.now(),
+  minRetentionSec = 120
+): Promise<KvChallengeConsumeStatus> {
+  const res = await cmd(['EVAL', CONSUME_CHALLENGE_LUA, 1, key, nowMs, minRetentionSec]);
+  const num = Number(res);
+  if (num === 1) return 'CONSUMED';
+  if (num === 2) return 'ALREADY_CONSUMED';
+  if (num === 3) return 'EXPIRED';
+  return 'NOT_FOUND';
 }
 
 export async function kvHGet(key: string, field: string): Promise<string | null> {

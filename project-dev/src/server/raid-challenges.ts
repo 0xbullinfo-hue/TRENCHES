@@ -116,12 +116,23 @@ export async function issueRaidChallenge(params: {
   return challenge;
 }
 
+export type RaidChallengeState =
+  | { status: 'ACTIVE'; challenge: RaidChallenge }
+  | { status: 'CONSUMED'; consumedAt?: number }
+  | { status: 'EXPIRED' }
+  | { status: 'NOT_FOUND' };
+
+export type ConsumeChallengeOutcome = {
+  success: boolean;
+  status: 'CONSUMED' | 'ALREADY_CONSUMED' | 'EXPIRED' | 'NOT_FOUND';
+};
+
 /**
- * Loads an unconsumed challenge from the authoritative storage backend.
- * Enforces single-authority: a Redis-authoritative challenge is NEVER loaded from DB mirror.
+ * Loads the authoritative lifecycle state of a challenge.
+ * Returns explicit state (ACTIVE, CONSUMED, EXPIRED, NOT_FOUND) without relying on asynchronous DB mirror timing.
  */
-export async function getRaidChallenge(challengeId: string): Promise<RaidChallenge | null> {
-  if (!challengeId) return null;
+export async function getRaidChallengeState(challengeId: string): Promise<RaidChallengeState> {
+  if (!challengeId) return { status: 'NOT_FOUND' };
 
   const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
 
@@ -138,28 +149,72 @@ export async function getRaidChallenge(challengeId: string): Promise<RaidChallen
 
     if (raw) {
       try {
-        const parsed = JSON.parse(raw) as RaidChallenge;
-        if (Date.now() > parsed.expiresAt) return null;
-        return parsed;
+        const parsed = JSON.parse(raw);
+        if (parsed.status === 'consumed') {
+          return { status: 'CONSUMED', consumedAt: parsed.consumedAt };
+        }
+        if (Date.now() > parsed.expiresAt) {
+          return { status: 'EXPIRED' };
+        }
+        return { status: 'ACTIVE', challenge: parsed as RaidChallenge };
       } catch {
-        return null;
+        return { status: 'NOT_FOUND' };
       }
     }
 
     // Key was NOT found in Redis.
-    // Check if this challenge was issued under DB authority
+    // Check if this challenge was issued under DB authority or has a recorded DB mirror
     const row = await getRaidChallengeRow(challengeId);
-    if (!row) return null;
+    if (!row) return { status: 'NOT_FOUND' };
 
-    // MANDATORY RULE: A challenge issued under Redis authority MUST NEVER fall back to DB mirror!
+    // MANDATORY RULE: A challenge issued under Redis authority MUST NEVER fall back to DB mirror to authorize!
     if (row.authority === 'redis') {
-      return null;
+      if (row.consumed_at) {
+        return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+      }
+      return { status: 'NOT_FOUND' };
     }
 
     // Genuine DB-authoritative challenge
-    if (row.consumed_at) return null;
-    if (new Date(row.expires_at).getTime() <= Date.now()) return null;
+    if (row.consumed_at) {
+      return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+    }
+    if (new Date(row.expires_at).getTime() <= Date.now()) {
+      return { status: 'EXPIRED' };
+    }
     return {
+      status: 'ACTIVE',
+      challenge: {
+        challengeId: row.challenge_id,
+        nonce: row.nonce,
+        campaignId: row.campaign_id,
+        walletAddress: row.wallet_address,
+        createdAt: new Date(row.created_at).getTime(),
+        expiresAt: new Date(row.expires_at).getTime(),
+        message: row.message,
+        authority: 'db',
+      },
+    };
+  }
+
+  // Redis is NOT configured
+  const row = await getRaidChallengeRow(challengeId);
+  if (!row) return { status: 'NOT_FOUND' };
+
+  // If the challenge was issued with Redis authority, but Redis is now unavailable: Fail closed!
+  if (row.authority === 'redis') {
+    throw new Error('Authoritative Redis store is unavailable');
+  }
+
+  if (row.consumed_at) {
+    return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    return { status: 'EXPIRED' };
+  }
+  return {
+    status: 'ACTIVE',
+    challenge: {
       challengeId: row.challenge_id,
       nonce: row.nonce,
       campaignId: row.campaign_id,
@@ -168,81 +223,112 @@ export async function getRaidChallenge(challengeId: string): Promise<RaidChallen
       expiresAt: new Date(row.expires_at).getTime(),
       message: row.message,
       authority: 'db',
-    };
-  }
-
-  // Redis is NOT configured
-  const row = await getRaidChallengeRow(challengeId);
-  if (!row) return null;
-
-  // If the challenge was issued with Redis authority, but Redis is now unavailable: Fail closed!
-  if (row.authority === 'redis') {
-    throw new Error('Authoritative Redis store is unavailable');
-  }
-
-  if (row.consumed_at) return null;
-  if (new Date(row.expires_at).getTime() <= Date.now()) return null;
-  return {
-    challengeId: row.challenge_id,
-    nonce: row.nonce,
-    campaignId: row.campaign_id,
-    walletAddress: row.wallet_address,
-    createdAt: new Date(row.created_at).getTime(),
-    expiresAt: new Date(row.expires_at).getTime(),
-    message: row.message,
-    authority: 'db',
+    },
   };
 }
 
 /**
- * Atomically consumes a challenge so it cannot be reused.
- * Guaranteed single-use execution under concurrent requests and across instances.
- * If Redis is authoritative, Redis Lua is the ONLY authority (never falls back to DB).
- * If Redis is unavailable during consumption, fails closed.
+ * Loads an unconsumed challenge from the authoritative storage backend.
+ * Enforces single-authority: a Redis-authoritative challenge is NEVER loaded from DB mirror.
  */
-export async function consumeRaidChallenge(challengeId: string): Promise<boolean> {
-  if (!challengeId) return false;
+export async function getRaidChallenge(challengeId: string): Promise<RaidChallenge | null> {
+  const state = await getRaidChallengeState(challengeId);
+  if (state.status === 'ACTIVE') {
+    return state.challenge;
+  }
+  return null;
+}
+
+/**
+ * Atomically consumes a challenge so it cannot be reused.
+ * Returns detailed outcome (CONSUMED, ALREADY_CONSUMED, EXPIRED, NOT_FOUND).
+ */
+export async function consumeRaidChallengeOutcome(
+  challengeId: string
+): Promise<ConsumeChallengeOutcome> {
+  if (!challengeId) return { success: false, status: 'NOT_FOUND' };
 
   const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
 
   if (redisActive) {
     const key = challengeRedisKey(challengeId);
-    let consumedInRedis = false;
+    let redisStatus;
     try {
-      consumedInRedis = await kvConsumeChallenge(key);
+      redisStatus = await kvConsumeChallenge(key, Date.now(), 120);
     } catch (err) {
       console.error('[RaidChallenge] Authoritative Redis consume error:', err);
       // MANDATORY RULE: Redis errors produce a fail-closed result. No silent DB fallback.
       throw new Error('Authoritative Redis store is unavailable');
     }
 
-    if (consumedInRedis) {
+    if (redisStatus === 'CONSUMED') {
       // Background DB mirror update for audit logging only (definitive decision already made in Redis)
       consumeRaidChallengeRow(challengeId).catch(() => {});
-      return true;
+      return { success: true, status: 'CONSUMED' };
     }
 
-    // Key was missing or already consumed in Redis.
+    if (redisStatus === 'ALREADY_CONSUMED') {
+      return { success: false, status: 'ALREADY_CONSUMED' };
+    }
+
+    if (redisStatus === 'EXPIRED') {
+      return { success: false, status: 'EXPIRED' };
+    }
+
+    // Key was NOT_FOUND in Redis.
     // Check if it was issued as a genuine DB-authoritative challenge
     const row = await getRaidChallengeRow(challengeId);
-    if (!row) return false;
+    if (!row) return { success: false, status: 'NOT_FOUND' };
 
     // MANDATORY RULE: Redis-authoritative challenge cannot fall back to DB mirror!
     if (row.authority === 'redis') {
-      return false;
+      if (row.consumed_at) {
+        return { success: false, status: 'ALREADY_CONSUMED' };
+      }
+      return { success: false, status: 'NOT_FOUND' };
     }
 
-    return await consumeRaidChallengeRow(challengeId);
+    // Genuine DB-authoritative challenge
+    const rowConsumed = await consumeRaidChallengeRow(challengeId);
+    if (rowConsumed) {
+      return { success: true, status: 'CONSUMED' };
+    }
+    if (row.consumed_at) {
+      return { success: false, status: 'ALREADY_CONSUMED' };
+    }
+    if (new Date(row.expires_at).getTime() <= Date.now()) {
+      return { success: false, status: 'EXPIRED' };
+    }
+    return { success: false, status: 'NOT_FOUND' };
   }
 
   // Redis is NOT configured
   const row = await getRaidChallengeRow(challengeId);
-  if (!row) return false;
+  if (!row) return { success: false, status: 'NOT_FOUND' };
 
   // If issued under Redis, fail closed
   if (row.authority === 'redis') {
     throw new Error('Authoritative Redis store is unavailable');
   }
 
-  return await consumeRaidChallengeRow(challengeId);
+  if (row.consumed_at) {
+    return { success: false, status: 'ALREADY_CONSUMED' };
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    return { success: false, status: 'EXPIRED' };
+  }
+
+  const rowConsumed = await consumeRaidChallengeRow(challengeId);
+  if (rowConsumed) {
+    return { success: true, status: 'CONSUMED' };
+  }
+  return { success: false, status: 'ALREADY_CONSUMED' };
+}
+
+/**
+ * Backward-compatible boolean consumer.
+ */
+export async function consumeRaidChallenge(challengeId: string): Promise<boolean> {
+  const outcome = await consumeRaidChallengeOutcome(challengeId);
+  return outcome.success;
 }

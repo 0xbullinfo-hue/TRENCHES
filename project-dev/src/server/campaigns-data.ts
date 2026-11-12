@@ -2,9 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { PublicKey } from '@solana/web3.js';
-import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
+import { KV_CONFIGURED, isKvConfigured, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
 import { ADMIN_WALLET } from '@/lib/config';
 import type { Campaign, CampaignSubmission, CampaignStatus, SubmissionStatus } from '@/lib/types';
+
+const isKvActive = () => Boolean(KV_CONFIGURED || isKvConfigured());
 
 const CAMPAIGNS_FILE_PATH = path.join(process.cwd(), 'data', 'campaigns.json');
 const SUBMISSIONS_FILE_PATH = path.join(process.cwd(), 'data', 'campaign_submissions.json');
@@ -21,7 +23,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = campaignsLockChain.then(async () => {
-    if (!KV_CONFIGURED) {
+    if (!isKvActive()) {
       if (!FILE_PERSISTENCE_ALLOWED) {
         throw new Error('Persistence not configured. Set ALLOW_FILE_PERSISTENCE=true or KV credentials.');
       }
@@ -50,7 +52,7 @@ export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
 const DEFAULT_CAMPAIGNS: Campaign[] = [];
 
 export async function loadCampaigns(): Promise<Campaign[]> {
-  if (KV_CONFIGURED) {
+  if (isKvActive()) {
     const raw = await kvGet(KV_CAMPAIGNS_KEY);
     if (!raw) return DEFAULT_CAMPAIGNS;
     try {
@@ -78,7 +80,7 @@ export async function loadCampaigns(): Promise<Campaign[]> {
 
 export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: boolean; error?: string }> {
   try {
-    if (KV_CONFIGURED) {
+    if (isKvActive()) {
       await kvSet(KV_CAMPAIGNS_KEY, JSON.stringify(campaigns));
       return { success: true };
     }
@@ -110,7 +112,7 @@ export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: b
 }
 
 export async function loadSubmissions(): Promise<CampaignSubmission[]> {
-  if (KV_CONFIGURED) {
+  if (isKvActive()) {
     const raw = await kvGet(KV_SUBMISSIONS_KEY);
     if (!raw) return [];
     try {
@@ -138,7 +140,7 @@ export async function loadSubmissions(): Promise<CampaignSubmission[]> {
 
 export async function saveSubmissions(submissions: CampaignSubmission[]): Promise<{ success: boolean; error?: string }> {
   try {
-    if (KV_CONFIGURED) {
+    if (isKvActive()) {
       await kvSet(KV_SUBMISSIONS_KEY, JSON.stringify(submissions));
       return { success: true };
     }

@@ -3,8 +3,10 @@ import { submitCampaignCompletion, loadCampaigns } from '@/server/campaigns-data
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { verifySolanaSignature } from '@/server/auth';
-import { getRaidChallenge, consumeRaidChallenge } from '@/server/raid-challenges';
-import { getRaidChallengeRow } from '@/server/db';
+import {
+  getRaidChallengeState,
+  consumeRaidChallengeOutcome,
+} from '@/server/raid-challenges';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -111,10 +113,10 @@ export async function POST(
     );
   }
 
-  // 2. Load the challenge from authoritative server storage
-  let challenge;
+  // 2. Load the challenge state from authoritative server storage
+  let challengeState;
   try {
-    challenge = await getRaidChallenge(challengeId);
+    challengeState = await getRaidChallengeState(challengeId);
   } catch (err) {
     console.error('[API /api/campaigns/[id]/submit POST] Challenge storage lookup error:', err);
     return NextResponse.json(
@@ -123,20 +125,29 @@ export async function POST(
     );
   }
 
-  // 3. Verify existence
-  if (!challenge) {
-    const existingRow = await getRaidChallengeRow(challengeId).catch(() => null);
-    if (existingRow && existingRow.consumed_at) {
-      return NextResponse.json(
-        { ok: false, error: 'Challenge has already been consumed or replayed.' },
-        { status: 409, headers: NO_STORE }
-      );
-    }
+  // 3. Inspect authoritative lifecycle state
+  if (challengeState.status === 'CONSUMED') {
+    return NextResponse.json(
+      { ok: false, error: 'Challenge has already been consumed or replayed.' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  if (challengeState.status === 'NOT_FOUND') {
     return NextResponse.json(
       { ok: false, error: 'Unknown challenge ID or challenge expired.' },
       { status: 401, headers: NO_STORE }
     );
   }
+
+  if (challengeState.status === 'EXPIRED') {
+    return NextResponse.json(
+      { ok: false, error: 'Challenge expired. Please request a fresh challenge.' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  const challenge = challengeState.challenge;
 
   // 4. Verify server-side expiration (never trust client-supplied expiry)
   const now = Date.now();
@@ -172,9 +183,9 @@ export async function POST(
   }
 
   // 8. Atomically consume the challenge in authoritative store (single-use replay protection)
-  let consumed = false;
+  let consumeOutcome;
   try {
-    consumed = await consumeRaidChallenge(challengeId);
+    consumeOutcome = await consumeRaidChallengeOutcome(challengeId);
   } catch (err) {
     console.error('[API /api/campaigns/[id]/submit POST] Atomic consume error:', err);
     return NextResponse.json(
@@ -183,10 +194,16 @@ export async function POST(
     );
   }
 
-  if (!consumed) {
+  if (!consumeOutcome.success) {
+    if (consumeOutcome.status === 'ALREADY_CONSUMED') {
+      return NextResponse.json(
+        { ok: false, error: 'Challenge has already been consumed or replayed.' },
+        { status: 409, headers: NO_STORE }
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: 'Challenge has already been consumed or replayed.' },
-      { status: 409, headers: NO_STORE }
+      { ok: false, error: 'Unknown challenge ID or challenge expired.' },
+      { status: 401, headers: NO_STORE }
     );
   }
 

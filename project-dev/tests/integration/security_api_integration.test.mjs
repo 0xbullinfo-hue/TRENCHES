@@ -93,20 +93,26 @@ globalThis.fetch = async (url, options) => {
     }
 
     if (cmd === 'EVAL') {
-      // Atomic Lua consumption script execution simulation
+      // Upgraded atomic Lua consumption script simulation with deterministic tombstones
       const key = String(args[3] ?? args[2]);
-      if (mockRedisStore.has(key)) {
-        mockRedisStore.delete(key);
-        return new Response(JSON.stringify({ result: 1 }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      } else {
+      const val = mockRedisStore.get(key);
+      if (!val) {
         return new Response(JSON.stringify({ result: 0 }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (typeof val === 'string' && val.includes('"status":"consumed"')) {
+        return new Response(JSON.stringify({ result: 2 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      mockRedisStore.set(key, JSON.stringify({ status: 'consumed', consumedAt: Date.now() }));
+      return new Response(JSON.stringify({ result: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({ result: null }), {
@@ -130,7 +136,12 @@ import { signSession, SESSION_COOKIE_NAME } from '../../src/server/auth.ts';
 import { createCampaign, deleteCampaign } from '../../src/server/campaigns-data.ts';
 import { resolveWalletEntitlement, evaluateWalletDowngrade } from '../../src/server/entitlements.ts';
 import { issueRaidChallenge, getRaidChallenge, consumeRaidChallenge } from '../../src/server/raid-challenges.ts';
-import { consumeRaidChallengeRow, createRaidChallengeRow } from '../../src/server/db.ts';
+import {
+  consumeRaidChallengeRow,
+  createRaidChallengeRow,
+  getRaidChallengeRow,
+  __setTestFailCreateRaidChallengeRow,
+} from '../../src/server/db.ts';
 
 function signEd25519(keypair, message) {
   const messageBytes = Buffer.from(message, 'utf-8');
@@ -520,12 +531,83 @@ test('Social Raid [8/31]: Authoritative storage failure returns 503', async () =
   }
 });
 
-test('Social Raid [9/31]: Database mirror failure follows documented authority policy', async () => {
-  const kp = Keypair.generate();
-  const wallet = kp.publicKey.toBase58();
-  const ch = await issueRaidChallenge({ campaignId: 'camp_mirror_pol', walletAddress: wallet });
-  assert.equal(ch.authority, 'redis');
-  assert.ok(ch.challengeId);
+test('Social Raid [9/31]: Database mirror failure follows documented authority policy (real failure injection)', async () => {
+  const camp = await createTestCampaign({ title: 'DB Mirror Failure Injection Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    // 1. Simulate failure of createRaidChallengeRow() while Redis is available
+    __setTestFailCreateRaidChallengeRow(new Error('Simulated DB disk failure during audit mirror write'));
+
+    // Issuance must succeed because Redis is authoritative
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    assert.equal(ch.authority, 'redis');
+    assert.ok(ch.challengeId);
+
+    // 2. Confirm database mirror write failed (no row exists in DB)
+    const dbRow = await getRaidChallengeRow(ch.challengeId);
+    assert.equal(dbRow, null);
+
+    // 3. Challenge submission succeeds only through Redis (201)
+    const sigHex = signEd25519(kp, ch.message);
+    const req1 = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@redis_hero',
+        xRetweetLink: 'https://x.com/redis_hero/status/12345',
+        signature: sigHex,
+      }),
+    });
+    const res1 = await submitCampaign(req1, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res1.status, 201);
+
+    // 4. Challenge cannot be consumed twice (409 Conflict)
+    const req2 = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@redis_hero',
+        xRetweetLink: 'https://x.com/redis_hero/status/12345',
+        signature: sigHex,
+      }),
+    });
+    const res2 = await submitCampaign(req2, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res2.status, 409);
+
+    // 5. Database mirror recovery / reconciliation does not reset consumed state
+    await createRaidChallengeRow({
+      challenge_id: ch.challengeId,
+      nonce: ch.nonce,
+      campaign_id: camp.id,
+      wallet_address: wallet,
+      created_at: new Date(ch.createdAt).toISOString(),
+      expires_at: new Date(ch.expiresAt).toISOString(),
+      message: ch.message,
+      authority: 'redis',
+    });
+    const req3 = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@redis_hero',
+        xRetweetLink: 'https://x.com/redis_hero/status/12345',
+        signature: sigHex,
+      }),
+    });
+    const res3 = await submitCampaign(req3, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res3.status, 409);
+  } finally {
+    __setTestFailCreateRaidChallengeRow(null);
+    await deleteCampaign(camp.id);
+  }
 });
 
 test('Social Raid [10/31]: Rate limits work independently for IP and wallet', async () => {

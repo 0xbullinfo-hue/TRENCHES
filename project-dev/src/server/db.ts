@@ -198,7 +198,7 @@ const DB_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'db.lock');
 async function acquireFileLock(): Promise<() => void> {
   const maxWaitMs = 5000;
   const start = Date.now();
-  const staleThresholdMs = 15000;
+  const lockToken = safeRandomUUID();
 
   while (Date.now() - start < maxWaitMs) {
     try {
@@ -210,7 +210,10 @@ async function acquireFileLock(): Promise<() => void> {
       // 'wx' opens for writing exclusively, failing if path already exists (atomic OS kernel lock)
       const fd = fs.openSync(DB_FILE_LOCK_PATH, 'wx');
       try {
-        fs.writeSync(fd, `${process.pid}\n${Date.now()}`);
+        fs.writeSync(
+          fd,
+          JSON.stringify({ pid: process.pid, token: lockToken, createdAt: Date.now() })
+        );
       } catch {}
 
       let released = false;
@@ -221,19 +224,19 @@ async function acquireFileLock(): Promise<() => void> {
           fs.closeSync(fd);
         } catch {}
         try {
-          fs.unlinkSync(DB_FILE_LOCK_PATH);
+          // Verify ownership before unlinking: never delete another process's lock
+          if (fs.existsSync(DB_FILE_LOCK_PATH)) {
+            const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+            if (raw.includes(lockToken)) {
+              fs.unlinkSync(DB_FILE_LOCK_PATH);
+            }
+          }
         } catch {}
       };
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-        try {
-          const stats = fs.statSync(DB_FILE_LOCK_PATH);
-          if (Date.now() - stats.mtimeMs > staleThresholdMs) {
-            try {
-              fs.unlinkSync(DB_FILE_LOCK_PATH);
-            } catch {}
-          }
-        } catch {}
+        // Active lock held by another process: wait for cooperative release.
+        // MANDATORY RULE (V2.3 Issue A): Never delete another process's active lock merely based on age.
         await sleep(20 + Math.floor(Math.random() * 30));
       } else {
         throw err;
@@ -672,9 +675,20 @@ export async function releaseVerificationSession(sessionId: string): Promise<voi
 // Database Operations: Raid Nonce Challenges
 // -------------------------------------------------------------
 
+let _testFailNextCreateRaidChallengeRow: Error | null = null;
+
+export function __setTestFailCreateRaidChallengeRow(err: Error | null): void {
+  _testFailNextCreateRaidChallengeRow = err;
+}
+
 export async function createRaidChallengeRow(
   challenge: Omit<RaidChallengeRow, 'consumed_at'>
 ): Promise<RaidChallengeRow> {
+  if (_testFailNextCreateRaidChallengeRow) {
+    const injectedErr = _testFailNextCreateRaidChallengeRow;
+    _testFailNextCreateRaidChallengeRow = null;
+    throw injectedErr;
+  }
   return withDbLock(async () => {
     const db = await loadDb();
     if (!Array.isArray(db.raid_challenges)) db.raid_challenges = [];
