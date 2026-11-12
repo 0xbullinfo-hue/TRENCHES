@@ -636,25 +636,66 @@ export async function rollbackRaidChallengeProcessing(
   return await rollbackRaidChallengeProcessingRow(challengeId, attemptId, fencingToken);
 }
 
+export type RaidChallengeReconcileResult = {
+  success: boolean;
+  status?: 'COMPLETED' | 'ALREADY_COMPLETED';
+  reason?: string;
+  submissionId?: string;
+  existingSubmissionId?: string;
+};
+
 /**
- * Reconciles challenge state to COMPLETED when a retry finds the durable submission in the DB
- * after an interrupted previous Redis finalization.
+ * Reconciles challenge state conditionally and immutably when a retry finds the durable submission
+ * after an interrupted previous finalization.
  */
 export async function reconcileRaidChallengeCompleted(
   challengeId: string,
-  submissionId: string
-): Promise<boolean> {
-  if (!challengeId || !submissionId) return false;
+  submissionId: string,
+  options?: {
+    attemptId?: string;
+    fencingToken?: number;
+    campaignId?: string;
+    walletAddress?: string;
+    detailed?: boolean;
+  }
+): Promise<any> {
+  if (!challengeId || !submissionId) {
+    if (options?.detailed) return { success: false, reason: 'INVALID_PARAMS' };
+    return false;
+  }
 
   const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
   if (redisActive) {
     const key = challengeRedisKey(challengeId);
+    let redisResult;
     try {
-      await kvReconcileChallengeCompleted(key, submissionId, Date.now(), 120);
+      redisResult = await kvReconcileChallengeCompleted(key, submissionId, Date.now(), 120, {
+        campaignId: options?.campaignId,
+        walletAddress: options?.walletAddress,
+        attemptId: options?.attemptId,
+        fencingToken: options?.fencingToken,
+      });
     } catch (err) {
-      console.warn('[RaidChallenge] Redis reconciliation error:', err);
+      console.error('[RaidChallenge] Redis reconciliation error (failing closed):', err);
+      throw new Error('Authoritative Redis store is unavailable during reconciliation');
     }
+
+    if (!redisResult.success) {
+      if (options?.detailed) return redisResult;
+      return false;
+    }
+
+    // Mirror to DB under background task
+    reconcileRaidChallengeCompletedRow(challengeId, submissionId, options).catch(() => {});
+    if (options?.detailed) return redisResult;
+    return true;
   }
 
-  return await reconcileRaidChallengeCompletedRow(challengeId, submissionId);
+  const dbRes = await reconcileRaidChallengeCompletedRow(challengeId, submissionId, {
+    ...options,
+    detailed: true,
+  });
+
+  if (options?.detailed) return dbRes;
+  return dbRes.success;
 }

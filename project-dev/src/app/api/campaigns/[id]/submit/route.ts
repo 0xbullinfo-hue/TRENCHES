@@ -6,6 +6,7 @@ import {
   loadSubmissions,
   isValidXUrl,
   getSubmissionByChallengeId,
+  reconcileCampaignSubmission,
 } from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
@@ -159,6 +160,7 @@ export async function POST(
       existingSubmission.walletAddress.toLowerCase() === walletAddress.toLowerCase()
     ) {
       if (isRetry || challengeState.attemptId === attemptId) {
+        await reconcileCampaignSubmission(id, existingSubmission.id).catch(() => {});
         return NextResponse.json(
           {
             ok: true,
@@ -258,6 +260,7 @@ export async function POST(
     // If it's for this exact challenge, it's an idempotent retry
     if (existingForWallet.challengeId === challengeId) {
       await reconcileRaidChallengeCompleted(challengeId, existingForWallet.id).catch(() => {});
+      await reconcileCampaignSubmission(id, existingForWallet.id).catch(() => {});
       if (isRetry || matchesAttempt) {
         return NextResponse.json(
           {
@@ -283,6 +286,7 @@ export async function POST(
   const existingDurable = await getSubmissionByChallengeId(challengeId);
   if (existingDurable) {
     await reconcileRaidChallengeCompleted(challengeId, existingDurable.id).catch(() => {});
+    await reconcileCampaignSubmission(id, existingDurable.id).catch(() => {});
     if (isRetry || matchesAttempt) {
       return NextResponse.json(
         {
@@ -321,6 +325,7 @@ export async function POST(
   if (claim.status === 'COMPLETED') {
     const existing = await getSubmissionByChallengeId(challengeId);
     if (existing && (isRetry || claim.attemptId === attemptId)) {
+      await reconcileCampaignSubmission(id, existing.id).catch(() => {});
       return NextResponse.json(
         {
           ok: true,
@@ -374,8 +379,9 @@ export async function POST(
     // FIRST: Check if the submission was actually saved before rolling back
     const durableCheck = await getSubmissionByChallengeId(challengeId);
     if (durableCheck) {
-      // The submission was durably saved! Finalize challenge and return success:
+      // The submission was durably saved! Finalize challenge, repair counter and return success:
       finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
+      await reconcileCampaignSubmission(id, durableCheck.id).catch(() => {});
       return NextResponse.json(
         {
           ok: true,
@@ -396,9 +402,19 @@ export async function POST(
 
   if (!result.ok || !result.submission) {
     const durableCheck = await getSubmissionByChallengeId(challengeId);
-    if (!durableCheck) {
-      await rollbackRaidChallengeProcessing(challengeId, attemptId, fencingToken, challenge);
+    if (durableCheck) {
+      finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
+      await reconcileCampaignSubmission(id, durableCheck.id).catch(() => {});
+      return NextResponse.json(
+        {
+          ok: true,
+          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
+          submission: durableCheck,
+        },
+        { status: 200, headers: NO_STORE }
+      );
     }
+    await rollbackRaidChallengeProcessing(challengeId, attemptId, fencingToken, challenge);
     return NextResponse.json(
       { ok: false, error: result.error || 'Failed to submit campaign proof' },
       { status: 400, headers: NO_STORE }
@@ -415,6 +431,10 @@ export async function POST(
     // - Do not roll back the durable submission!
     // - Do not report that the submission was never recorded!
     // - Return a response reflecting the durable result (201).
+  }
+
+  if (result.isExisting) {
+    await reconcileCampaignSubmission(id, result.submission.id).catch(() => {});
   }
 
   const responseStatus = result.isExisting ? 200 : 201;

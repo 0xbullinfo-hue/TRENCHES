@@ -763,3 +763,114 @@ test('Real Redis [V2.5 Exactly-Once]: 20 simultaneous submissions yield exactly 
     await deleteCampaign(camp.id);
   }
 });
+
+test('Real Redis Lua [V2.6 Conditional & Immutable Reconciliation]: Production Lua immutability against genuine Redis (§6)', async () => {
+  const camp = await createCampaign({
+    title: 'V2.6 Real Redis Immutability Test',
+    description: 'Testing conditional and immutable reconciliation Lua against genuine redis-server',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98799',
+    rewardAmount: '1,000 $GENESIS',
+    postedBy: 'Admin',
+  });
+
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    trackedKeys.add(`raid:challenge:${ch.challengeId}`);
+
+    // Claim challenge
+    const claim = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-v26-owner', 30000);
+    assert.equal(claim.status, 'CLAIMED');
+
+    // 1. Reconciliation of valid persisted submission -> COMPLETED
+    const rec1 = await reconcileRaidChallengeCompleted(ch.challengeId, 'sub-authoritative-001', {
+      detailed: true,
+      attemptId: 'attempt-v26-owner',
+      fencingToken: 1,
+      campaignId: camp.id,
+      walletAddress: wallet,
+    });
+    assert.equal(rec1.success, true);
+    assert.equal(rec1.status, 'COMPLETED');
+    assert.equal(rec1.submissionId, 'sub-authoritative-001');
+
+    // 2. Repeated reconciliation with same submission ID -> ALREADY_COMPLETED (idempotent success)
+    const recRepeated = await reconcileRaidChallengeCompleted(ch.challengeId, 'sub-authoritative-001', {
+      detailed: true,
+      campaignId: camp.id,
+      walletAddress: wallet,
+    });
+    assert.equal(recRepeated.success, true);
+    assert.equal(recRepeated.status, 'ALREADY_COMPLETED');
+    assert.equal(recRepeated.submissionId, 'sub-authoritative-001');
+
+    // 3. Conflicting submission ID against completed challenge -> REJECTED (immutable!)
+    const recConflict = await reconcileRaidChallengeCompleted(ch.challengeId, 'sub-conflicting-999', {
+      detailed: true,
+      campaignId: camp.id,
+      walletAddress: wallet,
+    });
+    assert.equal(recConflict.success, false);
+    assert.equal(recConflict.reason, 'COMPLETED_DIFFERENT_SUBMISSION');
+    assert.equal(recConflict.existingSubmissionId, 'sub-authoritative-001');
+
+    // 4. Stale worker against newer processing attempt
+    const kp2 = Keypair.generate();
+    const wallet2 = kp2.publicKey.toBase58();
+    const ch2 = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet2 });
+    trackedKeys.add(`raid:challenge:${ch2.challengeId}`);
+
+    // First claim: attempt-worker-1 with 20ms short lease
+    const claim1 = await claimRaidChallengeProcessing(ch2.challengeId, 'attempt-worker-1', 20);
+    assert.equal(claim1.status, 'CLAIMED');
+    assert.equal(claim1.fencingToken, 1);
+
+    // Wait for lease to expire
+    await new Promise((r) => setTimeout(r, 40));
+
+    // Second claim: attempt-worker-2 reclaims with fencing token 2
+    const claim2 = await claimRaidChallengeProcessing(ch2.challengeId, 'attempt-worker-2', 30000);
+    assert.equal(claim2.status, 'RECOVERED');
+    assert.equal(claim2.fencingToken, 2);
+
+    // Stale worker-1 tries to reconcile with obsolete fencing token 1 -> REJECTED
+    const recStaleWorker = await reconcileRaidChallengeCompleted(ch2.challengeId, 'sub-stale-attempt', {
+      detailed: true,
+      attemptId: 'attempt-worker-1',
+      fencingToken: 1,
+      campaignId: camp.id,
+      walletAddress: wallet2,
+    });
+    assert.equal(recStaleWorker.success, false);
+    assert.equal(recStaleWorker.reason, 'STALE_FENCING_TOKEN');
+
+    // 5. Campaign mismatch check -> REJECTED
+    const recCampMismatch = await reconcileRaidChallengeCompleted(ch2.challengeId, 'sub-mismatch', {
+      detailed: true,
+      campaignId: 'camp-wrong-id',
+      walletAddress: wallet2,
+    });
+    assert.equal(recCampMismatch.success, false);
+    assert.equal(recCampMismatch.reason, 'CAMPAIGN_MISMATCH');
+
+    // 6. Wallet mismatch check -> REJECTED
+    const recWalletMismatch = await reconcileRaidChallengeCompleted(ch2.challengeId, 'sub-mismatch', {
+      detailed: true,
+      campaignId: camp.id,
+      walletAddress: 'So11111111111111111111111111111111111111112',
+    });
+    assert.equal(recWalletMismatch.success, false);
+    assert.equal(recWalletMismatch.reason, 'WALLET_MISMATCH');
+
+    // 7. Unknown / Missing challenge ID -> REJECTED
+    const recMissing = await reconcileRaidChallengeCompleted('rc_nonexistent_99999', 'sub-any', {
+      detailed: true,
+    });
+    assert.equal(recMissing.success, false);
+    assert.equal(recMissing.reason, 'NOT_FOUND');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});

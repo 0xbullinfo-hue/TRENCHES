@@ -311,18 +311,48 @@ export const ROLLBACK_CHALLENGE_PROCESSING_LUA =
 
 export const RECONCILE_CHALLENGE_COMPLETED_LUA =
   "local raw = redis.call('get', KEYS[1]) " +
-  "if not raw then return 0 end " +
+  "if not raw then return cjson.encode({ success = false, reason = 'NOT_FOUND' }) end " +
   "local c = cjson.decode(raw) " +
+  "if ARGV[4] and ARGV[4] ~= '' and c.campaignId and c.campaignId ~= ARGV[4] then " +
+  "  return cjson.encode({ success = false, reason = 'CAMPAIGN_MISMATCH' }) " +
+  "end " +
+  "if ARGV[5] and ARGV[5] ~= '' and c.walletAddress and string.lower(c.walletAddress) ~= string.lower(ARGV[5]) then " +
+  "  return cjson.encode({ success = false, reason = 'WALLET_MISMATCH' }) " +
+  "end " +
+  "if c.status == 'COMPLETED' or c.status == 'consumed' or c.processingState == 'COMPLETED' then " +
+  "  if c.submissionId == ARGV[1] then " +
+  "    return cjson.encode({ success = true, status = 'ALREADY_COMPLETED', submissionId = c.submissionId }) " +
+  "  end " +
+  "  return cjson.encode({ success = false, reason = 'COMPLETED_DIFFERENT_SUBMISSION', existingSubmissionId = c.submissionId }) " +
+  "end " +
+  "local nowMs = tonumber(ARGV[2]) or 0 " +
+  "if c.expiresAt and nowMs > tonumber(c.expiresAt) and (not c.status or c.status == 'ACTIVE') then " +
+  "  return cjson.encode({ success = false, reason = 'EXPIRED' }) " +
+  "end " +
+  "if c.status == 'PROCESSING' then " +
+  "  local callerFencingToken = tonumber(ARGV[7]) or 0 " +
+  "  local currentFencingToken = tonumber(c.fencingToken) or 0 " +
+  "  if callerFencingToken > 0 and currentFencingToken > callerFencingToken then " +
+  "    return cjson.encode({ success = false, reason = 'STALE_FENCING_TOKEN' }) " +
+  "  end " +
+  "  local callerAttemptId = ARGV[6] " +
+  "  if callerAttemptId and callerAttemptId ~= '' and c.attemptId and c.attemptId ~= '' and c.attemptId ~= callerAttemptId then " +
+  "    local leaseExp = tonumber(c.processingLeaseExpiresAt) or 0 " +
+  "    if nowMs <= leaseExp then " +
+  "      return cjson.encode({ success = false, reason = 'STALE_ATTEMPT' }) " +
+  "    end " +
+  "  end " +
+  "end " +
   "c.status = 'consumed' " +
   "c.processingState = 'COMPLETED' " +
   "c.submissionId = ARGV[1] " +
-  "c.completedAt = tonumber(ARGV[2]) or 0 " +
+  "c.completedAt = nowMs " +
   "c.idempotencyKey = 'raid-submission:' .. (c.challengeId or '') " +
   "local ttl = redis.call('ttl', KEYS[1]) " +
   "local retention = tonumber(ARGV[3]) or 120 " +
   "if not ttl or ttl < retention then ttl = retention end " +
   "redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
-  "return 1";
+  "return cjson.encode({ success = true, status = 'COMPLETED', submissionId = c.submissionId })";
 
 export type KvChallengeClaimResult =
   | { status: 'CLAIMED'; attemptId: string; fencingToken: number; leaseExpiresAt: number }
@@ -393,14 +423,45 @@ export async function kvRollbackChallengeProcessing(
   }
 }
 
+export type KvChallengeReconcileResult = {
+  success: boolean;
+  status?: 'COMPLETED' | 'ALREADY_COMPLETED';
+  reason?: string;
+  submissionId?: string;
+  existingSubmissionId?: string;
+};
+
 export async function kvReconcileChallengeCompleted(
   key: string,
   submissionId: string,
   nowMs = Date.now(),
-  minRetentionSec = 120
-): Promise<boolean> {
-  const res = await cmd(['EVAL', RECONCILE_CHALLENGE_COMPLETED_LUA, 1, key, submissionId, nowMs, minRetentionSec]);
-  return Number(res) === 1;
+  minRetentionSec = 120,
+  options?: {
+    campaignId?: string;
+    walletAddress?: string;
+    attemptId?: string;
+    fencingToken?: number;
+  }
+): Promise<KvChallengeReconcileResult> {
+  const res = await cmd([
+    'EVAL',
+    RECONCILE_CHALLENGE_COMPLETED_LUA,
+    1,
+    key,
+    submissionId,
+    nowMs,
+    minRetentionSec,
+    options?.campaignId || '',
+    options?.walletAddress || '',
+    options?.attemptId || '',
+    options?.fencingToken ? String(options.fencingToken) : '0',
+  ]);
+  if (!res) return { success: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as KvChallengeReconcileResult;
+  } catch {
+    return { success: false, reason: 'PARSE_ERROR' };
+  }
 }
 
 /**

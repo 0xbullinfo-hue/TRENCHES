@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
+import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
 import { getGenesisPrice } from '@/server/price';
@@ -223,36 +223,53 @@ export function isPidDead(pid: number): boolean {
   }
 }
 
+export interface FileLockRelease {
+  (): void;
+  token: string;
+  fencingGeneration: number;
+  assertOwned: () => void;
+  isOwned: () => boolean;
+}
+
 /**
- * Hardened file lock acquisition with metadata integrity and race-safe recovery.
+ * Hardened file lock acquisition with metadata integrity and atomic OS rename recovery.
  *
  * Supported deployment model:
  * - Local dev / single-node host: Cross-process mutual exclusion via atomic kernel open ('wx')
- *   with verification and race-safe dead PID recovery.
+ *   with verification and atomic rename-based dead PID recovery.
  * - Multi-instance / serverless production: Backed by shared Upstash Redis distributed lock
- *   (withRegistryLock / kvAcquireLock with token ownership and lease renewals).
+ *   (withRegistryLock / kvLock with token ownership, fencing, and lease renewals).
  */
-export async function acquireFileLock(): Promise<() => void> {
-  const maxWaitMs = 5000;
+export async function acquireFileLock(
+  lockFilePath: string = DB_FILE_LOCK_PATH,
+  options?: { maxWaitMs?: number }
+): Promise<FileLockRelease> {
+  const maxWaitMs = options?.maxWaitMs ?? 5000;
   const start = Date.now();
   const lockToken = safeRandomUUID();
 
   while (Date.now() - start < maxWaitMs) {
     try {
-      const dataDir = path.dirname(DB_FILE_LOCK_PATH);
+      const dataDir = path.dirname(lockFilePath);
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
       // 1. 'wx' opens for writing exclusively, failing if path already exists (atomic OS kernel lock)
-      const fd = fs.openSync(DB_FILE_LOCK_PATH, 'wx');
+      const fd = fs.openSync(lockFilePath, 'wx');
+      let fencingGeneration = 1;
       try {
         if (_testFailNextLockMetadataWrite) {
           _testFailNextLockMetadataWrite = false;
           throw new Error('Simulated lock metadata write failure');
         }
 
-        const metadata = JSON.stringify({ pid: process.pid, token: lockToken, createdAt: Date.now() });
+        const metadata = JSON.stringify({
+          pid: process.pid,
+          token: lockToken,
+          fencingGeneration,
+          createdAt: Date.now(),
+        });
         const bytes = fs.writeSync(fd, metadata);
         if (bytes === 0) {
           throw new Error('Lock metadata write failed: 0 bytes written');
@@ -265,7 +282,7 @@ export async function acquireFileLock(): Promise<() => void> {
         }
 
         // Verify metadata immediately by reading back from disk
-        const verifyRaw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+        const verifyRaw = fs.readFileSync(lockFilePath, 'utf8');
         const verifyData = JSON.parse(verifyRaw);
         if (verifyData?.token !== lockToken) {
           throw new Error('Lock metadata verification failed: token mismatch');
@@ -276,51 +293,78 @@ export async function acquireFileLock(): Promise<() => void> {
           fs.closeSync(fd);
         } catch {}
         try {
-          if (fs.existsSync(DB_FILE_LOCK_PATH)) {
-            const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+          if (fs.existsSync(lockFilePath)) {
+            const raw = fs.readFileSync(lockFilePath, 'utf8');
             if (raw.includes(lockToken)) {
-              fs.unlinkSync(DB_FILE_LOCK_PATH);
+              fs.unlinkSync(lockFilePath);
             }
           }
         } catch {}
         throw metaErr;
       }
 
+      try {
+        fs.closeSync(fd);
+      } catch {}
+
       let released = false;
-      return () => {
+      const releaseFn = () => {
         if (released) return;
         released = true;
         try {
-          fs.closeSync(fd);
-        } catch {}
-        try {
           // Verify ownership before unlinking: never delete another process's lock
-          if (fs.existsSync(DB_FILE_LOCK_PATH)) {
-            const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+          if (fs.existsSync(lockFilePath)) {
+            const raw = fs.readFileSync(lockFilePath, 'utf8');
             try {
               const data = JSON.parse(raw);
               if (data?.token === lockToken) {
-                fs.unlinkSync(DB_FILE_LOCK_PATH);
+                fs.unlinkSync(lockFilePath);
               }
             } catch {
               if (raw.includes(lockToken)) {
-                fs.unlinkSync(DB_FILE_LOCK_PATH);
+                fs.unlinkSync(lockFilePath);
               }
             }
           }
         } catch {}
       };
+
+      const handle: FileLockRelease = Object.assign(releaseFn, {
+        token: lockToken,
+        fencingGeneration,
+        isOwned: () => {
+          if (released) return false;
+          try {
+            if (!fs.existsSync(lockFilePath)) return false;
+            const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+            return cur?.token === lockToken;
+          } catch {
+            return false;
+          }
+        },
+        assertOwned: () => {
+          if (released) {
+            throw new Error('Lock has already been released');
+          }
+          if (!fs.existsSync(lockFilePath)) {
+            throw new Error('Lock file no longer exists');
+          }
+          const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+          if (cur?.token !== lockToken) {
+            throw new Error(`Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`);
+          }
+        },
+      });
+
+      return handle;
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-        // 2. Race-Safe Stale Lock Recovery:
-        // Do NOT blindly read PID and unlink: another process might acquire immediately after,
-        // which would cause an unsafe deletion of a replacement lock.
-        // Instead, open with 'r+', check that the PID is dead, and atomically overwrite with new metadata!
-        let recoveryFd: number | null = null;
+        // 2. Race-Safe Atomic Stale Lock Recovery:
+        // A live process lock MUST NEVER be stolen or deleted.
+        // If the PID is dead (ESRCH), recover ATOMICALLY using an atomic OS rename!
         try {
-          if (fs.existsSync(DB_FILE_LOCK_PATH)) {
-            recoveryFd = fs.openSync(DB_FILE_LOCK_PATH, 'r+');
-            const raw = fs.readFileSync(recoveryFd, 'utf8');
+          if (fs.existsSync(lockFilePath)) {
+            const raw = fs.readFileSync(lockFilePath, 'utf8');
             let data: Record<string, unknown> | null = null;
             try {
               data = JSON.parse(raw);
@@ -328,46 +372,101 @@ export async function acquireFileLock(): Promise<() => void> {
 
             if (data && typeof data.pid === 'number' && isPidDead(data.pid)) {
               // The holding process crashed or terminated (ESRCH).
-              // Atomically overwrite using the open file descriptor to take over ownership safely.
-              const recoveryToken = safeRandomUUID();
-              const recMeta = JSON.stringify({ pid: process.pid, token: recoveryToken, createdAt: Date.now() });
-              fs.ftruncateSync(recoveryFd, 0);
-              fs.writeSync(recoveryFd, recMeta, 0, 'utf8');
-              fs.fsyncSync(recoveryFd);
+              // ATOMIC RECOVERY:
+              // Competing recovery processes both attempting to recover will race on an atomic renameSync.
+              // Exactly ONE process will succeed in moving the stale lock file to its unique staging path;
+              // any concurrent process will immediately receive ENOENT and safely back off.
+              const reclaimPath = `${lockFilePath}.reclaim.${lockToken}.${Date.now()}`;
+              let reclaimed = false;
+              try {
+                fs.renameSync(lockFilePath, reclaimPath);
+                reclaimed = true;
+              } catch {
+                // Another process already reclaimed or replaced it
+              }
 
-              // Verify the recovery write succeeded and token matches
-              const checkRaw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
-              const checkData = JSON.parse(checkRaw);
-              if (checkData?.token === recoveryToken) {
-                let recReleased = false;
-                const finalFd = recoveryFd;
-                recoveryFd = null; // Hand over to release callback
-                return () => {
-                  if (recReleased) return;
-                  recReleased = true;
+              if (reclaimed) {
+                try {
+                  const staleRaw = fs.readFileSync(reclaimPath, 'utf8');
+                  let prevGen = 1;
                   try {
-                    fs.closeSync(finalFd);
+                    const parsedStale = JSON.parse(staleRaw);
+                    prevGen = Number(parsedStale?.fencingGeneration) || 1;
                   } catch {}
+
                   try {
-                    if (fs.existsSync(DB_FILE_LOCK_PATH)) {
-                      const cur = JSON.parse(fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8'));
-                      if (cur?.token === recoveryToken) {
-                        fs.unlinkSync(DB_FILE_LOCK_PATH);
-                      }
-                    }
+                    fs.unlinkSync(reclaimPath);
                   } catch {}
-                };
+
+                  // Immediately acquire exclusively with incremented fencing generation
+                  const nextGen = prevGen + 1;
+                  const recFd = fs.openSync(lockFilePath, 'wx');
+                  const recMeta = JSON.stringify({
+                    pid: process.pid,
+                    token: lockToken,
+                    fencingGeneration: nextGen,
+                    createdAt: Date.now(),
+                  });
+                  fs.writeSync(recFd, recMeta);
+                  fs.fsyncSync(recFd);
+                  try {
+                    fs.closeSync(recFd);
+                  } catch {}
+
+                  // Verify write
+                  const verifyCheck = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                  if (verifyCheck?.token === lockToken) {
+                    let recReleased = false;
+                    const recReleaseFn = () => {
+                      if (recReleased) return;
+                      recReleased = true;
+                      try {
+                        if (fs.existsSync(lockFilePath)) {
+                          const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                          if (cur?.token === lockToken) {
+                            fs.unlinkSync(lockFilePath);
+                          }
+                        }
+                      } catch {}
+                    };
+
+                    const recHandle: FileLockRelease = Object.assign(recReleaseFn, {
+                      token: lockToken,
+                      fencingGeneration: nextGen,
+                      isOwned: () => {
+                        if (recReleased) return false;
+                        try {
+                          if (!fs.existsSync(lockFilePath)) return false;
+                          const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                          return cur?.token === lockToken;
+                        } catch {
+                          return false;
+                        }
+                      },
+                      assertOwned: () => {
+                        if (recReleased) {
+                          throw new Error('Lock has already been released');
+                        }
+                        if (!fs.existsSync(lockFilePath)) {
+                          throw new Error('Lock file no longer exists');
+                        }
+                        const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                        if (cur?.token !== lockToken) {
+                          throw new Error(`Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`);
+                        }
+                      },
+                    });
+
+                    return recHandle;
+                  }
+                } catch {
+                  // Fall through to cooperative sleep and retry
+                }
               }
             }
           }
         } catch {
-          // If race occurred or file was deleted by owner, continue loop
-        } finally {
-          if (recoveryFd !== null) {
-            try {
-              fs.closeSync(recoveryFd);
-            } catch {}
-          }
+          // If race occurred or file was transiently inaccessible, continue loop
         }
 
         // Active lock held by a live process: wait cooperatively.
@@ -393,9 +492,36 @@ async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
         if (!acquired) await sleep(100);
       }
       if (!acquired) throw new Error('Database busy, retry shortly');
+
+      let renewTimer: NodeJS.Timeout | null = null;
+      let renewInFlight = false;
+      let lockLost = false;
+
+      renewTimer = setInterval(async () => {
+        if (renewInFlight || lockLost) return;
+        renewInFlight = true;
+        try {
+          const renewed = await kvRenewLock(DB_LOCK_KEY, token, 30);
+          if (!renewed) {
+            lockLost = true;
+            if (renewTimer) clearInterval(renewTimer);
+          }
+        } catch {
+          lockLost = true;
+          if (renewTimer) clearInterval(renewTimer);
+        } finally {
+          renewInFlight = false;
+        }
+      }, 10_000);
+
+      if (typeof renewTimer.unref === 'function') {
+        renewTimer.unref();
+      }
+
       try {
         return await fn();
       } finally {
+        if (renewTimer) clearInterval(renewTimer);
         await kvUnlock(DB_LOCK_KEY, token).catch(() => undefined);
       }
     }
@@ -1058,22 +1184,92 @@ export async function rollbackRaidChallengeProcessingRow(
   });
 }
 
+export type DbChallengeReconcileResult = {
+  success: boolean;
+  status?: 'COMPLETED' | 'ALREADY_COMPLETED';
+  reason?: string;
+  submissionId?: string;
+  existingSubmissionId?: string;
+};
+
 export async function reconcileRaidChallengeCompletedRow(
   challengeId: string,
-  submissionId: string
-): Promise<boolean> {
-  return withDbLock(async () => {
+  submissionId: string,
+  options?: {
+    attemptId?: string;
+    fencingToken?: number;
+    campaignId?: string;
+    walletAddress?: string;
+    nowMs?: number;
+    detailed?: boolean;
+  }
+): Promise<any> {
+  const result = await withDbLock<DbChallengeReconcileResult>(async () => {
     const db = await loadDb();
-    if (!Array.isArray(db.raid_challenges)) return false;
+    if (!Array.isArray(db.raid_challenges)) return { success: false, reason: 'NOT_FOUND' };
     const row = db.raid_challenges.find((c) => c.challenge_id === challengeId);
-    if (!row) return false;
+    if (!row) return { success: false, reason: 'NOT_FOUND' };
+
+    // 1. Campaign binding check
+    if (options?.campaignId && row.campaign_id !== options.campaignId) {
+      return { success: false, reason: 'CAMPAIGN_MISMATCH' };
+    }
+
+    // 2. Wallet binding check
+    if (options?.walletAddress && row.wallet_address.toLowerCase() !== options.walletAddress.toLowerCase()) {
+      return { success: false, reason: 'WALLET_MISMATCH' };
+    }
+
+    // 3. Immutability check: if already completed
+    if (row.status === 'COMPLETED' || row.consumed_at) {
+      if (row.submission_id === submissionId) {
+        return { success: true, status: 'ALREADY_COMPLETED', submissionId: row.submission_id };
+      }
+      return {
+        success: false,
+        reason: 'COMPLETED_DIFFERENT_SUBMISSION',
+        submissionId,
+        existingSubmissionId: row.submission_id || undefined,
+      };
+    }
+
+    const nowMs = options?.nowMs || Date.now();
+
+    // 4. Expiry check if inactive
+    if (new Date(row.expires_at).getTime() <= nowMs && (!row.status || row.status === 'ACTIVE')) {
+      return { success: false, reason: 'EXPIRED' };
+    }
+
+    // 5. Ownership & fencing token checks if PROCESSING
+    if (row.status === 'PROCESSING') {
+      const callerFencingToken = options?.fencingToken || 0;
+      const currentFencingToken = row.fencing_token || 0;
+      if (callerFencingToken > 0 && currentFencingToken > callerFencingToken) {
+        return { success: false, reason: 'STALE_FENCING_TOKEN' };
+      }
+
+      if (options?.attemptId && row.attempt_id && row.attempt_id !== options.attemptId) {
+        const leaseExp = row.processing_lease_expires_at
+          ? new Date(row.processing_lease_expires_at).getTime()
+          : 0;
+        if (nowMs <= leaseExp) {
+          return { success: false, reason: 'STALE_ATTEMPT' };
+        }
+      }
+    }
+
     row.status = 'COMPLETED';
-    row.consumed_at = new Date().toISOString();
+    row.consumed_at = new Date(nowMs).toISOString();
     row.submission_id = submissionId;
     row.idempotency_key = `raid-submission:${challengeId}`;
     await saveDb(db);
-    return true;
+    return { success: true, status: 'COMPLETED', submissionId };
   });
+
+  if (options?.detailed) {
+    return result;
+  }
+  return result.success;
 }
 
 // -------------------------------------------------------------

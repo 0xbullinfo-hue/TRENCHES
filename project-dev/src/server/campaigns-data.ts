@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { PublicKey } from '@solana/web3.js';
-import { KV_CONFIGURED, isKvConfigured, kvGet, kvSet, kvLock, kvUnlock } from '@/server/kv';
+import { KV_CONFIGURED, isKvConfigured, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock } from '@/server/kv';
 import { ADMIN_WALLET } from '@/lib/config';
+import { acquireFileLock } from '@/server/db';
 import type { Campaign, CampaignSubmission, CampaignStatus, SubmissionStatus } from '@/lib/types';
 
 const isKvActive = () => Boolean(KV_CONFIGURED || isKvConfigured());
@@ -21,14 +22,22 @@ const FILE_PERSISTENCE_ALLOWED =
 let campaignsLockChain: Promise<unknown> = Promise.resolve();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const CAMPAIGNS_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'campaigns.lock');
+
 export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = campaignsLockChain.then(async () => {
     if (!isKvActive()) {
       if (!FILE_PERSISTENCE_ALLOWED) {
         throw new Error('Persistence not configured. Set ALLOW_FILE_PERSISTENCE=true or KV credentials.');
       }
-      return fn();
+      const releaseFileLock = await acquireFileLock(CAMPAIGNS_FILE_LOCK_PATH);
+      try {
+        return await fn();
+      } finally {
+        releaseFileLock();
+      }
     }
+
     const token = crypto.randomUUID();
     let acquired = false;
     for (let i = 0; i < 20 && !acquired; i++) {
@@ -36,9 +45,36 @@ export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
       if (!acquired) await sleep(150);
     }
     if (!acquired) throw new Error('Campaigns store busy, retry shortly');
+
+    let renewTimer: NodeJS.Timeout | null = null;
+    let renewInFlight = false;
+    let lockLost = false;
+
+    renewTimer = setInterval(async () => {
+      if (renewInFlight || lockLost) return;
+      renewInFlight = true;
+      try {
+        const renewed = await kvRenewLock(KV_LOCK_KEY, token, 30);
+        if (!renewed) {
+          lockLost = true;
+          if (renewTimer) clearInterval(renewTimer);
+        }
+      } catch {
+        lockLost = true;
+        if (renewTimer) clearInterval(renewTimer);
+      } finally {
+        renewInFlight = false;
+      }
+    }, 10_000);
+
+    if (typeof renewTimer.unref === 'function') {
+      renewTimer.unref();
+    }
+
     try {
       return await fn();
     } finally {
+      if (renewTimer) clearInterval(renewTimer);
       await kvUnlock(KV_LOCK_KEY, token).catch(() => undefined);
     }
   });
@@ -79,6 +115,9 @@ export async function loadCampaigns(): Promise<Campaign[]> {
 }
 
 export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: boolean; error?: string }> {
+  if (_testFailSaveCampaignsPersistent) {
+    return { success: false, error: _testFailSaveCampaignsPersistent.message };
+  }
   try {
     if (isKvActive()) {
       await kvSet(KV_CAMPAIGNS_KEY, JSON.stringify(campaigns));
@@ -304,6 +343,7 @@ export async function deleteCampaign(id: string): Promise<boolean> {
 
 let _testFailNextSaveSubmissions: Error | null = null;
 let _testFailNextSaveCampaigns: Error | null = null;
+let _testFailSaveCampaignsPersistent: Error | null = null;
 
 export function __setTestFailSaveSubmissions(err: Error | null): void {
   _testFailNextSaveSubmissions = err;
@@ -312,6 +352,13 @@ export function __setTestFailSaveSubmissions(err: Error | null): void {
 export function __setTestFailSaveCampaigns(err: Error | null): void {
   _testFailNextSaveCampaigns = err;
 }
+
+export function __setTestFailSaveCampaignsPersistent(err: Error | null): void {
+  _testFailSaveCampaignsPersistent = err;
+}
+
+const SUBMISSIONS_BY_CHALLENGE_DIR = path.join(process.cwd(), 'data', 'submissions_by_challenge');
+const KV_SUBMISSION_CHALLENGE_PREFIX = 'trench:sub:challenge:';
 
 export async function getSubmissionByIdempotencyKey(
   idempotencyKey: string
@@ -325,6 +372,24 @@ export async function getSubmissionByChallengeId(
   challengeId: string
 ): Promise<CampaignSubmission | null> {
   if (!challengeId) return null;
+
+  if (isKvActive()) {
+    try {
+      const direct = await kvGet(`${KV_SUBMISSION_CHALLENGE_PREFIX}${challengeId}`);
+      if (direct) {
+        return JSON.parse(direct) as CampaignSubmission;
+      }
+    } catch {}
+  } else {
+    const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${challengeId}.json`);
+    if (fs.existsSync(singlePath)) {
+      try {
+        const direct = fs.readFileSync(singlePath, 'utf-8');
+        return JSON.parse(direct) as CampaignSubmission;
+      } catch {}
+    }
+  }
+
   const submissions = await loadSubmissions();
   const expectedKey = `raid-submission:${challengeId}`;
   return (
@@ -332,6 +397,108 @@ export async function getSubmissionByChallengeId(
       (s) => s.challengeId === challengeId || (s.idempotencyKey && s.idempotencyKey === expectedKey)
     ) || null
   );
+}
+
+export type ReconcileCampaignResult =
+  | { ok: true; status: 'RECONCILED'; campaignId: string; submissionId: string; submissionsCount: number }
+  | { ok: true; status: 'ALREADY_RECONCILED'; campaignId: string; submissionId: string; submissionsCount: number }
+  | { ok: false; status: 'SUBMISSION_NOT_FOUND'; campaignId: string; submissionId: string; error: string }
+  | { ok: false; status: 'CAMPAIGN_NOT_FOUND'; campaignId: string; submissionId: string; error: string }
+  | { ok: false; status: 'CAMPAIGN_MISMATCH'; campaignId: string; submissionId: string; error: string }
+  | { ok: false; status: 'STORAGE_ERROR'; campaignId: string; submissionId: string; error: string };
+
+export async function reconcileCampaignSubmission(
+  campaignId: string,
+  submissionId: string
+): Promise<ReconcileCampaignResult> {
+  if (!campaignId || !submissionId) {
+    return {
+      ok: false,
+      status: 'SUBMISSION_NOT_FOUND',
+      campaignId: campaignId || '',
+      submissionId: submissionId || '',
+      error: 'campaignId and submissionId are required',
+    };
+  }
+
+  return withCampaignsLock(async () => {
+    try {
+      const submissions = await loadSubmissions();
+      const sub = submissions.find((s) => s.id === submissionId);
+      if (!sub) {
+        return {
+          ok: false,
+          status: 'SUBMISSION_NOT_FOUND',
+          campaignId,
+          submissionId,
+          error: `Submission ${submissionId} not found`,
+        };
+      }
+
+      if (sub.campaignId !== campaignId) {
+        return {
+          ok: false,
+          status: 'CAMPAIGN_MISMATCH',
+          campaignId,
+          submissionId,
+          error: `Submission ${submissionId} belongs to campaign ${sub.campaignId}, not ${campaignId}`,
+        };
+      }
+
+      const campaigns = await loadCampaigns();
+      const campaign = campaigns.find((c) => c.id === campaignId);
+      if (!campaign) {
+        return {
+          ok: false,
+          status: 'CAMPAIGN_NOT_FOUND',
+          campaignId,
+          submissionId,
+          error: `Campaign ${campaignId} not found`,
+        };
+      }
+
+      const matchingSubs = submissions.filter((s) => s.campaignId === campaignId);
+      const expectedCount = matchingSubs.length;
+      const currentCount = campaign.submissionsCount || 0;
+
+      if (currentCount < expectedCount) {
+        campaign.submissionsCount = expectedCount;
+        const saveRes = await saveCampaigns(campaigns);
+        if (!saveRes.success) {
+          return {
+            ok: false,
+            status: 'STORAGE_ERROR',
+            campaignId,
+            submissionId,
+            error: saveRes.error || 'Failed to save updated campaign counter',
+          };
+        }
+        return {
+          ok: true,
+          status: 'RECONCILED',
+          campaignId,
+          submissionId,
+          submissionsCount: expectedCount,
+        };
+      }
+
+      return {
+        ok: true,
+        status: 'ALREADY_RECONCILED',
+        campaignId,
+        submissionId,
+        submissionsCount: currentCount,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        status: 'STORAGE_ERROR',
+        campaignId,
+        submissionId,
+        error: (err as Error).message || 'Persistence unavailable',
+      };
+    }
+  });
 }
 
 export async function submitCampaignCompletion(payload: {
@@ -381,21 +548,22 @@ export async function submitCampaignCompletion(payload: {
     const idempotencyKey =
       payload.idempotencyKey || (payload.challengeId ? `raid-submission:${payload.challengeId}` : undefined);
 
-    if (idempotencyKey || payload.challengeId) {
-      const existingByIdempotency = submissions.find(
-        (s) =>
-          (idempotencyKey && s.idempotencyKey === idempotencyKey) ||
-          (payload.challengeId && s.challengeId === payload.challengeId)
-      );
-      if (existingByIdempotency) {
-        // Reconcile campaign counter if previously interrupted during counter save
-        const matchingCount = submissions.filter((s) => s.campaignId === payload.campaignId).length;
-        if ((campaign.submissionsCount || 0) < matchingCount) {
-          campaign.submissionsCount = matchingCount;
-          await saveCampaigns(campaigns);
-        }
-        return { ok: true, submission: existingByIdempotency, isExisting: true };
+    let existingSubmission: CampaignSubmission | null = null;
+    if (payload.challengeId) {
+      existingSubmission = await getSubmissionByChallengeId(payload.challengeId);
+    }
+    if (!existingSubmission && idempotencyKey) {
+      existingSubmission = submissions.find((s) => s.idempotencyKey === idempotencyKey) || null;
+    }
+
+    if (existingSubmission) {
+      // Reconcile campaign counter if previously interrupted during counter save
+      const matchingCount = submissions.filter((s) => s.campaignId === payload.campaignId).length;
+      if ((campaign.submissionsCount || 0) < matchingCount) {
+        campaign.submissionsCount = matchingCount;
+        await saveCampaigns(campaigns);
       }
+      return { ok: true, submission: existingSubmission, isExisting: true };
     }
 
     // 2. Check for duplicate submission by this wallet on this campaign (with a different challenge)
@@ -425,13 +593,50 @@ export async function submitCampaignCompletion(payload: {
       idempotencyKey,
     };
 
+    // 4. Authoritative Uniqueness Store (prevents duplicate persistence across racing processes)
+    if (payload.challengeId) {
+      if (isKvActive()) {
+        const directKey = `${KV_SUBMISSION_CHALLENGE_PREFIX}${payload.challengeId}`;
+        const existingRaw = await kvGet(directKey);
+        if (existingRaw) {
+          try {
+            const parsed = JSON.parse(existingRaw) as CampaignSubmission;
+            await reconcileCampaignSubmission(payload.campaignId, parsed.id);
+            return { ok: true, submission: parsed, isExisting: true };
+          } catch {}
+        }
+        await kvSet(directKey, JSON.stringify(newSubmission));
+      } else {
+        try {
+          fs.mkdirSync(SUBMISSIONS_BY_CHALLENGE_DIR, { recursive: true });
+          const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${payload.challengeId}.json`);
+          const singleFd = fs.openSync(singlePath, 'wx');
+          fs.writeSync(singleFd, JSON.stringify(newSubmission, null, 2), 0, 'utf8');
+          fs.fsyncSync(singleFd);
+          fs.closeSync(singleFd);
+        } catch (err: unknown) {
+          if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+            const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${payload.challengeId}.json`);
+            try {
+              const existing = JSON.parse(fs.readFileSync(singlePath, 'utf8')) as CampaignSubmission;
+              await reconcileCampaignSubmission(payload.campaignId, existing.id);
+              return { ok: true, submission: existing, isExisting: true };
+            } catch {}
+          }
+        }
+      }
+    }
+
     submissions.unshift(newSubmission);
     const saveSubRes = await saveSubmissions(submissions);
     if (!saveSubRes.success) {
       throw new Error(saveSubRes.error || 'Failed to persist submission');
     }
 
-    // 4. Inject simulated test failure on campaign counter update if active
+    // 5. Inject simulated test failure on campaign counter update if active
+    if (_testFailSaveCampaignsPersistent) {
+      throw _testFailSaveCampaignsPersistent;
+    }
     if (_testFailNextSaveCampaigns) {
       const err = _testFailNextSaveCampaigns;
       _testFailNextSaveCampaigns = null;
