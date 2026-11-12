@@ -14,6 +14,11 @@ import {
   kvRenewLock,
   kvSetLocked,
   kvReserveSubmissionChallenge,
+  kvAdvanceSubmissionReservation,
+  kvScan,
+  kvSMembers,
+  kvSAdd,
+  kvSRem,
 } from '@/server/kv';
 import { ADMIN_WALLET } from '@/lib/config';
 import { acquireFileLock } from '@/server/db';
@@ -47,6 +52,10 @@ export interface CampaignsLockContext {
 export const campaignsLockStorage = new AsyncLocalStorage<CampaignsLockContext>();
 
 export function withCampaignsLock<T>(fn: (ctx?: CampaignsLockContext) => Promise<T> | T): Promise<T> {
+  const activeLock = campaignsLockStorage.getStore();
+  if (activeLock) {
+    return Promise.resolve(fn(activeLock));
+  }
   const run = campaignsLockChain.then(async () => {
     if (!isKvActive()) {
       if (!FILE_PERSISTENCE_ALLOWED) {
@@ -170,14 +179,19 @@ export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: b
   try {
     if (isKvActive()) {
       if (activeLock && activeLock.lockType === 'kv') {
-        const res = await kvSetLocked(KV_LOCK_KEY, KV_CAMPAIGNS_KEY, activeLock.token, JSON.stringify(campaigns));
+        const res = await kvSetLocked(
+          KV_LOCK_KEY,
+          KV_CAMPAIGNS_KEY,
+          activeLock.token,
+          JSON.stringify(campaigns),
+          activeLock.fencingGeneration
+        );
         if (!res.success) {
           return { success: false, error: `Lock ownership lost: ${res.reason || 'not owned'}` };
         }
         return { success: true };
       }
-      await kvSet(KV_CAMPAIGNS_KEY, JSON.stringify(campaigns));
-      return { success: true };
+      return { success: false, error: 'Lock required for protected campaign save in KV mode' };
     }
     if (!FILE_PERSISTENCE_ALLOWED) {
       return {
@@ -245,14 +259,19 @@ export async function saveSubmissions(submissions: CampaignSubmission[]): Promis
   try {
     if (isKvActive()) {
       if (activeLock && activeLock.lockType === 'kv') {
-        const res = await kvSetLocked(KV_LOCK_KEY, KV_SUBMISSIONS_KEY, activeLock.token, JSON.stringify(submissions));
+        const res = await kvSetLocked(
+          KV_LOCK_KEY,
+          KV_SUBMISSIONS_KEY,
+          activeLock.token,
+          JSON.stringify(submissions),
+          activeLock.fencingGeneration
+        );
         if (!res.success) {
           return { success: false, error: `Lock ownership lost: ${res.reason || 'not owned'}` };
         }
         return { success: true };
       }
-      await kvSet(KV_SUBMISSIONS_KEY, JSON.stringify(submissions));
-      return { success: true };
+      return { success: false, error: 'Lock required for protected submission save in KV mode' };
     }
     if (!FILE_PERSISTENCE_ALLOWED) {
       return {
@@ -428,8 +447,198 @@ export function __setTestFailSaveCampaignsPersistent(err: Error | null): void {
   _testFailSaveCampaignsPersistent = err;
 }
 
+export type SubmissionReservationState =
+  | 'RESERVED'
+  | 'PERSISTED'
+  | 'COMPLETED'
+  | 'RETRYABLE'
+  | 'REJECTED'
+  | 'EXPIRED';
+
+export interface SubmissionReservationRecord {
+  challengeId: string;
+  campaignId: string;
+  walletAddress: string;
+  submissionId: string;
+  idempotencyKey: string;
+  state: SubmissionReservationState;
+  createdAt: number;
+  updatedAt: number;
+  attemptId: string;
+  fencingGeneration: number;
+  recoveryMetadata?: {
+    error?: string;
+    retries?: number;
+    lastAttemptAt?: number;
+    counterStatus?: 'RECONCILED' | 'PENDING_RECONCILIATION';
+    sideEffectsStatus?: 'DURABLE' | 'PENDING_RECONCILIATION';
+    [key: string]: unknown;
+  };
+  submissionPayload: CampaignSubmission;
+}
+
 const SUBMISSIONS_BY_CHALLENGE_DIR = path.join(process.cwd(), 'data', 'submissions_by_challenge');
+const SUBMISSION_RESERVATIONS_DIR = path.join(process.cwd(), 'data', 'submission_reservations');
+
 const KV_SUBMISSION_CHALLENGE_PREFIX = 'trench:sub:challenge:';
+const KV_SUBMISSION_RESERVATION_PREFIX = 'trench:sub:reservation:';
+const KV_SUBMISSION_RESERVATION_SET = 'trench:sub:reservations_set';
+
+export async function getSubmissionReservation(
+  challengeId: string
+): Promise<SubmissionReservationRecord | null> {
+  if (!challengeId) return null;
+
+  if (isKvActive()) {
+    try {
+      const raw =
+        (await kvGet(`${KV_SUBMISSION_RESERVATION_PREFIX}${challengeId}`)) ||
+        (await kvGet(`${KV_SUBMISSION_CHALLENGE_PREFIX}${challengeId}`));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.state && parsed?.challengeId) {
+          return parsed as SubmissionReservationRecord;
+        }
+        if (parsed?.id && parsed?.walletAddress) {
+          return {
+            challengeId,
+            campaignId: parsed.campaignId,
+            walletAddress: parsed.walletAddress,
+            submissionId: parsed.id,
+            idempotencyKey: parsed.idempotencyKey || `raid-submission:${challengeId}`,
+            state: 'COMPLETED',
+            createdAt: parsed.submittedAt ? new Date(parsed.submittedAt).getTime() : Date.now(),
+            updatedAt: Date.now(),
+            attemptId: 'legacy',
+            fencingGeneration: 1,
+            submissionPayload: parsed as CampaignSubmission,
+          };
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  const resPath = path.join(SUBMISSION_RESERVATIONS_DIR, `${challengeId}.json`);
+  if (fs.existsSync(resPath)) {
+    try {
+      const raw = fs.readFileSync(resPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed?.state && parsed?.challengeId) {
+        return parsed as SubmissionReservationRecord;
+      }
+    } catch {}
+  }
+
+  const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${challengeId}.json`);
+  if (fs.existsSync(singlePath)) {
+    try {
+      const raw = fs.readFileSync(singlePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed?.state && parsed?.challengeId) {
+        return parsed as SubmissionReservationRecord;
+      }
+      if (parsed?.id && parsed?.walletAddress) {
+        return {
+          challengeId,
+          campaignId: parsed.campaignId,
+          walletAddress: parsed.walletAddress,
+          submissionId: parsed.id,
+          idempotencyKey: parsed.idempotencyKey || `raid-submission:${challengeId}`,
+          state: 'COMPLETED',
+          createdAt: parsed.submittedAt ? new Date(parsed.submittedAt).getTime() : Date.now(),
+          updatedAt: Date.now(),
+          attemptId: 'legacy',
+          fencingGeneration: 1,
+          submissionPayload: parsed as CampaignSubmission,
+        };
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+export async function saveSubmissionReservation(
+  reservation: SubmissionReservationRecord
+): Promise<{ success: boolean; error?: string }> {
+  reservation.updatedAt = reservation.updatedAt || Date.now();
+  const challengeId = reservation.challengeId;
+
+  if (isKvActive()) {
+    try {
+      const resKey = `${KV_SUBMISSION_RESERVATION_PREFIX}${challengeId}`;
+      const payload = JSON.stringify(reservation);
+      await kvSet(resKey, payload);
+      await kvSAdd(KV_SUBMISSION_RESERVATION_SET, challengeId);
+      await kvSet(`${KV_SUBMISSION_CHALLENGE_PREFIX}${challengeId}`, payload);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  try {
+    fs.mkdirSync(SUBMISSION_RESERVATIONS_DIR, { recursive: true });
+    fs.mkdirSync(SUBMISSIONS_BY_CHALLENGE_DIR, { recursive: true });
+    const resPath = path.join(SUBMISSION_RESERVATIONS_DIR, `${challengeId}.json`);
+    const legacyPath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${challengeId}.json`);
+    const payload = JSON.stringify(reservation, null, 2);
+
+    const tmp = `${resPath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, payload, 'utf8');
+    try {
+      fs.renameSync(tmp, resPath);
+    } catch {
+      fs.writeFileSync(resPath, payload, 'utf8');
+      try { fs.unlinkSync(tmp); } catch {}
+    }
+
+    const legTmp = `${legacyPath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(legTmp, payload, 'utf8');
+    try {
+      fs.renameSync(legTmp, legacyPath);
+    } catch {
+      fs.writeFileSync(legacyPath, payload, 'utf8');
+      try { fs.unlinkSync(legTmp); } catch {}
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateSubmissionReservationState(
+  challengeId: string,
+  state: SubmissionReservationState,
+  options?: {
+    attemptId?: string;
+    fencingGeneration?: number;
+    error?: string;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<{ ok: boolean; reservation?: SubmissionReservationRecord; error?: string }> {
+  const current = await getSubmissionReservation(challengeId);
+  if (!current) {
+    return { ok: false, error: 'Reservation not found' };
+  }
+
+  current.state = state;
+  current.updatedAt = Date.now();
+  if (options?.attemptId) current.attemptId = options.attemptId;
+  if (options?.fencingGeneration) current.fencingGeneration = options.fencingGeneration;
+  if (!current.recoveryMetadata) current.recoveryMetadata = {};
+  if (options?.error) current.recoveryMetadata.error = options.error;
+  if (options?.metadata) {
+    Object.assign(current.recoveryMetadata, options.metadata);
+  }
+
+  const saveRes = await saveSubmissionReservation(current);
+  if (!saveRes.success) {
+    return { ok: false, error: saveRes.error || 'Failed to update reservation' };
+  }
+  return { ok: true, reservation: current };
+}
 
 export async function getSubmissionByIdempotencyKey(
   idempotencyKey: string
@@ -444,34 +653,35 @@ export async function getSubmissionByChallengeId(
 ): Promise<CampaignSubmission | null> {
   if (!challengeId) return null;
 
-  if (isKvActive()) {
-    try {
-      const direct = await kvGet(`${KV_SUBMISSION_CHALLENGE_PREFIX}${challengeId}`);
-      if (direct) {
-        return JSON.parse(direct) as CampaignSubmission;
-      }
-    } catch {}
-  } else {
-    const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${challengeId}.json`);
-    if (fs.existsSync(singlePath)) {
-      try {
-        const direct = fs.readFileSync(singlePath, 'utf-8');
-        return JSON.parse(direct) as CampaignSubmission;
-      } catch {}
+  const reservation = await getSubmissionReservation(challengeId);
+  const submissions = await loadSubmissions();
+  const expectedKey = `raid-submission:${challengeId}`;
+
+  const durableInSubmissions = submissions.find(
+    (s) =>
+      s.challengeId === challengeId ||
+      (s.idempotencyKey && s.idempotencyKey === expectedKey) ||
+      (reservation && s.id === reservation.submissionId)
+  );
+
+  if (reservation) {
+    // If reservation is in RESERVED or RETRYABLE state, it is NOT yet persisted.
+    // Never return a successful persisted-submission response solely because a reservation exists!
+    if (reservation.state === 'RESERVED' || reservation.state === 'RETRYABLE') {
+      return durableInSubmissions || null;
+    }
+
+    if (reservation.state === 'PERSISTED' || reservation.state === 'COMPLETED') {
+      return durableInSubmissions || reservation.submissionPayload || null;
     }
   }
 
-  const submissions = await loadSubmissions();
-  const expectedKey = `raid-submission:${challengeId}`;
-  return (
-    submissions.find(
-      (s) => s.challengeId === challengeId || (s.idempotencyKey && s.idempotencyKey === expectedKey)
-    ) || null
-  );
+  return durableInSubmissions || null;
 }
 
 const PENDING_RECONCILE_DIR = path.join(process.cwd(), 'data', 'pending_counter_reconciliations');
 const KV_PENDING_RECONCILE_PREFIX = 'trench:camp:pending_reconcile:';
+const KV_PENDING_RECONCILE_SET = 'trench:camp:pending_reconcile_set';
 
 export async function markCampaignCounterPendingReconciliation(
   campaignId: string,
@@ -485,14 +695,21 @@ export async function markCampaignCounterPendingReconciliation(
         `${KV_PENDING_RECONCILE_PREFIX}${key}`,
         JSON.stringify({ campaignId, submissionId, createdAt: Date.now() })
       );
-    } catch {}
+      await kvSAdd(KV_PENDING_RECONCILE_SET, key);
+    } catch (err) {
+      console.error('[TrenchLabs Campaigns] Failed to mark Redis pending counter reconciliation:', err);
+      throw err;
+    }
     return;
   }
   try {
     fs.mkdirSync(PENDING_RECONCILE_DIR, { recursive: true });
     const filePath = path.join(PENDING_RECONCILE_DIR, `${key}.json`);
     fs.writeFileSync(filePath, JSON.stringify({ campaignId, submissionId, createdAt: Date.now() }), 'utf8');
-  } catch {}
+  } catch (err) {
+    console.error('[TrenchLabs Campaigns] Failed to mark file pending counter reconciliation:', err);
+    throw err;
+  }
 }
 
 export async function clearCampaignCounterPendingReconciliation(
@@ -504,7 +721,11 @@ export async function clearCampaignCounterPendingReconciliation(
   if (isKvActive()) {
     try {
       await kvDel(`${KV_PENDING_RECONCILE_PREFIX}${key}`);
-    } catch {}
+      await kvSRem(KV_PENDING_RECONCILE_SET, key);
+    } catch (err) {
+      console.error('[TrenchLabs Campaigns] Failed to clear Redis pending counter reconciliation:', err);
+      throw err;
+    }
     return;
   }
   try {
@@ -512,48 +733,245 @@ export async function clearCampaignCounterPendingReconciliation(
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-  } catch {}
+  } catch (err) {
+    console.error('[TrenchLabs Campaigns] Failed to clear file pending counter reconciliation:', err);
+    throw err;
+  }
 }
 
-export async function getPendingCounterReconciliations(): Promise<Array<{ campaignId: string; submissionId: string }>> {
+export async function getPendingCounterReconciliations(
+  batchSize = 100
+): Promise<Array<{ campaignId: string; submissionId: string; createdAt?: number }>> {
+  const safeBatch = Math.max(1, Math.min(batchSize, 500));
+  const results: Array<{ campaignId: string; submissionId: string; createdAt?: number }> = [];
+
+  if (isKvActive()) {
+    try {
+      const members = await kvSMembers(KV_PENDING_RECONCILE_SET);
+      const keysToFetch: string[] = [];
+      if (Array.isArray(members) && members.length > 0) {
+        for (const m of members.slice(0, safeBatch)) {
+          keysToFetch.push(`${KV_PENDING_RECONCILE_PREFIX}${m}`);
+        }
+      }
+
+      if (keysToFetch.length < safeBatch) {
+        let cursor = '0';
+        do {
+          const [nextCursor, scanned] = await kvScan(cursor, `${KV_PENDING_RECONCILE_PREFIX}*`, safeBatch);
+          for (const k of scanned) {
+            if (!keysToFetch.includes(k)) {
+              keysToFetch.push(k);
+              if (keysToFetch.length >= safeBatch) break;
+            }
+          }
+          cursor = nextCursor;
+        } while (cursor !== '0' && keysToFetch.length < safeBatch);
+      }
+
+      for (const k of keysToFetch) {
+        try {
+          const raw = await kvGet(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (
+              typeof parsed?.campaignId === 'string' &&
+              typeof parsed?.submissionId === 'string' &&
+              parsed.campaignId.length > 0 &&
+              parsed.submissionId.length > 0
+            ) {
+              results.push({
+                campaignId: parsed.campaignId,
+                submissionId: parsed.submissionId,
+                createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : undefined,
+              });
+            }
+          }
+        } catch (fetchErr) {
+          console.error(`[TrenchLabs Campaigns] Error fetching pending counter record ${k}:`, fetchErr);
+        }
+      }
+      return results;
+    } catch (kvErr) {
+      console.error('[TrenchLabs Campaigns] Redis error reading pending counter reconciliations:', kvErr);
+      throw kvErr;
+    }
+  }
+
   if (!fs.existsSync(PENDING_RECONCILE_DIR)) return [];
   try {
     const files = fs.readdirSync(PENDING_RECONCILE_DIR);
-    const results: Array<{ campaignId: string; submissionId: string }> = [];
-    for (const f of files) {
+    for (const f of files.slice(0, safeBatch)) {
       if (f.endsWith('.json')) {
         try {
           const raw = fs.readFileSync(path.join(PENDING_RECONCILE_DIR, f), 'utf8');
           const parsed = JSON.parse(raw);
-          if (parsed?.campaignId && parsed?.submissionId) {
-            results.push({ campaignId: parsed.campaignId, submissionId: parsed.submissionId });
+          if (
+            typeof parsed?.campaignId === 'string' &&
+            typeof parsed?.submissionId === 'string' &&
+            parsed.campaignId.length > 0 &&
+            parsed.submissionId.length > 0
+          ) {
+            results.push({
+              campaignId: parsed.campaignId,
+              submissionId: parsed.submissionId,
+              createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : undefined,
+            });
           }
-        } catch {}
+        } catch (readErr) {
+          console.error(`[TrenchLabs Campaigns] Corrupt pending counter file ${f}:`, readErr);
+        }
       }
     }
     return results;
-  } catch {
+  } catch (dirErr) {
+    console.error('[TrenchLabs Campaigns] Error reading pending counter directory:', dirErr);
     return [];
   }
 }
 
-export async function reconcileAllPendingCampaignCounters(): Promise<{
+export async function reconcileAllPendingCampaignCounters(batchSize = 100): Promise<{
   attempted: number;
   reconciled: number;
   failed: number;
+  errors: Array<{ campaignId: string; submissionId: string; error: string }>;
 }> {
-  const pending = await getPendingCounterReconciliations();
+  const pending = await getPendingCounterReconciliations(batchSize);
   let reconciled = 0;
   let failed = 0;
+  const errors: Array<{ campaignId: string; submissionId: string; error: string }> = [];
+
   for (const item of pending) {
-    const res = await reconcileCampaignSubmission(item.campaignId, item.submissionId);
-    if (res.ok) {
-      reconciled += 1;
-    } else {
+    try {
+      const res = await reconcileCampaignSubmission(item.campaignId, item.submissionId);
+      if (res.ok) {
+        await clearCampaignCounterPendingReconciliation(item.campaignId, item.submissionId);
+        reconciled += 1;
+      } else {
+        failed += 1;
+        const errMsg = res.error || 'Reconciliation failed';
+        errors.push({ campaignId: item.campaignId, submissionId: item.submissionId, error: errMsg });
+        console.error(
+          `[TrenchLabs Counter Recovery] Reconciliation failed for camp=${item.campaignId} sub=${item.submissionId}: ${errMsg}`
+        );
+      }
+    } catch (itemErr) {
       failed += 1;
+      const errMsg = (itemErr as Error).message || 'Reconciliation error';
+      errors.push({ campaignId: item.campaignId, submissionId: item.submissionId, error: errMsg });
+      console.error(
+        `[TrenchLabs Counter Recovery] Exception reconciling camp=${item.campaignId} sub=${item.submissionId}:`,
+        itemErr
+      );
     }
   }
-  return { attempted: pending.length, reconciled, failed };
+
+  return { attempted: pending.length, reconciled, failed, errors };
+}
+
+export async function getPendingSubmissionReservations(
+  batchSize = 50
+): Promise<SubmissionReservationRecord[]> {
+  const safeBatch = Math.max(1, Math.min(batchSize, 200));
+  const results: SubmissionReservationRecord[] = [];
+
+  if (isKvActive()) {
+    try {
+      const members = await kvSMembers(KV_SUBMISSION_RESERVATION_SET);
+      if (Array.isArray(members)) {
+        for (const challengeId of members) {
+          const res = await getSubmissionReservation(challengeId);
+          if (res && res.state !== 'COMPLETED') {
+            results.push(res);
+            if (results.length >= safeBatch) break;
+          }
+        }
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  if (!fs.existsSync(SUBMISSION_RESERVATIONS_DIR)) return [];
+  try {
+    const files = fs.readdirSync(SUBMISSION_RESERVATIONS_DIR);
+    for (const f of files) {
+      if (f.endsWith('.json')) {
+        try {
+          const raw = fs.readFileSync(path.join(SUBMISSION_RESERVATIONS_DIR, f), 'utf8');
+          const parsed = JSON.parse(raw);
+          if (parsed?.state && parsed?.challengeId && parsed.state !== 'COMPLETED') {
+            results.push(parsed as SubmissionReservationRecord);
+            if (results.length >= safeBatch) break;
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+  return results;
+}
+
+export async function recoverSubmissionReservation(
+  challengeId: string
+): Promise<{ ok: boolean; submission?: CampaignSubmission; status: string; error?: string }> {
+  return withCampaignsLock(async () => {
+    const reservation = await getSubmissionReservation(challengeId);
+    if (!reservation) {
+      return { ok: false, status: 'NOT_FOUND', error: 'Reservation not found' };
+    }
+
+    const submissions = await loadSubmissions();
+    let durableSub = submissions.find(
+      (s) => s.id === reservation.submissionId || s.challengeId === challengeId
+    );
+
+    if (reservation.state === 'COMPLETED' || reservation.state === 'PERSISTED') {
+      if (!durableSub && reservation.submissionPayload) {
+        durableSub = reservation.submissionPayload;
+        submissions.unshift(durableSub);
+        await saveSubmissions(submissions);
+      }
+      if (durableSub) {
+        await reconcileCampaignSubmission(reservation.campaignId, durableSub.id);
+      }
+      if (reservation.state === 'PERSISTED') {
+        await updateSubmissionReservationState(challengeId, 'COMPLETED');
+      }
+      return { ok: true, submission: durableSub, status: 'COMPLETED' };
+    }
+
+    // Reservation is RESERVED or RETRYABLE:
+    if (durableSub) {
+      await updateSubmissionReservationState(challengeId, 'COMPLETED');
+      await reconcileCampaignSubmission(reservation.campaignId, durableSub.id);
+      return { ok: true, submission: durableSub, status: 'RECOVERED_PERSISTED' };
+    }
+
+    // It was NOT persisted yet: resume persistence from payload
+    const payload = reservation.submissionPayload;
+    submissions.unshift(payload);
+    const saveSubRes = await saveSubmissions(submissions);
+    if (!saveSubRes.success) {
+      await updateSubmissionReservationState(challengeId, 'RETRYABLE', { error: saveSubRes.error });
+      return { ok: false, status: 'RETRYABLE', error: saveSubRes.error };
+    }
+
+    await updateSubmissionReservationState(challengeId, 'PERSISTED');
+    const campaigns = await loadCampaigns();
+    const campaign = campaigns.find((c) => c.id === reservation.campaignId);
+    if (campaign) {
+      campaign.submissionsCount = (campaign.submissionsCount || 0) + 1;
+      const saveCampRes = await saveCampaigns(campaigns);
+      if (!saveCampRes.success) {
+        await markCampaignCounterPendingReconciliation(reservation.campaignId, payload.id);
+      } else {
+        await updateSubmissionReservationState(challengeId, 'COMPLETED');
+      }
+    }
+
+    return { ok: true, submission: payload, status: 'RECOVERED_AND_PERSISTED' };
+  });
 }
 
 export type ReconcileCampaignResult =
@@ -703,28 +1121,50 @@ export async function submitCampaignCompletion(payload: {
 
     const submissions = await loadSubmissions();
 
-    // 1. Durable Idempotency Check:
-    // If a submission exists for this challengeId or idempotencyKey, return the original submission.
-    // Never create a duplicate record, never re-increment counters, never duplicate rewards.
+    // 1. Durable Idempotency Check via Authoritative Submissions & Reservations
     const idempotencyKey =
       payload.idempotencyKey || (payload.challengeId ? `raid-submission:${payload.challengeId}` : undefined);
 
-    let existingSubmission: CampaignSubmission | null = null;
+    let existingReservation: SubmissionReservationRecord | null = null;
     if (payload.challengeId) {
-      existingSubmission = await getSubmissionByChallengeId(payload.challengeId);
-    }
-    if (!existingSubmission && idempotencyKey) {
-      existingSubmission = submissions.find((s) => s.idempotencyKey === idempotencyKey) || null;
+      existingReservation = await getSubmissionReservation(payload.challengeId);
     }
 
-    if (existingSubmission) {
-      // Reconcile campaign counter if previously interrupted during counter save
-      const matchingCount = submissions.filter((s) => s.campaignId === payload.campaignId).length;
-      if ((campaign.submissionsCount || 0) < matchingCount) {
-        campaign.submissionsCount = matchingCount;
-        await saveCampaigns(campaigns);
+    if (existingReservation) {
+      if (existingReservation.state === 'COMPLETED' || existingReservation.state === 'PERSISTED') {
+        let authSub = submissions.find((s) => s.id === existingReservation!.submissionId);
+        if (!authSub) {
+          authSub = existingReservation.submissionPayload;
+          submissions.unshift(authSub);
+          await saveSubmissions(submissions);
+        }
+        if (existingReservation.state === 'PERSISTED') {
+          await updateSubmissionReservationState(payload.challengeId!, 'COMPLETED');
+        }
+        await reconcileCampaignSubmission(payload.campaignId, authSub.id);
+        return { ok: true, submission: authSub, isExisting: true };
       }
-      return { ok: true, submission: existingSubmission, isExisting: true };
+
+      // Reservation is in RESERVED or RETRYABLE state
+      const authSub = submissions.find((s) => s.id === existingReservation!.submissionId);
+      if (authSub) {
+        await updateSubmissionReservationState(payload.challengeId!, 'COMPLETED');
+        await reconcileCampaignSubmission(payload.campaignId, authSub.id);
+        return { ok: true, submission: authSub, isExisting: true };
+      }
+    }
+
+    const existingInSubmissions = submissions.find(
+      (s) =>
+        (payload.challengeId && s.challengeId === payload.challengeId) ||
+        (idempotencyKey && s.idempotencyKey === idempotencyKey)
+    );
+    if (existingInSubmissions) {
+      if (payload.challengeId) {
+        await updateSubmissionReservationState(payload.challengeId, 'COMPLETED');
+      }
+      await reconcileCampaignSubmission(payload.campaignId, existingInSubmissions.id);
+      return { ok: true, submission: existingInSubmissions, isExisting: true };
     }
 
     // 2. Check for duplicate submission by this wallet on this campaign (with a different challenge)
@@ -735,15 +1175,11 @@ export async function submitCampaignCompletion(payload: {
       return { ok: false, error: 'This wallet has already submitted proof for this campaign' };
     }
 
-    // 3. Inject simulated test failure if active
-    if (_testFailNextSaveSubmissions) {
-      const err = _testFailNextSaveSubmissions;
-      _testFailNextSaveSubmissions = null;
-      throw err;
-    }
-
+    const submissionId = existingReservation
+      ? existingReservation.submissionId
+      : `sub-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
     const newSubmission: CampaignSubmission = {
-      id: `sub-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      id: submissionId,
       campaignId: payload.campaignId,
       walletAddress: cleanWallet,
       xHandle: cleanHandle,
@@ -754,53 +1190,109 @@ export async function submitCampaignCompletion(payload: {
       idempotencyKey,
     };
 
-    // 4. Authoritative Uniqueness Store (prevents duplicate persistence across racing processes)
-    if (payload.challengeId) {
+    // 3. Acquire reservation in RESERVED state
+    if (payload.challengeId && !existingReservation) {
+      const reservationRecord: SubmissionReservationRecord = {
+        challengeId: payload.challengeId,
+        campaignId: payload.campaignId,
+        walletAddress: cleanWallet,
+        submissionId: newSubmission.id,
+        idempotencyKey: idempotencyKey || `raid-submission:${payload.challengeId}`,
+        state: 'RESERVED',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        attemptId: crypto.randomUUID(),
+        fencingGeneration: 1,
+        submissionPayload: newSubmission,
+      };
+
       if (isKvActive()) {
-        const directKey = `${KV_SUBMISSION_CHALLENGE_PREFIX}${payload.challengeId}`;
-        const reserveRes = await kvReserveSubmissionChallenge(directKey, JSON.stringify(newSubmission));
+        const resKey = `${KV_SUBMISSION_RESERVATION_PREFIX}${payload.challengeId}`;
+        const reserveRes = await kvReserveSubmissionChallenge(
+          resKey,
+          JSON.stringify(reservationRecord),
+          604800,
+          KV_SUBMISSION_RESERVATION_SET,
+          payload.challengeId
+        );
         if (!reserveRes.created) {
-          if (reserveRes.submission) {
-            try {
-              const parsed = JSON.parse(reserveRes.submission) as CampaignSubmission;
-              await reconcileCampaignSubmission(payload.campaignId, parsed.id);
-              return { ok: true, submission: parsed, isExisting: true };
-            } catch {}
-          }
-          const existing = await getSubmissionByChallengeId(payload.challengeId);
-          if (existing) {
-            await reconcileCampaignSubmission(payload.campaignId, existing.id);
-            return { ok: true, submission: existing, isExisting: true };
+          const winning = await getSubmissionReservation(payload.challengeId);
+          if (winning) {
+            if (winning.state === 'COMPLETED' || winning.state === 'PERSISTED') {
+              const sub = submissions.find((s) => s.id === winning.submissionId) || winning.submissionPayload;
+              await reconcileCampaignSubmission(payload.campaignId, sub.id);
+              return { ok: true, submission: sub, isExisting: true };
+            }
+            const sub = submissions.find((s) => s.id === winning.submissionId);
+            if (sub) {
+              await updateSubmissionReservationState(payload.challengeId, 'COMPLETED');
+              await reconcileCampaignSubmission(payload.campaignId, sub.id);
+              return { ok: true, submission: sub, isExisting: true };
+            }
           }
         }
       } else {
         try {
+          fs.mkdirSync(SUBMISSION_RESERVATIONS_DIR, { recursive: true });
           fs.mkdirSync(SUBMISSIONS_BY_CHALLENGE_DIR, { recursive: true });
-          const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${payload.challengeId}.json`);
-          const singleFd = fs.openSync(singlePath, 'wx');
-          fs.writeSync(singleFd, JSON.stringify(newSubmission, null, 2), 0, 'utf8');
+          const resPath = path.join(SUBMISSION_RESERVATIONS_DIR, `${payload.challengeId}.json`);
+          const singleFd = fs.openSync(resPath, 'wx');
+          fs.writeSync(singleFd, JSON.stringify(reservationRecord, null, 2), 0, 'utf8');
           fs.fsyncSync(singleFd);
           fs.closeSync(singleFd);
+
+          const legPath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${payload.challengeId}.json`);
+          try {
+            fs.writeFileSync(legPath, JSON.stringify(reservationRecord, null, 2), 'utf8');
+          } catch {}
         } catch (err: unknown) {
-          if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-            const singlePath = path.join(SUBMISSIONS_BY_CHALLENGE_DIR, `${payload.challengeId}.json`);
-            try {
-              const existing = JSON.parse(fs.readFileSync(singlePath, 'utf8')) as CampaignSubmission;
-              await reconcileCampaignSubmission(payload.campaignId, existing.id);
-              return { ok: true, submission: existing, isExisting: true };
-            } catch {}
+          const errCode = (err as NodeJS.ErrnoException).code;
+          if (errCode === 'EEXIST' || errCode === 'EPERM' || errCode === 'EACCES') {
+            const winning = await getSubmissionReservation(payload.challengeId);
+            if (winning) {
+              if (winning.state === 'COMPLETED' || winning.state === 'PERSISTED') {
+                const sub = submissions.find((s) => s.id === winning.submissionId) || winning.submissionPayload;
+                await reconcileCampaignSubmission(payload.campaignId, sub.id);
+                return { ok: true, submission: sub, isExisting: true };
+              }
+              const sub = submissions.find((s) => s.id === winning.submissionId);
+              if (sub) {
+                await updateSubmissionReservationState(payload.challengeId, 'COMPLETED');
+                await reconcileCampaignSubmission(payload.campaignId, sub.id);
+                return { ok: true, submission: sub, isExisting: true };
+              }
+            }
           }
         }
       }
     }
 
+    // 4. Inject simulated test failure if active
+    if (_testFailNextSaveSubmissions) {
+      const err = _testFailNextSaveSubmissions;
+      _testFailNextSaveSubmissions = null;
+      if (payload.challengeId) {
+        await updateSubmissionReservationState(payload.challengeId, 'RETRYABLE', { error: err.message });
+      }
+      throw err;
+    }
+
+    // 5. Persist to authoritative submissions collection
     submissions.unshift(newSubmission);
     const saveSubRes = await saveSubmissions(submissions);
     if (!saveSubRes.success) {
+      if (payload.challengeId) {
+        await updateSubmissionReservationState(payload.challengeId, 'RETRYABLE', { error: saveSubRes.error });
+      }
       throw new Error(saveSubRes.error || 'Failed to persist submission');
     }
 
-    // 5. Inject simulated test failure on campaign counter update if active
+    // 6. Advance reservation to PERSISTED
+    if (payload.challengeId) {
+      await updateSubmissionReservationState(payload.challengeId, 'PERSISTED');
+    }
+
+    // 7. Inject simulated test failure on campaign counter update if active
     if (_testFailSaveCampaignsPersistent) {
       throw _testFailSaveCampaignsPersistent;
     }
@@ -810,11 +1302,21 @@ export async function submitCampaignCompletion(payload: {
       throw err;
     }
 
-    // Update submission count on campaign
+    // 8. Update submission count on campaign
     campaign.submissionsCount = (campaign.submissionsCount || 0) + 1;
     const saveCampRes = await saveCampaigns(campaigns);
     if (!saveCampRes.success) {
       console.warn('[TrenchLabs Campaigns] Failed to update campaign counter, submission is durable:', saveCampRes.error);
+      if (payload.challengeId) {
+        await markCampaignCounterPendingReconciliation(payload.campaignId, newSubmission.id);
+        await updateSubmissionReservationState(payload.challengeId, 'PERSISTED', {
+          metadata: { counterStatus: 'PENDING_RECONCILIATION' },
+        });
+      }
+    } else {
+      if (payload.challengeId) {
+        await updateSubmissionReservationState(payload.challengeId, 'COMPLETED');
+      }
     }
 
     return { ok: true, submission: newSubmission, isExisting: false };

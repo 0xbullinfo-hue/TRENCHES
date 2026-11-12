@@ -83,6 +83,59 @@ globalThis.fetch = async (url, options) => {
       });
     }
 
+    if (cmd === 'SADD') {
+      const key = String(args[1]);
+      const member = String(args[2]);
+      const current = mockRedisStore.get(key);
+      const set = current ? new Set(JSON.parse(current)) : new Set();
+      set.add(member);
+      mockRedisStore.set(key, JSON.stringify([...set]));
+      return new Response(JSON.stringify({ result: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (cmd === 'SMEMBERS') {
+      const key = String(args[1]);
+      const current = mockRedisStore.get(key);
+      const members = current ? JSON.parse(current) : [];
+      return new Response(JSON.stringify({ result: members }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (cmd === 'SREM') {
+      const key = String(args[1]);
+      const member = String(args[2]);
+      const current = mockRedisStore.get(key);
+      if (current) {
+        const set = new Set(JSON.parse(current));
+        set.delete(member);
+        mockRedisStore.set(key, JSON.stringify([...set]));
+      }
+      return new Response(JSON.stringify({ result: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (cmd === 'SCAN') {
+      const matchPattern = args[2] === 'MATCH' ? String(args[3]) : '';
+      const prefix = matchPattern ? matchPattern.replace('*', '') : '';
+      const matched = [];
+      for (const k of mockRedisStore.keys()) {
+        if (!prefix || k.startsWith(prefix)) {
+          matched.push(k);
+        }
+      }
+      return new Response(JSON.stringify({ result: ['0', matched] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (cmd === 'DEL') {
       const key = String(args[1]);
       const count = mockRedisStore.delete(key) ? 1 : 0;
@@ -117,8 +170,9 @@ globalThis.fetch = async (url, options) => {
         });
       }
 
-      // V2.7 Submission Challenge Reservation Lua
+      // V2.8 Submission Challenge Reservation Lua
       if (script.includes('RESERVE_SUBMISSION') || (script.includes('created') && script.includes('604800'))) {
+        const numKeys = Number(args[2]) || 1;
         const chalKey = String(args[3]);
         const existingSub = mockRedisStore.get(chalKey);
         if (existingSub) {
@@ -127,8 +181,44 @@ globalThis.fetch = async (url, options) => {
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           );
         }
-        mockRedisStore.set(chalKey, String(args[4]));
+        const payload = numKeys === 2 ? String(args[5]) : String(args[4]);
+        mockRedisStore.set(chalKey, payload);
+        if (numKeys === 2 && args[4]) {
+          const indexKey = String(args[4]);
+          const member = String(args[6] || '');
+          const cur = mockRedisStore.get(indexKey);
+          const set = cur ? new Set(JSON.parse(cur)) : new Set();
+          if (member) set.add(member);
+          mockRedisStore.set(indexKey, JSON.stringify([...set]));
+        }
         return new Response(JSON.stringify({ result: JSON.stringify({ created: true }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // V2.8 Advance Submission Reservation Lua
+      if (script.includes('ADVANCE_SUBMISSION_RESERVATION') || (script.includes('newState') && script.includes('recoveryMetadata'))) {
+        const chalKey = String(args[3]);
+        const raw = mockRedisStore.get(chalKey);
+        if (!raw) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const r = JSON.parse(raw);
+        r.state = String(args[4]);
+        r.updatedAt = Number(args[5]) || Date.now();
+        if (args[6]) {
+          try {
+            const meta = JSON.parse(String(args[6]));
+            if (!r.recoveryMetadata) r.recoveryMetadata = {};
+            Object.assign(r.recoveryMetadata, meta);
+          } catch {}
+        }
+        mockRedisStore.set(chalKey, JSON.stringify(r));
+        return new Response(JSON.stringify({ result: JSON.stringify({ ok: true, reservation: r }) }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });

@@ -6,14 +6,22 @@ import {
   KV_CONFIGURED,
   kvGet,
   kvSet,
+  kvSetLocked,
+  kvSAdd,
+  kvSMembers,
+  kvScan,
   kvClaimNotificationDispatch,
   kvCompleteNotificationDispatch,
 } from '@/server/kv';
 import {
   withCampaignsLock,
+  campaignsLockStorage,
   loadCampaigns,
   loadSubmissions,
   reconcileCampaignSubmission,
+  reconcileAllPendingCampaignCounters,
+  getPendingSubmissionReservations,
+  recoverSubmissionReservation,
 } from '@/server/campaigns-data';
 import type { CampaignSubmission, Campaign } from '@/lib/types';
 
@@ -93,10 +101,39 @@ export async function getSideEffectEvent(idempotencyKey: string): Promise<Campai
   }
 }
 
+const KV_SIDE_EFFECT_SET = 'trench:camp:sideeffects_set';
+
 async function saveSideEffectEvent(event: CampaignSideEffectEvent): Promise<void> {
   event.updatedAt = new Date().toISOString();
+  const activeLock = campaignsLockStorage.getStore();
+  if (activeLock) {
+    try {
+      activeLock.assertOwned();
+    } catch (assertErr) {
+      throw new Error(`Cannot save side effect: ${(assertErr as Error).message}`);
+    }
+  }
+
   if (isKvActive()) {
-    await kvSet(`${KV_SIDE_EFFECT_PREFIX}${event.idempotencyKey}`, JSON.stringify(event));
+    const key = `${KV_SIDE_EFFECT_PREFIX}${event.idempotencyKey}`;
+    const payload = JSON.stringify(event);
+    if (activeLock && activeLock.lockType === 'kv') {
+      const res = await kvSetLocked(
+        'trench:campaigns:lock',
+        key,
+        activeLock.token,
+        payload,
+        activeLock.fencingGeneration
+      );
+      if (!res.success) {
+        throw new Error(`Side effect write rejected: ${res.reason || 'Lock lost'}`);
+      }
+    } else {
+      await kvSet(key, payload);
+    }
+    try {
+      await kvSAdd(KV_SIDE_EFFECT_SET, event.idempotencyKey);
+    } catch {}
     return;
   }
 
@@ -487,6 +524,245 @@ export async function reconcilePendingCampaignOperations(): Promise<{
     reconciledRewards,
     reconciledNotifications,
     recoveredDispatchEvents,
+  };
+}
+
+export async function getEligibleNotificationEvents(
+  batchSize = 50
+): Promise<CampaignSideEffectEvent[]> {
+  const safeBatch = Math.max(1, Math.min(batchSize, 200));
+  const results: CampaignSideEffectEvent[] = [];
+
+  if (isKvActive()) {
+    try {
+      const members = await kvSMembers(KV_SIDE_EFFECT_SET);
+      if (Array.isArray(members)) {
+        for (const m of members.slice(0, safeBatch * 2)) {
+          const ev = await getSideEffectEvent(m);
+          if (ev && ev.type === 'NOTIFICATION') {
+            results.push(ev);
+            if (results.length >= safeBatch) break;
+          }
+        }
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  if (!fs.existsSync(SIDE_EFFECTS_DIR)) return [];
+  try {
+    const files = fs.readdirSync(SIDE_EFFECTS_DIR);
+    for (const f of files) {
+      if (f.endsWith('.json')) {
+        try {
+          const raw = fs.readFileSync(path.join(SIDE_EFFECTS_DIR, f), 'utf8');
+          const ev = JSON.parse(raw) as CampaignSideEffectEvent;
+          if (ev && ev.type === 'NOTIFICATION') {
+            results.push(ev);
+            if (results.length >= safeBatch) break;
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+  return results;
+}
+
+export async function defaultCampaignNotificationDispatcher(
+  event: CampaignSideEffectEvent
+): Promise<{ accepted: boolean; delivered?: boolean; externalRef?: string; error?: string }> {
+  try {
+    const externalRef = `notif_prov_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    return {
+      accepted: true,
+      delivered: false, // At-least-once provider acceptance. Does not represent confirmed delivery.
+      externalRef,
+    };
+  } catch (err) {
+    return {
+      accepted: false,
+      error: (err as Error).message || 'Provider communication failure',
+    };
+  }
+}
+
+export async function processNotificationOutboxBatch(options?: {
+  batchSize?: number;
+  workerId?: string;
+  leaseMs?: number;
+  dispatcher?: (event: CampaignSideEffectEvent) => Promise<{
+    accepted: boolean;
+    delivered?: boolean;
+    externalRef?: string;
+    error?: string;
+  }>;
+}): Promise<{
+  discovered: number;
+  dispatched: number;
+  failed: number;
+  retryable: number;
+}> {
+  const batchSize = options?.batchSize || 50;
+  const workerId = options?.workerId || `worker-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  const leaseMs = options?.leaseMs || 30000;
+  const dispatcher = options?.dispatcher || defaultCampaignNotificationDispatcher;
+
+  const events = await getEligibleNotificationEvents(batchSize);
+  let discovered = 0;
+  let dispatched = 0;
+  let failed = 0;
+  let retryable = 0;
+
+  for (const event of events) {
+    discovered += 1;
+    const now = Date.now();
+    let isEligible = false;
+
+    if (event.status === 'CREATED') {
+      isEligible = true;
+    } else if (event.status === 'FAILED') {
+      const attempts = Number(event.attemptCount) || 1;
+      const backoffMs = Math.min(300_000, 1000 * Math.pow(2, attempts));
+      const lastAttempt = event.lastAttemptAt ? new Date(event.lastAttemptAt).getTime() : 0;
+      if (now - lastAttempt >= backoffMs) {
+        isEligible = true;
+      } else {
+        retryable += 1;
+      }
+    }
+
+    if (isEligible) {
+      const res = await dispatchCampaignNotification(event.idempotencyKey, dispatcher, {
+        workerId,
+        leaseMs,
+      });
+      if (res.ok) {
+        dispatched += 1;
+      } else {
+        failed += 1;
+        retryable += 1;
+      }
+    }
+  }
+
+  return { discovered, dispatched, failed, retryable };
+}
+
+export interface CampaignRecoveryWorkerResult {
+  ok: boolean;
+  status: 'COMPLETED';
+  workerId: string;
+  durationMs: number;
+  recordsDiscovered: number;
+  recordsProcessed: number;
+  recordsRecovered: number;
+  recordsStillPending: number;
+  failedOperations: number;
+  retryableFailures: number;
+  reconciledCounters: number;
+  recoveredReservations: number;
+  dispatchedNotifications: number;
+  details: {
+    reservations: { discovered: number; recovered: number; failed: number };
+    counters: { attempted: number; reconciled: number; failed: number };
+    sideEffects: {
+      reconciledRewards: number;
+      reconciledNotifications: number;
+      recoveredDispatchEvents: number;
+    };
+    outboxDispatch: { discovered: number; dispatched: number; failed: number; retryable: number };
+  };
+}
+
+export async function runCampaignRecoveryWorker(options?: {
+  workerId?: string;
+  batchSize?: number;
+}): Promise<CampaignRecoveryWorkerResult> {
+  const workerId = options?.workerId || `recovery-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  const batchSize = Math.max(1, Math.min(options?.batchSize || 50, 200));
+  const startMs = Date.now();
+
+  let recordsDiscovered = 0;
+  let recordsProcessed = 0;
+  let recordsRecovered = 0;
+  let recordsStillPending = 0;
+  let failedOperations = 0;
+  let retryableFailures = 0;
+
+  // 1. Recover Pending / Stalled Submission Reservations
+  const reservations = await getPendingSubmissionReservations(batchSize);
+  let resRecovered = 0;
+  let resFailed = 0;
+
+  for (const res of reservations) {
+    recordsDiscovered += 1;
+    if (res.state === 'RESERVED' || res.state === 'RETRYABLE' || res.state === 'PERSISTED') {
+      if (Date.now() - res.updatedAt > 2000) {
+        recordsProcessed += 1;
+        const recResult = await recoverSubmissionReservation(res.challengeId);
+        if (recResult.ok) {
+          recordsRecovered += 1;
+          resRecovered += 1;
+        } else {
+          resFailed += 1;
+          failedOperations += 1;
+          retryableFailures += 1;
+          recordsStillPending += 1;
+        }
+      } else {
+        recordsStillPending += 1;
+      }
+    }
+  }
+
+  // 2. Reconcile Campaign Counters
+  const counterRes = await reconcileAllPendingCampaignCounters(batchSize);
+  recordsDiscovered += counterRes.attempted;
+  recordsProcessed += counterRes.attempted;
+  recordsRecovered += counterRes.reconciled;
+  failedOperations += counterRes.failed;
+  recordsStillPending += counterRes.failed;
+  if (counterRes.failed > 0) retryableFailures += counterRes.failed;
+
+  // 3. Reconcile Missing Outbox Events & Expired Leases
+  const sideOps = await reconcilePendingCampaignOperations();
+  recordsRecovered += sideOps.reconciledRewards + sideOps.reconciledNotifications + sideOps.recoveredDispatchEvents;
+
+  // 4. Dispatch Eligible Outbox Notifications
+  const dispatchRes = await processNotificationOutboxBatch({ batchSize, workerId });
+  recordsDiscovered += dispatchRes.discovered;
+  recordsProcessed += dispatchRes.dispatched + dispatchRes.failed;
+  recordsRecovered += dispatchRes.dispatched;
+  failedOperations += dispatchRes.failed;
+  retryableFailures += dispatchRes.retryable;
+  recordsStillPending += dispatchRes.retryable;
+
+  return {
+    ok: failedOperations === 0 || recordsRecovered > 0,
+    status: 'COMPLETED',
+    workerId,
+    durationMs: Date.now() - startMs,
+    recordsDiscovered,
+    recordsProcessed,
+    recordsRecovered,
+    recordsStillPending,
+    failedOperations,
+    retryableFailures,
+    reconciledCounters: counterRes.reconciled,
+    recoveredReservations: resRecovered,
+    dispatchedNotifications: dispatchRes.dispatched,
+    details: {
+      reservations: { discovered: reservations.length, recovered: resRecovered, failed: resFailed },
+      counters: { attempted: counterRes.attempted, reconciled: counterRes.reconciled, failed: counterRes.failed },
+      sideEffects: {
+        reconciledRewards: sideOps.reconciledRewards,
+        reconciledNotifications: sideOps.reconciledNotifications,
+        recoveredDispatchEvents: sideOps.recoveredDispatchEvents,
+      },
+      outboxDispatch: dispatchRes,
+    },
   };
 }
 

@@ -31,6 +31,9 @@ function cleanupLock(p = TEST_LOCK_PATH) {
   try {
     if (fs.existsSync(p)) fs.unlinkSync(p);
   } catch {}
+  try {
+    if (fs.existsSync(`${p}.gen`)) fs.unlinkSync(`${p}.gen`);
+  } catch {}
 }
 
 test('V2.6 Lock Scenario 1 & 2: Two independent processes attempt initial acquisition; exactly one obtains ownership', async () => {

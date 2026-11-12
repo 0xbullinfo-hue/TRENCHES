@@ -240,6 +240,32 @@ export interface FileLockRelease {
   isOwned: () => boolean;
 }
 
+export function getAndIncrementDurableGeneration(lockFilePath: string, minGen = 0): number {
+  const genFilePath = `${lockFilePath}.gen`;
+  let currentGen = minGen;
+  try {
+    if (fs.existsSync(genFilePath)) {
+      const raw = fs.readFileSync(genFilePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      currentGen = Math.max(currentGen, Number(parsed?.generation) || 0);
+    }
+  } catch {}
+  const nextGen = currentGen + 1;
+  try {
+    const tmp = `${genFilePath}.${process.pid}.${Date.now()}.${safeRandomUUID()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ generation: nextGen, updatedAt: Date.now() }), 'utf8');
+    try {
+      fs.renameSync(tmp, genFilePath);
+    } catch {
+      fs.writeFileSync(genFilePath, JSON.stringify({ generation: nextGen, updatedAt: Date.now() }), 'utf8');
+      try {
+        fs.unlinkSync(tmp);
+      } catch {}
+    }
+  } catch {}
+  return nextGen;
+}
+
 /**
  * Race-safe file lock acquisition with metadata verification, monotonic fencing generations,
  * and atomic OS rename recovery guarded against replacement lock races.
@@ -295,7 +321,7 @@ export async function acquireFileLock(
 
       // 1. 'wx' opens exclusively, failing with EEXIST if path already exists (atomic OS kernel lock)
       const fd = fs.openSync(lockFilePath, 'wx');
-      const fencingGeneration = 1;
+      const fencingGeneration = getAndIncrementDurableGeneration(lockFilePath, 0);
       try {
         if (_testFailNextLockMetadataWrite) {
           _testFailNextLockMetadataWrite = false;
@@ -453,9 +479,18 @@ export async function acquireFileLock(
                     reclaimPid !== inspectedPid ||
                     !isPidDead(reclaimPid)
                   ) {
-                    try {
-                      fs.renameSync(reclaimPath, lockFilePath);
-                    } catch {}
+                    // Restoration must never replace a newer lock:
+                    if (!fs.existsSync(lockFilePath)) {
+                      try {
+                        fs.renameSync(reclaimPath, lockFilePath);
+                      } catch {}
+                    } else {
+                      try {
+                        if (isPidDead(reclaimPid)) {
+                          fs.unlinkSync(reclaimPath);
+                        }
+                      } catch {}
+                    }
                     await sleep(20 + Math.floor(Math.random() * 30));
                     continue;
                   }
@@ -466,7 +501,7 @@ export async function acquireFileLock(
                   } catch {}
 
                   // Acquire exclusively with incremented fencing generation
-                  const nextGen = inspectedGen + 1;
+                  const nextGen = getAndIncrementDurableGeneration(lockFilePath, inspectedGen);
                   const recFd = fs.openSync(lockFilePath, 'wx');
                   try {
                     if (_testFailNextLockMetadataWrite) {
@@ -579,6 +614,10 @@ export async function acquireFileLock(
 }
 
 async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
+  const activeLock = dbLockStorage.getStore();
+  if (activeLock) {
+    return Promise.resolve(fn());
+  }
   const run = dbLockChain.then(async () => {
     assertPersistence();
 
@@ -723,14 +762,19 @@ export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
   inMemoryDb = db;
   if (KV_CONFIGURED) {
     if (activeLock) {
-      const res = await kvSetLocked(DB_LOCK_KEY, DB_KV_KEY, activeLock.token, JSON.stringify(db));
+      const res = await kvSetLocked(
+        DB_LOCK_KEY,
+        DB_KV_KEY,
+        activeLock.token,
+        JSON.stringify(db),
+        activeLock.fencingGeneration
+      );
       if (!res.success) {
         throw new Error(`Database write rejected: ${res.reason || 'Lock ownership lost'}`);
       }
       return;
     }
-    await kvSet(DB_KV_KEY, JSON.stringify(db));
-    return;
+    throw new Error('Database write rejected: lock required for protected write in KV mode');
   }
   try {
     fs.mkdirSync(path.dirname(DATA_FILE_PATH), { recursive: true });

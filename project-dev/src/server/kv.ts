@@ -731,8 +731,21 @@ export async function kvOutboxFinalizeEvent(
 
 export const SAVE_LOCKED_KEY_LUA =
   "local lockVal = redis.call('get', KEYS[1]) " +
-  "if not lockVal or lockVal ~= ARGV[1] then " +
+  "if not lockVal then " +
   "  return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "end " +
+  "if lockVal ~= ARGV[1] then " +
+  "  local ok, parsed = pcall(cjson.decode, lockVal) " +
+  "  if ok and type(parsed) == 'table' then " +
+  "    if parsed.token ~= ARGV[1] then " +
+  "      return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "    end " +
+  "    if ARGV[3] and ARGV[3] ~= '' and parsed.fencingGeneration and tonumber(parsed.fencingGeneration) ~= tonumber(ARGV[3]) then " +
+  "      return cjson.encode({ success = false, reason = 'FENCING_GENERATION_MISMATCH' }) " +
+  "    end " +
+  "  else " +
+  "    return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "  end " +
   "end " +
   "redis.call('set', KEYS[2], ARGV[2]) " +
   "return cjson.encode({ success = true })";
@@ -741,9 +754,22 @@ export async function kvSetLocked(
   lockKey: string,
   targetKey: string,
   ownerToken: string,
-  payload: string
+  payload: string,
+  fencingGeneration?: number
 ): Promise<{ success: boolean; reason?: string }> {
-  const res = await cmd(['EVAL', SAVE_LOCKED_KEY_LUA, 2, lockKey, targetKey, ownerToken, payload]);
+  const args: Array<string | number> = [
+    'EVAL',
+    SAVE_LOCKED_KEY_LUA,
+    2,
+    lockKey,
+    targetKey,
+    ownerToken,
+    payload,
+  ];
+  if (fencingGeneration !== undefined && fencingGeneration !== null) {
+    args.push(fencingGeneration);
+  }
+  const res = await cmd(args);
   if (!res) return { success: false, reason: 'NO_RESPONSE' };
   try {
     return (typeof res === 'string' ? JSON.parse(res) : res) as { success: boolean; reason?: string };
@@ -759,20 +785,97 @@ export const RESERVE_SUBMISSION_CHALLENGE_LUA =
   "end " +
   "local ttl = tonumber(ARGV[2]) or 604800 " +
   "redis.call('set', KEYS[1], ARGV[1], 'EX', ttl) " +
+  "if KEYS[2] and ARGV[3] and ARGV[3] ~= '' then " +
+  "  redis.call('sadd', KEYS[2], ARGV[3]) " +
+  "end " +
   "return cjson.encode({ created = true })";
 
 export async function kvReserveSubmissionChallenge(
   challengeKey: string,
   submissionJson: string,
-  ttlSec = 604800
+  ttlSec = 604800,
+  indexSetKey?: string,
+  indexMember?: string
 ): Promise<{ created: boolean; submission?: string }> {
-  const res = await cmd(['EVAL', RESERVE_SUBMISSION_CHALLENGE_LUA, 1, challengeKey, submissionJson, ttlSec]);
+  const args: Array<string | number> = [
+    'EVAL',
+    RESERVE_SUBMISSION_CHALLENGE_LUA,
+    indexSetKey ? 2 : 1,
+    challengeKey,
+  ];
+  if (indexSetKey) args.push(indexSetKey);
+  args.push(submissionJson, ttlSec);
+  if (indexMember) args.push(indexMember);
+
+  const res = await cmd(args);
   if (!res) return { created: false };
   try {
     return (typeof res === 'string' ? JSON.parse(res) : res) as { created: boolean; submission?: string };
   } catch {
     return { created: false };
   }
+}
+
+export const ADVANCE_SUBMISSION_RESERVATION_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ ok = false, reason = 'NOT_FOUND' }) end " +
+  "local r = cjson.decode(raw) " +
+  "local nowMs = tonumber(ARGV[2]) or 0 " +
+  "local newState = ARGV[1] " +
+  "r.state = newState " +
+  "r.updatedAt = nowMs " +
+  "if ARGV[3] and ARGV[3] ~= '' then " +
+  "  local ok, meta = pcall(cjson.decode, ARGV[3]) " +
+  "  if ok and type(meta) == 'table' then " +
+  "    if not r.recoveryMetadata then r.recoveryMetadata = {} end " +
+  "    for k, v in pairs(meta) do r.recoveryMetadata[k] = v end " +
+  "  end " +
+  "end " +
+  "local ttl = tonumber(ARGV[4]) or 604800 " +
+  "redis.call('set', KEYS[1], cjson.encode(r), 'EX', ttl) " +
+  "return cjson.encode({ ok = true, reservation = r })";
+
+export async function kvAdvanceSubmissionReservation(
+  challengeKey: string,
+  newState: string,
+  nowMs = Date.now(),
+  metadata?: Record<string, unknown>,
+  ttlSec = 604800
+): Promise<{ ok: boolean; reason?: string; reservation?: unknown }> {
+  const metaJson = metadata ? JSON.stringify(metadata) : '';
+  const res = await cmd([
+    'EVAL',
+    ADVANCE_SUBMISSION_RESERVATION_LUA,
+    1,
+    challengeKey,
+    newState,
+    nowMs,
+    metaJson,
+    ttlSec,
+  ]);
+  if (!res) return { ok: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as {
+      ok: boolean;
+      reason?: string;
+      reservation?: unknown;
+    };
+  } catch {
+    return { ok: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export async function kvScan(
+  cursor: string | number,
+  pattern: string,
+  count = 100
+): Promise<[string, string[]]> {
+  const res = (await cmd(['SCAN', cursor, 'MATCH', pattern, 'COUNT', count])) as [
+    string | number,
+    string[]
+  ];
+  if (!res || !Array.isArray(res)) return ['0', []];
+  return [String(res[0]), Array.isArray(res[1]) ? res[1] : []];
 }
 
 export const CLAIM_NOTIFICATION_DISPATCH_LUA =
