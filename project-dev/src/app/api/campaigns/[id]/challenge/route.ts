@@ -3,6 +3,7 @@ import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { loadCampaigns } from '@/server/campaigns-data';
 import { issueRaidChallenge } from '@/server/raid-challenges';
+import { getAuthSession } from '@/server/auth';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -13,7 +14,7 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  // Rate limit per IP: 30 challenge requests per 60s
+  // 1. Rate limit per IP: 30 challenge requests per 60s
   const ip = clientIp(req);
   const ipLimit = await rateLimit(`challenge-ip:${ip}`, 30, 60);
   if (!ipLimit.ok) {
@@ -48,7 +49,24 @@ export async function POST(
     );
   }
 
-  // Rate limit per wallet: 10 challenges per 60s
+  // 2. Authentication requirement: verified session must exist
+  const auth = await getAuthSession(req);
+  if (!auth || !auth.wallet) {
+    return NextResponse.json(
+      { ok: false, error: 'Authentication session required to issue a challenge' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  if (auth.wallet !== walletAddress) {
+    return NextResponse.json(
+      { ok: false, error: 'Requested wallet does not match authenticated session' },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+
+  // 3. Rate limit per authenticated wallet: 10 challenges per 60s
+  // Unauthenticated callers are rejected beforehand, preventing quota exhaustion
   const walletLimit = await rateLimit(`challenge-wallet:${walletAddress}`, 10, 60);
   if (!walletLimit.ok) {
     return NextResponse.json(
@@ -96,23 +114,23 @@ export async function POST(
         createdAt: challenge.createdAt,
         expiresAt: challenge.expiresAt,
         message: challenge.message,
+        authority: challenge.authority,
         challenge,
       },
       { status: 201, headers: NO_STORE }
     );
   } catch (err) {
-    console.error('[API /api/campaigns/[id]/challenge POST] Error:', err);
+    console.error('[API /api/campaigns/[id]/challenge POST] Storage error:', err);
     return NextResponse.json(
-      { ok: false, error: 'Challenge storage unavailable. Retry shortly.' },
-      { status: 502, headers: NO_STORE }
+      { ok: false, error: 'Authoritative storage unavailable. Retry shortly.' },
+      { status: 503, headers: NO_STORE }
     );
   }
 }
 
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  return POST(req, context);
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: 'Method Not Allowed. Use POST to request a challenge.' },
+    { status: 405, headers: { ...NO_STORE, Allow: 'POST' } }
+  );
 }
-

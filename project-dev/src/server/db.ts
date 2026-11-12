@@ -90,6 +90,7 @@ export interface RaidChallengeRow {
   expires_at: string;
   message: string;
   consumed_at: string | null;
+  authority?: 'redis' | 'db';
 }
 
 interface TrenchDatabaseSchema {
@@ -192,23 +193,84 @@ let inMemoryDb: TrenchDatabaseSchema = buildInitialSeed();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let dbLockChain = Promise.resolve();
 
+const DB_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'db.lock');
+
+async function acquireFileLock(): Promise<() => void> {
+  const maxWaitMs = 5000;
+  const start = Date.now();
+  const staleThresholdMs = 15000;
+
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const dataDir = path.dirname(DB_FILE_LOCK_PATH);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+
+      // 'wx' opens for writing exclusively, failing if path already exists (atomic OS kernel lock)
+      const fd = fs.openSync(DB_FILE_LOCK_PATH, 'wx');
+      try {
+        fs.writeSync(fd, `${process.pid}\n${Date.now()}`);
+      } catch {}
+
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        try {
+          fs.closeSync(fd);
+        } catch {}
+        try {
+          fs.unlinkSync(DB_FILE_LOCK_PATH);
+        } catch {}
+      };
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+        try {
+          const stats = fs.statSync(DB_FILE_LOCK_PATH);
+          if (Date.now() - stats.mtimeMs > staleThresholdMs) {
+            try {
+              fs.unlinkSync(DB_FILE_LOCK_PATH);
+            } catch {}
+          }
+        } catch {}
+        await sleep(20 + Math.floor(Math.random() * 30));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error('Database file lock acquisition timeout');
+}
+
 async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
   const run = dbLockChain.then(async () => {
     assertPersistence();
-    if (!KV_CONFIGURED) return fn();
-    const token = safeRandomUUID();
-    let acquired = false;
-    for (let i = 0; i < 20 && !acquired; i++) {
-      acquired = await kvLock(DB_LOCK_KEY, token, 30);
-      if (!acquired) await sleep(100);
+
+    if (KV_CONFIGURED) {
+      const token = safeRandomUUID();
+      let acquired = false;
+      for (let i = 0; i < 20 && !acquired; i++) {
+        acquired = await kvLock(DB_LOCK_KEY, token, 30);
+        if (!acquired) await sleep(100);
+      }
+      if (!acquired) throw new Error('Database busy, retry shortly');
+      try {
+        return await fn();
+      } finally {
+        await kvUnlock(DB_LOCK_KEY, token).catch(() => undefined);
+      }
     }
-    if (!acquired) throw new Error('Database busy, retry shortly');
+
+    // Cross-process OS file lock when Redis is not configured
+    const releaseFileLock = await acquireFileLock();
     try {
       return await fn();
     } finally {
-      await kvUnlock(DB_LOCK_KEY, token).catch(() => undefined);
+      releaseFileLock();
     }
   });
+
   dbLockChain = run.then(
     () => undefined,
     () => undefined
@@ -625,6 +687,7 @@ export async function createRaidChallengeRow(
 
     const row: RaidChallengeRow = {
       ...challenge,
+      authority: challenge.authority || 'db',
       consumed_at: null,
     };
     db.raid_challenges.push(row);

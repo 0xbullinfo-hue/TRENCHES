@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { submitCampaignCompletion } from '@/server/campaigns-data';
+import { submitCampaignCompletion, loadCampaigns } from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { verifySolanaSignature } from '@/server/auth';
 import { getRaidChallenge, consumeRaidChallenge } from '@/server/raid-challenges';
+import { getRaidChallengeRow } from '@/server/db';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -86,27 +87,58 @@ export async function POST(
     );
   }
 
-  // 1. Load the challenge from server storage
+  // 1. Verify campaign exists and is active
+  const campaigns = await loadCampaigns();
+  const campaign = campaigns.find((c) => c.id === id);
+  if (!campaign) {
+    return NextResponse.json(
+      { ok: false, error: 'Campaign not found' },
+      { status: 404, headers: NO_STORE }
+    );
+  }
+
+  if (campaign.status === 'PAUSED' || campaign.status === 'COMPLETED') {
+    return NextResponse.json(
+      { ok: false, error: `Campaign is currently ${campaign.status.toLowerCase()}` },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  if (campaign.expiresAt && new Date(campaign.expiresAt).getTime() <= Date.now()) {
+    return NextResponse.json(
+      { ok: false, error: 'Campaign has expired' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  // 2. Load the challenge from authoritative server storage
   let challenge;
   try {
     challenge = await getRaidChallenge(challengeId);
   } catch (err) {
     console.error('[API /api/campaigns/[id]/submit POST] Challenge storage lookup error:', err);
     return NextResponse.json(
-      { ok: false, error: 'Challenge storage unavailable. Retry shortly.' },
-      { status: 502, headers: NO_STORE }
+      { ok: false, error: 'Authoritative storage unavailable. Retry shortly.' },
+      { status: 503, headers: NO_STORE }
     );
   }
 
-  // 2. Verify existence
+  // 3. Verify existence
   if (!challenge) {
+    const existingRow = await getRaidChallengeRow(challengeId).catch(() => null);
+    if (existingRow && existingRow.consumed_at) {
+      return NextResponse.json(
+        { ok: false, error: 'Challenge has already been consumed or replayed.' },
+        { status: 409, headers: NO_STORE }
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: 'Unknown challenge ID or challenge already consumed.' },
+      { ok: false, error: 'Unknown challenge ID or challenge expired.' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // 3. Verify server-side expiration (never trust client-supplied expiry)
+  // 4. Verify server-side expiration (never trust client-supplied expiry)
   const now = Date.now();
   if (now > challenge.expiresAt) {
     return NextResponse.json(
@@ -115,23 +147,23 @@ export async function POST(
     );
   }
 
-  // 4. Verify campaign binding
+  // 5. Verify campaign binding (403 Forbidden on mismatch)
   if (challenge.campaignId !== id) {
     return NextResponse.json(
-      { ok: false, error: 'Challenge campaign mismatch.' },
-      { status: 401, headers: NO_STORE }
+      { ok: false, error: 'Challenge was not issued for this campaign.' },
+      { status: 403, headers: NO_STORE }
     );
   }
 
-  // 5. Verify wallet binding
+  // 6. Verify wallet binding (403 Forbidden on mismatch)
   if (challenge.walletAddress !== walletAddress) {
     return NextResponse.json(
-      { ok: false, error: 'Challenge wallet mismatch. Wrong wallet.' },
-      { status: 401, headers: NO_STORE }
+      { ok: false, error: 'Challenge was not issued for this wallet.' },
+      { status: 403, headers: NO_STORE }
     );
   }
 
-  // 6. Verify Ed25519 signature over exact server-issued challenge message
+  // 7. Verify Ed25519 signature over exact server-issued challenge message
   if (!verifySolanaSignature(challenge.walletAddress, signature, challenge.message)) {
     return NextResponse.json(
       { ok: false, error: 'Invalid challenge signature.' },
@@ -139,26 +171,26 @@ export async function POST(
     );
   }
 
-  // 7. Atomically consume the challenge (guarantees concurrent single-use replay protection)
+  // 8. Atomically consume the challenge in authoritative store (single-use replay protection)
   let consumed = false;
   try {
     consumed = await consumeRaidChallenge(challengeId);
   } catch (err) {
     console.error('[API /api/campaigns/[id]/submit POST] Atomic consume error:', err);
     return NextResponse.json(
-      { ok: false, error: 'Challenge storage unavailable during consumption. Retry shortly.' },
-      { status: 502, headers: NO_STORE }
+      { ok: false, error: 'Authoritative storage unavailable during consumption. Retry shortly.' },
+      { status: 503, headers: NO_STORE }
     );
   }
 
   if (!consumed) {
     return NextResponse.json(
       { ok: false, error: 'Challenge has already been consumed or replayed.' },
-      { status: 401, headers: NO_STORE }
+      { status: 409, headers: NO_STORE }
     );
   }
 
-  // 8. Continue the submission only after successful atomic consumption
+  // 9. Continue the submission only after successful authoritative atomic consumption
   const walletLimit = await rateLimit(`submit-camp:wallet:${walletAddress}`, 5, 60);
   if (!walletLimit.ok) {
     return NextResponse.json(

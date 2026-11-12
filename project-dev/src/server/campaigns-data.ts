@@ -224,6 +224,7 @@ export async function createCampaign(data: {
   durationHours?: number;
   postedBy: string;
   pinned?: boolean;
+  status?: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
 }): Promise<Campaign> {
   return withCampaignsLock(async () => {
     const campaigns = await loadCampaigns();
@@ -246,7 +247,7 @@ export async function createCampaign(data: {
       rewardToken: data.rewardToken?.trim() || '$GENESIS',
       totalPool: data.totalPool?.trim(),
       targetActions: data.targetActions && data.targetActions.length > 0 ? data.targetActions : ['Like', 'Retweet', 'Comment'],
-      status: 'ACTIVE',
+      status: data.status || 'ACTIVE',
       createdAt: new Date().toISOString(),
       expiresAt,
       durationHours,

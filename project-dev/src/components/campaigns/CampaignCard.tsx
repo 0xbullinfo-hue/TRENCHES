@@ -204,10 +204,46 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
       // Verify wallet ownership with server-generated cryptographic challenge signature
       if (activeSignMessage && wallet.publicKey && wallet.publicKey.toBase58() === cleanWallet) {
+        // Ensure active wallet session exists
+        let hasSession = false;
+        try {
+          const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+          if (sessionRes.ok) {
+            const sess = await sessionRes.json();
+            if (sess.wallet === cleanWallet) {
+              hasSession = true;
+            }
+          }
+        } catch {}
+
+        if (!hasSession) {
+          const ts = Date.now();
+          const sessionMsg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
+          const sessSigBytes = await activeSignMessage(new TextEncoder().encode(sessionMsg));
+          const sessSigHex = Array.from(sessSigBytes)
+            .map((b) => (b as number).toString(16).padStart(2, '0'))
+            .join('');
+
+          const authRes = await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              wallet: cleanWallet,
+              signature: sessSigHex,
+              timestamp: ts,
+            }),
+          });
+          if (!authRes.ok) {
+            throw new Error('Wallet session authentication failed. Please retry.');
+          }
+        }
+
         // 1. Request server-issued challenge
         const challengeRes = await fetch(`/api/campaigns/${campaign.id}/challenge`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ walletAddress: cleanWallet }),
         });
         const challengeData = await challengeRes.json();
@@ -237,6 +273,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       const res = await fetch(`/api/campaigns/${campaign.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           challengeId: activeChallengeId,
           walletAddress: cleanWallet,
