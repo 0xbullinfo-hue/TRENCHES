@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useGenesisBalance } from '@/context/GenesisContext';
+import { isBase58Address } from '@/lib/config';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   ExternalLink,
@@ -14,6 +16,9 @@ import {
   Check,
   Twitter,
   Pin,
+  Wallet,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 interface CampaignCardProps {
@@ -84,7 +89,17 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   onTogglePin,
 }) => {
   const wallet = useWallet();
-  const [walletInput, setWalletInput] = useState(userWallet || '');
+  const {
+    connected: genesisConnected,
+    publicKeyBase58,
+    needsSignature: genesisNeedsSignature,
+    verificationState,
+    connectWallet: openConnectWalletModal,
+    switchWallet: handleSwitchWallet,
+    requestUnlockSignature,
+  } = useGenesisBalance();
+
+  const [walletInput, setWalletInput] = useState(userWallet || publicKeyBase58 || '');
   const [xHandleInput, setXHandleInput] = useState('');
   const [retweetLinkInput, setRetweetLinkInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -133,20 +148,21 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     };
   }, [campaign.expiresAt, campaign.status]);
 
-  // Keep wallet input in sync if userWallet connects later
+  // Keep wallet input in sync if publicKeyBase58 or userWallet connects later
   useEffect(() => {
     let active = true;
-    if (userWallet) {
+    const activeWallet = publicKeyBase58 || userWallet;
+    if (activeWallet) {
       queueMicrotask(() => {
         if (active) {
-          setWalletInput((prev) => (!prev ? userWallet : prev));
+          setWalletInput((prev) => (!prev ? activeWallet : prev));
         }
       });
     }
     return () => {
       active = false;
     };
-  }, [userWallet]);
+  }, [userWallet, publicKeyBase58]);
 
   // Keep submission state synced if props refresh
   useEffect(() => {
@@ -163,6 +179,35 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     };
   }, [campaign.userSubmission]);
 
+  const activeAdapter = wallet.wallet?.adapter;
+  const activeSignMessage =
+    wallet.signMessage ||
+    (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
+      ? (activeAdapter as any).signMessage.bind(activeAdapter)
+      : null);
+
+  const cleanWallet = walletInput.trim();
+  const cleanHandle = xHandleInput.trim();
+  const cleanRetweet = retweetLinkInput.trim();
+
+  // Active connected wallet address (adapter public key takes precedence for live signing)
+  const connectedAddress = wallet.publicKey ? wallet.publicKey.toBase58() : publicKeyBase58;
+
+  // Determine Wallet Connection & Verification State (Sections 3.A & 3.B)
+  const isWalletConnected = Boolean(connectedAddress);
+  const isWalletMismatched = Boolean(
+    isWalletConnected && cleanWallet && connectedAddress && cleanWallet !== connectedAddress
+  );
+  const isSigningSupported = Boolean(activeSignMessage);
+  const isWalletAuthenticated = Boolean(
+    isWalletConnected &&
+    !isWalletMismatched &&
+    !genesisNeedsSignature &&
+    verificationState !== 'DISCONNECTED' &&
+    verificationState !== 'CONNECTED_UNVERIFIED' &&
+    verificationState !== 'VERIFICATION_FAILED'
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -173,14 +218,29 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const cleanWallet = walletInput.trim();
-    const cleanHandle = xHandleInput.trim();
-    const cleanRetweet = retweetLinkInput.trim();
+    // 1. Connection check
+    if (!isWalletConnected || !connectedAddress) {
+      setErrorMsg('Please connect your Solana wallet before submitting raid proof.');
+      return;
+    }
 
+    // 2. Address matching check
     if (!cleanWallet) {
       setErrorMsg('Please enter your Solana wallet address for the airdrop.');
       return;
     }
+    if (!isBase58Address(cleanWallet)) {
+      setErrorMsg('Invalid Solana wallet address format.');
+      return;
+    }
+    if (cleanWallet !== connectedAddress) {
+      setErrorMsg(
+        `Entered address does not match your connected wallet (${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}). Use connected address or switch wallets.`
+      );
+      return;
+    }
+
+    // 3. Field validation
     if (!cleanHandle) {
       setErrorMsg('Please enter your @X (Twitter) handle.');
       return;
@@ -189,87 +249,129 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       setErrorMsg('Please paste the URL link to your retweet/quote.');
       return;
     }
+    if (!/https?:\/\/(www\.)?(twitter\.com|x\.com)\/[a-zA-Z0-9_]{1,15}\/status\/[0-9]+/i.test(cleanRetweet)) {
+      setErrorMsg('Invalid X / Twitter retweet URL. Must be a valid link on x.com or twitter.com.');
+      return;
+    }
+
+    // 4. Signing support check
+    if (!activeSignMessage) {
+      setErrorMsg(
+        'Connected wallet does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.'
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
-      let signatureHex: string | undefined;
-      let activeChallengeId: string | undefined;
-
-      const activeAdapter = wallet.wallet?.adapter;
-      const activeSignMessage =
-        wallet.signMessage ||
-        (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
-          ? (activeAdapter as any).signMessage.bind(activeAdapter)
-          : null);
-
-      // Verify wallet ownership with server-generated cryptographic challenge signature
-      if (activeSignMessage && wallet.publicKey && wallet.publicKey.toBase58() === cleanWallet) {
-        // Ensure active wallet session exists
-        let hasSession = false;
-        try {
-          const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
-          if (sessionRes.ok) {
-            const sess = await sessionRes.json();
-            if (sess.wallet === cleanWallet) {
-              hasSession = true;
-            }
-          }
-        } catch {}
-
-        if (!hasSession) {
-          const ts = Date.now();
-          const sessionMsg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
-          const sessSigBytes = await activeSignMessage(new TextEncoder().encode(sessionMsg));
-          const sessSigHex = Array.from(sessSigBytes)
-            .map((b) => (b as number).toString(16).padStart(2, '0'))
-            .join('');
-
-          const authRes = await fetch('/api/auth/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              wallet: cleanWallet,
-              signature: sessSigHex,
-              timestamp: ts,
-            }),
-          });
-          if (!authRes.ok) {
-            throw new Error('Wallet session authentication failed. Please retry.');
+      // Step A: Ensure active server authentication session exists
+      let hasSession = false;
+      try {
+        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+        if (sessionRes.ok) {
+          const sess = await sessionRes.json();
+          if (sess.wallet === cleanWallet) {
+            hasSession = true;
           }
         }
+      } catch {
+        // ignore probe error
+      }
 
-        // 1. Request server-issued challenge
-        const challengeRes = await fetch(`/api/campaigns/${campaign.id}/challenge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ walletAddress: cleanWallet }),
-        });
-        const challengeData = await challengeRes.json();
-        if (!challengeRes.ok || !challengeData.ok || !challengeData.challengeId || !challengeData.message) {
-          throw new Error(challengeData.error || 'Failed to request raid verification challenge.');
-        }
-
-        activeChallengeId = challengeData.challengeId;
-
-        // 2. Sign exact server challenge message
+      if (!hasSession) {
+        // Authenticate session via wallet signature
+        const ts = Date.now();
+        const sessionMsg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
+        let sessSigBytes: Uint8Array;
         try {
-          const sigBytes = await activeSignMessage(new TextEncoder().encode(challengeData.message));
-          signatureHex = Array.from(sigBytes)
-            .map((b) => (b as number).toString(16).padStart(2, '0'))
-            .join('');
-        } catch (signErr) {
-          const signErrMsg = (signErr as Error)?.message || '';
-          if (/user rejected|window closed|cancelled|canceled|denied/i.test(signErrMsg)) {
-            setErrorMsg('Signature cancelled. Wallet verification is required to submit.');
+          sessSigBytes = await activeSignMessage(new TextEncoder().encode(sessionMsg));
+        } catch (sessSignErr) {
+          const errMsg = (sessSignErr as Error)?.message || '';
+          if (/user rejected|window closed|cancelled|canceled|denied/i.test(errMsg)) {
+            setErrorMsg('Session signature rejected. Wallet authentication is required to participate.');
             setSubmitting(false);
             return;
           }
-          throw signErr;
+          throw new Error('Failed to sign authentication session message.');
+        }
+
+        const sessSigHex = Array.from(sessSigBytes)
+          .map((b) => (b as number).toString(16).padStart(2, '0'))
+          .join('');
+
+        const authRes = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            wallet: cleanWallet,
+            signature: sessSigHex,
+            timestamp: ts,
+          }),
+        });
+
+        if (!authRes.ok) {
+          const authData = await authRes.json().catch(() => null);
+          throw new Error(authData?.error || 'Wallet session authentication failed. Please retry.');
         }
       }
 
+      // Step B: Verify wallet connection before issuing challenge (prevent disconnect mid-flight)
+      if (!wallet.publicKey && !publicKeyBase58) {
+        setErrorMsg('Wallet disconnected during submission. Please reconnect.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Step C: Request server-issued challenge
+      const challengeRes = await fetch(`/api/campaigns/${campaign.id}/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ walletAddress: cleanWallet }),
+      });
+
+      const challengeData = await challengeRes.json();
+      if (!challengeRes.ok || !challengeData.ok || !challengeData.challengeId || !challengeData.message) {
+        throw new Error(challengeData.error || 'Failed to request raid verification challenge.');
+      }
+
+      // Bound validation: verify returned challenge belongs to campaign and wallet
+      if (challengeData.campaignId && challengeData.campaignId !== campaign.id) {
+        throw new Error('Challenge campaign mismatch. Please retry.');
+      }
+      if (challengeData.walletAddress && challengeData.walletAddress !== cleanWallet) {
+        throw new Error('Challenge wallet mismatch. Please retry.');
+      }
+
+      const activeChallengeId = challengeData.challengeId;
+
+      // Step D: Sign exact server challenge message
+      let signatureHex: string;
+      try {
+        const sigBytes = await activeSignMessage(new TextEncoder().encode(challengeData.message));
+        signatureHex = Array.from(sigBytes)
+          .map((b) => (b as number).toString(16).padStart(2, '0'))
+          .join('');
+      } catch (signErr) {
+        const signErrMsg = (signErr as Error)?.message || '';
+        if (/user rejected|window closed|cancelled|canceled|denied/i.test(signErrMsg)) {
+          setErrorMsg('Challenge signature rejected. Cryptographic proof is required to submit.');
+          setSubmitting(false);
+          return;
+        }
+        throw new Error(signErrMsg || 'Failed to sign raid verification challenge.');
+      }
+
+      // Step E: Verify wallet connection remains intact right before submission dispatch
+      const currentPubkey = wallet.publicKey ? wallet.publicKey.toBase58() : publicKeyBase58;
+      if (!currentPubkey || currentPubkey !== cleanWallet) {
+        setErrorMsg('Wallet disconnected or switched during signing. Submission aborted.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Step F: Submit raid proof to server
       const res = await fetch(`/api/campaigns/${campaign.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -553,6 +655,86 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               <span className="text-muted font-normal text-[10px]">Open to All Wallets</span>
             </div>
 
+            {/* Wallet Verification State Indicator & Banner (Section 3.A & 3.B) */}
+            {!isWalletConnected ? (
+              <div className="p-2.5 rounded-lg bg-surface-card border border-border-default space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs font-sans">
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <Wallet className="w-3.5 h-3.5 text-raid-primary" />
+                    <span>No wallet connected</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={openConnectWalletModal}
+                    className="px-2.5 py-1 rounded bg-raid-strong hover:bg-raid-primary text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    Connect Wallet
+                  </button>
+                </div>
+                <p className="text-[10px] font-sans text-dim">
+                  Connect your Solana wallet to sign verification proof and receive your $GENESIS airdrop.
+                </p>
+              </div>
+            ) : !isSigningSupported ? (
+              <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/30 space-y-1">
+                <div className="flex items-center gap-1.5 text-danger font-sans text-xs font-bold">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Wallet signing unavailable</span>
+                </div>
+                <p className="text-[10px] font-sans text-danger/80">
+                  Your connected wallet or browser adapter does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.
+                </p>
+              </div>
+            ) : isWalletMismatched ? (
+              <div className="p-2.5 rounded-lg bg-amber/10 border border-amber/30 space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs font-sans">
+                  <span className="flex items-center gap-1.5 text-amber font-bold">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Wallet Address Mismatch</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setWalletInput(connectedAddress || '')}
+                    className="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-amber/40 text-amber font-mono text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Use Connected
+                  </button>
+                </div>
+                <p className="text-[10px] font-sans text-muted">
+                  Entered address differs from connected wallet ({connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}). Submissions must be signed by the receiving address.
+                </p>
+              </div>
+            ) : !isWalletAuthenticated ? (
+              <div className="p-2.5 rounded-lg bg-surface-card border border-border-default space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs font-sans">
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber" />
+                    <span>Wallet connected · Needs session</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => requestUnlockSignature()}
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-border-default text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    Authenticate
+                  </button>
+                </div>
+                <p className="text-[10px] font-sans text-dim">
+                  A quick one-click wallet signature authenticates your session prior to challenge submission.
+                </p>
+              </div>
+            ) : (
+              <div className="p-2 rounded-md bg-toxic-bg/30 border border-toxic-border/50 flex items-center justify-between gap-2 text-[11px] font-sans">
+                <span className="flex items-center gap-1.5 text-toxic font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-toxic shrink-0" />
+                  <span>Wallet Authenticated &amp; Ready</span>
+                </span>
+                <span className="font-mono text-[10px] text-muted">
+                  {connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}
+                </span>
+              </div>
+            )}
+
             {errorMsg && (
               <div className="p-2 rounded-md bg-danger/10 border border-danger/30 text-danger text-[11px] font-sans flex items-start gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -569,14 +751,31 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
             <div className="space-y-2">
               <div>
-                <label className="sr-only" htmlFor={`wallet-${campaign.id}`}>Solana Wallet Address</label>
+                <div className="flex items-center justify-between pb-1">
+                  <label className="text-[10px] font-mono text-muted uppercase font-bold" htmlFor={`wallet-${campaign.id}`}>
+                    Solana Wallet Address
+                  </label>
+                  {isWalletConnected && (
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchWallet?.()}
+                      className="text-[10px] font-mono text-raid-primary hover:underline cursor-pointer"
+                    >
+                      Switch Wallet
+                    </button>
+                  )}
+                </div>
                 <input
                   id={`wallet-${campaign.id}`}
                   type="text"
                   value={walletInput}
                   onChange={(e) => setWalletInput(e.target.value)}
                   placeholder="Your Solana wallet address..."
-                  className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  className={`w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border ${
+                    isWalletMismatched
+                      ? 'border-amber/60 focus:border-amber text-amber'
+                      : 'border-border-default focus:border-raid-primary text-white'
+                  } font-mono text-xs placeholder:text-dim focus:outline-none`}
                 />
               </div>
 
@@ -608,11 +807,43 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full h-11 min-h-[44px] px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50"
+              disabled={
+                submitting ||
+                !isWalletConnected ||
+                !isSigningSupported ||
+                isWalletMismatched ||
+                !cleanWallet ||
+                !cleanHandle ||
+                !cleanRetweet
+              }
+              className="w-full h-11 min-h-[44px] px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>{submitting ? 'Submitting Proof...' : 'Claim Raid Airdrop'}</span>
+              {submitting ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Submitting Proof...</span>
+                </>
+              ) : !isWalletConnected ? (
+                <>
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span>Connect Wallet to Submit</span>
+                </>
+              ) : !isSigningSupported ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Signing Unsupported</span>
+                </>
+              ) : isWalletMismatched ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber" />
+                  <span>Wallet Address Mismatch</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Claim Raid Airdrop</span>
+                </>
+              )}
             </button>
           </form>
         )}
