@@ -193,9 +193,19 @@ let inMemoryDb: TrenchDatabaseSchema = buildInitialSeed();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let dbLockChain = Promise.resolve();
 
-const DB_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'db.lock');
+export const DB_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'db.lock');
 
-async function acquireFileLock(): Promise<() => void> {
+export function isPidDead(pid: number): boolean {
+  if (typeof pid !== 'number' || pid <= 0 || !Number.isInteger(pid)) return false;
+  try {
+    process.kill(pid, 0);
+    return false; // Process exists in OS process table
+  } catch (err: unknown) {
+    return (err as NodeJS.ErrnoException).code === 'ESRCH'; // Definitively dead / terminated
+  }
+}
+
+export async function acquireFileLock(): Promise<() => void> {
   const maxWaitMs = 5000;
   const start = Date.now();
   const lockToken = safeRandomUUID();
@@ -227,16 +237,39 @@ async function acquireFileLock(): Promise<() => void> {
           // Verify ownership before unlinking: never delete another process's lock
           if (fs.existsSync(DB_FILE_LOCK_PATH)) {
             const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
-            if (raw.includes(lockToken)) {
-              fs.unlinkSync(DB_FILE_LOCK_PATH);
+            try {
+              const data = JSON.parse(raw);
+              if (data?.token === lockToken) {
+                fs.unlinkSync(DB_FILE_LOCK_PATH);
+              }
+            } catch {
+              if (raw.includes(lockToken)) {
+                fs.unlinkSync(DB_FILE_LOCK_PATH);
+              }
             }
           }
         } catch {}
       };
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-        // Active lock held by another process: wait for cooperative release.
-        // MANDATORY RULE (V2.3 Issue A): Never delete another process's active lock merely based on age.
+        // Safe lock recovery: check if the holding process crashed or was terminated
+        try {
+          if (fs.existsSync(DB_FILE_LOCK_PATH)) {
+            const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+            const data = JSON.parse(raw);
+            if (data && typeof data.pid === 'number' && isPidDead(data.pid)) {
+              // The process that created this lock is definitively dead (ESRCH).
+              // Safe recovery without age-based heuristic deletion.
+              try {
+                fs.unlinkSync(DB_FILE_LOCK_PATH);
+              } catch {}
+              continue;
+            }
+          }
+        } catch {}
+
+        // Active lock held by a live process: wait cooperatively.
+        // MANDATORY RULE: Never delete a live process's lock.
         await sleep(20 + Math.floor(Math.random() * 30));
       } else {
         throw err;
@@ -729,6 +762,21 @@ export async function consumeRaidChallengeRow(
     if (row.consumed_at) return false;
     if (new Date(row.expires_at).getTime() <= Date.now()) return false;
     row.consumed_at = new Date().toISOString();
+    await saveDb(db);
+    return true;
+  });
+}
+
+export async function rollbackRaidChallengeRow(
+  challengeId: string
+): Promise<boolean> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.raid_challenges)) return false;
+    const row = db.raid_challenges.find((c) => c.challenge_id === challengeId);
+    if (!row || !row.consumed_at) return false;
+    if (new Date(row.expires_at).getTime() <= Date.now()) return false;
+    row.consumed_at = null;
     await saveDb(db);
     return true;
   });

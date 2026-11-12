@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { submitCampaignCompletion, loadCampaigns } from '@/server/campaigns-data';
+import {
+  submitCampaignCompletion,
+  loadCampaigns,
+  loadSubmissions,
+  isValidXUrl,
+} from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { verifySolanaSignature } from '@/server/auth';
 import {
   getRaidChallengeState,
   consumeRaidChallengeOutcome,
+  finalizeRaidChallengeTombstone,
+  rollbackRaidChallenge,
 } from '@/server/raid-challenges';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +78,13 @@ export async function POST(
   if (!xRetweetLink) {
     return NextResponse.json(
       { ok: false, error: 'X Retweet or Quote link is required' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  if (!isValidXUrl(xRetweetLink)) {
+    return NextResponse.json(
+      { ok: false, error: 'Invalid X / Twitter retweet URL. Must be a valid link on x.com or twitter.com.' },
       { status: 400, headers: NO_STORE }
     );
   }
@@ -182,6 +196,27 @@ export async function POST(
     );
   }
 
+  // Preliminary check: Wallet rate limit (check before consumption to prevent burning challenge)
+  const walletLimit = await rateLimit(`submit-camp:wallet:${walletAddress}`, 5, 60);
+  if (!walletLimit.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many submissions from this wallet. Please wait.' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(walletLimit.retryAfter) } }
+    );
+  }
+
+  // Preliminary check: Duplicate campaign submission check (check before consumption to prevent burning challenge)
+  const allSubmissions = await loadSubmissions();
+  const alreadySubmitted = allSubmissions.some(
+    (s) => s.campaignId === id && s.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+  );
+  if (alreadySubmitted) {
+    return NextResponse.json(
+      { ok: false, error: 'This wallet has already submitted proof for this campaign' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
   // 8. Atomically consume the challenge in authoritative store (single-use replay protection)
   let consumeOutcome;
   try {
@@ -207,27 +242,38 @@ export async function POST(
     );
   }
 
-  // 9. Continue the submission only after successful authoritative atomic consumption
-  const walletLimit = await rateLimit(`submit-camp:wallet:${walletAddress}`, 5, 60);
-  if (!walletLimit.ok) {
+  // 9. Persist the submission completion
+  let result;
+  try {
+    result = await submitCampaignCompletion({
+      campaignId: id,
+      walletAddress,
+      xHandle,
+      xRetweetLink,
+    });
+  } catch (err) {
+    console.error('[API /api/campaigns/[id]/submit POST] Submission persistence error, rolling back challenge:', err);
+    await rollbackRaidChallenge(challengeId, challenge);
     return NextResponse.json(
-      { ok: false, error: 'Too many submissions from this wallet. Please wait.' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(walletLimit.retryAfter) } }
+      { ok: false, error: 'Storage failure during submission persistence. Challenge restored, please retry.' },
+      { status: 503, headers: NO_STORE }
     );
   }
 
-  const result = await submitCampaignCompletion({
-    campaignId: id,
-    walletAddress,
-    xHandle,
-    xRetweetLink,
-  });
-
-  if (!result.ok) {
+  if (!result.ok || !result.submission) {
+    console.error('[API /api/campaigns/[id]/submit POST] submitCampaignCompletion returned error, rolling back challenge:', result.error);
+    await rollbackRaidChallenge(challengeId, challenge);
     return NextResponse.json(
       { ok: false, error: result.error || 'Failed to submit campaign proof' },
       { status: 400, headers: NO_STORE }
     );
+  }
+
+  // 10. Finalize tombstone with persisted submissionId for idempotent retries
+  try {
+    await finalizeRaidChallengeTombstone(challengeId, result.submission.id);
+  } catch (tombstoneErr) {
+    console.warn('[API /api/campaigns/[id]/submit POST] Failed to finalize tombstone with submissionId:', tombstoneErr);
   }
 
   return NextResponse.json(

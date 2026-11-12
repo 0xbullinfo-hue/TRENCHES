@@ -93,9 +93,38 @@ globalThis.fetch = async (url, options) => {
     }
 
     if (cmd === 'EVAL') {
-      // Upgraded atomic Lua consumption script simulation with deterministic tombstones
+      const script = String(args[1]);
       const key = String(args[3] ?? args[2]);
       const val = mockRedisStore.get(key);
+
+      // Finalize tombstone script
+      if (script.includes('submissionId')) {
+        if (!val) return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed.status === 'consumed') {
+            parsed.submissionId = String(args[4]);
+            mockRedisStore.set(key, JSON.stringify(parsed));
+            return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+        } catch {}
+        return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // Rollback challenge script
+      if (script.includes('tonumber(ARGV[2])') && script.includes('del')) {
+        if (!val) return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed.status === 'consumed') {
+            mockRedisStore.set(key, String(args[4]));
+            return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+        } catch {}
+        return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // Consume challenge script
       if (!val) {
         return new Response(JSON.stringify({ result: 0 }), {
           status: 200,
@@ -134,13 +163,23 @@ import { GET as getAlphas } from '../../src/app/api/alphas/route.ts';
 // Actual shared auth & server utilities
 import { signSession, SESSION_COOKIE_NAME } from '../../src/server/auth.ts';
 import { createCampaign, deleteCampaign } from '../../src/server/campaigns-data.ts';
+import fs from 'fs';
 import { resolveWalletEntitlement, evaluateWalletDowngrade } from '../../src/server/entitlements.ts';
-import { issueRaidChallenge, getRaidChallenge, consumeRaidChallenge } from '../../src/server/raid-challenges.ts';
+import {
+  issueRaidChallenge,
+  getRaidChallenge,
+  consumeRaidChallenge,
+  getRaidChallengeState,
+  rollbackRaidChallenge,
+} from '../../src/server/raid-challenges.ts';
 import {
   consumeRaidChallengeRow,
   createRaidChallengeRow,
   getRaidChallengeRow,
   __setTestFailCreateRaidChallengeRow,
+  isPidDead,
+  acquireFileLock,
+  DB_FILE_LOCK_PATH,
 } from '../../src/server/db.ts';
 
 function signEd25519(keypair, message) {
@@ -1369,4 +1408,201 @@ test('Wallet isolation [3/3]: Legacy Watchlist migration occurs only once', () =
   assert.equal(legacyForB, undefined); // Cannot be migrated a second time
   const walletBData = mockStorage.get(getWatchlistKey(walletB));
   assert.equal(walletBData, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// 5. V2.4 STRICT RELIABILITY & HARDENED LOCKS GUARANTEES
+// ---------------------------------------------------------------------------
+test('V2.4 Guarantee 1: Preliminary check failure (invalid signature) does NOT consume challenge', async () => {
+  const camp = await createTestCampaign({ title: 'Preliminary Check Protection Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const wrongSig = '00'.repeat(64); // bad signature
+
+    const reqBad = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@test_handle',
+        xRetweetLink: 'https://x.com/test_handle/status/111',
+        signature: wrongSig,
+      }),
+    });
+
+    const resBad = await submitCampaign(reqBad, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(resBad.status, 401);
+
+    // Verify challenge state is still ACTIVE (not consumed)
+    const stateAfter = await getRaidChallengeState(ch.challengeId);
+    assert.equal(stateAfter.status, 'ACTIVE', 'Challenge must NOT be consumed by rejected preliminary check');
+
+    // Valid submission with correct signature now succeeds
+    const goodSig = signEd25519(kp, ch.message);
+    const reqGood = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@test_handle',
+        xRetweetLink: 'https://x.com/test_handle/status/111',
+        signature: goodSig,
+      }),
+    });
+
+    const resGood = await submitCampaign(reqGood, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(resGood.status, 201, 'Subsequent valid submission using unconsumed challenge must succeed');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.4 Guarantee 1: Preliminary check failure (duplicate wallet) does NOT consume challenge', async () => {
+  const camp = await createTestCampaign({ title: 'Preliminary Duplicate Check Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    // 1. Initial valid submission
+    const ch1 = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig1 = signEd25519(kp, ch1.message);
+
+    const req1 = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch1.challengeId,
+        walletAddress: wallet,
+        xHandle: '@user_duplicate',
+        xRetweetLink: 'https://x.com/user_duplicate/status/111',
+        signature: sig1,
+      }),
+    });
+    const res1 = await submitCampaign(req1, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res1.status, 201);
+
+    // 2. Second challenge issued for same wallet
+    const ch2 = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig2 = signEd25519(kp, ch2.message);
+
+    const req2 = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch2.challengeId,
+        walletAddress: wallet,
+        xHandle: '@user_duplicate',
+        xRetweetLink: 'https://x.com/user_duplicate/status/222',
+        signature: sig2,
+      }),
+    });
+    const res2 = await submitCampaign(req2, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res2.status, 400);
+    const json2 = await res2.json();
+    assert.match(json2.error, /already submitted proof/i);
+
+    // Verify ch2 was NOT consumed because preliminary duplicate check stopped it before consume
+    const state2 = await getRaidChallengeState(ch2.challengeId);
+    assert.equal(state2.status, 'ACTIVE', 'Duplicate wallet preliminary check must not burn challenge');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.4 Guarantee 2: Transient persistence failure triggers rollback so legitimate submission is not lost', async () => {
+  const camp = await createTestCampaign({ title: 'Rollback Recovery Test' });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig = signEd25519(kp, ch.message);
+
+    // Consume challenge
+    const consumeRes = await consumeRaidChallenge(ch.challengeId);
+    assert.equal(consumeRes, true);
+
+    const stateConsumed = await getRaidChallengeState(ch.challengeId);
+    assert.equal(stateConsumed.status, 'CONSUMED');
+
+    // Rollback challenge (simulating rollback on transient persistence failure)
+    const rolledBack = await rollbackRaidChallenge(ch.challengeId, ch);
+    assert.equal(rolledBack, true, 'Rollback must successfully revert consumed state');
+
+    // Verify challenge is active again
+    const stateRestored = await getRaidChallengeState(ch.challengeId);
+    assert.equal(stateRestored.status, 'ACTIVE', 'Challenge must be restored to ACTIVE state');
+
+    // User retry now succeeds
+    const reqRetry = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@retry_user',
+        xRetweetLink: 'https://x.com/retry_user/status/333',
+        signature: sig,
+      }),
+    });
+    const resRetry = await submitCampaign(reqRetry, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(resRetry.status, 201, 'Retrying submission after rollback must succeed');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.4 Guarantee 7 & 8: File-lock ownership verification and dead PID recovery (no age heuristic)', async () => {
+  // Test PID liveness
+  assert.equal(isPidDead(process.pid), false, 'Current process PID must be reported as alive');
+  assert.equal(isPidDead(99999999), true, 'Non-existent PID 99999999 must be reported as dead (ESRCH)');
+
+  // Ensure clean lock path
+  try {
+    if (fs.existsSync(DB_FILE_LOCK_PATH)) {
+      fs.unlinkSync(DB_FILE_LOCK_PATH);
+    }
+  } catch {}
+
+  // 1. Acquire lock normally
+  const releaseLock = await acquireFileLock();
+  assert.ok(fs.existsSync(DB_FILE_LOCK_PATH), 'Lock file must exist when acquired');
+
+  // Verify another attempt cannot steal or overwrite active lock
+  let lockStolen = false;
+  try {
+    const fdSecond = fs.openSync(DB_FILE_LOCK_PATH, 'wx');
+    fs.closeSync(fdSecond);
+    lockStolen = true;
+  } catch (err) {
+    assert.equal(err.code, 'EEXIST', 'Active lock cannot be overwritten by another caller');
+  }
+  assert.equal(lockStolen, false);
+
+  // Release lock safely
+  releaseLock();
+  assert.equal(fs.existsSync(DB_FILE_LOCK_PATH), false, 'Lock file must be unlinked on safe release');
+
+  // 2. Simulate crashed dead process that left a lock file
+  const deadPid = 99999998;
+  fs.writeFileSync(
+    DB_FILE_LOCK_PATH,
+    JSON.stringify({ pid: deadPid, token: 'dead-lock-token', createdAt: Date.now() - 500 }) // only 500ms old, NOT stale by age
+  );
+
+  // New acquireFileLock call should detect dead PID (ESRCH) and safely recover without age threshold
+  const recoveredRelease = await acquireFileLock();
+  assert.ok(fs.existsSync(DB_FILE_LOCK_PATH), 'Lock must be acquired after dead PID recovery');
+
+  // Verify the new lock contains current PID
+  const lockContent = JSON.parse(fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8'));
+  assert.equal(lockContent.pid, process.pid, 'Recovered lock must belong to current process');
+
+  recoveredRelease();
+  assert.equal(fs.existsSync(DB_FILE_LOCK_PATH), false, 'Recovered lock must unlink cleanly on release');
 });

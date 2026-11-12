@@ -1,9 +1,18 @@
 import crypto from 'crypto';
-import { KV_CONFIGURED, isKvConfigured, kvGet, kvSetEx, kvConsumeChallenge } from '@/server/kv';
+import {
+  KV_CONFIGURED,
+  isKvConfigured,
+  kvGet,
+  kvSetEx,
+  kvConsumeChallenge,
+  kvFinalizeChallengeTombstone,
+  kvRollbackChallenge,
+} from '@/server/kv';
 import {
   createRaidChallengeRow,
   getRaidChallengeRow,
   consumeRaidChallengeRow,
+  rollbackRaidChallengeRow,
 } from '@/server/db';
 import { isBase58Address } from '@/lib/config';
 
@@ -118,7 +127,7 @@ export async function issueRaidChallenge(params: {
 
 export type RaidChallengeState =
   | { status: 'ACTIVE'; challenge: RaidChallenge }
-  | { status: 'CONSUMED'; consumedAt?: number }
+  | { status: 'CONSUMED'; consumedAt?: number; submissionId?: string }
   | { status: 'EXPIRED' }
   | { status: 'NOT_FOUND' };
 
@@ -151,7 +160,7 @@ export async function getRaidChallengeState(challengeId: string): Promise<RaidCh
       try {
         const parsed = JSON.parse(raw);
         if (parsed.status === 'consumed') {
-          return { status: 'CONSUMED', consumedAt: parsed.consumedAt };
+          return { status: 'CONSUMED', consumedAt: parsed.consumedAt, submissionId: parsed.submissionId };
         }
         if (Date.now() > parsed.expiresAt) {
           return { status: 'EXPIRED' };
@@ -331,4 +340,48 @@ export async function consumeRaidChallengeOutcome(
 export async function consumeRaidChallenge(challengeId: string): Promise<boolean> {
   const outcome = await consumeRaidChallengeOutcome(challengeId);
   return outcome.success;
+}
+
+/**
+ * Finalizes the consumed tombstone with the persisted submissionId.
+ */
+export async function finalizeRaidChallengeTombstone(
+  challengeId: string,
+  submissionId: string
+): Promise<void> {
+  if (!challengeId || !submissionId) return;
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    await kvFinalizeChallengeTombstone(key, submissionId).catch((err) => {
+      console.warn('[RaidChallenge] Failed to finalize tombstone with submissionId in Redis:', err);
+    });
+  }
+}
+
+/**
+ * Rolls back a consumed challenge in authoritative storage when submission persistence fails.
+ * Guarantees a transient storage error does not permanently destroy a legitimate user submission.
+ */
+export async function rollbackRaidChallenge(
+  challengeId: string,
+  challenge: RaidChallenge
+): Promise<boolean> {
+  if (!challengeId || !challenge) return false;
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    const remainingMs = challenge.expiresAt - Date.now();
+    if (remainingMs <= 0) return false;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    try {
+      return await kvRollbackChallenge(key, JSON.stringify(challenge), remainingSec);
+    } catch (err) {
+      console.error('[RaidChallenge] Rollback error in Redis:', err);
+      return false;
+    }
+  }
+
+  // Database-authoritative mode rollback
+  return await rollbackRaidChallengeRow(challengeId);
 }

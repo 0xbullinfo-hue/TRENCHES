@@ -168,6 +168,62 @@ export async function kvConsumeChallenge(
   return 'NOT_FOUND';
 }
 
+export const FINALIZE_CHALLENGE_TOMBSTONE_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return 0 end " +
+  "if string.find(raw, '\"status\":\"consumed\"') then " +
+  "  local nowMs = tonumber(ARGV[3]) or 0 " +
+  "  local finalTombstone = '{\"status\":\"consumed\",\"consumedAt\":' .. nowMs .. ',\"submissionId\":\"' .. ARGV[1] .. '\"}' " +
+  "  local ttl = redis.call('ttl', KEYS[1]) " +
+  "  local tombstoneTtl = ttl " +
+  "  local minRetention = tonumber(ARGV[2]) or 120 " +
+  "  if not tombstoneTtl or tombstoneTtl < minRetention then tombstoneTtl = minRetention end " +
+  "  redis.call('set', KEYS[1], finalTombstone, 'EX', tombstoneTtl) " +
+  "  return 1 " +
+  "end " +
+  "return 0";
+
+export const ROLLBACK_CHALLENGE_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if raw and string.find(raw, '\"status\":\"consumed\"') then " +
+  "  local ttl = tonumber(ARGV[2]) " +
+  "  if ttl and ttl > 0 then " +
+  "    redis.call('set', KEYS[1], ARGV[1], 'EX', ttl) " +
+  "    return 1 " +
+  "  else " +
+  "    redis.call('del', KEYS[1]) " +
+  "    return 1 " +
+  "  end " +
+  "end " +
+  "return 0";
+
+/**
+ * Atomically binds a completed submission ID to the challenge tombstone in Redis.
+ * Enables idempotent replay recovery where a retried request can return the existing submission.
+ */
+export async function kvFinalizeChallengeTombstone(
+  key: string,
+  submissionId: string,
+  minRetentionSec = 120,
+  nowMs = Date.now()
+): Promise<boolean> {
+  const res = await cmd(['EVAL', FINALIZE_CHALLENGE_TOMBSTONE_LUA, 1, key, submissionId, minRetentionSec, nowMs]);
+  return Number(res) === 1;
+}
+
+/**
+ * Atomically rolls back a consumed challenge to its original unconsumed state if persistence fails.
+ * Guarantees that legitimate submissions are not permanently lost due to downstream transient persistence outages.
+ */
+export async function kvRollbackChallenge(
+  key: string,
+  originalChallengeJson: string,
+  remainingTtlSec: number
+): Promise<boolean> {
+  const res = await cmd(['EVAL', ROLLBACK_CHALLENGE_LUA, 1, key, originalChallengeJson, remainingTtlSec]);
+  return Number(res) === 1;
+}
+
 export async function kvHGet(key: string, field: string): Promise<string | null> {
   return ((await cmd(['HGET', key, field])) as string | null) ?? null;
 }
