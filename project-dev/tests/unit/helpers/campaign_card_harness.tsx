@@ -2,6 +2,7 @@ import React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
 import { WalletContext, type WalletContextState } from '@solana/wallet-adapter-react';
+export { WalletContext };
 import { GenesisContext, type GenesisContextValue } from '../../../src/context/GenesisContext';
 import { CampaignCard } from '../../../src/components/campaigns/CampaignCard';
 import type { Campaign, CampaignSubmission } from '../../../src/lib/types';

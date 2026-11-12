@@ -205,9 +205,15 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <div className="font-sans text-xs text-muted mt-0.5 flex flex-wrap items-center gap-2">
                     <span>Caller: {token.caller}</span>
                     <span>•</span>
-                    <span className="text-pump-pill font-semibold">
-                      {token.callerWinRate}
-                    </span>
+                    {isWatchlist ? (
+                      <span className="text-sky-400 font-semibold">
+                        Research Coverage
+                      </span>
+                    ) : (
+                      <span className="text-pump-pill font-semibold">
+                        {token.callerWinRate}
+                      </span>
+                    )}
                     <span>•</span>
                     <span>Posted: {token.age}</span>
                   </div>

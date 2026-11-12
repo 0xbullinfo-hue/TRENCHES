@@ -32,6 +32,9 @@ function makeItem(overrides = {}) {
     riskRewardRatio: '1:5',
     stopLoss: '$80K',
     summary: 'Early ecosystem accumulation and developer activity.',
+    caller: 'AlphaAnalyst',
+    callerWinRate: '84% Win Rate',
+    age: '2h ago',
     takeProfits: [
       { label: '$300K', hit: true },
       { label: '$600K', hit: false },
@@ -260,4 +263,33 @@ test('V1.4 Watchlist [5/5]: IncubatorHub excludes WATCHLIST from topWinningCoins
       hubSource.includes("const isRowWatchlist = token.callType === 'WATCHLIST'"),
     'Table view must omit trading columns on WATCHLIST tab'
   );
+});
+
+test('V1.5 Watchlist [6/6]: AlphaInspectorModal omits callerWinRate for WATCHLIST while preserving caller attribution', async () => {
+  const token = makeItem({
+    callType: 'WATCHLIST',
+    caller: 'ResearchLead',
+    callerWinRate: '91% Win Rate',
+    age: '4h ago',
+  });
+  const mounted = await renderNode(
+    React.createElement(
+      GenesisContext.Provider,
+      { value: makeGenesisValue({ isAdmin: false }) },
+      React.createElement(AlphaInspectorModal, {
+        token,
+        onClose: () => {},
+      })
+    )
+  );
+
+  try {
+    const text = mounted.container.textContent;
+    assert.ok(text.includes('Caller: ResearchLead'));
+    assert.ok(text.includes('Research Coverage'));
+    assert.ok(text.includes('Posted: 4h ago'));
+    assert.ok(!text.includes('91% Win Rate'), 'Watchlist inspector must not display trading win-rate');
+  } finally {
+    await mounted.unmount();
+  }
 });

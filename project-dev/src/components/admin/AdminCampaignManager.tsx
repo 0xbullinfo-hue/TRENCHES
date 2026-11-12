@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   AlertCircle,
@@ -44,9 +44,19 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectedCampaignIdRef.current = selectedCampaignId;
   }, [selectedCampaignId]);
+
+  const selectCampaign = useCallback((campaignId: string | null) => {
+    if (campaignId === selectedCampaignIdRef.current) return;
+    submissionsReqGenRef.current += 1;
+    selectedCampaignIdRef.current = campaignId;
+    setSelectedCampaignId(campaignId);
+    setSubmissions([]);
+    setSubmissionsError(null);
+    setLoadingSubmissions(Boolean(campaignId));
+  }, []);
 
   // Form states (Create / Edit)
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -86,8 +96,8 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
       const data = await res.json();
       if (data.ok && Array.isArray(data.campaigns)) {
         setCampaigns(data.campaigns);
-        if (data.campaigns.length > 0 && !selectedCampaignId) {
-          setSelectedCampaignId(data.campaigns[0].id);
+        if (data.campaigns.length > 0 && !selectedCampaignIdRef.current) {
+          selectCampaign(data.campaigns[0].id);
         }
       }
     } catch {
@@ -95,7 +105,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [onToast, selectedCampaignId]);
+  }, [onToast, selectCampaign]);
 
   useEffect(() => {
     let active = true;
@@ -106,8 +116,8 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
         const data = await res.json();
         if (active && data.ok && Array.isArray(data.campaigns)) {
           setCampaigns(data.campaigns);
-          if (data.campaigns.length > 0) {
-            setSelectedCampaignId((prev) => prev || data.campaigns[0].id);
+          if (data.campaigns.length > 0 && !selectedCampaignIdRef.current) {
+            selectCampaign(data.campaigns[0].id);
           }
         }
       } catch {
@@ -120,7 +130,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     return () => {
       active = false;
     };
-  }, [onToast]);
+  }, [onToast, selectCampaign]);
 
   const fetchSubmissions = useCallback(
     async (campaignId: string) => {
@@ -640,7 +650,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             <button
               key={camp.id}
               type="button"
-              onClick={() => setSelectedCampaignId(camp.id)}
+              onClick={() => selectCampaign(camp.id)}
               className={`px-3.5 py-2 rounded-lg border font-sans text-xs font-bold shrink-0 transition-colors cursor-pointer inline-flex items-center gap-2 ${
                 selectedCampaignId === camp.id
                   ? 'bg-raid-bg border-raid-border text-raid-text'

@@ -621,3 +621,73 @@ test('V1.4 Submissions [9/9]: Unmounting while submissions request is in-flight 
   assert.equal(toasts.length, 0);
   fx.restore();
 });
+
+test('V1.5 Submissions [10/10]: Campaign A resolving BEFORE Campaign B finishes never overwrites B or clears B loading indicator, and returning to A loads A', async () => {
+  const campA = makeCampaign({ id: 'camp-A', title: 'Campaign Alpha' });
+  const campB = makeCampaign({ id: 'camp-B', title: 'Campaign Beta' });
+  const deferredA1 = makeDeferred();
+  const deferredB = makeDeferred();
+  let callsA = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if ((url === '/api/campaigns' || url === '/api/admin/campaigns') && method === 'GET') {
+      return jsonResponse({ ok: true, campaigns: [campA, campB] });
+    }
+    if (url === '/api/admin/campaigns/camp-A/submissions') {
+      callsA += 1;
+      if (callsA === 1) {
+        return deferredA1.promise;
+      }
+      return jsonResponse({
+        ok: true,
+        submissions: [makeSubmission({ id: 'sub-A2', campaignId: 'camp-A', xHandle: '@alpha_returned' })],
+      });
+    }
+    if (url === '/api/admin/campaigns/camp-B/submissions') {
+      return deferredB.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountAdminManager();
+  try {
+    // Select B immediately while initial A request is in-flight
+    await act(async () => {
+      findButtonByText(mounted.container, 'Campaign Beta').click();
+    });
+    assert.ok(mounted.container.textContent.includes('Loading submissions...'));
+
+    // A resolves BEFORE B finishes
+    deferredA1.resolve(
+      jsonResponse({
+        ok: true,
+        submissions: [makeSubmission({ id: 'sub-A1', campaignId: 'camp-A', xHandle: '@alpha_early_stale' })],
+      })
+    );
+    await mounted.flush(20);
+
+    // Must NOT show A's data and must STILL show B's loading indicator
+    assert.ok(!mounted.container.textContent.includes('@alpha_early_stale'));
+    assert.ok(mounted.container.textContent.includes('Loading submissions...'));
+
+    // Now B finishes
+    deferredB.resolve(
+      jsonResponse({
+        ok: true,
+        submissions: [makeSubmission({ id: 'sub-B', campaignId: 'camp-B', xHandle: '@beta_ready' })],
+      })
+    );
+    await mounted.flush(25);
+    assert.ok(mounted.container.textContent.includes('@beta_ready'));
+
+    // Returning to A loads A's latest data
+    await act(async () => {
+      findButtonByText(mounted.container, 'Campaign Alpha').click();
+    });
+    await mounted.flush(25);
+    assert.ok(mounted.container.textContent.includes('@alpha_returned'));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
