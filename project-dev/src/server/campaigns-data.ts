@@ -612,32 +612,83 @@ export async function updateSubmissionReservationState(
   challengeId: string,
   state: SubmissionReservationState,
   options?: {
+    expectedState?: string;
     attemptId?: string;
+    submissionId?: string;
     fencingGeneration?: number;
     error?: string;
     metadata?: Record<string, unknown>;
   }
 ): Promise<{ ok: boolean; reservation?: SubmissionReservationRecord; error?: string }> {
-  const current = await getSubmissionReservation(challengeId);
-  if (!current) {
-    return { ok: false, error: 'Reservation not found' };
+  if (isKvActive()) {
+    const key = `${KV_SUBMISSION_RESERVATION_PREFIX}${challengeId}`;
+    const advRes = await kvAdvanceSubmissionReservation(
+      key,
+      options?.expectedState || '*',
+      state,
+      {
+        attemptId: options?.attemptId,
+        submissionId: options?.submissionId,
+        fencingGeneration: options?.fencingGeneration,
+        metadata: {
+          ...(options?.metadata || {}),
+          ...(options?.error ? { error: options.error } : {}),
+        },
+      }
+    );
+    if (!advRes.ok) {
+      return { ok: false, error: advRes.reason || 'Failed to advance reservation' };
+    }
+    return { ok: true, reservation: advRes.reservation as SubmissionReservationRecord };
   }
 
-  current.state = state;
-  current.updatedAt = Date.now();
-  if (options?.attemptId) current.attemptId = options.attemptId;
-  if (options?.fencingGeneration) current.fencingGeneration = options.fencingGeneration;
-  if (!current.recoveryMetadata) current.recoveryMetadata = {};
-  if (options?.error) current.recoveryMetadata.error = options.error;
-  if (options?.metadata) {
-    Object.assign(current.recoveryMetadata, options.metadata);
-  }
+  return withCampaignsLock(async () => {
+    const current = await getSubmissionReservation(challengeId);
+    if (!current) {
+      return { ok: false, error: 'Reservation not found' };
+    }
 
-  const saveRes = await saveSubmissionReservation(current);
-  if (!saveRes.success) {
-    return { ok: false, error: saveRes.error || 'Failed to update reservation' };
-  }
-  return { ok: true, reservation: current };
+    if (options?.expectedState && options.expectedState !== '*' && current.state !== options.expectedState) {
+      return {
+        ok: false,
+        error: `STATE_MISMATCH: expected ${options.expectedState}, found ${current.state}`,
+      };
+    }
+    if (options?.attemptId && current.attemptId && current.attemptId !== options.attemptId) {
+      return {
+        ok: false,
+        error: `ATTEMPT_MISMATCH: expected ${options.attemptId}, found ${current.attemptId}`,
+      };
+    }
+    if (options?.submissionId && current.submissionId && current.submissionId !== options.submissionId) {
+      return {
+        ok: false,
+        error: `SUBMISSION_ID_MISMATCH: expected ${options.submissionId}, found ${current.submissionId}`,
+      };
+    }
+    if (options?.fencingGeneration && current.fencingGeneration && current.fencingGeneration > options.fencingGeneration) {
+      return {
+        ok: false,
+        error: `FENCING_VIOLATION: current gen ${current.fencingGeneration} > ${options.fencingGeneration}`,
+      };
+    }
+
+    current.state = state;
+    current.updatedAt = Date.now();
+    if (options?.attemptId) current.attemptId = options.attemptId;
+    if (options?.fencingGeneration) current.fencingGeneration = options.fencingGeneration;
+    if (!current.recoveryMetadata) current.recoveryMetadata = {};
+    if (options?.error) current.recoveryMetadata.error = options.error;
+    if (options?.metadata) {
+      Object.assign(current.recoveryMetadata, options.metadata);
+    }
+
+    const saveRes = await saveSubmissionReservation(current);
+    if (!saveRes.success) {
+      return { ok: false, error: saveRes.error || 'Failed to update reservation' };
+    }
+    return { ok: true, reservation: current };
+  });
 }
 
 export async function getSubmissionByIdempotencyKey(
@@ -668,11 +719,24 @@ export async function getSubmissionByChallengeId(
     // If reservation is in RESERVED or RETRYABLE state, it is NOT yet persisted.
     // Never return a successful persisted-submission response solely because a reservation exists!
     if (reservation.state === 'RESERVED' || reservation.state === 'RETRYABLE') {
-      return durableInSubmissions || null;
+      return null;
     }
 
     if (reservation.state === 'PERSISTED' || reservation.state === 'COMPLETED') {
-      return durableInSubmissions || reservation.submissionPayload || null;
+      if (!durableInSubmissions) return null;
+      if (reservation.submissionId && durableInSubmissions.id !== reservation.submissionId) {
+        return null; // Submission ID mismatch
+      }
+      if (reservation.campaignId && durableInSubmissions.campaignId !== reservation.campaignId) {
+        return null; // Campaign ID mismatch
+      }
+      if (
+        reservation.walletAddress &&
+        durableInSubmissions.walletAddress.toLowerCase() !== reservation.walletAddress.toLowerCase()
+      ) {
+        return null; // Wallet ownership mismatch
+      }
+      return durableInSubmissions;
     }
   }
 
@@ -888,8 +952,9 @@ export async function getPendingSubmissionReservations(
         }
       }
       return results;
-    } catch {
-      return [];
+    } catch (kvErr) {
+      console.error('[TrenchLabs Campaigns] Redis error reading pending reservations:', kvErr);
+      throw kvErr;
     }
   }
 
@@ -915,6 +980,8 @@ export async function getPendingSubmissionReservations(
 export async function recoverSubmissionReservation(
   challengeId: string
 ): Promise<{ ok: boolean; submission?: CampaignSubmission; status: string; error?: string }> {
+  if (!challengeId) return { ok: false, status: 'INVALID_ARGUMENT', error: 'challengeId is required' };
+
   return withCampaignsLock(async () => {
     const reservation = await getSubmissionReservation(challengeId);
     if (!reservation) {
@@ -922,55 +989,117 @@ export async function recoverSubmissionReservation(
     }
 
     const submissions = await loadSubmissions();
-    let durableSub = submissions.find(
-      (s) => s.id === reservation.submissionId || s.challengeId === challengeId
+    const durableSub = submissions.find(
+      (s) =>
+        s.id === reservation.submissionId ||
+        s.challengeId === challengeId ||
+        (s.idempotencyKey && s.idempotencyKey === reservation.idempotencyKey)
     );
 
+    // If already in COMPLETED or PERSISTED state:
     if (reservation.state === 'COMPLETED' || reservation.state === 'PERSISTED') {
-      if (!durableSub && reservation.submissionPayload) {
-        durableSub = reservation.submissionPayload;
-        submissions.unshift(durableSub);
-        await saveSubmissions(submissions);
+      if (!durableSub) {
+        // Recovery must persist the staged payload to authoritative storage
+        const payload = reservation.submissionPayload;
+        if (!payload) {
+          return { ok: false, status: 'CORRUPTED', error: 'Reservation missing submission payload' };
+        }
+        submissions.unshift(payload);
+        const saveRes = await saveSubmissions(submissions);
+        if (!saveRes.success) {
+          await updateSubmissionReservationState(challengeId, 'RETRYABLE', {
+            expectedState: reservation.state,
+            submissionId: reservation.submissionId,
+            attemptId: reservation.attemptId,
+            fencingGeneration: reservation.fencingGeneration,
+            error: saveRes.error,
+          });
+          return { ok: false, status: 'RETRYABLE', error: saveRes.error };
+        }
+
+        // Re-read canonical submissions to verify durable persistence
+        const reloaded = await loadSubmissions();
+        const verified = reloaded.find((s) => s.id === payload.id);
+        if (!verified) {
+          return { ok: false, status: 'STORAGE_VERIFICATION_FAILED', error: 'Failed to verify durable submission' };
+        }
+
+        await reconcileCampaignSubmission(reservation.campaignId, verified.id);
+        await updateSubmissionReservationState(challengeId, 'COMPLETED', {
+          submissionId: reservation.submissionId,
+          attemptId: reservation.attemptId,
+          fencingGeneration: reservation.fencingGeneration,
+        });
+        return { ok: true, submission: verified, status: 'RECOVERED_AND_PERSISTED' };
       }
-      if (durableSub) {
-        await reconcileCampaignSubmission(reservation.campaignId, durableSub.id);
-      }
+
+      await reconcileCampaignSubmission(reservation.campaignId, durableSub.id);
       if (reservation.state === 'PERSISTED') {
-        await updateSubmissionReservationState(challengeId, 'COMPLETED');
+        await updateSubmissionReservationState(challengeId, 'COMPLETED', {
+          expectedState: 'PERSISTED',
+          submissionId: reservation.submissionId,
+          attemptId: reservation.attemptId,
+          fencingGeneration: reservation.fencingGeneration,
+        });
       }
       return { ok: true, submission: durableSub, status: 'COMPLETED' };
     }
 
     // Reservation is RESERVED or RETRYABLE:
     if (durableSub) {
-      await updateSubmissionReservationState(challengeId, 'COMPLETED');
+      await updateSubmissionReservationState(challengeId, 'COMPLETED', {
+        submissionId: reservation.submissionId,
+        attemptId: reservation.attemptId,
+        fencingGeneration: reservation.fencingGeneration,
+      });
       await reconcileCampaignSubmission(reservation.campaignId, durableSub.id);
       return { ok: true, submission: durableSub, status: 'RECOVERED_PERSISTED' };
     }
 
     // It was NOT persisted yet: resume persistence from payload
     const payload = reservation.submissionPayload;
+    if (!payload) {
+      return { ok: false, status: 'CORRUPTED', error: 'Reservation missing submission payload' };
+    }
+
     submissions.unshift(payload);
     const saveSubRes = await saveSubmissions(submissions);
     if (!saveSubRes.success) {
-      await updateSubmissionReservationState(challengeId, 'RETRYABLE', { error: saveSubRes.error });
+      await updateSubmissionReservationState(challengeId, 'RETRYABLE', {
+        expectedState: reservation.state,
+        submissionId: reservation.submissionId,
+        attemptId: reservation.attemptId,
+        fencingGeneration: reservation.fencingGeneration,
+        error: saveSubRes.error,
+      });
       return { ok: false, status: 'RETRYABLE', error: saveSubRes.error };
     }
 
-    await updateSubmissionReservationState(challengeId, 'PERSISTED');
-    const campaigns = await loadCampaigns();
-    const campaign = campaigns.find((c) => c.id === reservation.campaignId);
-    if (campaign) {
-      campaign.submissionsCount = (campaign.submissionsCount || 0) + 1;
-      const saveCampRes = await saveCampaigns(campaigns);
-      if (!saveCampRes.success) {
-        await markCampaignCounterPendingReconciliation(reservation.campaignId, payload.id);
-      } else {
-        await updateSubmissionReservationState(challengeId, 'COMPLETED');
-      }
+    // Verify canonical persistence by re-reading
+    const reloaded = await loadSubmissions();
+    const verified = reloaded.find((s) => s.id === payload.id);
+    if (!verified) {
+      return { ok: false, status: 'STORAGE_VERIFICATION_FAILED', error: 'Failed to verify durable submission' };
     }
 
-    return { ok: true, submission: payload, status: 'RECOVERED_AND_PERSISTED' };
+    await updateSubmissionReservationState(challengeId, 'PERSISTED', {
+      expectedState: reservation.state,
+      submissionId: reservation.submissionId,
+      attemptId: reservation.attemptId,
+      fencingGeneration: reservation.fencingGeneration,
+    });
+
+    const reconRes = await reconcileCampaignSubmission(reservation.campaignId, verified.id);
+    if (reconRes.ok) {
+      await updateSubmissionReservationState(challengeId, 'COMPLETED', {
+        expectedState: 'PERSISTED',
+        submissionId: reservation.submissionId,
+        attemptId: reservation.attemptId,
+        fencingGeneration: reservation.fencingGeneration,
+      });
+    }
+
+    return { ok: true, submission: verified, status: 'RECOVERED_AND_PERSISTED' };
   });
 }
 
@@ -1032,11 +1161,29 @@ export async function reconcileCampaignSubmission(
         };
       }
 
+      // Recalculate unique submissions strictly by deduplicating by id, challengeId, and walletAddress
       const matchingSubs = submissions.filter((s) => s.campaignId === campaignId);
-      const expectedCount = matchingSubs.length;
+      const seenIds = new Set<string>();
+      const seenChallenges = new Set<string>();
+      const seenWallets = new Set<string>();
+      const uniqueSubs: CampaignSubmission[] = [];
+
+      for (const s of matchingSubs) {
+        const walletKey = (s.walletAddress || '').toLowerCase();
+        if (s.id && seenIds.has(s.id)) continue;
+        if (s.challengeId && seenChallenges.has(s.challengeId)) continue;
+        if (walletKey && seenWallets.has(walletKey)) continue;
+
+        if (s.id) seenIds.add(s.id);
+        if (s.challengeId) seenChallenges.add(s.challengeId);
+        if (walletKey) seenWallets.add(walletKey);
+        uniqueSubs.push(s);
+      }
+
+      const expectedCount = uniqueSubs.length;
       const currentCount = campaign.submissionsCount || 0;
 
-      if (currentCount < expectedCount) {
+      if (currentCount !== expectedCount) {
         campaign.submissionsCount = expectedCount;
         const saveRes = await saveCampaigns(campaigns);
         if (!saveRes.success) {
@@ -1049,6 +1196,21 @@ export async function reconcileCampaignSubmission(
             error: saveRes.error || 'Failed to save updated campaign counter',
           };
         }
+
+        // Re-read canonical campaigns to verify counter persistence
+        const reloadedCampaigns = await loadCampaigns();
+        const reloaded = reloadedCampaigns.find((c) => c.id === campaignId);
+        if (!reloaded || reloaded.submissionsCount !== expectedCount) {
+          await markCampaignCounterPendingReconciliation(campaignId, submissionId);
+          return {
+            ok: false,
+            status: 'STORAGE_ERROR',
+            campaignId,
+            submissionId,
+            error: 'Failed to verify durable campaign counter update',
+          };
+        }
+
         await clearCampaignCounterPendingReconciliation(campaignId, submissionId);
         return {
           ok: true,
@@ -1219,9 +1381,20 @@ export async function submitCampaignCompletion(payload: {
           const winning = await getSubmissionReservation(payload.challengeId);
           if (winning) {
             if (winning.state === 'COMPLETED' || winning.state === 'PERSISTED') {
-              const sub = submissions.find((s) => s.id === winning.submissionId) || winning.submissionPayload;
-              await reconcileCampaignSubmission(payload.campaignId, sub.id);
-              return { ok: true, submission: sub, isExisting: true };
+              let sub = submissions.find((s) => s.id === winning.submissionId);
+              if (!sub && winning.submissionPayload) {
+                // Perform controlled recovery: save and verify
+                submissions.unshift(winning.submissionPayload);
+                const recoverySave = await saveSubmissions(submissions);
+                if (recoverySave.success) {
+                  const reloaded = await loadSubmissions();
+                  sub = reloaded.find((s) => s.id === winning.submissionPayload.id);
+                }
+              }
+              if (sub) {
+                await reconcileCampaignSubmission(payload.campaignId, sub.id);
+                return { ok: true, submission: sub, isExisting: true };
+              }
             }
             const sub = submissions.find((s) => s.id === winning.submissionId);
             if (sub) {
@@ -1251,9 +1424,20 @@ export async function submitCampaignCompletion(payload: {
             const winning = await getSubmissionReservation(payload.challengeId);
             if (winning) {
               if (winning.state === 'COMPLETED' || winning.state === 'PERSISTED') {
-                const sub = submissions.find((s) => s.id === winning.submissionId) || winning.submissionPayload;
-                await reconcileCampaignSubmission(payload.campaignId, sub.id);
-                return { ok: true, submission: sub, isExisting: true };
+                let sub = submissions.find((s) => s.id === winning.submissionId);
+                if (!sub && winning.submissionPayload) {
+                  // Perform controlled recovery: save and verify
+                  submissions.unshift(winning.submissionPayload);
+                  const recoverySave = await saveSubmissions(submissions);
+                  if (recoverySave.success) {
+                    const reloaded = await loadSubmissions();
+                    sub = reloaded.find((s) => s.id === winning.submissionPayload.id);
+                  }
+                }
+                if (sub) {
+                  await reconcileCampaignSubmission(payload.campaignId, sub.id);
+                  return { ok: true, submission: sub, isExisting: true };
+                }
               }
               const sub = submissions.find((s) => s.id === winning.submissionId);
               if (sub) {

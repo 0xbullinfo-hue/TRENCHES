@@ -49,7 +49,8 @@ async function handle(req: NextRequest) {
   try {
     const result = await runCampaignRecoveryWorker({ batchSize });
     console.log('[TrenchLabs Worker] Campaign recovery cycle completed:', JSON.stringify(result));
-    return NextResponse.json(result, { status: 200, headers: NO_STORE });
+    const httpStatus = result.status === 'FAILED' ? 503 : 200;
+    return NextResponse.json(result, { status: httpStatus, headers: NO_STORE });
   } catch (err) {
     console.error('[TrenchLabs Worker] Campaign recovery cycle failed:', err);
     return NextResponse.json(

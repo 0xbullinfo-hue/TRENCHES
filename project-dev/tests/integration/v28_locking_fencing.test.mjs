@@ -148,10 +148,13 @@ test('V2.8 Fencing [4/4]: Stale lock holder with lost ownership is prevented fro
     token: 'stale-worker-token-000',
     fencingGeneration: 0,
     isOwned: () => false,
+    assertOwned: () => {
+      throw new Error('Lock lease expired or stolen by newer generation');
+    },
   };
 
   await campaignsLockStorage.run(fakeStaleLock, async () => {
-    // Even if called within async context, if isOwned() returns false, it must fail closed
+    // Even if called within async context, if isOwned() / assertOwned() fails, it must fail closed
     let threw = false;
     try {
       const res = await saveCampaigns(campaigns);
@@ -161,8 +164,6 @@ test('V2.8 Fencing [4/4]: Stale lock holder with lost ownership is prevented fro
     } catch {
       threw = true;
     }
-    // If not in KV mode, saveCampaigns writes file, but verify isOwned check
-    // In our implementation, saveCampaigns verifies activeLock.isOwned()
-    assert.equal(threw || true, true);
+    assert.equal(threw, true, 'Protected write must throw or return failure when lock ownership is lost');
   });
 });

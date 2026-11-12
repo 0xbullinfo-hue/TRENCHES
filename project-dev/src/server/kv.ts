@@ -820,35 +820,110 @@ export const ADVANCE_SUBMISSION_RESERVATION_LUA =
   "local raw = redis.call('get', KEYS[1]) " +
   "if not raw then return cjson.encode({ ok = false, reason = 'NOT_FOUND' }) end " +
   "local r = cjson.decode(raw) " +
-  "local nowMs = tonumber(ARGV[2]) or 0 " +
-  "local newState = ARGV[1] " +
+  "local expectedState = ARGV[1] " +
+  "local newState = ARGV[2] " +
+  "if expectedState ~= '*' and r.state ~= expectedState then " +
+  "  return cjson.encode({ ok = false, reason = 'STATE_MISMATCH', currentState = r.state, expectedState = expectedState }) " +
+  "end " +
+  "local reqAttempt = ARGV[3] " +
+  "if reqAttempt and reqAttempt ~= '' and r.attemptId and r.attemptId ~= reqAttempt then " +
+  "  return cjson.encode({ ok = false, reason = 'ATTEMPT_MISMATCH', currentAttempt = r.attemptId, requiredAttempt = reqAttempt }) " +
+  "end " +
+  "local reqSubId = ARGV[4] " +
+  "if reqSubId and reqSubId ~= '' and r.submissionId and r.submissionId ~= reqSubId then " +
+  "  return cjson.encode({ ok = false, reason = 'SUBMISSION_ID_MISMATCH', currentSubmissionId = r.submissionId, requiredSubmissionId = reqSubId }) " +
+  "end " +
+  "local reqGen = tonumber(ARGV[5]) or 0 " +
+  "local curGen = tonumber(r.fencingGeneration) or 0 " +
+  "if reqGen > 0 and curGen > reqGen then " +
+  "  return cjson.encode({ ok = false, reason = 'FENCING_VIOLATION', currentGeneration = curGen, providedGeneration = reqGen }) " +
+  "end " +
+  "if reqGen > curGen then r.fencingGeneration = reqGen end " +
+  "local nowMs = tonumber(ARGV[6]) or 0 " +
   "r.state = newState " +
   "r.updatedAt = nowMs " +
-  "if ARGV[3] and ARGV[3] ~= '' then " +
-  "  local ok, meta = pcall(cjson.decode, ARGV[3]) " +
+  "if ARGV[7] and ARGV[7] ~= '' then " +
+  "  local ok, meta = pcall(cjson.decode, ARGV[7]) " +
   "  if ok and type(meta) == 'table' then " +
   "    if not r.recoveryMetadata then r.recoveryMetadata = {} end " +
   "    for k, v in pairs(meta) do r.recoveryMetadata[k] = v end " +
   "  end " +
   "end " +
-  "local ttl = tonumber(ARGV[4]) or 604800 " +
+  "local ttl = tonumber(ARGV[8]) or 604800 " +
   "redis.call('set', KEYS[1], cjson.encode(r), 'EX', ttl) " +
   "return cjson.encode({ ok = true, reservation = r })";
 
 export async function kvAdvanceSubmissionReservation(
   challengeKey: string,
-  newState: string,
-  nowMs = Date.now(),
-  metadata?: Record<string, unknown>,
-  ttlSec = 604800
-): Promise<{ ok: boolean; reason?: string; reservation?: unknown }> {
-  const metaJson = metadata ? JSON.stringify(metadata) : '';
+  arg2: string,
+  arg3?: string | number,
+  arg4?:
+    | {
+        attemptId?: string;
+        submissionId?: string;
+        fencingGeneration?: number;
+        nowMs?: number;
+        metadata?: Record<string, unknown>;
+        ttlSec?: number;
+      }
+    | Record<string, unknown>,
+  arg5?: number
+): Promise<{
+  ok: boolean;
+  reason?: string;
+  currentState?: string;
+  expectedState?: string;
+  reservation?: unknown;
+}> {
+  // Support both:
+  // 1. V2.9 signature: (challengeKey, expectedState, newState, options)
+  // 2. V2.8 signature: (challengeKey, newState, nowMs, metadata, ttlSec)
+  let expectedState = '*';
+  let newState: string;
+  let options: {
+    attemptId?: string;
+    submissionId?: string;
+    fencingGeneration?: number;
+    nowMs?: number;
+    metadata?: Record<string, unknown>;
+    ttlSec?: number;
+  } = {};
+
+  if (typeof arg3 === 'string') {
+    // V2.9 signature: (challengeKey, expectedState, newState, options)
+    expectedState = arg2 || '*';
+    newState = arg3;
+    if (arg4 && typeof arg4 === 'object') {
+      options = arg4 as typeof options;
+    }
+  } else {
+    // V2.8 legacy signature: (challengeKey, newState, nowMs?, metadata?, ttlSec?)
+    newState = arg2;
+    if (typeof arg3 === 'number') {
+      options.nowMs = arg3;
+    }
+    if (arg4 && typeof arg4 === 'object') {
+      options.metadata = arg4 as Record<string, unknown>;
+    }
+    if (typeof arg5 === 'number') {
+      options.ttlSec = arg5;
+    }
+  }
+
+  const metaJson = options.metadata ? JSON.stringify(options.metadata) : '';
+  const nowMs = options.nowMs || Date.now();
+  const ttlSec = options.ttlSec || 604800;
+
   const res = await cmd([
     'EVAL',
     ADVANCE_SUBMISSION_RESERVATION_LUA,
     1,
     challengeKey,
+    expectedState,
     newState,
+    options.attemptId || '',
+    options.submissionId || '',
+    options.fencingGeneration || 0,
     nowMs,
     metaJson,
     ttlSec,
@@ -858,10 +933,71 @@ export async function kvAdvanceSubmissionReservation(
     return (typeof res === 'string' ? JSON.parse(res) : res) as {
       ok: boolean;
       reason?: string;
+      currentState?: string;
+      expectedState?: string;
       reservation?: unknown;
     };
   } catch {
     return { ok: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export const SAVE_SIDE_EFFECT_EVENT_LUA =
+  "if KEYS[3] and ARGV[3] and ARGV[3] ~= '' then " +
+  "  local lockVal = redis.call('get', KEYS[3]) " +
+  "  if not lockVal then " +
+  "    return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "  end " +
+  "  if lockVal ~= ARGV[3] then " +
+  "    local ok, parsed = pcall(cjson.decode, lockVal) " +
+  "    if ok and type(parsed) == 'table' then " +
+  "      if parsed.token ~= ARGV[3] then " +
+  "        return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "      end " +
+  "      if ARGV[4] and ARGV[4] ~= '' and parsed.fencingGeneration and tonumber(parsed.fencingGeneration) ~= tonumber(ARGV[4]) then " +
+  "        return cjson.encode({ success = false, reason = 'FENCING_GENERATION_MISMATCH' }) " +
+  "      end " +
+  "    else " +
+  "      return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "    end " +
+  "  end " +
+  "end " +
+  "redis.call('set', KEYS[1], ARGV[1]) " +
+  "redis.call('sadd', KEYS[2], ARGV[2]) " +
+  "return cjson.encode({ success = true })";
+
+export async function kvSaveSideEffectEventLocked(
+  eventKey: string,
+  indexSetKey: string,
+  idempotencyKey: string,
+  eventJson: string,
+  lockKey?: string,
+  ownerToken?: string,
+  fencingGeneration?: number
+): Promise<{ success: boolean; reason?: string }> {
+  const args: Array<string | number> = [
+    'EVAL',
+    SAVE_SIDE_EFFECT_EVENT_LUA,
+    lockKey ? 3 : 2,
+    eventKey,
+    indexSetKey,
+  ];
+  if (lockKey) args.push(lockKey);
+  args.push(eventJson, idempotencyKey);
+  if (ownerToken) args.push(ownerToken);
+  else args.push('');
+  if (fencingGeneration !== undefined && fencingGeneration !== null) {
+    args.push(fencingGeneration);
+  } else {
+    args.push(0);
+  }
+
+  const res = await cmd(args);
+  if (!res) return { success: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as { success: boolean; reason?: string };
+  } catch {
+    return { success: false, reason: 'PARSE_ERROR' };
   }
 }
 

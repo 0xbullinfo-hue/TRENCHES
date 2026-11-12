@@ -7,12 +7,14 @@ import {
   kvGet,
   kvSet,
   kvSetLocked,
+  kvSaveSideEffectEventLocked,
   kvSAdd,
   kvSMembers,
   kvScan,
   kvClaimNotificationDispatch,
   kvCompleteNotificationDispatch,
 } from '@/server/kv';
+import { tgCall } from '@/server/telegram';
 import {
   withCampaignsLock,
   campaignsLockStorage,
@@ -22,6 +24,7 @@ import {
   reconcileAllPendingCampaignCounters,
   getPendingSubmissionReservations,
   recoverSubmissionReservation,
+  SubmissionReservationRecord,
 } from '@/server/campaigns-data';
 import type { CampaignSubmission, Campaign } from '@/lib/types';
 
@@ -62,10 +65,13 @@ export function buildNotificationIdempotencyKey(submissionId: string, notificati
   return `camp_notify:${submissionId}:${notificationType}`;
 }
 
-// Test failure injection hooks
+// Test failure injection and mock dispatcher hooks
 let _testFailNextRewardRecord: Error | null = null;
 let _testFailNextNotificationEnqueue: Error | null = null;
 let _testFailNextNotificationDispatch: Error | null = null;
+let _testMockDispatcher:
+  | ((event: CampaignSideEffectEvent) => Promise<{ accepted: boolean; delivered?: boolean; externalRef?: string; error?: string; status?: string }>)
+  | null = null;
 
 export function __setTestFailNextRewardRecord(err: Error | null) {
   _testFailNextRewardRecord = err;
@@ -77,6 +83,14 @@ export function __setTestFailNextNotificationEnqueue(err: Error | null) {
 
 export function __setTestFailNextNotificationDispatch(err: Error | null) {
   _testFailNextNotificationDispatch = err;
+}
+
+export function __setTestMockNotificationDispatcher(
+  fn:
+    | ((event: CampaignSideEffectEvent) => Promise<{ accepted: boolean; delivered?: boolean; externalRef?: string; error?: string; status?: string }>)
+    | null
+) {
+  _testMockDispatcher = fn;
 }
 
 export async function getSideEffectEvent(idempotencyKey: string): Promise<CampaignSideEffectEvent | null> {
@@ -117,23 +131,22 @@ async function saveSideEffectEvent(event: CampaignSideEffectEvent): Promise<void
   if (isKvActive()) {
     const key = `${KV_SIDE_EFFECT_PREFIX}${event.idempotencyKey}`;
     const payload = JSON.stringify(event);
-    if (activeLock && activeLock.lockType === 'kv') {
-      const res = await kvSetLocked(
-        'trench:campaigns:lock',
-        key,
-        activeLock.token,
-        payload,
-        activeLock.fencingGeneration
-      );
-      if (!res.success) {
-        throw new Error(`Side effect write rejected: ${res.reason || 'Lock lost'}`);
-      }
-    } else {
-      await kvSet(key, payload);
+    const lockKey = activeLock && activeLock.lockType === 'kv' ? 'trench:campaigns:lock' : undefined;
+    const lockToken = activeLock && activeLock.lockType === 'kv' ? activeLock.token : undefined;
+    const fencing = activeLock && activeLock.lockType === 'kv' ? activeLock.fencingGeneration : undefined;
+
+    const res = await kvSaveSideEffectEventLocked(
+      key,
+      payload,
+      KV_SIDE_EFFECT_SET,
+      event.idempotencyKey,
+      lockKey,
+      lockToken,
+      fencing
+    );
+    if (!res.success) {
+      throw new Error(`Side effect write rejected: ${res.reason || 'Lock lost or persistence failed'}`);
     }
-    try {
-      await kvSAdd(KV_SIDE_EFFECT_SET, event.idempotencyKey);
-    } catch {}
     return;
   }
 
@@ -546,8 +559,9 @@ export async function getEligibleNotificationEvents(
         }
       }
       return results;
-    } catch {
-      return [];
+    } catch (kvErr) {
+      console.error('[TrenchLabs Outbox] Redis error reading eligible notifications:', kvErr);
+      throw kvErr;
     }
   }
 
@@ -572,20 +586,113 @@ export async function getEligibleNotificationEvents(
 
 export async function defaultCampaignNotificationDispatcher(
   event: CampaignSideEffectEvent
-): Promise<{ accepted: boolean; delivered?: boolean; externalRef?: string; error?: string }> {
-  try {
-    const externalRef = `notif_prov_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    return {
-      accepted: true,
-      delivered: false, // At-least-once provider acceptance. Does not represent confirmed delivery.
-      externalRef,
-    };
-  } catch (err) {
-    return {
-      accepted: false,
-      error: (err as Error).message || 'Provider communication failure',
-    };
+): Promise<{ accepted: boolean; delivered?: boolean; externalRef?: string; error?: string; status?: string }> {
+  if (_testMockDispatcher) {
+    return _testMockDispatcher(event);
   }
+
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramChatId = process.env.TELEGRAM_ALERT_CHANNEL_ID || process.env.TELEGRAM_MEMBER_GROUP_ID;
+  const webhookUrl = process.env.CAMPAIGN_NOTIFICATION_WEBHOOK_URL;
+
+  // 1. If real Telegram bot credentials and destination channel are configured, dispatch via Telegram Bot API
+  if (telegramToken && telegramChatId) {
+    try {
+      const text =
+        `🚀 *Raid Submission Verified*\n` +
+        `• Campaign: \`${String(event.payload?.campaignTitle || event.campaignId)}\`\n` +
+        `• Participant: \`${event.payload?.xHandle || event.walletAddress.slice(0, 4) + '...' + event.walletAddress.slice(-4)}\`\n` +
+        `• Status: Verified\n` +
+        `• Submission ID: \`${event.submissionId}\``;
+
+      const tgRes = await tgCall('sendMessage', {
+        chat_id: telegramChatId,
+        text,
+        parse_mode: 'Markdown',
+      });
+
+      if (tgRes.ok) {
+        const msgId = (tgRes.result as { message_id?: number })?.message_id;
+        return {
+          accepted: true,
+          delivered: true,
+          externalRef: `tg_msg_${msgId || Date.now()}`,
+        };
+      } else {
+        return {
+          accepted: false,
+          delivered: false,
+          status: 'FAILED',
+          error: tgRes.description || 'Telegram API rejected notification message',
+        };
+      }
+    } catch (tgErr) {
+      return {
+        accepted: false,
+        delivered: false,
+        status: 'FAILED',
+        error: (tgErr as Error).message || 'Telegram communication failure',
+      };
+    }
+  }
+
+  // 2. If dedicated notification webhook URL is configured, POST payload to provider webhook
+  if (webhookUrl) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': event.idempotencyKey,
+        },
+        body: JSON.stringify({
+          idempotencyKey: event.idempotencyKey,
+          submissionId: event.submissionId,
+          campaignId: event.campaignId,
+          walletAddress: event.walletAddress,
+          type: event.type,
+          payload: event.payload,
+          timestamp: new Date().toISOString(),
+        }),
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(timer));
+
+      if (res.ok) {
+        const externalRef = res.headers.get('x-provider-ref') || `webhook_${res.status}_${Date.now()}`;
+        return {
+          accepted: true,
+          delivered: res.status >= 200 && res.status < 300,
+          externalRef,
+        };
+      } else {
+        const errText = await res.text().catch(() => '');
+        return {
+          accepted: false,
+          delivered: false,
+          status: 'FAILED',
+          error: `Webhook returned HTTP ${res.status}: ${errText.slice(0, 100)}`,
+        };
+      }
+    } catch (whErr) {
+      return {
+        accepted: false,
+        delivered: false,
+        status: 'FAILED',
+        error: (whErr as Error).message || 'Webhook communication failure',
+      };
+    }
+  }
+
+  // 3. Neither Telegram bot nor webhook provider is configured: FAIL CLOSED
+  // Do NOT fabricate acceptance.
+  return {
+    accepted: false,
+    delivered: false,
+    status: 'BLOCKED',
+    error: 'Notification provider not configured (TELEGRAM_BOT_TOKEN/TELEGRAM_ALERT_CHANNEL_ID or CAMPAIGN_NOTIFICATION_WEBHOOK_URL missing)',
+  };
 }
 
 export async function processNotificationOutboxBatch(options?: {
@@ -652,7 +759,7 @@ export async function processNotificationOutboxBatch(options?: {
 
 export interface CampaignRecoveryWorkerResult {
   ok: boolean;
-  status: 'COMPLETED';
+  status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'COMPLETED';
   workerId: string;
   durationMs: number;
   recordsDiscovered: number;
@@ -691,57 +798,124 @@ export async function runCampaignRecoveryWorker(options?: {
   let failedOperations = 0;
   let retryableFailures = 0;
 
-  // 1. Recover Pending / Stalled Submission Reservations
-  const reservations = await getPendingSubmissionReservations(batchSize);
+  let reservations: SubmissionReservationRecord[] = [];
   let resRecovered = 0;
   let resFailed = 0;
 
-  for (const res of reservations) {
-    recordsDiscovered += 1;
-    if (res.state === 'RESERVED' || res.state === 'RETRYABLE' || res.state === 'PERSISTED') {
-      if (Date.now() - res.updatedAt > 2000) {
-        recordsProcessed += 1;
-        const recResult = await recoverSubmissionReservation(res.challengeId);
-        if (recResult.ok) {
-          recordsRecovered += 1;
-          resRecovered += 1;
+  try {
+    // 1. Recover Pending / Stalled Submission Reservations
+    reservations = await getPendingSubmissionReservations(batchSize);
+
+    for (const res of reservations) {
+      recordsDiscovered += 1;
+      if (res.state === 'RESERVED' || res.state === 'RETRYABLE' || res.state === 'PERSISTED') {
+        if (Date.now() - res.updatedAt > 2000) {
+          recordsProcessed += 1;
+          const recResult = await recoverSubmissionReservation(res.challengeId);
+          if (recResult.ok) {
+            recordsRecovered += 1;
+            resRecovered += 1;
+          } else {
+            resFailed += 1;
+            failedOperations += 1;
+            retryableFailures += 1;
+            recordsStillPending += 1;
+          }
         } else {
-          resFailed += 1;
-          failedOperations += 1;
-          retryableFailures += 1;
           recordsStillPending += 1;
         }
-      } else {
-        recordsStillPending += 1;
       }
     }
+  } catch (resErr) {
+    console.error('[TrenchLabs Worker] Critical error discovering/recovering reservations:', resErr);
+    failedOperations += 1;
+    return {
+      ok: false,
+      status: 'FAILED',
+      workerId,
+      durationMs: Date.now() - startMs,
+      recordsDiscovered,
+      recordsProcessed,
+      recordsRecovered,
+      recordsStillPending: recordsStillPending + 1,
+      failedOperations,
+      retryableFailures,
+      reconciledCounters: 0,
+      recoveredReservations: 0,
+      dispatchedNotifications: 0,
+      details: {
+        reservations: { discovered: reservations.length, recovered: resRecovered, failed: resFailed + 1 },
+        counters: { attempted: 0, reconciled: 0, failed: 0 },
+        sideEffects: { reconciledRewards: 0, reconciledNotifications: 0, recoveredDispatchEvents: 0 },
+        outboxDispatch: { discovered: 0, dispatched: 0, failed: 0, retryable: 0 },
+      },
+    };
   }
 
   // 2. Reconcile Campaign Counters
-  const counterRes = await reconcileAllPendingCampaignCounters(batchSize);
-  recordsDiscovered += counterRes.attempted;
-  recordsProcessed += counterRes.attempted;
-  recordsRecovered += counterRes.reconciled;
-  failedOperations += counterRes.failed;
-  recordsStillPending += counterRes.failed;
-  if (counterRes.failed > 0) retryableFailures += counterRes.failed;
+  let counterRes = { attempted: 0, reconciled: 0, failed: 0, errors: [] as any[] };
+  try {
+    counterRes = await reconcileAllPendingCampaignCounters(batchSize);
+    recordsDiscovered += counterRes.attempted;
+    recordsProcessed += counterRes.attempted;
+    recordsRecovered += counterRes.reconciled;
+    failedOperations += counterRes.failed;
+    recordsStillPending += counterRes.failed;
+    if (counterRes.failed > 0) retryableFailures += counterRes.failed;
+  } catch (cErr) {
+    console.error('[TrenchLabs Worker] Counter reconciliation failure:', cErr);
+    failedOperations += 1;
+  }
 
   // 3. Reconcile Missing Outbox Events & Expired Leases
-  const sideOps = await reconcilePendingCampaignOperations();
-  recordsRecovered += sideOps.reconciledRewards + sideOps.reconciledNotifications + sideOps.recoveredDispatchEvents;
+  let sideOps = { reconciledRewards: 0, reconciledNotifications: 0, recoveredDispatchEvents: 0 };
+  try {
+    sideOps = await reconcilePendingCampaignOperations();
+    recordsRecovered += sideOps.reconciledRewards + sideOps.reconciledNotifications + sideOps.recoveredDispatchEvents;
+  } catch (sErr) {
+    console.error('[TrenchLabs Worker] Side effects reconciliation failure:', sErr);
+    failedOperations += 1;
+  }
 
   // 4. Dispatch Eligible Outbox Notifications
-  const dispatchRes = await processNotificationOutboxBatch({ batchSize, workerId });
-  recordsDiscovered += dispatchRes.discovered;
-  recordsProcessed += dispatchRes.dispatched + dispatchRes.failed;
-  recordsRecovered += dispatchRes.dispatched;
-  failedOperations += dispatchRes.failed;
-  retryableFailures += dispatchRes.retryable;
-  recordsStillPending += dispatchRes.retryable;
+  let dispatchRes = { discovered: 0, dispatched: 0, failed: 0, retryable: 0 };
+  try {
+    dispatchRes = await processNotificationOutboxBatch({ batchSize, workerId });
+    recordsDiscovered += dispatchRes.discovered;
+    recordsProcessed += dispatchRes.dispatched + dispatchRes.failed;
+    recordsRecovered += dispatchRes.dispatched;
+    failedOperations += dispatchRes.failed;
+    retryableFailures += dispatchRes.retryable;
+    recordsStillPending += dispatchRes.retryable;
+  } catch (dErr) {
+    console.error('[TrenchLabs Worker] Notification outbox dispatch failure:', dErr);
+    failedOperations += 1;
+  }
+
+  // Determine explicit status:
+  // If critical operations failed and nothing was recovered, FAILED.
+  // If some operations failed or records remain pending, PARTIAL.
+  // If zero operations failed and no critical unrecovered records remain, SUCCESS.
+  let overallStatus: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'COMPLETED' = 'SUCCESS';
+  if (failedOperations > 0 && recordsRecovered === 0 && recordsProcessed > 0) {
+    overallStatus = 'FAILED';
+  } else if (resFailed > 0 || counterRes.failed > 0 || (dispatchRes.failed > 0 && dispatchRes.dispatched === 0)) {
+    overallStatus = 'PARTIAL';
+  } else if (failedOperations > 0 || recordsStillPending > 0) {
+    // If background retries are waiting for backoff, mark PARTIAL unless all processed items succeeded
+    overallStatus = dispatchRes.dispatched > 0 && failedOperations === 0 ? 'SUCCESS' : 'PARTIAL';
+  }
+
+  // Backward compatibility alias for V2.8 tests: if all operations completed without failure, status is COMPLETED
+  if ((overallStatus as string) === 'SUCCESS') {
+    overallStatus = 'COMPLETED';
+  }
+
+  const ok = (overallStatus as string) === 'SUCCESS' || overallStatus === 'COMPLETED' || overallStatus === 'PARTIAL';
 
   return {
-    ok: failedOperations === 0 || recordsRecovered > 0,
-    status: 'COMPLETED',
+    ok,
+    status: overallStatus,
     workerId,
     durationMs: Date.now() - startMs,
     recordsDiscovered,
