@@ -38,17 +38,17 @@ test('Social Raid Submission UX [1/13]: Static analysis confirms CampaignCard di
   assert.ok(src.includes('!isWalletConnected'), 'Must handle State 1: No wallet connected');
   assert.ok(src.includes('!isSigningSupported'), 'Must handle State 5: Signing unsupported');
   assert.ok(src.includes('isWalletMismatched'), 'Must handle Address Mismatch state');
-  assert.ok(src.includes('!isWalletAuthenticated'), 'Must handle State 2: Connected but not authenticated');
+  assert.ok(src.includes('!isServerSessionAuthenticated'), 'Must handle State 2: Connected but not authenticated');
   assert.ok(src.includes('Wallet Authenticated'), 'Must handle State 3: Authenticated and ready');
 
   // 2. Exact address matching logic
-  assert.ok(src.includes('cleanWallet !== connectedAddress'), 'Must strictly reject mismatch between entered and connected wallet');
+  assert.ok(src.includes('cleanWallet !== capturedAddress'), 'Must strictly reject mismatch between entered and connected wallet');
   assert.ok(src.includes('Use Connected'), 'Must provide one-click Use Connected action');
   assert.ok(src.includes('handleSwitchWallet'), 'Must support Switch Wallet');
 
   // 3. Challenge issuance lifecycle
   assert.ok(src.includes("fetch(`/api/campaigns/${campaign.id}/challenge`"), 'Must request server-issued challenge');
-  assert.ok(src.includes('!challengeData.challengeId || !challengeData.message'), 'Must validate challenge response structure');
+  assert.ok(src.includes('hasValidBinding'), 'Must validate challenge response structure and mandatory binding');
   assert.ok(src.includes('activeSignMessage(new TextEncoder().encode(challengeData.message))'), 'Must sign exact server challenge message');
   assert.ok(src.includes("fetch(`/api/campaigns/${campaign.id}/submit`"), 'Must submit challengeId, signature and proof to submit API');
 

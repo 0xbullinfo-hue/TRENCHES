@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { isBase58Address } from '@/lib/config';
@@ -81,6 +81,45 @@ function getConfiguredDurationLabel(
   return 'Duration unavailable';
 }
 
+export type ServerSessionStatus =
+  | 'UNKNOWN'
+  | 'CHECKING'
+  | 'AUTHENTICATED'
+  | 'UNAUTHENTICATED'
+  | 'ERROR';
+
+interface ServerSessionState {
+  status: ServerSessionStatus;
+  wallet: string | null;
+  error?: string | null;
+}
+
+/**
+ * Fix A: Authoritative wallet connection state derived strictly from the active
+ * Solana wallet adapter. Never falls back to stale GenesisContext or input addresses.
+ */
+function getAuthoritativeWalletState(wallet: ReturnType<typeof useWallet>) {
+  const adapter = wallet.wallet?.adapter ?? null;
+  const walletPk = wallet.publicKey ? wallet.publicKey.toBase58() : null;
+  const adapterPk = adapter?.publicKey ? adapter.publicKey.toBase58() : null;
+
+  const isConnected = Boolean(
+    wallet.connected &&
+      adapter &&
+      adapter.connected &&
+      walletPk &&
+      isBase58Address(walletPk) &&
+      adapterPk &&
+      adapterPk === walletPk
+  );
+
+  return {
+    isConnected,
+    address: isConnected ? walletPk : null,
+    adapter: isConnected ? adapter : null,
+  };
+}
+
 export const CampaignCard: React.FC<CampaignCardProps> = ({
   campaign,
   userWallet,
@@ -90,28 +129,58 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 }) => {
   const wallet = useWallet();
   const {
-    connected: genesisConnected,
-    publicKeyBase58,
-    needsSignature: genesisNeedsSignature,
-    verificationState,
     connectWallet: openConnectWalletModal,
     switchWallet: handleSwitchWallet,
-    requestUnlockSignature,
   } = useGenesisBalance();
 
-  const [walletInput, setWalletInput] = useState(userWallet || publicKeyBase58 || '');
+  const authWallet = getAuthoritativeWalletState(wallet);
+  const connectedAddress = authWallet.address;
+  const activeAdapter = authWallet.adapter;
+
+  const [walletInput, setWalletInput] = useState(connectedAddress || '');
   const [xHandleInput, setXHandleInput] = useState('');
   const [retweetLinkInput, setRetweetLinkInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [authenticatingSession, setAuthenticatingSession] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [userSubmission, setUserSubmission] = useState<CampaignSubmission | null>(
     campaign.userSubmission || null
   );
   const [copiedWallet, setCopiedWallet] = useState(false);
+  const [serverSession, setServerSession] = useState<ServerSessionState>({
+    status: authWallet.isConnected ? 'CHECKING' : 'UNKNOWN',
+    wallet: null,
+    error: null,
+  });
   const [now, setNow] = useState<number>(() =>
     typeof window !== 'undefined' ? Date.now() : 0
   );
+
+  const submittingRef = useRef(false);
+  const sessionCheckGenRef = useRef(0);
+  const submitAttemptGenRef = useRef(0);
+  const latestWalletRef = useRef<{
+    isConnected: boolean;
+    address: string | null;
+    adapter: typeof activeAdapter;
+  }>({
+    isConnected: authWallet.isConnected,
+    address: connectedAddress,
+    adapter: activeAdapter,
+  });
+
+  // Keep latestWalletRef synchronized after commits for async wallet identity checks
+  useEffect(() => {
+    latestWalletRef.current = {
+      isConnected: authWallet.isConnected,
+      address: connectedAddress,
+      adapter: activeAdapter,
+    };
+  }, [authWallet.isConnected, connectedAddress, activeAdapter]);
+
+  // Suppress unused prop warning while preserving prop API compatibility
+  void userWallet;
 
   // Expiration boundary trigger and visibilitychange refresh (no polling, no decorative countdown)
   useEffect(() => {
@@ -148,21 +217,116 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     };
   }, [campaign.expiresAt, campaign.status]);
 
-  // Keep wallet input in sync if publicKeyBase58 or userWallet connects later
+  // Keep wallet input prefilled when an authoritative wallet connects
   useEffect(() => {
     let active = true;
-    const activeWallet = publicKeyBase58 || userWallet;
-    if (activeWallet) {
+    if (authWallet.isConnected && connectedAddress) {
       queueMicrotask(() => {
         if (active) {
-          setWalletInput((prev) => (!prev ? activeWallet : prev));
+          setWalletInput((prev) => (!prev ? connectedAddress : prev));
         }
       });
     }
     return () => {
       active = false;
     };
-  }, [userWallet, publicKeyBase58]);
+  }, [authWallet.isConnected, connectedAddress]);
+
+  // Fix B: Verify actual server-authenticated session on wallet connection or account/adapter change
+  useEffect(() => {
+    const gen = ++sessionCheckGenRef.current;
+    // Invalidate any in-flight submission attempt when wallet identity or adapter changes
+    submitAttemptGenRef.current += 1;
+    submittingRef.current = false;
+
+    const capturedAddress = connectedAddress;
+    const capturedAdapter = activeAdapter;
+    const capturedConnected = authWallet.isConnected;
+
+    queueMicrotask(() => {
+      if (sessionCheckGenRef.current !== gen) return;
+      setSubmitting(false);
+
+      if (!capturedConnected || !capturedAddress || !capturedAdapter) {
+        setServerSession({ status: 'UNKNOWN', wallet: null, error: null });
+        return;
+      }
+
+      setServerSession({ status: 'CHECKING', wallet: null, error: null });
+
+      (async () => {
+        try {
+          const res = await fetch('/api/auth/session', { credentials: 'include' });
+
+          // Ignore stale responses or wallet changes that occurred during the fetch
+          const latest = latestWalletRef.current;
+          if (
+            sessionCheckGenRef.current !== gen ||
+            !latest.isConnected ||
+            latest.address !== capturedAddress ||
+            latest.adapter !== capturedAdapter ||
+            !latest.adapter?.connected
+          ) {
+            return;
+          }
+
+          if (res.status === 401) {
+            setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+            return;
+          }
+
+          if (!res.ok) {
+            setServerSession({
+              status: 'ERROR',
+              wallet: null,
+              error: 'Unable to verify server session.',
+            });
+            return;
+          }
+
+          const data = await res.json().catch(() => null);
+
+          // Recheck active wallet before accepting result
+          const latestAfterJson = latestWalletRef.current;
+          if (
+            sessionCheckGenRef.current !== gen ||
+            !latestAfterJson.isConnected ||
+            latestAfterJson.address !== capturedAddress ||
+            latestAfterJson.adapter !== capturedAdapter ||
+            !latestAfterJson.adapter?.connected
+          ) {
+            return;
+          }
+
+          if (
+            data &&
+            data.authenticated === true &&
+            typeof data.wallet === 'string' &&
+            data.wallet === capturedAddress
+          ) {
+            setServerSession({ status: 'AUTHENTICATED', wallet: capturedAddress, error: null });
+          } else {
+            setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+          }
+        } catch {
+          const latestOnErr = latestWalletRef.current;
+          if (
+            sessionCheckGenRef.current !== gen ||
+            !latestOnErr.isConnected ||
+            latestOnErr.address !== capturedAddress ||
+            latestOnErr.adapter !== capturedAdapter
+          ) {
+            return;
+          }
+          setServerSession({
+            status: 'ERROR',
+            wallet: null,
+            error: 'Network error while verifying server session.',
+          });
+        }
+      })();
+    });
+  }, [authWallet.isConnected, connectedAddress, activeAdapter]);
 
   // Keep submission state synced if props refresh
   useEffect(() => {
@@ -179,38 +343,223 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     };
   }, [campaign.userSubmission]);
 
-  const activeAdapter = wallet.wallet?.adapter;
   const activeSignMessage =
     wallet.signMessage ||
-    (activeAdapter && typeof (activeAdapter as any).signMessage === 'function'
-      ? (activeAdapter as any).signMessage.bind(activeAdapter)
+    (activeAdapter && typeof (activeAdapter as unknown as { signMessage?: unknown }).signMessage === 'function'
+      ? (activeAdapter as unknown as { signMessage: (msg: Uint8Array) => Promise<Uint8Array> }).signMessage.bind(activeAdapter)
       : null);
 
   const cleanWallet = walletInput.trim();
   const cleanHandle = xHandleInput.trim();
   const cleanRetweet = retweetLinkInput.trim();
 
-  // Active connected wallet address (adapter public key takes precedence for live signing)
-  const connectedAddress = wallet.publicKey ? wallet.publicKey.toBase58() : publicKeyBase58;
-
-  // Determine Wallet Connection & Verification State (Sections 3.A & 3.B)
-  const isWalletConnected = Boolean(connectedAddress);
+  // Authoritative connection & verification flags
+  const isWalletConnected = authWallet.isConnected && Boolean(connectedAddress);
   const isWalletMismatched = Boolean(
     isWalletConnected && cleanWallet && connectedAddress && cleanWallet !== connectedAddress
   );
-  const isSigningSupported = Boolean(activeSignMessage);
-  const isWalletAuthenticated = Boolean(
+  const isSigningSupported = Boolean(isWalletConnected && activeSignMessage);
+  const isServerSessionAuthenticated = Boolean(
     isWalletConnected &&
-    !isWalletMismatched &&
-    !genesisNeedsSignature &&
-    verificationState !== 'DISCONNECTED' &&
-    verificationState !== 'CONNECTED_UNVERIFIED' &&
-    verificationState !== 'VERIFICATION_FAILED'
+      !isWalletMismatched &&
+      serverSession.status === 'AUTHENTICATED' &&
+      serverSession.wallet === connectedAddress
   );
+
+  // Reusable wallet identity verification helper for async checkpoints
+  const isWalletIdentityValid = useCallback(
+    (
+      capturedAddress: string,
+      capturedAdapter: typeof activeAdapter,
+      attemptGen?: number
+    ): boolean => {
+      if (typeof attemptGen === 'number' && submitAttemptGenRef.current !== attemptGen) {
+        return false;
+      }
+      const latest = latestWalletRef.current;
+      const adapterPk = capturedAdapter?.publicKey ? capturedAdapter.publicKey.toBase58() : null;
+      return Boolean(
+        latest.isConnected &&
+          latest.adapter &&
+          latest.adapter === capturedAdapter &&
+          latest.adapter.connected &&
+          latest.address &&
+          latest.address === capturedAddress &&
+          capturedAdapter.connected &&
+          adapterPk === capturedAddress
+      );
+    },
+    []
+  );
+
+  const abortForWalletChange = useCallback((customMsg?: string) => {
+    setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+    setSuccessMsg(null);
+    setErrorMsg(
+      customMsg ||
+        'Wallet disconnected or switched during submission. Please reconnect and authenticate again.'
+    );
+  }, []);
+
+  const verifyServerSessionForWallet = useCallback(
+    async (
+      capturedAddress: string,
+      capturedAdapter: typeof activeAdapter,
+      attemptGen?: number
+    ): Promise<{ ok: boolean; authenticated: boolean; aborted: boolean; error?: string }> => {
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        return { ok: false, authenticated: false, aborted: true };
+      }
+
+      try {
+        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          return { ok: false, authenticated: false, aborted: true };
+        }
+
+        if (sessionRes.status === 401) {
+          return { ok: true, authenticated: false, aborted: false };
+        }
+
+        if (!sessionRes.ok) {
+          return {
+            ok: false,
+            authenticated: false,
+            aborted: false,
+            error: 'Unable to verify server session.',
+          };
+        }
+
+        const sess = await sessionRes.json().catch(() => null);
+
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          return { ok: false, authenticated: false, aborted: true };
+        }
+
+        const isMatch = Boolean(
+          sess &&
+            sess.authenticated === true &&
+            typeof sess.wallet === 'string' &&
+            sess.wallet === capturedAddress
+        );
+        return { ok: true, authenticated: isMatch, aborted: false };
+      } catch {
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          return { ok: false, authenticated: false, aborted: true };
+        }
+        return {
+          ok: false,
+          authenticated: false,
+          aborted: false,
+          error: 'Network error while verifying server session.',
+        };
+      }
+    },
+    [isWalletIdentityValid]
+  );
+
+  const handleAuthenticateSession = async () => {
+    if (authenticatingSession || submittingRef.current) return;
+    const current = getAuthoritativeWalletState(wallet);
+    if (!current.isConnected || !current.address || !current.adapter) {
+      setErrorMsg('Please connect your Solana wallet first.');
+      return;
+    }
+    if (!activeSignMessage) {
+      setErrorMsg(
+        'Connected wallet does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.'
+      );
+      return;
+    }
+
+    const capturedAddress = current.address;
+    const capturedAdapter = current.adapter;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setAuthenticatingSession(true);
+    setServerSession({ status: 'CHECKING', wallet: null, error: null });
+
+    try {
+      const ts = Date.now();
+      const sessionMsg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
+      let sessSigBytes: Uint8Array;
+      try {
+        sessSigBytes = await activeSignMessage(new TextEncoder().encode(sessionMsg));
+      } catch (signErr) {
+        const errMsg = (signErr as Error)?.message || '';
+        if (/user rejected|window closed|cancelled|canceled|denied/i.test(errMsg)) {
+          setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+          setErrorMsg('Session signature rejected. Wallet authentication is required.');
+          return;
+        }
+        throw new Error('Failed to sign authentication session message.');
+      }
+
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter)) {
+        abortForWalletChange();
+        return;
+      }
+
+      const sessSigHex = Array.from(sessSigBytes)
+        .map((b) => (b as number).toString(16).padStart(2, '0'))
+        .join('');
+
+      const authRes = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          wallet: capturedAddress,
+          signature: sessSigHex,
+          timestamp: ts,
+        }),
+      });
+
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter)) {
+        abortForWalletChange();
+        return;
+      }
+
+      if (!authRes.ok) {
+        const authData = await authRes.json().catch(() => null);
+        setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+        setErrorMsg(authData?.error || 'Wallet session authentication failed. Please retry.');
+        return;
+      }
+
+      // Confirm server session via GET /api/auth/session before marking AUTHENTICATED
+      const confirm = await verifyServerSessionForWallet(capturedAddress, capturedAdapter);
+      if (confirm.aborted) {
+        abortForWalletChange();
+        return;
+      }
+      if (!confirm.ok || !confirm.authenticated) {
+        setServerSession({
+          status: confirm.ok ? 'UNAUTHENTICATED' : 'ERROR',
+          wallet: null,
+          error: confirm.error || 'Server session confirmation failed.',
+        });
+        setErrorMsg(confirm.error || 'Server session could not be confirmed. Please retry.');
+        return;
+      }
+
+      setServerSession({ status: 'AUTHENTICATED', wallet: capturedAddress, error: null });
+    } catch (err) {
+      setServerSession({
+        status: 'ERROR',
+        wallet: null,
+        error: (err as Error).message,
+      });
+      setErrorMsg((err as Error).message || 'Session authentication failed.');
+    } finally {
+      setAuthenticatingSession(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submittingRef.current) return;
     if (isCompleted || isPaused || isExpired) {
       setErrorMsg(`Submissions are closed for this campaign (${statusLabel}).`);
       return;
@@ -218,11 +567,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // 1. Connection check
-    if (!isWalletConnected || !connectedAddress) {
+    // 1. Authoritative connection check
+    const initialWallet = getAuthoritativeWalletState(wallet);
+    if (!initialWallet.isConnected || !initialWallet.address || !initialWallet.adapter) {
       setErrorMsg('Please connect your Solana wallet before submitting raid proof.');
       return;
     }
+
+    const capturedAddress = initialWallet.address;
+    const capturedAdapter = initialWallet.adapter;
 
     // 2. Address matching check
     if (!cleanWallet) {
@@ -233,9 +586,9 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       setErrorMsg('Invalid Solana wallet address format.');
       return;
     }
-    if (cleanWallet !== connectedAddress) {
+    if (cleanWallet !== capturedAddress) {
       setErrorMsg(
-        `Entered address does not match your connected wallet (${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}). Use connected address or switch wallets.`
+        `Entered address does not match your connected wallet (${capturedAddress.slice(0, 4)}...${capturedAddress.slice(-4)}). Use connected address or switch wallets.`
       );
       return;
     }
@@ -262,24 +615,43 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       return;
     }
 
+    // Acquire synchronous in-flight guard & capture attempt generation
+    const attemptGen = ++submitAttemptGenRef.current;
+    submittingRef.current = true;
     setSubmitting(true);
+
     try {
-      // Step A: Ensure active server authentication session exists
-      let hasSession = false;
-      try {
-        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
-        if (sessionRes.ok) {
-          const sess = await sessionRes.json();
-          if (sess.wallet === cleanWallet) {
-            hasSession = true;
-          }
-        }
-      } catch {
-        // ignore probe error
+      // Checkpoint 1: Before session lookup
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
+        return;
       }
 
-      if (!hasSession) {
-        // Authenticate session via wallet signature
+      // Step A: Verify active server authentication session via GET /api/auth/session
+      const initialSessionCheck = await verifyServerSessionForWallet(
+        capturedAddress,
+        capturedAdapter,
+        attemptGen
+      );
+
+      // Checkpoint 2: Immediately after session lookup
+      if (
+        initialSessionCheck.aborted ||
+        !isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)
+      ) {
+        abortForWalletChange();
+        return;
+      }
+
+      if (!initialSessionCheck.authenticated) {
+        setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+
+        // Checkpoint 3: Before session signing
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          abortForWalletChange();
+          return;
+        }
+
         const ts = Date.now();
         const sessionMsg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
         let sessSigBytes: Uint8Array;
@@ -288,11 +660,17 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         } catch (sessSignErr) {
           const errMsg = (sessSignErr as Error)?.message || '';
           if (/user rejected|window closed|cancelled|canceled|denied/i.test(errMsg)) {
+            setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
             setErrorMsg('Session signature rejected. Wallet authentication is required to participate.');
-            setSubmitting(false);
             return;
           }
           throw new Error('Failed to sign authentication session message.');
+        }
+
+        // Checkpoint 4: Immediately after session signing
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          abortForWalletChange();
+          return;
         }
 
         const sessSigHex = Array.from(sessSigBytes)
@@ -304,49 +682,113 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            wallet: cleanWallet,
+            wallet: capturedAddress,
             signature: sessSigHex,
             timestamp: ts,
           }),
         });
 
+        // Checkpoint 5: Immediately after session authentication
+        if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+          abortForWalletChange();
+          return;
+        }
+
         if (!authRes.ok) {
           const authData = await authRes.json().catch(() => null);
+          setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
           throw new Error(authData?.error || 'Wallet session authentication failed. Please retry.');
+        }
+
+        // Verify server session again before proceeding to challenge issuance
+        const confirmSessionCheck = await verifyServerSessionForWallet(
+          capturedAddress,
+          capturedAdapter,
+          attemptGen
+        );
+
+        // Checkpoint 6: After server-session confirmation
+        if (
+          confirmSessionCheck.aborted ||
+          !isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)
+        ) {
+          abortForWalletChange();
+          return;
+        }
+
+        if (!confirmSessionCheck.ok || !confirmSessionCheck.authenticated) {
+          setServerSession({
+            status: confirmSessionCheck.ok ? 'UNAUTHENTICATED' : 'ERROR',
+            wallet: null,
+            error: confirmSessionCheck.error || 'Server session confirmation failed.',
+          });
+          throw new Error(
+            confirmSessionCheck.error || 'Server session could not be confirmed. Please retry.'
+          );
         }
       }
 
-      // Step B: Verify wallet connection before issuing challenge (prevent disconnect mid-flight)
-      if (!wallet.publicKey && !publicKeyBase58) {
-        setErrorMsg('Wallet disconnected during submission. Please reconnect.');
-        setSubmitting(false);
+      setServerSession({ status: 'AUTHENTICATED', wallet: capturedAddress, error: null });
+
+      // Checkpoint 7: Immediately before challenge issuance
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
         return;
       }
 
-      // Step C: Request server-issued challenge
+      // Step B: Request fresh server-issued challenge
       const challengeRes = await fetch(`/api/campaigns/${campaign.id}/challenge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ walletAddress: cleanWallet }),
+        body: JSON.stringify({ walletAddress: capturedAddress }),
       });
 
-      const challengeData = await challengeRes.json();
-      if (!challengeRes.ok || !challengeData.ok || !challengeData.challengeId || !challengeData.message) {
-        throw new Error(challengeData.error || 'Failed to request raid verification challenge.');
+      // Checkpoint 8: Immediately after challenge response
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
+        return;
       }
 
-      // Bound validation: verify returned challenge belongs to campaign and wallet
-      if (challengeData.campaignId && challengeData.campaignId !== campaign.id) {
-        throw new Error('Challenge campaign mismatch. Please retry.');
+      const challengeData = await challengeRes.json().catch(() => null);
+      if (!challengeRes.ok) {
+        if (challengeRes.status === 401 || challengeRes.status === 403) {
+          setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+        }
+        throw new Error(challengeData?.error || 'Failed to request raid verification challenge.');
       }
-      if (challengeData.walletAddress && challengeData.walletAddress !== cleanWallet) {
-        throw new Error('Challenge wallet mismatch. Please retry.');
+
+      // Fix C: Mandatory Challenge Binding Validation (all fields non-empty and exact match)
+      const hasValidBinding = Boolean(
+        challengeData &&
+          challengeData.ok === true &&
+          typeof challengeData.challengeId === 'string' &&
+          challengeData.challengeId.trim().length > 0 &&
+          typeof challengeData.message === 'string' &&
+          challengeData.message.trim().length > 0 &&
+          typeof challengeData.campaignId === 'string' &&
+          challengeData.campaignId.trim().length > 0 &&
+          typeof challengeData.walletAddress === 'string' &&
+          challengeData.walletAddress.trim().length > 0 &&
+          challengeData.campaignId === campaign.id &&
+          challengeData.walletAddress === capturedAddress
+      );
+
+      if (!hasValidBinding) {
+        throw new Error(
+          'Challenge validation failed: server returned incomplete or mismatched campaign/wallet binding.'
+        );
       }
 
       const activeChallengeId = challengeData.challengeId;
 
-      // Step D: Sign exact server challenge message
+      // Checkpoint 9: Immediately before challenge signing
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
+        return;
+      }
+
+      // Step C: Sign exact server challenge message
       let signatureHex: string;
       try {
         const sigBytes = await activeSignMessage(new TextEncoder().encode(challengeData.message));
@@ -357,37 +799,43 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         const signErrMsg = (signErr as Error)?.message || '';
         if (/user rejected|window closed|cancelled|canceled|denied/i.test(signErrMsg)) {
           setErrorMsg('Challenge signature rejected. Cryptographic proof is required to submit.');
-          setSubmitting(false);
           return;
         }
         throw new Error(signErrMsg || 'Failed to sign raid verification challenge.');
       }
 
-      // Step E: Verify wallet connection remains intact right before submission dispatch
-      const currentPubkey = wallet.publicKey ? wallet.publicKey.toBase58() : publicKeyBase58;
-      if (!currentPubkey || currentPubkey !== cleanWallet) {
-        setErrorMsg('Wallet disconnected or switched during signing. Submission aborted.');
-        setSubmitting(false);
+      // Checkpoint 10: Immediately after challenge signing
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
         return;
       }
 
-      // Step F: Submit raid proof to server
+      // Checkpoint 11: Immediately before submission POST
+      if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
+        abortForWalletChange();
+        return;
+      }
+
+      // Step D: Submit raid proof to server
       const res = await fetch(`/api/campaigns/${campaign.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           challengeId: activeChallengeId,
-          walletAddress: cleanWallet,
+          walletAddress: capturedAddress,
           xHandle: cleanHandle,
           xRetweetLink: cleanRetweet,
           signature: signatureHex,
         }),
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || 'Failed to submit raid proof');
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json || json.ok !== true || !json.submission) {
+        if (res.status === 401) {
+          setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
+        }
+        throw new Error(json?.error || 'Failed to submit raid proof');
       }
 
       setUserSubmission(json.submission);
@@ -398,7 +846,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     } catch (err) {
       setErrorMsg((err as Error).message);
     } finally {
-      setSubmitting(false);
+      if (submitAttemptGenRef.current === attemptGen) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -655,7 +1106,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               <span className="text-muted font-normal text-[10px]">Open to All Wallets</span>
             </div>
 
-            {/* Wallet Verification State Indicator & Banner (Section 3.A & 3.B) */}
+            {/* Wallet Verification & Server Session Status Banner (Fixes A & B) */}
             {!isWalletConnected ? (
               <div className="p-2.5 rounded-lg bg-surface-card border border-border-default space-y-1.5">
                 <div className="flex items-center justify-between gap-2 text-xs font-sans">
@@ -666,7 +1117,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   <button
                     type="button"
                     onClick={openConnectWalletModal}
-                    className="px-2.5 py-1 rounded bg-raid-strong hover:bg-raid-primary text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
+                    className="px-2.5 py-1 min-h-[36px] rounded bg-raid-strong hover:bg-raid-primary text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
                   >
                     Connect Wallet
                   </button>
@@ -704,23 +1155,54 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   Entered address differs from connected wallet ({connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}). Submissions must be signed by the receiving address.
                 </p>
               </div>
-            ) : !isWalletAuthenticated ? (
+            ) : serverSession.status === 'CHECKING' ? (
+              <div className="p-2.5 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 text-xs font-sans">
+                <span className="flex items-center gap-1.5 text-muted">
+                  <RefreshCw className="w-3.5 h-3.5 text-raid-primary animate-spin" />
+                  <span>Checking server session...</span>
+                </span>
+                <span className="font-mono text-[10px] text-dim">
+                  {connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}
+                </span>
+              </div>
+            ) : serverSession.status === 'ERROR' ? (
+              <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/30 space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs font-sans">
+                  <span className="flex items-center gap-1.5 text-danger font-bold">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Session verification error</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={authenticatingSession || submitting}
+                    onClick={handleAuthenticateSession}
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-danger/40 text-white font-mono text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {authenticatingSession ? 'Authenticating...' : 'Retry Auth'}
+                  </button>
+                </div>
+                <p className="text-[10px] font-sans text-danger/80">
+                  {serverSession.error || 'Could not confirm server session. Re-authenticate to continue.'}
+                </p>
+              </div>
+            ) : !isServerSessionAuthenticated ? (
               <div className="p-2.5 rounded-lg bg-surface-card border border-border-default space-y-1.5">
                 <div className="flex items-center justify-between gap-2 text-xs font-sans">
                   <span className="flex items-center gap-1.5 text-muted">
                     <ShieldCheck className="w-3.5 h-3.5 text-amber" />
-                    <span>Wallet connected · Needs session</span>
+                    <span>Wallet connected · Authentication required</span>
                   </span>
                   <button
                     type="button"
-                    onClick={() => requestUnlockSignature()}
-                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-border-default text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
+                    disabled={authenticatingSession || submitting}
+                    onClick={handleAuthenticateSession}
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-border-default text-white font-mono text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    Authenticate
+                    {authenticatingSession ? 'Authenticating...' : 'Authenticate'}
                   </button>
                 </div>
                 <p className="text-[10px] font-sans text-dim">
-                  A quick one-click wallet signature authenticates your session prior to challenge submission.
+                  Sign a one-click session message to confirm wallet ownership with the server before submitting.
                 </p>
               </div>
             ) : (

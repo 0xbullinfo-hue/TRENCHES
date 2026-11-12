@@ -95,7 +95,7 @@ export type VerificationState =
   | 'VERIFICATION_FAILED'
   | 'INSUFFICIENT_MEMBERSHIP';
 
-interface GenesisContextValue {
+export interface GenesisContextValue {
   connected: boolean;
   publicKeyBase58: string | null;
   shortAddress: string;
@@ -153,7 +153,7 @@ interface GenesisContextValue {
   demoEnabled: boolean;
 }
 
-const GenesisContext = createContext<GenesisContextValue | undefined>(undefined);
+export const GenesisContext = createContext<GenesisContextValue | undefined>(undefined);
 
 const EVM_STORAGE_KEY = 'trenchlabs_bound_evm_v2';
 const WATCHLIST_STORAGE_KEY = 'trenchlabs_watchlist_v3';
