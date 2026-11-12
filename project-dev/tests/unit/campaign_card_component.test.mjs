@@ -1073,3 +1073,775 @@ test('Component [22/22]: Retry after challenge failure requests a fresh challeng
     fx.restore();
   }
 });
+
+// ============================================================================
+// V1.2 COMPONENT INTERACTION TESTS (Section 5: 10 Scenarios)
+// ============================================================================
+
+const EXPECTED_WALLET_CHANGED_WARNING =
+  'Your submission was accepted for the original wallet, but your connected wallet changed before confirmation.';
+
+test('V1.2 [1/10]: Wallet changes while submission POST is pending and server returns success', async () => {
+  const submitDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_1',
+        message: 'msg_v12_1',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return submitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+
+    // Switch to WALLET_B while POST /submit is pending
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+
+    // Server accepts original WALLET_A submission
+    submitDeferred.resolve(
+      jsonResponse({
+        ok: true,
+        submission: {
+          id: 'sub-v12-1',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_A,
+          xHandle: '@raider_hero',
+          xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+          status: 'PENDING',
+          submittedAt: new Date().toISOString(),
+        },
+      }, 201)
+    );
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0, 'Must not call onSubmissionSuccess for new wallet');
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1, 'Must not auto-resubmit');
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [2/10]: Wallet disconnects while submission POST is pending and server returns success', async () => {
+  const submitDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_2',
+        message: 'msg_v12_2',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return submitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+
+    // Disconnect wallet while POST /submit is pending
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: false,
+        publicKey: null,
+        adapterConnected: false,
+        adapterPublicKey: null,
+      }),
+    });
+
+    submitDeferred.resolve(
+      jsonResponse({
+        ok: true,
+        submission: {
+          id: 'sub-v12-2',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_A,
+          xHandle: '@raider_hero',
+          xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+          status: 'PENDING',
+          submittedAt: new Date().toISOString(),
+        },
+      }, 201)
+    );
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [3/10]: Adapter changes while submission POST is pending but public key remains the same', async () => {
+  const submitDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_3',
+        message: 'msg_v12_3',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return submitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const adapter1 = {
+    name: 'Phantom',
+    connected: true,
+    publicKey: makeMockPublicKey(WALLET_A),
+  };
+  const adapter2 = {
+    name: 'Solflare',
+    connected: true,
+    publicKey: makeMockPublicKey(WALLET_A),
+  };
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      adapterInstance: adapter1,
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+
+    // Replace adapter instance while keeping same WALLET_A public key
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_A),
+        adapterInstance: adapter2,
+        signMessage: async () => new Uint8Array(64).fill(1),
+      }),
+    });
+
+    submitDeferred.resolve(
+      jsonResponse({
+        ok: true,
+        submission: {
+          id: 'sub-v12-3',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_A,
+          xHandle: '@raider_hero',
+          xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+          status: 'PENDING',
+          submittedAt: new Date().toISOString(),
+        },
+      }, 201)
+    );
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [4/10]: Wallet changes immediately after HTTP response but before JSON parsing completes', async () => {
+  const jsonDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_4',
+        message: 'msg_v12_4',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return {
+        ok: true,
+        status: 201,
+        json: () => jsonDeferred.promise,
+      };
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+
+    // HTTP response has arrived (Checkpoint 12 passed), now res.json() is pending -> switch wallet
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+
+    // Complete JSON parsing after wallet switched
+    jsonDeferred.resolve({
+      ok: true,
+      submission: {
+        id: 'sub-v12-4',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+        xHandle: '@raider_hero',
+        xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+        status: 'PENDING',
+        submittedAt: new Date().toISOString(),
+      },
+    });
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [5/10]: Wallet remains unchanged through response parsing and successful submission is displayed normally', async () => {
+  const submitDeferred = makeDeferred();
+  const jsonDeferred = makeDeferred();
+  let deliveredSubmission = null;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_5',
+        message: 'msg_v12_5',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return submitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: (sub) => {
+      deliveredSubmission = sub;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    submitDeferred.resolve({
+      ok: true,
+      status: 201,
+      json: () => jsonDeferred.promise,
+    });
+    await mounted.flush(10);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+
+    jsonDeferred.resolve({
+      ok: true,
+      submission: {
+        id: 'sub-v12-5',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+        xHandle: '@raider_hero',
+        xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+        status: 'PENDING',
+        submittedAt: new Date().toISOString(),
+      },
+    });
+    await mounted.flush(25);
+
+    assert.ok(mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.equal(deliveredSubmission?.id, 'sub-v12-5');
+    assert.equal(deliveredSubmission?.walletAddress, WALLET_A);
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [6/10]: Stale response cannot overwrite a newer wallet UI state', async () => {
+  const walletASubmitDeferred = makeDeferred();
+  let currentWalletSession = WALLET_A;
+  const deliveredIds = [];
+
+  const fx = withMockFetch(({ url, method, body }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: currentWalletSession }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: `rc_${body.walletAddress === WALLET_A ? 'A' : 'B'}`,
+        message: 'msg',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: body.walletAddress,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      if (body.walletAddress === WALLET_A) {
+        return walletASubmitDeferred.promise;
+      }
+      return jsonResponse({
+        ok: true,
+        submission: {
+          id: 'sub-wallet-B',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_B,
+          xHandle: '@raider_hero',
+          xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+          status: 'PENDING',
+          submittedAt: new Date().toISOString(),
+        },
+      }, 201);
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: (sub) => {
+      deliveredIds.push(sub.id);
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    // Switch to WALLET_B and submit cleanly for WALLET_B
+    currentWalletSession = WALLET_B;
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+    fillValidFields(mounted.container, WALLET_B);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(25);
+
+    assert.ok(mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.deepEqual(deliveredIds, ['sub-wallet-B']);
+
+    // Now WALLET_A's stale POST resolves with an error or success -> must NOT overwrite WALLET_B's UI state
+    walletASubmitDeferred.resolve(
+      jsonResponse({ ok: false, error: 'Stale wallet A error' }, 400)
+    );
+    await mounted.flush(25);
+
+    assert.ok(mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(!mounted.container.textContent.includes('Stale wallet A error'));
+    assert.ok(!mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+    assert.deepEqual(deliveredIds, ['sub-wallet-B']);
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [7/10]: Stale attempt finally block cannot release a newer attempt in-flight guard', async () => {
+  const walletASubmitDeferred = makeDeferred();
+  const walletBChallengeDeferred = makeDeferred();
+  let currentWalletSession = WALLET_A;
+
+  const fx = withMockFetch(({ url, method, body }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: currentWalletSession }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      if (body.walletAddress === WALLET_A) {
+        return jsonResponse({
+          ok: true,
+          challengeId: 'rc_A_finally',
+          message: 'msg_A',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_A,
+        }, 201);
+      }
+      return walletBChallengeDeferred.promise;
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return walletASubmitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    // Switch to WALLET_B and start a new submission (pending at /challenge)
+    currentWalletSession = WALLET_B;
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+    fillValidFields(mounted.container, WALLET_B);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    const challengesBeforeStaleFinish = fx.calls.filter(
+      (c) => c.url.includes('/challenge') && c.body?.walletAddress === WALLET_B
+    ).length;
+    assert.equal(challengesBeforeStaleFinish, 1);
+
+    // Stale WALLET_A attempt finishes & runs its finally block
+    walletASubmitDeferred.resolve(jsonResponse({ ok: false, error: 'Stale error' }, 500));
+    await mounted.flush(20);
+
+    // Attempt a duplicate click for WALLET_B while WALLET_B's challenge is still pending:
+    // Must still be blocked by WALLET_B's in-flight guard!
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    const challengesAfterStaleFinish = fx.calls.filter(
+      (c) => c.url.includes('/challenge') && c.body?.walletAddress === WALLET_B
+    ).length;
+    assert.equal(
+      challengesAfterStaleFinish,
+      1,
+      'Stale attempt finally must not release newer attempt in-flight guard'
+    );
+
+    // Cleanly resolve WALLET_B challenge
+    walletBChallengeDeferred.resolve(jsonResponse({ ok: false, error: 'Done' }, 400));
+    await mounted.flush(20);
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [8/10]: Wallet snapshot is updated at commit phase before async callbacks continue', async () => {
+  const challengeDeferred = makeDeferred();
+  let signCalled = false;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return challengeDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => {
+        signCalled = true;
+        return new Uint8Array(64).fill(1);
+      },
+    }),
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    // Update wallet and immediately resolve challenge in the same tick after commit
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => {
+          signCalled = true;
+          return new Uint8Array(64).fill(2);
+        },
+      }),
+    });
+
+    challengeDeferred.resolve(
+      jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_8',
+        message: 'msg_v12_8',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201)
+    );
+    await mounted.flush(20);
+
+    assert.equal(signCalled, false, 'Commit-phase snapshot update must invalidate challenge callback');
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 0);
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [9/10]: Wallet changes immediately before deferred async response resolves', async () => {
+  const submitDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_9',
+        message: 'msg_v12_9',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return submitDeferred.promise;
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+
+    // Immediately resolve right after wallet transition
+    submitDeferred.resolve(
+      jsonResponse({
+        ok: true,
+        submission: {
+          id: 'sub-v12-9',
+          campaignId: 'camp-ux-test-1',
+          walletAddress: WALLET_A,
+          xHandle: '@raider_hero',
+          xRetweetLink: 'https://x.com/raider_hero/status/1850000000000000999',
+          status: 'PENDING',
+          submittedAt: new Date().toISOString(),
+        },
+      }, 201)
+    );
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0);
+    assert.equal(fx.calls.filter((c) => c.url.includes('/submit')).length, 1);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});
+
+test('V1.2 [10/10]: Backend rejection remains a rejection and never produces a success state', async () => {
+  const jsonDeferred = makeDeferred();
+  let onSuccessCalls = 0;
+
+  const fx = withMockFetch(({ url, method }) => {
+    if (url === '/api/auth/session' && method === 'GET') {
+      return jsonResponse({ authenticated: true, wallet: WALLET_A }, 200);
+    }
+    if (url.includes('/challenge') && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        challengeId: 'rc_v12_10',
+        message: 'msg_v12_10',
+        campaignId: 'camp-ux-test-1',
+        walletAddress: WALLET_A,
+      }, 201);
+    }
+    if (url.includes('/submit') && method === 'POST') {
+      return {
+        ok: false,
+        status: 409,
+        json: () => jsonDeferred.promise,
+      };
+    }
+    return jsonResponse({}, 500);
+  });
+
+  const mounted = await mountCampaignCard({
+    walletContext: makeMockWalletContext({
+      connected: true,
+      publicKey: makeMockPublicKey(WALLET_A),
+      signMessage: async () => new Uint8Array(64).fill(1),
+    }),
+    onSubmissionSuccess: () => {
+      onSuccessCalls += 1;
+    },
+  });
+
+  try {
+    fillValidFields(mounted.container, WALLET_A);
+    dom.submitForm(getForm(mounted.container));
+    await mounted.flush(20);
+
+    // Wallet changes before JSON parsing completes, and backend rejected with 409
+    await mounted.update({
+      walletContext: makeMockWalletContext({
+        connected: true,
+        publicKey: makeMockPublicKey(WALLET_B),
+        signMessage: async () => new Uint8Array(64).fill(2),
+      }),
+    });
+
+    jsonDeferred.resolve({
+      ok: false,
+      error: 'Duplicate challenge submission rejected by server.',
+    });
+    await mounted.flush(25);
+
+    assert.equal(onSuccessCalls, 0);
+    assert.ok(!mounted.container.textContent.includes('Raid Proof Submitted'));
+    assert.ok(!mounted.container.textContent.includes(EXPECTED_WALLET_CHANGED_WARNING));
+    assert.ok(
+      mounted.container.textContent.includes('Duplicate challenge submission rejected by server.')
+    );
+  } finally {
+    await mounted.unmount();
+    fx.restore();
+  }
+});

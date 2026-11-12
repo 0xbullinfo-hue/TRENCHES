@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { isBase58Address } from '@/lib/config';
@@ -120,6 +120,21 @@ function getAuthoritativeWalletState(wallet: ReturnType<typeof useWallet>) {
   };
 }
 
+function isValidSubmissionPayload(
+  sub: unknown,
+  expectedCampaignId: string,
+  expectedWallet: string
+): sub is CampaignSubmission {
+  if (!sub || typeof sub !== 'object') return false;
+  const s = sub as Record<string, unknown>;
+  return (
+    typeof s.id === 'string' &&
+    s.id.trim().length > 0 &&
+    s.campaignId === expectedCampaignId &&
+    s.walletAddress === expectedWallet
+  );
+}
+
 export const CampaignCard: React.FC<CampaignCardProps> = ({
   campaign,
   userWallet,
@@ -160,6 +175,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   const submittingRef = useRef(false);
   const sessionCheckGenRef = useRef(0);
   const submitAttemptGenRef = useRef(0);
+  const activeSubmitGenRef = useRef(0);
   const latestWalletRef = useRef<{
     isConnected: boolean;
     address: string | null;
@@ -170,13 +186,24 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     adapter: activeAdapter,
   });
 
-  // Keep latestWalletRef synchronized after commits for async wallet identity checks
-  useEffect(() => {
+  // Synchronize committed wallet snapshot at commit phase before async callbacks run
+  useLayoutEffect(() => {
+    const prev = latestWalletRef.current;
+    const identityChanged =
+      prev.isConnected !== authWallet.isConnected ||
+      prev.address !== connectedAddress ||
+      prev.adapter !== activeAdapter;
+
     latestWalletRef.current = {
       isConnected: authWallet.isConnected,
       address: connectedAddress,
       adapter: activeAdapter,
     };
+
+    if (identityChanged) {
+      submitAttemptGenRef.current += 1;
+      submittingRef.current = false;
+    }
   }, [authWallet.isConnected, connectedAddress, activeAdapter]);
 
   // Suppress unused prop warning while preserving prop API compatibility
@@ -235,9 +262,6 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   // Fix B: Verify actual server-authenticated session on wallet connection or account/adapter change
   useEffect(() => {
     const gen = ++sessionCheckGenRef.current;
-    // Invalidate any in-flight submission attempt when wallet identity or adapter changes
-    submitAttemptGenRef.current += 1;
-    submittingRef.current = false;
 
     const capturedAddress = connectedAddress;
     const capturedAdapter = activeAdapter;
@@ -376,8 +400,11 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       if (typeof attemptGen === 'number' && submitAttemptGenRef.current !== attemptGen) {
         return false;
       }
+      if (!capturedAdapter || !isBase58Address(capturedAddress)) {
+        return false;
+      }
       const latest = latestWalletRef.current;
-      const adapterPk = capturedAdapter?.publicKey ? capturedAdapter.publicKey.toBase58() : null;
+      const adapterPk = capturedAdapter.publicKey ? capturedAdapter.publicKey.toBase58() : null;
       return Boolean(
         latest.isConnected &&
           latest.adapter &&
@@ -617,13 +644,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
     // Acquire synchronous in-flight guard & capture attempt generation
     const attemptGen = ++submitAttemptGenRef.current;
+    activeSubmitGenRef.current = attemptGen;
+    const isSuperseded = () => activeSubmitGenRef.current !== attemptGen;
     submittingRef.current = true;
     setSubmitting(true);
 
     try {
       // Checkpoint 1: Before session lookup
       if (!isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)) {
-        abortForWalletChange();
+        if (!isSuperseded()) abortForWalletChange();
         return;
       }
 
@@ -830,8 +859,46 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         }),
       });
 
+      // Checkpoint 12: Immediately after the HTTP response
+      const identityValidAfterPost = isWalletIdentityValid(
+        capturedAddress,
+        capturedAdapter,
+        attemptGen
+      );
+
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json || json.ok !== true || !json.submission) {
+
+      // Checkpoint 13: Immediately after response parsing
+      const identityValidAfterJson = isWalletIdentityValid(
+        capturedAddress,
+        capturedAdapter,
+        attemptGen
+      );
+
+      // If a newer submission attempt has started, never overwrite its UI state
+      if (isSuperseded()) {
+        return;
+      }
+
+      const serverAccepted = Boolean(
+        res.ok &&
+          json &&
+          json.ok === true &&
+          isValidSubmissionPayload(json.submission, campaign.id, capturedAddress)
+      );
+
+      if (!identityValidAfterPost || !identityValidAfterJson) {
+        setSuccessMsg(null);
+        if (serverAccepted) {
+          setErrorMsg(
+            'Your submission was accepted for the original wallet, but your connected wallet changed before confirmation. Reconnect the original wallet to view its submission status.'
+          );
+          return;
+        }
+        throw new Error(json?.error || 'Failed to submit raid proof');
+      }
+
+      if (!serverAccepted) {
         if (res.status === 401) {
           setServerSession({ status: 'UNAUTHENTICATED', wallet: null, error: null });
         }
@@ -844,9 +911,11 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         onSubmissionSuccess(json.submission);
       }
     } catch (err) {
-      setErrorMsg((err as Error).message);
+      if (!isSuperseded()) {
+        setErrorMsg((err as Error).message);
+      }
     } finally {
-      if (submitAttemptGenRef.current === attemptGen) {
+      if (submitAttemptGenRef.current === attemptGen && !isSuperseded()) {
         submittingRef.current = false;
         setSubmitting(false);
       }
