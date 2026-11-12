@@ -167,20 +167,20 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
         <div className={`p-3.5 rounded-lg border ${content.requiredTier === 'MEMBER' ? 'bg-surface-card border-toxic/40' : 'bg-surface-card/50 border-border-default'}`}>
           <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
             <CheckCircle2 className={`w-3.5 h-3.5 ${content.requiredTier === 'MEMBER' ? 'text-toxic' : 'text-muted'}`} />
-            <span>MEMBER TIER REQUIREMENT</span>
+            <span>MEMBER ACCESS</span>
           </div>
-          <p className="text-foreground-muted text-[11px] mt-1">
-            Hold ≥ <strong className="text-white">$20 USD</strong> of $GENESIS in your connected wallet.
+          <p className="text-foreground-muted text-[11px] mt-1 leading-relaxed">
+            Hold at least <strong className="text-white">$20 worth of $GENESIS</strong> in your connected wallet to unlock Member access.
           </p>
         </div>
 
         <div className={`p-3.5 rounded-lg border ${content.requiredTier === 'PRO' ? 'bg-surface-card border-alpha-border' : 'bg-surface-card/50 border-border-default'}`}>
           <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
             <Sparkles className={`w-3.5 h-3.5 ${content.requiredTier === 'PRO' ? 'text-alpha-primary' : 'text-muted'}`} />
-            <span>PRO TIER REQUIREMENT</span>
+            <span>PRO ACCESS</span>
           </div>
-          <p className="text-foreground-muted text-[11px] mt-1">
-            Stake ≥ <strong className="text-white">$250 USD</strong> on StakePoint for 90 days.
+          <p className="text-foreground-muted text-[11px] mt-1 leading-relaxed">
+            Stake at least <strong className="text-white">$250 worth of $GENESIS</strong> through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
           </p>
         </div>
       </div>

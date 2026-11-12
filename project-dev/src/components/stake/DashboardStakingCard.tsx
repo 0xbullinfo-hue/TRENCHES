@@ -348,24 +348,43 @@ export function DashboardStakingCard({
           />
         </div>
 
-        <div className="pt-5 mt-auto space-y-3">
-          {/* On top of buttons */}
-          <div className="space-y-1.5">
-            <h4 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
-              HOLD $GENESIS TO UNLOCK STAKING
-            </h4>
+        <div className="pt-5 mt-auto space-y-4">
+          {/* Access Tier Requirements */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <span className="font-sans text-xs font-black text-toxic uppercase tracking-wider block">
+                MEMBER ACCESS
+              </span>
+              <p className="font-sans text-xs text-muted leading-relaxed">
+                Hold at least $20 worth of $GENESIS in your connected wallet to unlock Member access.
+              </p>
+            </div>
 
-            <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-              Hold at least $20 in $GENESIS to unlock Member tier access before staking for Pro 90-day locks.
-            </p>
+            <div className="space-y-1">
+              <span className="font-sans text-xs font-black text-white uppercase tracking-wider block">
+                PRO ACCESS
+              </span>
+              <p className="font-sans text-xs text-muted leading-relaxed">
+                Stake at least $250 worth of $GENESIS through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
+              </p>
+            </div>
           </div>
 
-          <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href={stakePointPoolUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+            >
+              <span>STAKE ON STAKEPOINT</span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            </a>
             <Link
               href="/#choose-your-access"
-              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic/40 hover:border-toxic text-toxic hover:text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center transition-colors cursor-pointer"
             >
-              <span>Upgrade to Member to stake →</span>
+              <span>VIEW TIERS</span>
             </Link>
           </div>
 

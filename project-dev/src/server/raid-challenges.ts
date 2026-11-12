@@ -152,3 +152,4 @@ export async function consumeRaidChallenge(challengeId: string): Promise<boolean
   // Authoritative fallback via database lock transaction
   return await consumeRaidChallengeRow(challengeId);
 }
+

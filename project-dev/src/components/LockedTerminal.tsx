@@ -216,13 +216,13 @@ export const LockedTerminal: React.FC = () => {
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-muted">Member Requirement</span>
-            <span className="font-mono text-toxic font-bold tnum">Hold ~$20 $GENESIS in Wallet</span>
+            <span className="text-muted">Member Access</span>
+            <span className="font-mono text-toxic font-bold tnum">Hold ≥ $20 $GENESIS in Wallet</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-muted">Pro Requirement</span>
-            <span className="font-mono text-toxic font-bold tnum">Stake ~$250 for 90 Days on StakePoint</span>
+            <span className="text-muted">Pro Access</span>
+            <span className="font-mono text-toxic font-bold tnum">Stake ≥ $250 on StakePoint (90d)</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between gap-2">
