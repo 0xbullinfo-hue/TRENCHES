@@ -203,6 +203,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     if (identityChanged) {
       submitAttemptGenRef.current += 1;
       submittingRef.current = false;
+      setSubmitting(false);
     }
   }, [authWallet.isConnected, connectedAddress, activeAdapter]);
 
@@ -269,7 +270,6 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
     queueMicrotask(() => {
       if (sessionCheckGenRef.current !== gen) return;
-      setSubmitting(false);
 
       if (!capturedConnected || !capturedAddress || !capturedAdapter) {
         setServerSession({ status: 'UNKNOWN', wallet: null, error: null });

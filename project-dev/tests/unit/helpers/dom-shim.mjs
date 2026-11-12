@@ -287,6 +287,22 @@ export function installDomShim() {
       super('button', ownerDocument);
       this.type = 'submit';
     }
+    click() {
+      if (this.disabled) return;
+      const notCancelled = this.dispatchEvent(
+        new MiniEvent('click', { bubbles: true, cancelable: true })
+      );
+      if (notCancelled && (this.type === 'submit' || !this.type)) {
+        let cur = this.parentNode;
+        while (cur) {
+          if (cur.localName === 'form') {
+            cur.dispatchEvent(new MiniEvent('submit', { bubbles: true, cancelable: true }));
+            break;
+          }
+          cur = cur.parentNode;
+        }
+      }
+    }
   }
 
   class MiniHTMLFormElement extends MiniElement {
