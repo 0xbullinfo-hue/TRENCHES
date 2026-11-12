@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   AlertCircle,
@@ -32,6 +32,21 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<CampaignSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
+  const submissionsReqGenRef = useRef(0);
+  const selectedCampaignIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    selectedCampaignIdRef.current = selectedCampaignId;
+  }, [selectedCampaignId]);
 
   // Form states (Create / Edit)
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -109,39 +124,89 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
   const fetchSubmissions = useCallback(
     async (campaignId: string) => {
+      const reqGen = ++submissionsReqGenRef.current;
+      const isStale = () =>
+        !mountedRef.current ||
+        submissionsReqGenRef.current !== reqGen ||
+        selectedCampaignIdRef.current !== campaignId;
+
       setLoadingSubmissions(true);
+      setSubmissionsError(null);
       try {
         const headers = await getHeaders('GET', `/api/admin/campaigns/${campaignId}/submissions`, '');
+        if (isStale()) return;
+
         const res = await fetch(`/api/admin/campaigns/${campaignId}/submissions`, {
           headers,
         });
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.submissions)) {
-          setSubmissions(data.submissions);
-        } else {
+        if (isStale()) return;
+
+        let data: { ok?: boolean; submissions?: CampaignSubmission[]; error?: string } | null = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+        if (isStale()) return;
+
+        if (!res.ok) {
+          const msg =
+            res.status === 401 || res.status === 403
+              ? 'Authentication required or expired. Please re-verify admin access.'
+              : data?.error || `Failed to load campaign submissions (HTTP ${res.status})`;
           setSubmissions([]);
+          setSubmissionsError(msg);
+          onToast(msg, 'error');
+          return;
+        }
+
+        if (data?.ok && Array.isArray(data.submissions)) {
+          setSubmissions(data.submissions);
+          setSubmissionsError(null);
+        } else {
+          const msg = data?.error || 'Failed to load campaign submissions';
+          setSubmissions([]);
+          setSubmissionsError(msg);
+          onToast(msg, 'error');
         }
       } catch {
-        onToast('Failed to load campaign submissions', 'error');
+        if (isStale()) return;
+        const msg = 'Failed to load campaign submissions';
         setSubmissions([]);
+        setSubmissionsError(msg);
+        onToast(msg, 'error');
       } finally {
-        setLoadingSubmissions(false);
+        if (!isStale()) {
+          setLoadingSubmissions(false);
+        }
       }
     },
     [getHeaders, onToast]
   );
 
   useEffect(() => {
+    submissionsReqGenRef.current += 1;
     if (selectedCampaignId) {
       const timer = setTimeout(() => {
+        setSubmissions([]);
+        setSubmissionsError(null);
+        setLoadingSubmissions(true);
         void fetchSubmissions(selectedCampaignId);
       }, 0);
-      return () => clearTimeout(timer);
+      return () => {
+        submissionsReqGenRef.current += 1;
+        clearTimeout(timer);
+      };
     } else {
       const timer = setTimeout(() => {
         setSubmissions([]);
+        setSubmissionsError(null);
+        setLoadingSubmissions(false);
       }, 0);
-      return () => clearTimeout(timer);
+      return () => {
+        submissionsReqGenRef.current += 1;
+        clearTimeout(timer);
+      };
     }
   }, [selectedCampaignId, fetchSubmissions]);
 
@@ -213,6 +278,22 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
     setFormRewardAmount(camp.rewardAmount);
     setFormTotalPool(camp.totalPool || '');
     setFormDescription(camp.description);
+    let resolvedDuration = '24';
+    if (
+      typeof camp.durationHours === 'number' &&
+      Number.isFinite(camp.durationHours) &&
+      camp.durationHours > 0
+    ) {
+      resolvedDuration = String(camp.durationHours);
+    } else if (camp.createdAt && camp.expiresAt) {
+      const diffHours = Math.round(
+        (new Date(camp.expiresAt).getTime() - new Date(camp.createdAt).getTime()) / (1000 * 60 * 60)
+      );
+      if (Number.isFinite(diffHours) && diffHours > 0) {
+        resolvedDuration = String(diffHours);
+      }
+    }
+    setFormDurationHours(resolvedDuration);
     setFormPinned(Boolean(camp.pinned));
     setShowCreateForm(true);
   };
@@ -480,6 +561,10 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 onChange={(e) => setFormDurationHours(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none cursor-pointer"
               >
+                {formDurationHours &&
+                  !['12', '24', '48', '72', '168', '336'].includes(formDurationHours) && (
+                    <option value={formDurationHours}>{formDurationHours} Hours (Current)</option>
+                  )}
                 <option value="12">12 Hours</option>
                 <option value="24">24 Hours (1 Day)</option>
                 <option value="48">48 Hours (2 Days)</option>
@@ -684,6 +769,22 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               {loadingSubmissions ? (
                 <div className="py-12 text-center text-xs font-mono text-muted">
                   Loading submissions...
+                </div>
+              ) : submissionsError ? (
+                <div className="py-12 px-4 text-center space-y-3">
+                  <div className="inline-flex items-center gap-2 text-xs font-mono text-red-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{submissionsError}</span>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => selectedCampaignId && void fetchSubmissions(selectedCampaignId)}
+                      className="px-3 py-1.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary/50 text-xs font-mono text-foreground transition-colors cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 </div>
               ) : submissions.length === 0 ? (
                 <div className="py-12 text-center text-xs font-mono text-muted">

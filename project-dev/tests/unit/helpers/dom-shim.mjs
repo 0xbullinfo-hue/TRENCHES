@@ -330,16 +330,46 @@ export function installDomShim() {
     }
   }
 
+  class MiniHTMLOptionElement extends MiniElement {
+    constructor(ownerDocument) {
+      super('option', ownerDocument);
+      this.selected = false;
+      this.defaultSelected = false;
+    }
+    get value() {
+      const attr = this.getAttribute('value');
+      return attr !== null ? attr : this.textContent;
+    }
+    set value(v) {
+      this.setAttribute('value', v === null || v === undefined ? '' : String(v));
+    }
+  }
+
   class MiniHTMLSelectElement extends MiniElement {
     constructor(ownerDocument) {
       super('select', ownerDocument);
       this._value = '';
+      this.multiple = false;
+    }
+    get options() {
+      return this.querySelectorAll('option');
+    }
+    get selectedIndex() {
+      const opts = this.options;
+      return opts.findIndex((o) => o.selected || String(o.getAttribute('value') ?? o.textContent) === this._value);
     }
     get value() {
+      const sel = this.options.find((o) => o.selected);
+      if (sel) {
+        return String(sel.getAttribute('value') ?? sel.textContent);
+      }
       return this._value;
     }
     set value(v) {
       this._value = v === null || v === undefined ? '' : String(v);
+      for (const o of this.options) {
+        o.selected = String(o.getAttribute('value') ?? o.textContent) === this._value;
+      }
     }
   }
 
@@ -363,6 +393,9 @@ export function installDomShim() {
     createElement(tag) {
       const lower = tag.toLowerCase();
       if (lower === 'input') return new MiniHTMLInputElement(this);
+      if (lower === 'textarea') return new MiniHTMLTextAreaElement(this);
+      if (lower === 'select') return new MiniHTMLSelectElement(this);
+      if (lower === 'option') return new MiniHTMLOptionElement(this);
       if (lower === 'button') return new MiniHTMLButtonElement(this);
       if (lower === 'form') return new MiniHTMLFormElement(this);
       return new MiniElement(lower, this);
@@ -452,6 +485,18 @@ export function installDomShim() {
       }
       inputEl.dispatchEvent(new MiniEvent('input', { bubbles: true, cancelable: true }));
       inputEl.dispatchEvent(new MiniEvent('change', { bubbles: true, cancelable: true }));
+    },
+    setSelectValue(selectEl, nextVal) {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        MiniHTMLSelectElement.prototype,
+        'value'
+      )?.set;
+      if (nativeSetter) {
+        nativeSetter.call(selectEl, nextVal);
+      } else {
+        selectEl.value = nextVal;
+      }
+      selectEl.dispatchEvent(new MiniEvent('change', { bubbles: true, cancelable: true }));
     },
     submitForm(formEl) {
       formEl.dispatchEvent(new MiniEvent('submit', { bubbles: true, cancelable: true }));

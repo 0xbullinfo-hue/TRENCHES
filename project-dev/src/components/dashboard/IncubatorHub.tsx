@@ -611,7 +611,12 @@ export const IncubatorHub: React.FC = () => {
   const topWinningCoins = useMemo(
     () =>
       alphas
-        .filter((a) => (!a.isMaxAlpha || isProOrAdmin) && a.change24hPct !== null)
+        .filter(
+          (a) =>
+            a.callType !== 'WATCHLIST' &&
+            (!a.isMaxAlpha || isProOrAdmin) &&
+            a.change24hPct !== null
+        )
         .sort(compareChangeDesc)
         .slice(0, 4),
     [alphas, isProOrAdmin]
@@ -1030,15 +1035,18 @@ export const IncubatorHub: React.FC = () => {
                           setFormCallType('WATCHLIST');
                           setFormMaxAlpha(false);
                         }}
+                        aria-pressed={formCallType === 'WATCHLIST'}
                         className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
                           formCallType === 'WATCHLIST'
-                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/60 text-white'
                             : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-sans text-xs font-black uppercase text-emerald-400">WATCHLIST</span>
-                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
+                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">
+                            {formCallType === 'WATCHLIST' ? 'SELECTED · PRO' : 'PRO ONLY'}
+                          </span>
                         </div>
                         <p className="text-[11px] text-muted mt-1 leading-snug">Curated long-term projects for ongoing research.</p>
                       </button>
@@ -1453,23 +1461,30 @@ export const IncubatorHub: React.FC = () => {
                       <tr className="border-b border-border-default bg-surface-card font-sans text-xs text-muted uppercase">
                         <th className="py-3.5 px-4 font-bold">Token &amp; Chain</th>
                         <th className="py-3.5 px-4 font-bold">Contract Address (CA)</th>
-                        <th className="py-3.5 px-4 text-right font-bold">Entry MC</th>
+                        {currentTab !== 'WATCHLIST' && (
+                          <th className="py-3.5 px-4 text-right font-bold">Entry MC</th>
+                        )}
                         <th className="py-3.5 px-4 text-right font-bold">Current MC</th>
-                        <th className="py-3.5 px-4 text-center font-bold">Risk Ratio</th>
-                        <th className="py-3.5 px-4 font-bold">Take Profit</th>
+                        {currentTab !== 'WATCHLIST' && (
+                          <>
+                            <th className="py-3.5 px-4 text-center font-bold">Risk Ratio</th>
+                            <th className="py-3.5 px-4 font-bold">Take Profit</th>
+                          </>
+                        )}
                         <th className="py-3.5 px-4 text-right font-bold">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default font-sans text-xs">
                       {filteredTokens.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-8 text-center text-muted font-mono text-xs">
+                          <td colSpan={currentTab === 'WATCHLIST' ? 4 : 7} className="py-8 text-center text-muted font-mono text-xs">
                             No alpha calls match active filters.
                           </td>
                         </tr>
                       ) : (
                         filteredTokens.map((token) => {
                           const marketUrl = getPrimaryMarketUrl(token);
+                          const isRowWatchlist = token.callType === 'WATCHLIST';
                           return (
                             <tr
                               key={token.id}
@@ -1501,15 +1516,23 @@ export const IncubatorHub: React.FC = () => {
                                       <span className="font-mono text-xs text-toxic font-bold">
                                         {token.ticker}
                                       </span>
-                                      {token.outcome === 'PROFIT' && (
-                                        <span className="px-1.5 py-0.2 rounded bg-toxic text-canvas font-mono text-[10px] font-black uppercase">
-                                          PROFIT ✓
+                                      {isRowWatchlist ? (
+                                        <span className="px-1.5 py-0.2 rounded bg-surface-card border border-border-default text-emerald-400 font-mono text-[10px] font-black uppercase">
+                                          RESEARCH
                                         </span>
-                                      )}
-                                      {token.outcome === 'LOSS' && (
-                                        <span className="px-1.5 py-0.2 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
-                                          LOSS ✕
-                                        </span>
+                                      ) : (
+                                        <>
+                                          {token.outcome === 'PROFIT' && (
+                                            <span className="px-1.5 py-0.2 rounded bg-toxic text-canvas font-mono text-[10px] font-black uppercase">
+                                              PROFIT ✓
+                                            </span>
+                                          )}
+                                          {token.outcome === 'LOSS' && (
+                                            <span className="px-1.5 py-0.2 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
+                                              LOSS ✕
+                                            </span>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                     <div className="font-mono text-[11px] text-muted flex items-center gap-2 mt-0.5">
@@ -1544,11 +1567,13 @@ export const IncubatorHub: React.FC = () => {
                                 )}
                               </td>
 
-                              <td className="py-3.5 px-4 text-right font-mono tnum">
-                                <div className="font-bold text-white text-sm">
-                                  {token.entryMarketCap || '—'}
-                                </div>
-                              </td>
+                              {currentTab !== 'WATCHLIST' && (
+                                <td className="py-3.5 px-4 text-right font-mono tnum">
+                                  <div className="font-bold text-white text-sm">
+                                    {isRowWatchlist ? '—' : token.entryMarketCap || '—'}
+                                  </div>
+                                </td>
+                              )}
 
                               <td className="py-3.5 px-4 text-right font-mono tnum">
                                 <div className="font-black text-toxic-bright text-sm">
@@ -1556,35 +1581,47 @@ export const IncubatorHub: React.FC = () => {
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4 text-center font-mono text-xs">
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-card border border-border-default">
-                                  <span className="text-white font-bold">
-                                    Lvl {token.risk}/5
-                                  </span>
-                                  <span className="text-dim">•</span>
-                                  <span className="text-alpha-primary font-bold">
-                                    {token.riskRewardRatio || '2.5:1'}
-                                  </span>
-                                </div>
-                              </td>
+                              {currentTab !== 'WATCHLIST' && (
+                                <>
+                                  <td className="py-3.5 px-4 text-center font-mono text-xs">
+                                    {isRowWatchlist ? (
+                                      <span className="text-muted">—</span>
+                                    ) : (
+                                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-card border border-border-default">
+                                        <span className="text-white font-bold">
+                                          Lvl {token.risk}/5
+                                        </span>
+                                        <span className="text-dim">•</span>
+                                        <span className="text-alpha-primary font-bold">
+                                          {token.riskRewardRatio || '2.5:1'}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
 
-                              <td className="py-3.5 px-4 font-mono text-xs">
-                                <div className="flex flex-wrap items-center gap-1">
-                                  {token.takeProfits.map((tp) => (
-                                    <span
-                                      key={tp.label}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border ${
-                                        tp.hit
-                                          ? 'bg-toxic text-canvas border-toxic'
-                                          : 'bg-surface-card text-white border-border-default'
-                                      }`}
-                                    >
-                                      {tp.label}
-                                      {tp.hit ? ' ✓' : ''}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
+                                  <td className="py-3.5 px-4 font-mono text-xs">
+                                    {isRowWatchlist ? (
+                                      <span className="text-muted">—</span>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-1">
+                                        {token.takeProfits.map((tp) => (
+                                          <span
+                                            key={tp.label}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                              tp.hit
+                                                ? 'bg-toxic text-canvas border-toxic'
+                                                : 'bg-surface-card text-white border-border-default'
+                                            }`}
+                                          >
+                                            {tp.label}
+                                            {tp.hit ? ' ✓' : ''}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                </>
+                              )}
 
                               <td className="py-3.5 px-4 text-right font-sans text-xs">
                                 <div className="inline-flex items-center gap-1.5">

@@ -53,9 +53,10 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isCompleted = coin.outcome === 'PROFIT';
-  const isLoss = coin.outcome === 'LOSS';
-  const isPending = !isCompleted && !isLoss;
+  const isWatchlist = coin.callType === 'WATCHLIST';
+  const isCompleted = !isWatchlist && coin.outcome === 'PROFIT';
+  const isLoss = !isWatchlist && coin.outcome === 'LOSS';
+  const isPending = !isWatchlist && !isCompleted && !isLoss;
 
   // Distinguish Entry MC and Current MC visually
   const entryMcDisplay = coin.entryMarketCap || '—';
@@ -95,22 +96,29 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               </span>
             </span>
 
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
-                isCompleted
-                  ? 'bg-toxic text-canvas'
-                  : isLoss
-                  ? 'bg-danger text-white'
-                  : 'bg-surface-card border border-border-default text-white'
-              }`}
-            >
+            {isWatchlist ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider bg-surface-card border border-border-default text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>RESEARCH</span>
+              </span>
+            ) : (
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-toxic'
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
+                  isCompleted
+                    ? 'bg-toxic text-canvas'
+                    : isLoss
+                    ? 'bg-danger text-white'
+                    : 'bg-surface-card border border-border-default text-white'
                 }`}
-              />
-              <span>{isCompleted ? 'PROFIT ✓' : isLoss ? 'LOSS ✕' : 'ACTIVE'}</span>
-            </span>
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-toxic'
+                  }`}
+                />
+                <span>{isCompleted ? 'PROFIT ✓' : isLoss ? 'LOSS ✕' : 'ACTIVE'}</span>
+              </span>
+            )}
 
             <span className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default font-mono text-[10px] font-bold text-white">
               {coin.chain === 'ROBIN' ? 'ROBIN' : coin.chain}
@@ -233,94 +241,129 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
         )}
       </div>
 
-      {/* 2. MIDDLE & BOTTOM SECTION: Distinguishable Valuations + Risk & TP Telemetry */}
+      {/* 2. MIDDLE & BOTTOM SECTION: Distinguishable Valuations + Risk & TP Telemetry (Alpha) or Research Telemetry (Watchlist) */}
       <div className="mt-4 pt-1 space-y-2">
-        {/* Entry MC vs Current MC: Visually Distinguishable per Section 5.1 */}
-        <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-          {/* Entry Market Cap */}
-          <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-            <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
-              ENTRY MC
+        {isWatchlist ? (
+          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+            {/* Current Market Cap + 24h Change */}
+            <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+              <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
+                <span>CURRENT MC</span>
+                {coin.change24hPct !== null && (
+                  <span
+                    className={`text-[10px] font-bold ${
+                      coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                    }`}
+                  >
+                    {formatChangePct(coin.change24hPct)}
+                  </span>
+                )}
+              </div>
+              <div className="text-base font-black text-toxic-bright truncate tnum">
+                {currentMcDisplay}
+              </div>
             </div>
-            <div className="text-base font-extrabold text-white truncate tnum">
-              {entryMcDisplay}
-            </div>
-          </div>
 
-          {/* Current Market Cap + 24h Change */}
-          <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-            <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>CURRENT MC</span>
-              {coin.change24hPct !== null && (
-                <span
-                  className={`text-[10px] font-bold ${
-                    coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
-                  }`}
-                >
-                  {formatChangePct(coin.change24hPct)}
-                </span>
-              )}
-            </div>
-            <div className="text-base font-black text-toxic-bright truncate tnum">
-              {currentMcDisplay}
+            {/* 24h Volume / Research Track */}
+            <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+              <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                {coin.volume24h && coin.volume24h !== '—' ? '24H VOLUME' : 'RESEARCH TRACK'}
+              </div>
+              <div className="text-sm font-extrabold text-white truncate tnum">
+                {coin.volume24h && coin.volume24h !== '—' ? coin.volume24h : chainMeta.label}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Entry MC vs Current MC: Visually Distinguishable per Section 5.1 */}
+            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+              {/* Entry Market Cap */}
+              <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                  ENTRY MC
+                </div>
+                <div className="text-base font-extrabold text-white truncate tnum">
+                  {entryMcDisplay}
+                </div>
+              </div>
 
-        {/* 2x2 Clean Metric Grid: Risk, Stop Loss, Take Profits */}
-        <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-          {/* Risk Ratio */}
-          <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-            <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
-              RISK RATIO
+              {/* Current Market Cap + 24h Change */}
+              <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+                <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
+                  <span>CURRENT MC</span>
+                  {coin.change24hPct !== null && (
+                    <span
+                      className={`text-[10px] font-bold ${
+                        coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                      }`}
+                    >
+                      {formatChangePct(coin.change24hPct)}
+                    </span>
+                  )}
+                </div>
+                <div className="text-base font-black text-toxic-bright truncate tnum">
+                  {currentMcDisplay}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-white text-[11px]">
-                Lvl {coin.risk}/5
-              </span>
-              <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default text-alpha-primary font-bold text-[10px]">
-                {coin.riskRewardRatio || '2.5:1'}
-              </span>
-            </div>
-          </div>
 
-          {/* Stop Loss (SL) */}
-          <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-            <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
-              STOP LOSS (SL)
-            </div>
-            <div className="text-xs font-extrabold text-amber truncate">
-              {coin.stopLoss || '-25% SL'}
-            </div>
-          </div>
-        </div>
+            {/* 2x2 Clean Metric Grid: Risk, Stop Loss, Take Profits */}
+            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+              {/* Risk Ratio */}
+              <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                  RISK RATIO
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-[11px]">
+                    Lvl {coin.risk}/5
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default text-alpha-primary font-bold text-[10px]">
+                    {coin.riskRewardRatio || '2.5:1'}
+                  </span>
+                </div>
+              </div>
 
-        {/* Target Take Profits Row */}
-        <div className="p-2.5 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
-          <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center gap-1 shrink-0">
-            <Target className="w-3 h-3 text-alpha-primary" />
-            <span>TARGET TP:</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1 justify-end">
-            {coin.takeProfits && coin.takeProfits.length > 0 ? (
-              coin.takeProfits.slice(0, 3).map((tp) => (
-                <span
-                  key={tp.label}
-                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
-                    tp.hit
-                      ? 'bg-toxic text-canvas border-toxic'
-                      : 'bg-surface text-white border-border-default'
-                  }`}
-                >
-                  {tp.label}
-                  {tp.hit ? ' ✓' : ''}
-                </span>
-              ))
-            ) : (
-              <span className="text-muted text-[11px]">2x • 5x • 10x</span>
-            )}
-          </div>
-        </div>
+              {/* Stop Loss (SL) */}
+              <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
+                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                  STOP LOSS (SL)
+                </div>
+                <div className="text-xs font-extrabold text-amber truncate">
+                  {coin.stopLoss || '-25% SL'}
+                </div>
+              </div>
+            </div>
+
+            {/* Target Take Profits Row */}
+            <div className="p-2.5 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
+              <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center gap-1 shrink-0">
+                <Target className="w-3 h-3 text-alpha-primary" />
+                <span>TARGET TP:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1 justify-end">
+                {coin.takeProfits && coin.takeProfits.length > 0 ? (
+                  coin.takeProfits.slice(0, 3).map((tp) => (
+                    <span
+                      key={tp.label}
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                        tp.hit
+                          ? 'bg-toxic text-canvas border-toxic'
+                          : 'bg-surface text-white border-border-default'
+                      }`}
+                    >
+                      {tp.label}
+                      {tp.hit ? ' ✓' : ''}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-muted text-[11px]">2x • 5x • 10x</span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Contract Address Bar */}
         {coin.locked ? (

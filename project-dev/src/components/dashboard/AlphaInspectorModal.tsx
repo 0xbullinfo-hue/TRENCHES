@@ -107,6 +107,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     }
   };
 
+  const isWatchlist = token.callType === 'WATCHLIST';
   const primaryMarketUrl = getPrimaryMarketUrl(token);
   const chainMeta = CHAIN_METADATA[token.chain] || CHAIN_METADATA.SOL;
 
@@ -120,7 +121,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     >
       <div
         className={`w-full max-w-2xl rounded-xl bg-surface overflow-hidden transition-all shadow-none ${
-          token.isMaxAlpha
+          !isWatchlist && token.isMaxAlpha
             ? 'border-2 border-alpha-strong'
             : 'border border-border-default'
         }`}
@@ -129,7 +130,12 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
         {/* Top Modal Header */}
         <div className="px-5 py-3.5 bg-surface-card border-b border-border-default flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 font-sans text-xs font-bold">
-            {token.isMaxAlpha && (
+            {isWatchlist && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-950/40 text-emerald-400 border border-emerald-500/40 font-extrabold uppercase">
+                <span>WATCHLIST · RESEARCH</span>
+              </span>
+            )}
+            {!isWatchlist && token.isMaxAlpha && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-alpha-bg text-alpha-text border border-alpha-border font-extrabold uppercase">
                 <Flame className="w-3 h-3 text-alpha-primary" />
                 <span>ALPHA CALL · PRO MAX</span>
@@ -138,15 +144,15 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {token.pinned && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
                 <Pin className="w-3 h-3" />
-                <span>PINNED PRIORITY CALL</span>
+                <span>PINNED PRIORITY</span>
               </span>
             )}
-            {token.outcome === 'PROFIT' && (
+            {!isWatchlist && token.outcome === 'PROFIT' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
                 <span>ACHIEVED (IN PROFIT) ✓</span>
               </span>
             )}
-            {token.outcome === 'LOSS' && (
+            {!isWatchlist && token.outcome === 'LOSS' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-danger text-white font-extrabold uppercase">
                 <span>AT LOSS ✕</span>
               </span>
@@ -209,10 +215,10 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
                 <div className="text-right font-mono tnum">
                   <div className="text-lg font-extrabold text-white">
-                    {token.entryMarketCap || token.marketCap}
+                    {isWatchlist ? token.marketCap || '—' : token.entryMarketCap || token.marketCap}
                   </div>
                   <div className="text-xs font-bold text-pump">
-                    ENTRY MC
+                    {isWatchlist ? 'CURRENT MC' : 'ENTRY MC'}
                   </div>
                 </div>
               </div>
@@ -223,8 +229,37 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             </div>
           </div>
 
-          {/* Core Trade Call Metrics: Market Cap, Both Risk Metrics, Take Profit Multipliers */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-sans text-xs tnum">
+          {/* Core Metrics: Research Telemetry (Watchlist) vs Trade Call Metrics (Alpha) */}
+          {isWatchlist ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans text-xs tnum">
+              <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
+                <div className="text-[11px] text-muted font-bold uppercase">
+                  CURRENT MARKET CAP
+                </div>
+                <div className="text-lg font-extrabold text-white font-mono">
+                  {token.marketCap || '—'}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 font-mono text-xs text-muted">
+                  <MarketDataBadge item={token} />
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
+                <div className="text-[11px] text-muted font-bold uppercase">
+                  RESEARCH CLASSIFICATION
+                </div>
+                <div className="text-sm font-extrabold text-emerald-400 font-mono">
+                  Platform Watchlist
+                </div>
+                <div className="text-xs text-muted font-mono pt-1">
+                  {token.volume24h && token.volume24h !== '—'
+                    ? `24h Vol: ${token.volume24h}`
+                    : `${chainMeta.label} • Ongoing Research`}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-sans text-xs tnum">
             {/* 1. Market Cap & Entry */}
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
               <div className="text-[11px] text-muted font-bold uppercase">
@@ -317,6 +352,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Admin Quick Controls Inside Inspector */}
           {isAdmin && (
@@ -341,20 +377,22 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   </button>
                 )}
 
-                {/* Max Alpha Toggle */}
-                <button
-                  type="button"
-                  onClick={() => toggleMaxAlpha(token.id, !token.isMaxAlpha)}
-                  className={`px-3 py-1.5 rounded-lg border font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    token.isMaxAlpha
-                      ? 'bg-alpha-strong text-white border-alpha-border'
-                      : 'bg-surface text-white border-border-default hover:border-alpha-primary hover:text-alpha-primary'
-                  }`}
-                  title="Toggle Max Alpha (Purple highlight)"
-                >
-                  <Flame className="w-3.5 h-3.5" />
-                  <span>{token.isMaxAlpha ? 'Max Alpha Active' : 'Mark as Max Alpha'}</span>
-                </button>
+                {/* Max Alpha Toggle (Alpha calls only) */}
+                {!isWatchlist && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMaxAlpha(token.id, !token.isMaxAlpha)}
+                    className={`px-3 py-1.5 rounded-lg border font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      token.isMaxAlpha
+                        ? 'bg-alpha-strong text-white border-alpha-border'
+                        : 'bg-surface text-white border-border-default hover:border-alpha-primary hover:text-alpha-primary'
+                    }`}
+                    title="Toggle Max Alpha (Purple highlight)"
+                  >
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>{token.isMaxAlpha ? 'Max Alpha Active' : 'Mark as Max Alpha'}</span>
+                  </button>
+                )}
 
                 {/* Priority Pin Toggle */}
                 <button
@@ -370,45 +408,47 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <span>{token.pinned ? 'Unpin Priority' : 'Pin Priority'}</span>
                 </button>
 
-                {/* Outcome Selector */}
-                <div className="flex items-center gap-1 sm:border-l sm:border-line sm:pl-2">
-                  <button
-                    type="button"
-                    onClick={() => setCallOutcome(token.id, 'PROFIT')}
-                    className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
-                      token.outcome === 'PROFIT'
-                        ? 'bg-pump text-canvas border-pump'
-                        : 'bg-surface text-muted hover:text-white border-line hover:border-pump'
-                    }`}
-                    title="Mark as Achieved (In Profit)"
-                  >
-                    ✓ Achieved (Profit)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCallOutcome(token.id, 'LOSS')}
-                    className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
-                      token.outcome === 'LOSS'
-                        ? 'bg-danger text-white border-danger'
-                        : 'bg-surface text-muted hover:text-white border-line hover:border-danger'
-                    }`}
-                    title="Mark as At Loss"
-                  >
-                    ✕ At Loss
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCallOutcome(token.id, 'PENDING')}
-                    className={`px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                      !token.outcome || token.outcome === 'PENDING'
-                        ? 'bg-surface border-line text-white font-bold'
-                        : 'bg-surface text-dim border-line hover:text-white'
-                    }`}
-                    title="Reset outcome to Open"
-                  >
-                    Reset
-                  </button>
-                </div>
+                {/* Outcome Selector (Alpha calls only) */}
+                {!isWatchlist && (
+                  <div className="flex items-center gap-1 sm:border-l sm:border-line sm:pl-2">
+                    <button
+                      type="button"
+                      onClick={() => setCallOutcome(token.id, 'PROFIT')}
+                      className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
+                        token.outcome === 'PROFIT'
+                          ? 'bg-pump text-canvas border-pump'
+                          : 'bg-surface text-muted hover:text-white border-line hover:border-pump'
+                      }`}
+                      title="Mark as Achieved (In Profit)"
+                    >
+                      ✓ Achieved (Profit)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCallOutcome(token.id, 'LOSS')}
+                      className={`px-2.5 py-1.5 rounded border font-bold text-xs cursor-pointer transition-colors ${
+                        token.outcome === 'LOSS'
+                          ? 'bg-danger text-white border-danger'
+                          : 'bg-surface text-muted hover:text-white border-line hover:border-danger'
+                      }`}
+                      title="Mark as At Loss"
+                    >
+                      ✕ At Loss
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCallOutcome(token.id, 'PENDING')}
+                      className={`px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                        !token.outcome || token.outcome === 'PENDING'
+                          ? 'bg-surface border-line text-white font-bold'
+                          : 'bg-surface text-dim border-line hover:text-white'
+                      }`}
+                      title="Reset outcome to Open"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                )}
 
                 {/* Delete Call */}
                 <button

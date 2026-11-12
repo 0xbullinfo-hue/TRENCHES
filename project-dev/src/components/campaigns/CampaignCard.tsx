@@ -893,9 +893,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           setErrorMsg(
             'Your submission was accepted for the original wallet, but your connected wallet changed before confirmation. Reconnect the original wallet to view its submission status.'
           );
-          return;
         }
-        throw new Error(json?.error || 'Failed to submit raid proof');
+        return;
       }
 
       if (!serverAccepted) {
@@ -911,7 +910,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         onSubmissionSuccess(json.submission);
       }
     } catch (err) {
-      if (!isSuperseded()) {
+      if (
+        !isSuperseded() &&
+        isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)
+      ) {
         setErrorMsg((err as Error).message);
       }
     } finally {
