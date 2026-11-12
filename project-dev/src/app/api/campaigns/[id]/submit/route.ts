@@ -8,6 +8,7 @@ import {
   getSubmissionByChallengeId,
   reconcileCampaignSubmission,
 } from '@/server/campaigns-data';
+import { ensureCampaignSubmissionSideEffects } from '@/server/campaign-side-effects';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { verifySolanaSignature } from '@/server/auth';
@@ -18,9 +19,68 @@ import {
   rollbackRaidChallengeProcessing,
   reconcileRaidChallengeCompleted,
 } from '@/server/raid-challenges';
+import type { Campaign, CampaignSubmission } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
+
+async function buildSubmissionSuccessResponse(params: {
+  campaign: Campaign;
+  submission: CampaignSubmission;
+  isExisting: boolean;
+}): Promise<NextResponse> {
+  const { campaign, submission, isExisting } = params;
+
+  // 1. Authoritative counter reconciliation (never swallowed silently)
+  let reconcileRes;
+  try {
+    reconcileRes = await reconcileCampaignSubmission(campaign.id, submission.id);
+  } catch (err) {
+    reconcileRes = {
+      ok: false as const,
+      status: 'STORAGE_ERROR' as const,
+      campaignId: campaign.id,
+      submissionId: submission.id,
+      error: (err as Error).message || 'Persistence unavailable',
+    };
+  }
+  const counterStatus: 'RECONCILED' | 'PENDING_RECONCILIATION' = reconcileRes.ok
+    ? 'RECONCILED'
+    : 'PENDING_RECONCILIATION';
+
+  // 2. Durable side effects: transactional outbox reward & notification creation
+  const sideEffects = await ensureCampaignSubmissionSideEffects({
+    submission,
+    campaign,
+  });
+  const sideEffectsStatus: 'DURABLE' | 'PENDING_RECONCILIATION' = sideEffects.ok
+    ? 'DURABLE'
+    : 'PENDING_RECONCILIATION';
+
+  const defaultMessage = isExisting
+    ? 'Campaign proof successfully submitted! (Idempotent recovery)'
+    : 'Campaign proof successfully submitted! Awaiting admin airdrop verification.';
+
+  const message =
+    counterStatus === 'PENDING_RECONCILIATION'
+      ? 'Campaign proof persisted. Counter reconciliation pending retry.'
+      : defaultMessage;
+
+  const responseStatus = isExisting ? 200 : 201;
+
+  return NextResponse.json(
+    {
+      ok: true,
+      submissionStatus: 'PERSISTED',
+      counterStatus,
+      sideEffectsStatus,
+      message,
+      submission,
+      submissionsCount: reconcileRes.ok ? reconcileRes.submissionsCount : campaign.submissionsCount,
+    },
+    { status: responseStatus, headers: NO_STORE }
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -160,15 +220,11 @@ export async function POST(
       existingSubmission.walletAddress.toLowerCase() === walletAddress.toLowerCase()
     ) {
       if (isRetry || challengeState.attemptId === attemptId) {
-        await reconcileCampaignSubmission(id, existingSubmission.id).catch(() => {});
-        return NextResponse.json(
-          {
-            ok: true,
-            message: 'Campaign proof successfully submitted! (Idempotent recovery)',
-            submission: existingSubmission,
-          },
-          { status: 200, headers: NO_STORE }
-        );
+        return buildSubmissionSuccessResponse({
+          campaign,
+          submission: existingSubmission,
+          isExisting: true,
+        });
       }
       return NextResponse.json(
         { ok: false, error: 'Challenge has already been consumed or replayed.' },
@@ -183,6 +239,19 @@ export async function POST(
 
   // PROCESSING:
   if (challengeState.status === 'PROCESSING') {
+    const existingSubmission = await getSubmissionByChallengeId(challengeId);
+    if (
+      existingSubmission &&
+      existingSubmission.campaignId === id &&
+      existingSubmission.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+    ) {
+      await reconcileRaidChallengeCompleted(challengeId, existingSubmission.id).catch(() => {});
+      return buildSubmissionSuccessResponse({
+        campaign,
+        submission: existingSubmission,
+        isExisting: true,
+      });
+    }
     if (!challengeState.isLeaseExpired && challengeState.attemptId !== attemptId) {
       return NextResponse.json(
         { ok: false, error: 'Another valid attempt is currently processing this challenge. Retry shortly.' },
@@ -260,16 +329,12 @@ export async function POST(
     // If it's for this exact challenge, it's an idempotent retry
     if (existingForWallet.challengeId === challengeId) {
       await reconcileRaidChallengeCompleted(challengeId, existingForWallet.id).catch(() => {});
-      await reconcileCampaignSubmission(id, existingForWallet.id).catch(() => {});
       if (isRetry || matchesAttempt) {
-        return NextResponse.json(
-          {
-            ok: true,
-            message: 'Campaign proof successfully submitted! (Idempotent recovery)',
-            submission: existingForWallet,
-          },
-          { status: 200, headers: NO_STORE }
-        );
+        return buildSubmissionSuccessResponse({
+          campaign,
+          submission: existingForWallet,
+          isExisting: true,
+        });
       }
       return NextResponse.json(
         { ok: false, error: 'Challenge has already been consumed or replayed.' },
@@ -286,16 +351,12 @@ export async function POST(
   const existingDurable = await getSubmissionByChallengeId(challengeId);
   if (existingDurable) {
     await reconcileRaidChallengeCompleted(challengeId, existingDurable.id).catch(() => {});
-    await reconcileCampaignSubmission(id, existingDurable.id).catch(() => {});
     if (isRetry || matchesAttempt) {
-      return NextResponse.json(
-        {
-          ok: true,
-          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
-          submission: existingDurable,
-        },
-        { status: 200, headers: NO_STORE }
-      );
+      return buildSubmissionSuccessResponse({
+        campaign,
+        submission: existingDurable,
+        isExisting: true,
+      });
     }
     return NextResponse.json(
       { ok: false, error: 'Challenge has already been completed with conflicting operation.' },
@@ -325,15 +386,11 @@ export async function POST(
   if (claim.status === 'COMPLETED') {
     const existing = await getSubmissionByChallengeId(challengeId);
     if (existing && (isRetry || claim.attemptId === attemptId)) {
-      await reconcileCampaignSubmission(id, existing.id).catch(() => {});
-      return NextResponse.json(
-        {
-          ok: true,
-          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
-          submission: existing,
-        },
-        { status: 200, headers: NO_STORE }
-      );
+      return buildSubmissionSuccessResponse({
+        campaign,
+        submission: existing,
+        isExisting: true,
+      });
     }
     return NextResponse.json(
       { ok: false, error: 'Challenge has already been completed with conflicting operation.' },
@@ -380,16 +437,12 @@ export async function POST(
     const durableCheck = await getSubmissionByChallengeId(challengeId);
     if (durableCheck) {
       // The submission was durably saved! Finalize challenge, repair counter and return success:
-      finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
-      await reconcileCampaignSubmission(id, durableCheck.id).catch(() => {});
-      return NextResponse.json(
-        {
-          ok: true,
-          message: 'Campaign proof successfully submitted! Awaiting admin airdrop verification.',
-          submission: durableCheck,
-        },
-        { status: 201, headers: NO_STORE }
-      );
+      await finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
+      return buildSubmissionSuccessResponse({
+        campaign,
+        submission: durableCheck,
+        isExisting: false,
+      });
     }
 
     // Definitively NO durable submission exists: Safe ownership-protected rollback
@@ -403,16 +456,12 @@ export async function POST(
   if (!result.ok || !result.submission) {
     const durableCheck = await getSubmissionByChallengeId(challengeId);
     if (durableCheck) {
-      finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
-      await reconcileCampaignSubmission(id, durableCheck.id).catch(() => {});
-      return NextResponse.json(
-        {
-          ok: true,
-          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
-          submission: durableCheck,
-        },
-        { status: 200, headers: NO_STORE }
-      );
+      await finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
+      return buildSubmissionSuccessResponse({
+        campaign,
+        submission: durableCheck,
+        isExisting: true,
+      });
     }
     await rollbackRaidChallengeProcessing(challengeId, attemptId, fencingToken, challenge);
     return NextResponse.json(
@@ -426,26 +475,11 @@ export async function POST(
     await finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, result.submission.id);
   } catch (finalizeErr) {
     console.warn('[API submit POST] Redis finalization error (submission remains durable):', finalizeErr);
-    // MANDATORY REQUIREMENT 7:
-    // If Redis finalization fails after the submission has been persisted:
-    // - Do not roll back the durable submission!
-    // - Do not report that the submission was never recorded!
-    // - Return a response reflecting the durable result (201).
   }
 
-  if (result.isExisting) {
-    await reconcileCampaignSubmission(id, result.submission.id).catch(() => {});
-  }
-
-  const responseStatus = result.isExisting ? 200 : 201;
-  return NextResponse.json(
-    {
-      ok: true,
-      message: result.isExisting
-        ? 'Campaign proof successfully submitted! (Idempotent recovery)'
-        : 'Campaign proof successfully submitted! Awaiting admin airdrop verification.',
-      submission: result.submission,
-    },
-    { status: responseStatus, headers: NO_STORE }
-  );
+  return buildSubmissionSuccessResponse({
+    campaign,
+    submission: result.submission,
+    isExisting: Boolean(result.isExisting),
+  });
 }

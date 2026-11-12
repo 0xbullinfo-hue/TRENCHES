@@ -97,6 +97,117 @@ globalThis.fetch = async (url, options) => {
       const key = String(args[3] ?? args[2]);
       const val = mockRedisStore.get(key);
 
+      // V2.7 Locked Key Save Lua
+      if (script.includes('LOCK_LOST')) {
+        const lockKey = String(args[3]);
+        const targetKey = String(args[4]);
+        const expectedToken = String(args[5]);
+        const payload = String(args[6]);
+        const currentLock = mockRedisStore.get(lockKey);
+        if (!currentLock || currentLock !== expectedToken) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'LOCK_LOST' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        mockRedisStore.set(targetKey, payload);
+        return new Response(JSON.stringify({ result: JSON.stringify({ success: true }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // V2.7 Submission Challenge Reservation Lua
+      if (script.includes('RESERVE_SUBMISSION') || (script.includes('created') && script.includes('604800'))) {
+        const chalKey = String(args[3]);
+        const existingSub = mockRedisStore.get(chalKey);
+        if (existingSub) {
+          return new Response(
+            JSON.stringify({ result: JSON.stringify({ created: false, submission: existingSub }) }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        mockRedisStore.set(chalKey, String(args[4]));
+        return new Response(JSON.stringify({ result: JSON.stringify({ created: true }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // V2.7 Notification Dispatch Claim Lua
+      if (script.includes('DISPATCHING') && script.includes('dispatchWorkerId')) {
+        const evKey = String(args[3]);
+        const evRaw = mockRedisStore.get(evKey);
+        if (!evRaw) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const ev = JSON.parse(evRaw);
+        if (ev.status === 'ACCEPTED' || ev.status === 'DELIVERED') {
+          return new Response(
+            JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'ALREADY_COMPLETED', status: ev.status }) }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        const workerId = String(args[4]);
+        const nowMs = Number(args[5]) || Date.now();
+        const leaseMs = Number(args[6]) || 30000;
+        if (ev.status === 'DISPATCHING' && nowMs <= (Number(ev.dispatchLeaseExpiresAt) || 0) && ev.dispatchWorkerId !== workerId) {
+          return new Response(
+            JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'BUSY', workerId: ev.dispatchWorkerId }) }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        ev.status = 'DISPATCHING';
+        ev.dispatchWorkerId = workerId;
+        ev.dispatchLeaseExpiresAt = nowMs + leaseMs;
+        ev.dispatchGeneration = (Number(ev.dispatchGeneration) || 0) + 1;
+        ev.attemptCount = (Number(ev.attemptCount) || 0) + 1;
+        ev.lastAttemptAt = nowMs;
+        mockRedisStore.set(evKey, JSON.stringify(ev));
+        return new Response(
+          JSON.stringify({ result: JSON.stringify({ ok: true, dispatchGeneration: ev.dispatchGeneration, event: ev }) }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // V2.7 Notification Dispatch Complete Lua
+      if (script.includes('STALE_DISPATCH_WORKER')) {
+        const evKey = String(args[3]);
+        const evRaw = mockRedisStore.get(evKey);
+        if (!evRaw) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const ev = JSON.parse(evRaw);
+        const workerId = String(args[4]);
+        const dispatchGen = Number(args[5]);
+        if (ev.dispatchWorkerId !== workerId) {
+          return new Response(
+            JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'STALE_DISPATCH_WORKER' }) }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (Number(ev.dispatchGeneration) !== dispatchGen) {
+          return new Response(
+            JSON.stringify({ result: JSON.stringify({ ok: false, reason: 'STALE_DISPATCH_GENERATION' }) }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        ev.status = String(args[6]);
+        ev.externalRef = args[7] || null;
+        ev.error = args[8] || null;
+        mockRedisStore.set(evKey, JSON.stringify(ev));
+        return new Response(JSON.stringify({ result: JSON.stringify({ ok: true, status: ev.status, event: ev }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       // 1. V2.5 Claim Processing Lua
       if (script.includes('CLAIMED') && script.includes('PROCESSING')) {
         if (!val) {

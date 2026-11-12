@@ -724,3 +724,149 @@ export async function kvOutboxFinalizeEvent(
   ]);
   return (res as 'completed' | 'pending' | 'missing') ?? 'pending';
 }
+
+// ---------------------------------------------------------------------------
+// V2.7 Atomic Ownership, Submission Uniqueness & Outbox Dispatch Primitives
+// ---------------------------------------------------------------------------
+
+export const SAVE_LOCKED_KEY_LUA =
+  "local lockVal = redis.call('get', KEYS[1]) " +
+  "if not lockVal or lockVal ~= ARGV[1] then " +
+  "  return cjson.encode({ success = false, reason = 'LOCK_LOST' }) " +
+  "end " +
+  "redis.call('set', KEYS[2], ARGV[2]) " +
+  "return cjson.encode({ success = true })";
+
+export async function kvSetLocked(
+  lockKey: string,
+  targetKey: string,
+  ownerToken: string,
+  payload: string
+): Promise<{ success: boolean; reason?: string }> {
+  const res = await cmd(['EVAL', SAVE_LOCKED_KEY_LUA, 2, lockKey, targetKey, ownerToken, payload]);
+  if (!res) return { success: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as { success: boolean; reason?: string };
+  } catch {
+    return { success: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export const RESERVE_SUBMISSION_CHALLENGE_LUA =
+  "local existing = redis.call('get', KEYS[1]) " +
+  "if existing then " +
+  "  return cjson.encode({ created = false, submission = existing }) " +
+  "end " +
+  "local ttl = tonumber(ARGV[2]) or 604800 " +
+  "redis.call('set', KEYS[1], ARGV[1], 'EX', ttl) " +
+  "return cjson.encode({ created = true })";
+
+export async function kvReserveSubmissionChallenge(
+  challengeKey: string,
+  submissionJson: string,
+  ttlSec = 604800
+): Promise<{ created: boolean; submission?: string }> {
+  const res = await cmd(['EVAL', RESERVE_SUBMISSION_CHALLENGE_LUA, 1, challengeKey, submissionJson, ttlSec]);
+  if (!res) return { created: false };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as { created: boolean; submission?: string };
+  } catch {
+    return { created: false };
+  }
+}
+
+export const CLAIM_NOTIFICATION_DISPATCH_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ ok = false, reason = 'NOT_FOUND' }) end " +
+  "local e = cjson.decode(raw) " +
+  "if e.status == 'ACCEPTED' or e.status == 'DELIVERED' then " +
+  "  return cjson.encode({ ok = false, reason = 'ALREADY_COMPLETED', status = e.status }) " +
+  "end " +
+  "local nowMs = tonumber(ARGV[2]) " +
+  "local leaseMs = tonumber(ARGV[3]) " +
+  "if e.status == 'DISPATCHING' then " +
+  "  local leaseExp = tonumber(e.dispatchLeaseExpiresAt) or 0 " +
+  "  if nowMs <= leaseExp and e.dispatchWorkerId ~= ARGV[1] then " +
+  "    return cjson.encode({ ok = false, reason = 'BUSY', workerId = e.dispatchWorkerId }) " +
+  "  end " +
+  "end " +
+  "e.status = 'DISPATCHING' " +
+  "e.dispatchWorkerId = ARGV[1] " +
+  "e.dispatchLeaseExpiresAt = nowMs + leaseMs " +
+  "e.dispatchGeneration = (tonumber(e.dispatchGeneration) or 0) + 1 " +
+  "e.attemptCount = (tonumber(e.attemptCount) or 0) + 1 " +
+  "e.lastAttemptAt = nowMs " +
+  "redis.call('set', KEYS[1], cjson.encode(e)) " +
+  "return cjson.encode({ ok = true, dispatchGeneration = e.dispatchGeneration, event = e })";
+
+export async function kvClaimNotificationDispatch(
+  eventKey: string,
+  workerId: string,
+  nowMs = Date.now(),
+  leaseMs = 30000
+): Promise<{ ok: boolean; dispatchGeneration?: number; reason?: string; status?: string; event?: unknown }> {
+  const res = await cmd(['EVAL', CLAIM_NOTIFICATION_DISPATCH_LUA, 1, eventKey, workerId, nowMs, leaseMs]);
+  if (!res) return { ok: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as {
+      ok: boolean;
+      dispatchGeneration?: number;
+      reason?: string;
+      status?: string;
+      event?: unknown;
+    };
+  } catch {
+    return { ok: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export const COMPLETE_NOTIFICATION_DISPATCH_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ ok = false, reason = 'NOT_FOUND' }) end " +
+  "local e = cjson.decode(raw) " +
+  "if e.dispatchWorkerId ~= ARGV[1] then " +
+  "  return cjson.encode({ ok = false, reason = 'STALE_DISPATCH_WORKER' }) " +
+  "end " +
+  "if tonumber(e.dispatchGeneration) ~= tonumber(ARGV[2]) then " +
+  "  return cjson.encode({ ok = false, reason = 'STALE_DISPATCH_GENERATION' }) " +
+  "end " +
+  "e.status = ARGV[3] " +
+  "if ARGV[4] and ARGV[4] ~= '' then e.externalRef = ARGV[4] end " +
+  "if ARGV[5] and ARGV[5] ~= '' then e.error = ARGV[5] else e.error = nil end " +
+  "e.updatedAt = tonumber(ARGV[6]) or 0 " +
+  "redis.call('set', KEYS[1], cjson.encode(e)) " +
+  "return cjson.encode({ ok = true, status = e.status, event = e })";
+
+export async function kvCompleteNotificationDispatch(
+  eventKey: string,
+  workerId: string,
+  dispatchGeneration: number,
+  status: string,
+  externalRef = '',
+  error = '',
+  nowMs = Date.now()
+): Promise<{ ok: boolean; reason?: string; status?: string; event?: unknown }> {
+  const res = await cmd([
+    'EVAL',
+    COMPLETE_NOTIFICATION_DISPATCH_LUA,
+    1,
+    eventKey,
+    workerId,
+    dispatchGeneration,
+    status,
+    externalRef,
+    error,
+    nowMs,
+  ]);
+  if (!res) return { ok: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as {
+      ok: boolean;
+      reason?: string;
+      status?: string;
+      event?: unknown;
+    };
+  } catch {
+    return { ok: false, reason: 'PARSE_ERROR' };
+  }
+}

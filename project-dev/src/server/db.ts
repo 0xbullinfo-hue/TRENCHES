@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock } from '@/server/kv';
+import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock, kvSetLocked } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
 import { getGenesisPrice } from '@/server/price';
@@ -223,6 +223,15 @@ export function isPidDead(pid: number): boolean {
   }
 }
 
+import { AsyncLocalStorage } from 'async_hooks';
+
+export const dbLockStorage = new AsyncLocalStorage<FileLockRelease | {
+  token: string;
+  fencingGeneration: number;
+  assertOwned: () => void;
+  isOwned: () => boolean;
+}>();
+
 export interface FileLockRelease {
   (): void;
   token: string;
@@ -232,13 +241,14 @@ export interface FileLockRelease {
 }
 
 /**
- * Hardened file lock acquisition with metadata integrity and atomic OS rename recovery.
+ * Race-safe file lock acquisition with metadata verification, monotonic fencing generations,
+ * and atomic OS rename recovery guarded against replacement lock races.
  *
  * Supported deployment model:
  * - Local dev / single-node host: Cross-process mutual exclusion via atomic kernel open ('wx')
  *   with verification and atomic rename-based dead PID recovery.
  * - Multi-instance / serverless production: Backed by shared Upstash Redis distributed lock
- *   (withRegistryLock / kvLock with token ownership, fencing, and lease renewals).
+ *   (kvLock with token ownership, fencing, and lease renewals).
  */
 export async function acquireFileLock(
   lockFilePath: string = DB_FILE_LOCK_PATH,
@@ -248,16 +258,44 @@ export async function acquireFileLock(
   const start = Date.now();
   const lockToken = safeRandomUUID();
 
+  const dataDir = path.dirname(lockFilePath);
+  if (!fs.existsSync(dataDir)) {
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+    } catch {}
+  }
+
+  // Clean up any abandoned reclaim staging files left by dead processes
+  try {
+    const lockBase = path.basename(lockFilePath);
+    const reclaimPrefix = `${lockBase}.reclaim.`;
+    const entries = fs.readdirSync(dataDir);
+    for (const entry of entries) {
+      if (entry.startsWith(reclaimPrefix)) {
+        const full = path.join(dataDir, entry);
+        try {
+          const raw = fs.readFileSync(full, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (typeof parsed?.pid === 'number' && isPidDead(parsed.pid)) {
+            fs.unlinkSync(full);
+          }
+        } catch {
+          // If unreadable or corrupted staging file, clean up
+          try { fs.unlinkSync(full); } catch {}
+        }
+      }
+    }
+  } catch {}
+
   while (Date.now() - start < maxWaitMs) {
     try {
-      const dataDir = path.dirname(lockFilePath);
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      // 1. 'wx' opens for writing exclusively, failing if path already exists (atomic OS kernel lock)
+      // 1. 'wx' opens exclusively, failing with EEXIST if path already exists (atomic OS kernel lock)
       const fd = fs.openSync(lockFilePath, 'wx');
-      let fencingGeneration = 1;
+      const fencingGeneration = 1;
       try {
         if (_testFailNextLockMetadataWrite) {
           _testFailNextLockMetadataWrite = false;
@@ -288,14 +326,14 @@ export async function acquireFileLock(
           throw new Error('Lock metadata verification failed: token mismatch');
         }
       } catch (metaErr) {
-        // Acquisition integrity: never silently swallow metadata failures
+        // Acquisition integrity: never leave partially acquired lock on failure
         try {
           fs.closeSync(fd);
         } catch {}
         try {
           if (fs.existsSync(lockFilePath)) {
             const raw = fs.readFileSync(lockFilePath, 'utf8');
-            if (raw.includes(lockToken)) {
+            if (!raw || raw.includes(lockToken)) {
               fs.unlinkSync(lockFilePath);
             }
           }
@@ -337,7 +375,7 @@ export async function acquireFileLock(
           try {
             if (!fs.existsSync(lockFilePath)) return false;
             const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-            return cur?.token === lockToken;
+            return cur?.token === lockToken && Number(cur?.fencingGeneration) === fencingGeneration;
           } catch {
             return false;
           }
@@ -351,17 +389,24 @@ export async function acquireFileLock(
           }
           const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
           if (cur?.token !== lockToken) {
-            throw new Error(`Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`);
+            throw new Error(
+              `Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`
+            );
+          }
+          if (Number(cur?.fencingGeneration) !== fencingGeneration) {
+            throw new Error(
+              `Fencing generation mismatch: current generation ${cur?.fencingGeneration} does not match worker generation ${fencingGeneration}`
+            );
           }
         },
       });
 
       return handle;
     } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      const errCode = (err as NodeJS.ErrnoException).code;
+      if (errCode === 'EEXIST' || errCode === 'EPERM' || errCode === 'EACCES') {
         // 2. Race-Safe Atomic Stale Lock Recovery:
         // A live process lock MUST NEVER be stolen or deleted.
-        // If the PID is dead (ESRCH), recover ATOMICALLY using an atomic OS rename!
         try {
           if (fs.existsSync(lockFilePath)) {
             const raw = fs.readFileSync(lockFilePath, 'utf8');
@@ -370,97 +415,150 @@ export async function acquireFileLock(
               data = JSON.parse(raw);
             } catch {}
 
-            if (data && typeof data.pid === 'number' && isPidDead(data.pid)) {
-              // The holding process crashed or terminated (ESRCH).
-              // ATOMIC RECOVERY:
-              // Competing recovery processes both attempting to recover will race on an atomic renameSync.
-              // Exactly ONE process will succeed in moving the stale lock file to its unique staging path;
-              // any concurrent process will immediately receive ENOENT and safely back off.
-              const reclaimPath = `${lockFilePath}.reclaim.${lockToken}.${Date.now()}`;
+            const inspectedPid = typeof data?.pid === 'number' ? data.pid : -1;
+            const inspectedToken = typeof data?.token === 'string' ? data.token : '';
+            const inspectedGen = Number(data?.fencingGeneration) || 1;
+
+            if (inspectedPid > 0 && isPidDead(inspectedPid)) {
+              // The holding process terminated (ESRCH).
+              // ATOMIC RECOVERY STEP 1: Rename stale lock file to an isolated unique staging path
+              const reclaimPath = `${lockFilePath}.reclaim.${lockToken}.${Date.now()}.${safeRandomUUID()}`;
               let reclaimed = false;
               try {
                 fs.renameSync(lockFilePath, reclaimPath);
                 reclaimed = true;
               } catch {
-                // Another process already reclaimed or replaced it
+                // Another process already renamed or replaced the lock
               }
 
               if (reclaimed) {
                 try {
                   const staleRaw = fs.readFileSync(reclaimPath, 'utf8');
-                  let prevGen = 1;
+                  let reclaimData: Record<string, unknown> | null = null;
                   try {
-                    const parsedStale = JSON.parse(staleRaw);
-                    prevGen = Number(parsedStale?.fencingGeneration) || 1;
+                    reclaimData = JSON.parse(staleRaw);
                   } catch {}
 
+                  const reclaimToken = typeof reclaimData?.token === 'string' ? reclaimData.token : '';
+                  const reclaimGen = Number(reclaimData?.fencingGeneration) || 1;
+                  const reclaimPid = typeof reclaimData?.pid === 'number' ? reclaimData.pid : -1;
+
+                  // MANDATORY GENERATION VERIFICATION:
+                  // Confirm the renamed file is the EXACT stale lock generation originally inspected.
+                  // If a replacement lock was created between read and rename, the token or generation
+                  // will differ or the PID will be alive. If so, RESTORE IT IMMEDIATELY and abort.
+                  if (
+                    reclaimToken !== inspectedToken ||
+                    reclaimGen !== inspectedGen ||
+                    reclaimPid !== inspectedPid ||
+                    !isPidDead(reclaimPid)
+                  ) {
+                    try {
+                      fs.renameSync(reclaimPath, lockFilePath);
+                    } catch {}
+                    await sleep(20 + Math.floor(Math.random() * 30));
+                    continue;
+                  }
+
+                  // Unlink verified stale reclaim staging file
                   try {
                     fs.unlinkSync(reclaimPath);
                   } catch {}
 
-                  // Immediately acquire exclusively with incremented fencing generation
-                  const nextGen = prevGen + 1;
+                  // Acquire exclusively with incremented fencing generation
+                  const nextGen = inspectedGen + 1;
                   const recFd = fs.openSync(lockFilePath, 'wx');
-                  const recMeta = JSON.stringify({
-                    pid: process.pid,
-                    token: lockToken,
-                    fencingGeneration: nextGen,
-                    createdAt: Date.now(),
-                  });
-                  fs.writeSync(recFd, recMeta);
-                  fs.fsyncSync(recFd);
                   try {
-                    fs.closeSync(recFd);
-                  } catch {}
+                    if (_testFailNextLockMetadataWrite) {
+                      _testFailNextLockMetadataWrite = false;
+                      throw new Error('Simulated lock metadata write failure during recovery');
+                    }
 
-                  // Verify write
-                  const verifyCheck = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-                  if (verifyCheck?.token === lockToken) {
-                    let recReleased = false;
-                    const recReleaseFn = () => {
-                      if (recReleased) return;
-                      recReleased = true;
-                      try {
-                        if (fs.existsSync(lockFilePath)) {
-                          const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-                          if (cur?.token === lockToken) {
-                            fs.unlinkSync(lockFilePath);
-                          }
-                        }
-                      } catch {}
-                    };
-
-                    const recHandle: FileLockRelease = Object.assign(recReleaseFn, {
+                    const recMeta = JSON.stringify({
+                      pid: process.pid,
                       token: lockToken,
                       fencingGeneration: nextGen,
-                      isOwned: () => {
-                        if (recReleased) return false;
-                        try {
-                          if (!fs.existsSync(lockFilePath)) return false;
-                          const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-                          return cur?.token === lockToken;
-                        } catch {
-                          return false;
-                        }
-                      },
-                      assertOwned: () => {
-                        if (recReleased) {
-                          throw new Error('Lock has already been released');
-                        }
-                        if (!fs.existsSync(lockFilePath)) {
-                          throw new Error('Lock file no longer exists');
-                        }
-                        const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-                        if (cur?.token !== lockToken) {
-                          throw new Error(`Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`);
-                        }
-                      },
+                      createdAt: Date.now(),
                     });
+                    fs.writeSync(recFd, recMeta);
+                    fs.fsyncSync(recFd);
 
-                    return recHandle;
+                    if (_testFailNextLockMetadataVerify) {
+                      _testFailNextLockMetadataVerify = false;
+                      throw new Error('Simulated lock metadata verification failure during recovery');
+                    }
+
+                    // Verify write
+                    const verifyCheck = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                    if (verifyCheck?.token !== lockToken) {
+                      throw new Error('Lock metadata verification failed: token mismatch on recovery');
+                    }
+                  } catch (recMetaErr) {
+                    try { fs.closeSync(recFd); } catch {}
+                    try {
+                      if (fs.existsSync(lockFilePath)) {
+                        const raw = fs.readFileSync(lockFilePath, 'utf8');
+                        if (!raw || raw.includes(lockToken)) {
+                          fs.unlinkSync(lockFilePath);
+                        }
+                      }
+                    } catch {}
+                    throw recMetaErr;
                   }
+
+                  try { fs.closeSync(recFd); } catch {}
+
+                  let recReleased = false;
+                  const recReleaseFn = () => {
+                    if (recReleased) return;
+                    recReleased = true;
+                    try {
+                      if (fs.existsSync(lockFilePath)) {
+                        const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                        if (cur?.token === lockToken) {
+                          fs.unlinkSync(lockFilePath);
+                        }
+                      }
+                    } catch {}
+                  };
+
+                  const recHandle: FileLockRelease = Object.assign(recReleaseFn, {
+                    token: lockToken,
+                    fencingGeneration: nextGen,
+                    isOwned: () => {
+                      if (recReleased) return false;
+                      try {
+                        if (!fs.existsSync(lockFilePath)) return false;
+                        const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                        return cur?.token === lockToken && Number(cur?.fencingGeneration) === nextGen;
+                      } catch {
+                        return false;
+                      }
+                    },
+                    assertOwned: () => {
+                      if (recReleased) {
+                        throw new Error('Lock has already been released');
+                      }
+                      if (!fs.existsSync(lockFilePath)) {
+                        throw new Error('Lock file no longer exists');
+                      }
+                      const cur = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+                      if (cur?.token !== lockToken) {
+                        throw new Error(
+                          `Lock ownership lost: current owner token ${cur?.token} does not match worker token ${lockToken}`
+                        );
+                      }
+                      if (Number(cur?.fencingGeneration) !== nextGen) {
+                        throw new Error(
+                          `Fencing generation mismatch: current generation ${cur?.fencingGeneration} does not match worker generation ${nextGen}`
+                        );
+                      }
+                    },
+                  });
+
+                  return recHandle;
                 } catch {
-                  // Fall through to cooperative sleep and retry
+                  // Fall through to retry loop
                 }
               }
             }
@@ -518,8 +616,19 @@ async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
         renewTimer.unref();
       }
 
+      const kvCtx = {
+        token,
+        fencingGeneration: 1,
+        assertOwned: () => {
+          if (lockLost) {
+            throw new Error('Database KV lock ownership lost or expired');
+          }
+        },
+        isOwned: () => !lockLost,
+      };
+
       try {
-        return await fn();
+        return await dbLockStorage.run(kvCtx, async () => await fn());
       } finally {
         if (renewTimer) clearInterval(renewTimer);
         await kvUnlock(DB_LOCK_KEY, token).catch(() => undefined);
@@ -529,7 +638,7 @@ async function withDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
     // Cross-process OS file lock when Redis is not configured
     const releaseFileLock = await acquireFileLock();
     try {
-      return await fn();
+      return await dbLockStorage.run(releaseFileLock, async () => await fn());
     } finally {
       releaseFileLock();
     }
@@ -607,8 +716,19 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
 
 export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
   assertPersistence();
+  const activeLock = dbLockStorage.getStore();
+  if (activeLock) {
+    activeLock.assertOwned();
+  }
   inMemoryDb = db;
   if (KV_CONFIGURED) {
+    if (activeLock) {
+      const res = await kvSetLocked(DB_LOCK_KEY, DB_KV_KEY, activeLock.token, JSON.stringify(db));
+      if (!res.success) {
+        throw new Error(`Database write rejected: ${res.reason || 'Lock ownership lost'}`);
+      }
+      return;
+    }
     await kvSet(DB_KV_KEY, JSON.stringify(db));
     return;
   }
@@ -616,7 +736,14 @@ export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
     fs.mkdirSync(path.dirname(DATA_FILE_PATH), { recursive: true });
     const tmp = `${DATA_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf-8');
-    fs.renameSync(tmp, DATA_FILE_PATH);
+    try {
+      fs.renameSync(tmp, DATA_FILE_PATH);
+    } catch {
+      fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(db, null, 2), 'utf-8');
+      try {
+        fs.unlinkSync(tmp);
+      } catch {}
+    }
   } catch (err) {
     console.error('[TrenchLabs DB] Local save error:', err);
     throw err;

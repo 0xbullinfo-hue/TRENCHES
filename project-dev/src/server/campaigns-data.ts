@@ -1,8 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 import { PublicKey } from '@solana/web3.js';
-import { KV_CONFIGURED, isKvConfigured, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock } from '@/server/kv';
+import {
+  KV_CONFIGURED,
+  isKvConfigured,
+  kvGet,
+  kvSet,
+  kvDel,
+  kvLock,
+  kvUnlock,
+  kvRenewLock,
+  kvSetLocked,
+  kvReserveSubmissionChallenge,
+} from '@/server/kv';
 import { ADMIN_WALLET } from '@/lib/config';
 import { acquireFileLock } from '@/server/db';
 import type { Campaign, CampaignSubmission, CampaignStatus, SubmissionStatus } from '@/lib/types';
@@ -22,17 +34,34 @@ const FILE_PERSISTENCE_ALLOWED =
 let campaignsLockChain: Promise<unknown> = Promise.resolve();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const CAMPAIGNS_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'campaigns.lock');
+export const CAMPAIGNS_FILE_LOCK_PATH = path.join(process.cwd(), 'data', 'campaigns.lock');
 
-export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
+export interface CampaignsLockContext {
+  token: string;
+  fencingGeneration: number;
+  lockType: 'file' | 'kv';
+  assertOwned: () => void;
+  isOwned: () => boolean;
+}
+
+export const campaignsLockStorage = new AsyncLocalStorage<CampaignsLockContext>();
+
+export function withCampaignsLock<T>(fn: (ctx?: CampaignsLockContext) => Promise<T> | T): Promise<T> {
   const run = campaignsLockChain.then(async () => {
     if (!isKvActive()) {
       if (!FILE_PERSISTENCE_ALLOWED) {
         throw new Error('Persistence not configured. Set ALLOW_FILE_PERSISTENCE=true or KV credentials.');
       }
       const releaseFileLock = await acquireFileLock(CAMPAIGNS_FILE_LOCK_PATH);
+      const ctx: CampaignsLockContext = {
+        token: releaseFileLock.token,
+        fencingGeneration: releaseFileLock.fencingGeneration,
+        lockType: 'file',
+        assertOwned: () => releaseFileLock.assertOwned(),
+        isOwned: () => releaseFileLock.isOwned(),
+      };
       try {
-        return await fn();
+        return await campaignsLockStorage.run(ctx, async () => await fn(ctx));
       } finally {
         releaseFileLock();
       }
@@ -71,8 +100,20 @@ export function withCampaignsLock<T>(fn: () => Promise<T> | T): Promise<T> {
       renewTimer.unref();
     }
 
+    const kvCtx: CampaignsLockContext = {
+      token,
+      fencingGeneration: 1,
+      lockType: 'kv',
+      assertOwned: () => {
+        if (lockLost) {
+          throw new Error('Campaigns KV lock lease expired or lost');
+        }
+      },
+      isOwned: () => !lockLost,
+    };
+
     try {
-      return await fn();
+      return await campaignsLockStorage.run(kvCtx, async () => await fn(kvCtx));
     } finally {
       if (renewTimer) clearInterval(renewTimer);
       await kvUnlock(KV_LOCK_KEY, token).catch(() => undefined);
@@ -118,8 +159,23 @@ export async function saveCampaigns(campaigns: Campaign[]): Promise<{ success: b
   if (_testFailSaveCampaignsPersistent) {
     return { success: false, error: _testFailSaveCampaignsPersistent.message };
   }
+  const activeLock = campaignsLockStorage.getStore();
+  if (activeLock) {
+    try {
+      activeLock.assertOwned();
+    } catch (assertErr) {
+      return { success: false, error: (assertErr as Error).message };
+    }
+  }
   try {
     if (isKvActive()) {
+      if (activeLock && activeLock.lockType === 'kv') {
+        const res = await kvSetLocked(KV_LOCK_KEY, KV_CAMPAIGNS_KEY, activeLock.token, JSON.stringify(campaigns));
+        if (!res.success) {
+          return { success: false, error: `Lock ownership lost: ${res.reason || 'not owned'}` };
+        }
+        return { success: true };
+      }
       await kvSet(KV_CAMPAIGNS_KEY, JSON.stringify(campaigns));
       return { success: true };
     }
@@ -178,8 +234,23 @@ export async function loadSubmissions(): Promise<CampaignSubmission[]> {
 }
 
 export async function saveSubmissions(submissions: CampaignSubmission[]): Promise<{ success: boolean; error?: string }> {
+  const activeLock = campaignsLockStorage.getStore();
+  if (activeLock) {
+    try {
+      activeLock.assertOwned();
+    } catch (assertErr) {
+      return { success: false, error: (assertErr as Error).message };
+    }
+  }
   try {
     if (isKvActive()) {
+      if (activeLock && activeLock.lockType === 'kv') {
+        const res = await kvSetLocked(KV_LOCK_KEY, KV_SUBMISSIONS_KEY, activeLock.token, JSON.stringify(submissions));
+        if (!res.success) {
+          return { success: false, error: `Lock ownership lost: ${res.reason || 'not owned'}` };
+        }
+        return { success: true };
+      }
       await kvSet(KV_SUBMISSIONS_KEY, JSON.stringify(submissions));
       return { success: true };
     }
@@ -399,6 +470,92 @@ export async function getSubmissionByChallengeId(
   );
 }
 
+const PENDING_RECONCILE_DIR = path.join(process.cwd(), 'data', 'pending_counter_reconciliations');
+const KV_PENDING_RECONCILE_PREFIX = 'trench:camp:pending_reconcile:';
+
+export async function markCampaignCounterPendingReconciliation(
+  campaignId: string,
+  submissionId: string
+): Promise<void> {
+  if (!campaignId || !submissionId) return;
+  const key = `${campaignId}__${submissionId}`;
+  if (isKvActive()) {
+    try {
+      await kvSet(
+        `${KV_PENDING_RECONCILE_PREFIX}${key}`,
+        JSON.stringify({ campaignId, submissionId, createdAt: Date.now() })
+      );
+    } catch {}
+    return;
+  }
+  try {
+    fs.mkdirSync(PENDING_RECONCILE_DIR, { recursive: true });
+    const filePath = path.join(PENDING_RECONCILE_DIR, `${key}.json`);
+    fs.writeFileSync(filePath, JSON.stringify({ campaignId, submissionId, createdAt: Date.now() }), 'utf8');
+  } catch {}
+}
+
+export async function clearCampaignCounterPendingReconciliation(
+  campaignId: string,
+  submissionId: string
+): Promise<void> {
+  if (!campaignId || !submissionId) return;
+  const key = `${campaignId}__${submissionId}`;
+  if (isKvActive()) {
+    try {
+      await kvDel(`${KV_PENDING_RECONCILE_PREFIX}${key}`);
+    } catch {}
+    return;
+  }
+  try {
+    const filePath = path.join(PENDING_RECONCILE_DIR, `${key}.json`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch {}
+}
+
+export async function getPendingCounterReconciliations(): Promise<Array<{ campaignId: string; submissionId: string }>> {
+  if (!fs.existsSync(PENDING_RECONCILE_DIR)) return [];
+  try {
+    const files = fs.readdirSync(PENDING_RECONCILE_DIR);
+    const results: Array<{ campaignId: string; submissionId: string }> = [];
+    for (const f of files) {
+      if (f.endsWith('.json')) {
+        try {
+          const raw = fs.readFileSync(path.join(PENDING_RECONCILE_DIR, f), 'utf8');
+          const parsed = JSON.parse(raw);
+          if (parsed?.campaignId && parsed?.submissionId) {
+            results.push({ campaignId: parsed.campaignId, submissionId: parsed.submissionId });
+          }
+        } catch {}
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+export async function reconcileAllPendingCampaignCounters(): Promise<{
+  attempted: number;
+  reconciled: number;
+  failed: number;
+}> {
+  const pending = await getPendingCounterReconciliations();
+  let reconciled = 0;
+  let failed = 0;
+  for (const item of pending) {
+    const res = await reconcileCampaignSubmission(item.campaignId, item.submissionId);
+    if (res.ok) {
+      reconciled += 1;
+    } else {
+      failed += 1;
+    }
+  }
+  return { attempted: pending.length, reconciled, failed };
+}
+
 export type ReconcileCampaignResult =
   | { ok: true; status: 'RECONCILED'; campaignId: string; submissionId: string; submissionsCount: number }
   | { ok: true; status: 'ALREADY_RECONCILED'; campaignId: string; submissionId: string; submissionsCount: number }
@@ -465,6 +622,7 @@ export async function reconcileCampaignSubmission(
         campaign.submissionsCount = expectedCount;
         const saveRes = await saveCampaigns(campaigns);
         if (!saveRes.success) {
+          await markCampaignCounterPendingReconciliation(campaignId, submissionId);
           return {
             ok: false,
             status: 'STORAGE_ERROR',
@@ -473,6 +631,7 @@ export async function reconcileCampaignSubmission(
             error: saveRes.error || 'Failed to save updated campaign counter',
           };
         }
+        await clearCampaignCounterPendingReconciliation(campaignId, submissionId);
         return {
           ok: true,
           status: 'RECONCILED',
@@ -482,6 +641,7 @@ export async function reconcileCampaignSubmission(
         };
       }
 
+      await clearCampaignCounterPendingReconciliation(campaignId, submissionId);
       return {
         ok: true,
         status: 'ALREADY_RECONCILED',
@@ -490,6 +650,7 @@ export async function reconcileCampaignSubmission(
         submissionsCount: currentCount,
       };
     } catch (err) {
+      await markCampaignCounterPendingReconciliation(campaignId, submissionId);
       return {
         ok: false,
         status: 'STORAGE_ERROR',
@@ -597,15 +758,21 @@ export async function submitCampaignCompletion(payload: {
     if (payload.challengeId) {
       if (isKvActive()) {
         const directKey = `${KV_SUBMISSION_CHALLENGE_PREFIX}${payload.challengeId}`;
-        const existingRaw = await kvGet(directKey);
-        if (existingRaw) {
-          try {
-            const parsed = JSON.parse(existingRaw) as CampaignSubmission;
-            await reconcileCampaignSubmission(payload.campaignId, parsed.id);
-            return { ok: true, submission: parsed, isExisting: true };
-          } catch {}
+        const reserveRes = await kvReserveSubmissionChallenge(directKey, JSON.stringify(newSubmission));
+        if (!reserveRes.created) {
+          if (reserveRes.submission) {
+            try {
+              const parsed = JSON.parse(reserveRes.submission) as CampaignSubmission;
+              await reconcileCampaignSubmission(payload.campaignId, parsed.id);
+              return { ok: true, submission: parsed, isExisting: true };
+            } catch {}
+          }
+          const existing = await getSubmissionByChallengeId(payload.challengeId);
+          if (existing) {
+            await reconcileCampaignSubmission(payload.campaignId, existing.id);
+            return { ok: true, submission: existing, isExisting: true };
+          }
         }
-        await kvSet(directKey, JSON.stringify(newSubmission));
       } else {
         try {
           fs.mkdirSync(SUBMISSIONS_BY_CHALLENGE_DIR, { recursive: true });
