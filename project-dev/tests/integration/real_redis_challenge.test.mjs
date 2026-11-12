@@ -26,6 +26,10 @@ import {
   kvConsumeChallenge,
   kvGet,
   kvSetEx,
+  kvClaimChallengeProcessing,
+  kvFinalizeChallengeProcessing,
+  kvRollbackChallengeProcessing,
+  kvReconcileChallengeCompleted,
   CONSUME_CHALLENGE_LUA,
 } from '../../src/server/kv.ts';
 import {
@@ -33,6 +37,10 @@ import {
   getRaidChallengeState,
   consumeRaidChallengeOutcome,
   consumeRaidChallenge,
+  claimRaidChallengeProcessing,
+  finalizeRaidChallengeProcessing,
+  rollbackRaidChallengeProcessing,
+  reconcileRaidChallengeCompleted,
 } from '../../src/server/raid-challenges.ts';
 import {
   createCampaign,
@@ -533,6 +541,224 @@ test('Cross-Instance Testing: Two independent application instances cannot consu
     // 6. Verify replay attempt from a third instance is also rejected (409)
     const instC = await runInstanceSubmissionWorker(camp.id, ch.challengeId, wallet, sigHex);
     assert.equal(instC.data?.status, 409, 'Replay attempt must be rejected with 409 Conflict');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// V2.5 Real Redis Integration Tests: Processing Claims, Fencing & Exactly-Once
+// ---------------------------------------------------------------------------
+
+test('Real Redis Lua [V2.5 Claim & Fencing]: Atomic claim, concurrent conflict rejection, and lease recovery', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 Real Redis Claim & Fencing Test',
+    description: 'Testing genuine Redis Lua claim and fencing mechanics',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98766',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    trackedKeys.add(`raid:challenge:${ch.challengeId}`);
+
+    // 1. First claim succeeds with attemptId A, fencingToken 1
+    const claimA = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-A', 5000);
+    assert.equal(claimA.status, 'CLAIMED');
+    assert.equal(claimA.fencingToken, 1);
+    assert.equal(claimA.attemptId, 'attempt-A');
+
+    // 2. Concurrent claim attempt B while lease is active returns CONFLICT
+    const claimB = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-B', 5000);
+    assert.equal(claimB.status, 'CONFLICT');
+
+    // 3. Simulate expired processing lease in real Redis
+    const key = `raid:challenge:${ch.challengeId}`;
+    const rawData = await kvGet(key);
+    assert.ok(rawData);
+    const parsed = JSON.parse(rawData);
+    parsed.processingLeaseExpiresAt = Date.now() - 1000; // expired lease
+    await kvSetEx(key, JSON.stringify(parsed), 60);
+
+    // 4. New claim attempt C successfully takes over expired lease with incremented fencingToken (2)
+    const claimC = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-C', 5000);
+    assert.ok(claimC.status === 'CLAIMED' || claimC.status === 'RECOVERED');
+    assert.equal(claimC.fencingToken, 2);
+    assert.equal(claimC.attemptId, 'attempt-C');
+
+    // 5. Stale worker A attempts to finalize with old fencing token 1 -> rejected
+    const staleFinalize = await finalizeRaidChallengeProcessing(
+      ch.challengeId,
+      'attempt-A',
+      1,
+      'sub-stale'
+    );
+    assert.equal(staleFinalize.success, false);
+
+    // 6. Stale worker A attempts to rollback -> rejected
+    const staleRollback = await rollbackRaidChallengeProcessing(
+      ch.challengeId,
+      'attempt-A',
+      1,
+      ch
+    );
+    assert.equal(staleRollback.success, false);
+
+    // 7. Legitimate worker C finalizes with fencing token 2 -> succeeds
+    const legitFinalize = await finalizeRaidChallengeProcessing(
+      ch.challengeId,
+      'attempt-C',
+      2,
+      'sub-legit-123'
+    );
+    assert.equal(legitFinalize.success, true);
+    assert.equal(legitFinalize.status, 'COMPLETED');
+
+    // 8. Reconcile on completed challenge maintains completed state
+    const recon = await reconcileRaidChallengeCompleted(ch.challengeId, 'sub-legit-123');
+    assert.equal(recon, true);
+
+    // 9. Subsequent claims return COMPLETED
+    const claimPost = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-D', 5000);
+    assert.equal(claimPost.status, 'COMPLETED');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Real Redis Lua [V2.5 Rollback Protection]: Ownership-protected rollback restores ACTIVE state', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 Real Redis Rollback Test',
+    description: 'Testing genuine Redis Lua ownership-protected rollback',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98767',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    trackedKeys.add(`raid:challenge:${ch.challengeId}`);
+
+    // Claim challenge
+    const claim1 = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-owner', 10000);
+    assert.equal(claim1.status, 'CLAIMED');
+
+    // Attempt rollback with wrong attemptId -> rejected
+    const badRollback = await rollbackRaidChallengeProcessing(
+      ch.challengeId,
+      'attempt-imposter',
+      claim1.fencingToken || 1,
+      ch
+    );
+    assert.equal(badRollback.success, false);
+
+    // Legitimate owner rolls back -> succeeds
+    const goodRollback = await rollbackRaidChallengeProcessing(
+      ch.challengeId,
+      'attempt-owner',
+      claim1.fencingToken || 1,
+      ch
+    );
+    assert.equal(goodRollback.success, true);
+
+    // Verify challenge is ACTIVE again and can be claimed anew
+    const state = await getRaidChallengeState(ch.challengeId);
+    assert.equal(state.status, 'ACTIVE');
+
+    const claim2 = await claimRaidChallengeProcessing(ch.challengeId, 'attempt-new', 10000);
+    assert.equal(claim2.status, 'CLAIMED');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('Real Redis [V2.5 Exactly-Once]: 20 simultaneous submissions yield exactly 1 submission and 1 counter increment', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 20-Caller Real Redis Concurrency Test',
+    description: 'Testing genuine Redis Lua 20-caller concurrency',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98768',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    trackedKeys.add(`raid:challenge:${ch.challengeId}`);
+    const sigHex = signEd25519(kp, ch.message);
+
+    const makeReq = () =>
+      new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challengeId: ch.challengeId,
+          walletAddress: wallet,
+          xHandle: '@real_redis_user',
+          xRetweetLink: 'https://x.com/real_redis_user/status/999',
+          signature: sigHex,
+        }),
+      });
+
+    // Fire 20 concurrent requests simultaneously against real Redis
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) })
+      )
+    );
+
+    const statuses = results.map((r) => r.status);
+    const success201 = statuses.filter((s) => s === 201);
+    const rejected = statuses.filter((s) => s === 409 || s === 429);
+
+    assert.equal(success201.length, 1, 'Exactly one concurrent submission must succeed with HTTP 201');
+    assert.equal(rejected.length, 19, 'The remaining 19 requests must be rejected (409 Conflict or 429 Rate Limited)');
+
+    // Verify exactly one durable submission was written
+    const submissions = await loadSubmissions();
+    const challengeSubs = submissions.filter((s) => s.challengeId === ch.challengeId);
+    assert.equal(challengeSubs.length, 1, 'Exactly one submission record must exist for this challenge');
+
+    // Verify campaign counter incremented by exactly 1
+    const campaigns = await loadCampaigns();
+    const updatedCamp = campaigns.find((c) => c.id === camp.id);
+    assert.equal(updatedCamp?.submissionsCount, 1, 'Campaign submissionsCount must equal exactly 1');
+
+    // Verify idempotent retry returns HTTP 200 with original submission ID
+    const retryReq = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-retry': 'true' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@real_redis_user',
+        xRetweetLink: 'https://x.com/real_redis_user/status/999',
+        signature: sigHex,
+        isRetry: true,
+      }),
+    });
+
+    const retryRes = await submitCampaign(retryReq, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(retryRes.status, 200, 'Idempotent retry must return HTTP 200');
+    const retryJson = await retryRes.json();
+    assert.equal(retryJson.submission?.id, challengeSubs[0].id, 'Retry must return original submission ID');
+
+    // Confirm campaign counter remains 1 after retry
+    const campaignsAfterRetry = await loadCampaigns();
+    const campAfterRetry = campaignsAfterRetry.find((c) => c.id === camp.id);
+    assert.equal(campAfterRetry?.submissionsCount, 1, 'Campaign submissionsCount must not increment on retry');
   } finally {
     await deleteCampaign(camp.id);
   }

@@ -205,6 +205,8 @@ export interface CampaignSubmission {
   airdroppedAt?: string | null;
   airdropTx?: string | null;
   submittedAt: string;
+  challengeId?: string;
+  idempotencyKey?: string;
 }
 
 export interface Campaign {

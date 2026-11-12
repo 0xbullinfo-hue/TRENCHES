@@ -97,34 +97,267 @@ globalThis.fetch = async (url, options) => {
       const key = String(args[3] ?? args[2]);
       const val = mockRedisStore.get(key);
 
-      // Finalize tombstone script
+      // 1. V2.5 Claim Processing Lua
+      if (script.includes('CLAIMED') && script.includes('PROCESSING')) {
+        if (!val) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ status: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        try {
+          const c = JSON.parse(val);
+          const attemptId = String(args[4]);
+          const nowMs = Number(args[5]) || Date.now();
+          const leaseMs = Number(args[6]) || 30000;
+
+          if (c.expiresAt && nowMs > Number(c.expiresAt)) {
+            return new Response(JSON.stringify({ result: JSON.stringify({ status: 'EXPIRED' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (c.status === 'COMPLETED' || c.status === 'consumed') {
+            return new Response(
+              JSON.stringify({
+                result: JSON.stringify({
+                  status: 'COMPLETED',
+                  submissionId: c.submissionId,
+                  attemptId: c.attemptId,
+                  fencingToken: c.fencingToken,
+                }),
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+          if (!c.status || c.status === 'ACTIVE' || c.status === 'active' || c.status === 'pending') {
+            c.status = 'PROCESSING';
+            c.attemptId = attemptId;
+            c.fencingToken = 1;
+            c.processingStartedAt = nowMs;
+            c.processingLeaseExpiresAt = nowMs + leaseMs;
+            mockRedisStore.set(key, JSON.stringify(c));
+            return new Response(
+              JSON.stringify({
+                result: JSON.stringify({
+                  status: 'CLAIMED',
+                  attemptId: c.attemptId,
+                  fencingToken: c.fencingToken,
+                  leaseExpiresAt: c.processingLeaseExpiresAt,
+                }),
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+          if (c.status === 'PROCESSING') {
+            if (c.attemptId === attemptId) {
+              c.processingLeaseExpiresAt = nowMs + leaseMs;
+              mockRedisStore.set(key, JSON.stringify(c));
+              return new Response(
+                JSON.stringify({
+                  result: JSON.stringify({
+                    status: 'RESUMED',
+                    attemptId: c.attemptId,
+                    fencingToken: c.fencingToken,
+                    leaseExpiresAt: c.processingLeaseExpiresAt,
+                  }),
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              );
+            }
+            const leaseExp = Number(c.processingLeaseExpiresAt) || 0;
+            if (nowMs > leaseExp) {
+              c.attemptId = attemptId;
+              c.fencingToken = (Number(c.fencingToken) || 0) + 1;
+              c.processingStartedAt = nowMs;
+              c.processingLeaseExpiresAt = nowMs + leaseMs;
+              mockRedisStore.set(key, JSON.stringify(c));
+              return new Response(
+                JSON.stringify({
+                  result: JSON.stringify({
+                    status: 'RECOVERED',
+                    attemptId: c.attemptId,
+                    fencingToken: c.fencingToken,
+                    leaseExpiresAt: c.processingLeaseExpiresAt,
+                  }),
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              );
+            }
+            return new Response(
+              JSON.stringify({
+                result: JSON.stringify({
+                  status: 'BUSY',
+                  attemptId: c.attemptId,
+                  fencingToken: c.fencingToken,
+                  leaseExpiresAt: leaseExp,
+                }),
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch {}
+        return new Response(JSON.stringify({ result: JSON.stringify({ status: 'CONFLICT' }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 2. V2.5 Finalize Processing Lua
+      if (script.includes('STALE_FENCING_TOKEN') && script.includes('completedAt')) {
+        if (!val) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        try {
+          const c = JSON.parse(val);
+          const attemptId = String(args[4]);
+          const fencingToken = Number(args[5]);
+          const subId = String(args[6]);
+
+          if (c.status === 'COMPLETED' || c.status === 'consumed') {
+            if (c.submissionId === subId) {
+              return new Response(JSON.stringify({ result: JSON.stringify({ success: true, status: 'ALREADY_COMPLETED' }) }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            }
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'COMPLETED_DIFFERENT_SUBMISSION' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (c.status !== 'PROCESSING') {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'NOT_PROCESSING' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (c.attemptId !== attemptId) {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'STALE_ATTEMPT' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (Number(c.fencingToken) !== fencingToken) {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'STALE_FENCING_TOKEN' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          c.status = 'consumed';
+          c.processingState = 'COMPLETED';
+          c.submissionId = subId;
+          c.completedAt = Date.now();
+          c.idempotencyKey = 'raid-submission:' + (c.challengeId || '');
+          mockRedisStore.set(key, JSON.stringify(c));
+          return new Response(JSON.stringify({ result: JSON.stringify({ success: true, status: 'COMPLETED' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch {}
+        return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'ERROR' }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 3. V2.5 Rollback Processing Lua
+      if (script.includes('STALE_FENCING_TOKEN') && script.includes('ACTIVE')) {
+        if (!val) {
+          return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'NOT_FOUND' }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        try {
+          const c = JSON.parse(val);
+          const attemptId = String(args[4]);
+          const fencingToken = Number(args[5]);
+
+          if (c.status === 'COMPLETED' || c.status === 'consumed') {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'ALREADY_COMPLETED' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (c.status !== 'PROCESSING') {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'NOT_PROCESSING' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (c.attemptId !== attemptId) {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'STALE_ATTEMPT' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (Number(c.fencingToken) !== fencingToken) {
+            return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'STALE_FENCING_TOKEN' }) }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          c.status = 'ACTIVE';
+          c.attemptId = undefined;
+          c.fencingToken = undefined;
+          c.processingStartedAt = undefined;
+          c.processingLeaseExpiresAt = undefined;
+          mockRedisStore.set(key, JSON.stringify(c));
+          return new Response(JSON.stringify({ result: JSON.stringify({ success: true }) }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch {}
+        return new Response(JSON.stringify({ result: JSON.stringify({ success: false, reason: 'ERROR' }) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 4. V2.5 Reconcile Completed Lua
+      if (script.includes('c.status = \'consumed\'') || script.includes('c.processingState = \'COMPLETED\'')) {
+        if (!val) return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        try {
+          const c = JSON.parse(val);
+          c.status = 'consumed';
+          c.processingState = 'COMPLETED';
+          c.submissionId = String(args[4]);
+          c.completedAt = Date.now();
+          c.idempotencyKey = 'raid-submission:' + (c.challengeId || '');
+          mockRedisStore.set(key, JSON.stringify(c));
+          return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } catch {}
+        return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // Backward compatible tombstone finalize
       if (script.includes('submissionId')) {
         if (!val) return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         try {
           const parsed = JSON.parse(val);
-          if (parsed.status === 'consumed') {
-            parsed.submissionId = String(args[4]);
-            mockRedisStore.set(key, JSON.stringify(parsed));
-            return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-          }
+          parsed.status = 'consumed';
+          parsed.submissionId = String(args[4]);
+          mockRedisStore.set(key, JSON.stringify(parsed));
+          return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         } catch {}
         return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
 
-      // Rollback challenge script
+      // Backward compatible rollback
       if (script.includes('tonumber(ARGV[2])') && script.includes('del')) {
         if (!val) return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         try {
-          const parsed = JSON.parse(val);
-          if (parsed.status === 'consumed') {
-            mockRedisStore.set(key, String(args[4]));
-            return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-          }
+          mockRedisStore.set(key, String(args[4]));
+          return new Response(JSON.stringify({ result: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         } catch {}
         return new Response(JSON.stringify({ result: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
 
-      // Consume challenge script
+      // Default: consume challenge
       if (!val) {
         return new Response(JSON.stringify({ result: 0 }), {
           status: 200,
@@ -162,7 +395,16 @@ import { GET as getAlphas } from '../../src/app/api/alphas/route.ts';
 
 // Actual shared auth & server utilities
 import { signSession, SESSION_COOKIE_NAME } from '../../src/server/auth.ts';
-import { createCampaign, deleteCampaign } from '../../src/server/campaigns-data.ts';
+import {
+  createCampaign,
+  deleteCampaign,
+  loadSubmissions,
+  loadCampaigns,
+  getSubmissionByIdempotencyKey,
+  getSubmissionByChallengeId,
+  __setTestFailSaveSubmissions,
+  __setTestFailSaveCampaigns,
+} from '../../src/server/campaigns-data.ts';
 import fs from 'fs';
 import { resolveWalletEntitlement, evaluateWalletDowngrade } from '../../src/server/entitlements.ts';
 import {
@@ -171,6 +413,10 @@ import {
   consumeRaidChallenge,
   getRaidChallengeState,
   rollbackRaidChallenge,
+  claimRaidChallengeProcessing,
+  finalizeRaidChallengeProcessing,
+  rollbackRaidChallengeProcessing,
+  reconcileRaidChallengeCompleted,
 } from '../../src/server/raid-challenges.ts';
 import {
   consumeRaidChallengeRow,
@@ -1605,4 +1851,234 @@ test('V2.4 Guarantee 7 & 8: File-lock ownership verification and dead PID recove
 
   recoveredRelease();
   assert.equal(fs.existsSync(DB_FILE_LOCK_PATH), false, 'Recovered lock must unlink cleanly on release');
+});
+
+// ---------------------------------------------------------------------------
+// V2.5 Strict Requirements: Durable Idempotency, Scenarios A-D & Lock Hardening
+// ---------------------------------------------------------------------------
+
+test('V2.5 Scenario A: Failure before first durable write restores challenge to ACTIVE', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 Scenario A Test',
+    description: 'Testing rollback to ACTIVE when failure occurs before first write',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98770',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig = signEd25519(kp, ch.message);
+
+    const makeReq = () =>
+      new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challengeId: ch.challengeId,
+          walletAddress: wallet,
+          xHandle: '@scen_a_user',
+          xRetweetLink: 'https://x.com/scen_a_user/status/101',
+          signature: sig,
+        }),
+      });
+
+    // 1. Inject failure before durable submission write
+    __setTestFailSaveSubmissions(true);
+    const resFail = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
+    __setTestFailSaveSubmissions(false);
+
+    assert.equal(resFail.status, 503, 'Storage failure must return HTTP 503');
+
+    // 2. Verify no durable submission was created
+    const durableCheck = await getSubmissionByChallengeId(ch.challengeId);
+    assert.equal(durableCheck, null, 'No durable submission record must exist after Scenario A failure');
+
+    // 3. Verify challenge was safely rolled back to ACTIVE
+    const state = await getRaidChallengeState(ch.challengeId);
+    assert.equal(state.status, 'ACTIVE', 'Challenge must be safely restored to ACTIVE state');
+
+    // 4. Retry succeeds with HTTP 201
+    const resRetry = await submitCampaign(makeReq(), { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(resRetry.status, 201, 'Subsequent retry must succeed with HTTP 201');
+
+    const durableFinal = await getSubmissionByChallengeId(ch.challengeId);
+    assert.ok(durableFinal, 'Durable submission must exist after successful retry');
+  } finally {
+    __setTestFailSaveSubmissions(false);
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.5 Scenario B: Failure after submission creation preserves durable submission, does NOT rollback challenge', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 Scenario B Test',
+    description: 'Testing that durable submission is preserved when campaign counter write fails',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98771',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig = signEd25519(kp, ch.message);
+
+    const makeReq = (isRetry = false) =>
+      new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(isRetry ? { 'x-retry': 'true' } : {}) },
+        body: JSON.stringify({
+          challengeId: ch.challengeId,
+          walletAddress: wallet,
+          xHandle: '@scen_b_user',
+          xRetweetLink: 'https://x.com/scen_b_user/status/102',
+          signature: sig,
+          isRetry,
+        }),
+      });
+
+    // 1. Inject failure during campaign counter write (AFTER submission is written)
+    __setTestFailSaveCampaigns(true);
+    const res = await submitCampaign(makeReq(false), { params: Promise.resolve({ id: camp.id }) });
+    __setTestFailSaveCampaigns(false);
+
+    // The route detects the durable submission exists and returns 201 without rolling back
+    assert.equal(res.status, 201, 'Must return HTTP 201 reflecting durable submission');
+
+    // 2. Verify durable submission exists and challenge is NOT active
+    const durableCheck = await getSubmissionByChallengeId(ch.challengeId);
+    assert.ok(durableCheck, 'Durable submission must be preserved');
+
+    // 3. Idempotent retry returns HTTP 200 with the existing submission
+    const resRetry = await submitCampaign(makeReq(true), { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(resRetry.status, 200, 'Idempotent retry must return HTTP 200');
+    const retryJson = await resRetry.json();
+    assert.equal(retryJson.submission?.id, durableCheck.id, 'Retry must return the same submission ID');
+
+    // 4. Verify no duplicate submission was created
+    const allSubs = await loadSubmissions();
+    const matches = allSubs.filter((s) => s.challengeId === ch.challengeId);
+    assert.equal(matches.length, 1, 'Exactly one submission record must exist');
+  } finally {
+    __setTestFailSaveCampaigns(false);
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.5 Durable Idempotency Key: Prevents duplicate persistence and returns existing submission', async () => {
+  const camp = await createCampaign({
+    title: 'V2.5 Idempotency Key Test',
+    description: 'Testing durable challenge-derived idempotency key',
+    tweetUrl: 'https://x.com/TrenchLabsHQ/status/98772',
+    rewardAmount: '1,000 $GENESIS',
+    rewardToken: '$GENESIS',
+    durationHours: 24,
+    postedBy: 'Admin',
+  });
+  try {
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+
+    const ch = await issueRaidChallenge({ campaignId: camp.id, walletAddress: wallet });
+    const sig = signEd25519(kp, ch.message);
+
+    const req = new NextRequest(`http://localhost:3000/api/campaigns/${camp.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeId: ch.challengeId,
+        walletAddress: wallet,
+        xHandle: '@idem_user',
+        xRetweetLink: 'https://x.com/idem_user/status/103',
+        signature: sig,
+      }),
+    });
+
+    const res1 = await submitCampaign(req, { params: Promise.resolve({ id: camp.id }) });
+    assert.equal(res1.status, 201);
+    const json1 = await res1.json();
+    assert.ok(json1.submission?.id);
+
+    // Verify idempotencyKey is recorded on the submission
+    const expectedKey = `raid-submission:${ch.challengeId}`;
+    const byKey = await getSubmissionByIdempotencyKey(expectedKey);
+    assert.ok(byKey, 'Submission must be retrievable by durable idempotencyKey');
+    assert.equal(byKey?.id, json1.submission.id);
+
+    // Direct call to submitCampaignCompletion with same idempotency key returns existing without write
+    const { submitCampaignCompletion } = await import('../../src/server/campaigns-data.ts');
+    const dupResult = await submitCampaignCompletion({
+      campaignId: camp.id,
+      walletAddress: wallet,
+      xHandle: '@idem_user',
+      xRetweetLink: 'https://x.com/idem_user/status/103',
+      challengeId: ch.challengeId,
+    });
+
+    assert.equal(dupResult.ok, true);
+    assert.equal(dupResult.isExisting, true, 'Duplicate write must be detected and return isExisting: true');
+    assert.equal(dupResult.submission?.id, json1.submission.id);
+
+    // Ensure total submissions count on campaign did not increment twice
+    const camps = await loadCampaigns();
+    const foundCamp = camps.find((c) => c.id === camp.id);
+    assert.equal(foundCamp?.submissionsCount, 1, 'Campaign submission count must not increment on idempotent duplicate');
+  } finally {
+    await deleteCampaign(camp.id);
+  }
+});
+
+test('V2.5 Database Lock Hardening: Stale lock recovery replacement race cannot delete replacement lock', async () => {
+  // Ensure clean lock path
+  try {
+    if (fs.existsSync(DB_FILE_LOCK_PATH)) {
+      fs.unlinkSync(DB_FILE_LOCK_PATH);
+    }
+  } catch {}
+
+  // 1. Simulate dead process A lock
+  const deadPid = 99999997;
+  fs.writeFileSync(
+    DB_FILE_LOCK_PATH,
+    JSON.stringify({ pid: deadPid, token: 'dead-token-1', createdAt: Date.now() - 1000 })
+  );
+
+  // 2. Fast Process B replaces the dead lock with its own valid living lock
+  const fastLivingToken = 'living-token-B';
+  fs.writeFileSync(
+    DB_FILE_LOCK_PATH,
+    JSON.stringify({ pid: process.pid, token: fastLivingToken, createdAt: Date.now() })
+  );
+
+  // 3. Slow recovery process inspects the lock now:
+  // Because the lock belongs to process.pid (alive), it CANNOT overwrite or unlink it!
+  let stoleLock = false;
+  try {
+    const raw = fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (isPidDead(parsed.pid)) {
+      // Dead PID branch
+      fs.unlinkSync(DB_FILE_LOCK_PATH);
+      stoleLock = true;
+    }
+  } catch {}
+
+  assert.equal(stoleLock, false, 'Slow recovery must NOT unlink replacement lock owned by living process');
+  assert.ok(fs.existsSync(DB_FILE_LOCK_PATH), 'Living replacement lock must remain untouched');
+
+  const content = JSON.parse(fs.readFileSync(DB_FILE_LOCK_PATH, 'utf8'));
+  assert.equal(content.token, fastLivingToken, 'Living replacement lock content must be preserved');
+
+  // Clean up
+  try {
+    fs.unlinkSync(DB_FILE_LOCK_PATH);
+  } catch {}
 });

@@ -7,12 +7,23 @@ import {
   kvConsumeChallenge,
   kvFinalizeChallengeTombstone,
   kvRollbackChallenge,
+  kvClaimChallengeProcessing,
+  kvFinalizeChallengeProcessing,
+  kvRollbackChallengeProcessing,
+  kvReconcileChallengeCompleted,
+  KvChallengeClaimResult,
+  KvChallengeFinalizeResult,
+  KvChallengeRollbackResult,
 } from '@/server/kv';
 import {
   createRaidChallengeRow,
   getRaidChallengeRow,
   consumeRaidChallengeRow,
   rollbackRaidChallengeRow,
+  claimRaidChallengeProcessingRow,
+  finalizeRaidChallengeProcessingRow,
+  rollbackRaidChallengeProcessingRow,
+  reconcileRaidChallengeCompletedRow,
 } from '@/server/db';
 import { isBase58Address } from '@/lib/config';
 
@@ -127,7 +138,22 @@ export async function issueRaidChallenge(params: {
 
 export type RaidChallengeState =
   | { status: 'ACTIVE'; challenge: RaidChallenge }
-  | { status: 'CONSUMED'; consumedAt?: number; submissionId?: string }
+  | {
+      status: 'PROCESSING';
+      attemptId?: string;
+      fencingToken?: number;
+      leaseExpiresAt?: number;
+      isLeaseExpired?: boolean;
+      challenge: RaidChallenge;
+    }
+  | {
+      status: 'COMPLETED';
+      completedAt?: number;
+      submissionId?: string;
+      attemptId?: string;
+      idempotencyKey?: string;
+    }
+  | { status: 'CONSUMED'; consumedAt?: number; submissionId?: string; attemptId?: string }
   | { status: 'EXPIRED' }
   | { status: 'NOT_FOUND' };
 
@@ -138,7 +164,7 @@ export type ConsumeChallengeOutcome = {
 
 /**
  * Loads the authoritative lifecycle state of a challenge.
- * Returns explicit state (ACTIVE, CONSUMED, EXPIRED, NOT_FOUND) without relying on asynchronous DB mirror timing.
+ * Returns explicit state (ACTIVE, PROCESSING, COMPLETED, CONSUMED, EXPIRED, NOT_FOUND) without relying on asynchronous DB mirror timing.
  */
 export async function getRaidChallengeState(challengeId: string): Promise<RaidChallengeState> {
   if (!challengeId) return { status: 'NOT_FOUND' };
@@ -160,7 +186,34 @@ export async function getRaidChallengeState(challengeId: string): Promise<RaidCh
       try {
         const parsed = JSON.parse(raw);
         if (parsed.status === 'consumed') {
-          return { status: 'CONSUMED', consumedAt: parsed.consumedAt, submissionId: parsed.submissionId };
+          return {
+            status: 'CONSUMED',
+            consumedAt: parsed.consumedAt || parsed.completedAt,
+            submissionId: parsed.submissionId,
+            attemptId: parsed.attemptId,
+          };
+        }
+        if (parsed.status === 'COMPLETED') {
+          return {
+            status: 'COMPLETED',
+            completedAt: parsed.completedAt || parsed.consumedAt,
+            submissionId: parsed.submissionId,
+            attemptId: parsed.attemptId,
+            idempotencyKey: parsed.idempotencyKey || `raid-submission:${parsed.challengeId || challengeId}`,
+          };
+        }
+        if (parsed.status === 'PROCESSING') {
+          const isLeaseExpired =
+            typeof parsed.processingLeaseExpiresAt === 'number' &&
+            Date.now() > parsed.processingLeaseExpiresAt;
+          return {
+            status: 'PROCESSING',
+            attemptId: parsed.attemptId,
+            fencingToken: parsed.fencingToken,
+            leaseExpiresAt: parsed.processingLeaseExpiresAt,
+            isLeaseExpired,
+            challenge: parsed as RaidChallenge,
+          };
         }
         if (Date.now() > parsed.expiresAt) {
           return { status: 'EXPIRED' };
@@ -178,15 +231,63 @@ export async function getRaidChallengeState(challengeId: string): Promise<RaidCh
 
     // MANDATORY RULE: A challenge issued under Redis authority MUST NEVER fall back to DB mirror to authorize!
     if (row.authority === 'redis') {
-      if (row.consumed_at) {
-        return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+      if ((row.status as string) === 'consumed' || (row.consumed_at && row.status !== 'COMPLETED')) {
+        return {
+          status: 'CONSUMED',
+          consumedAt: row.consumed_at ? new Date(row.consumed_at).getTime() : undefined,
+          submissionId: row.submission_id || undefined,
+          attemptId: row.attempt_id || undefined,
+        };
+      }
+      if (row.status === 'COMPLETED') {
+        return {
+          status: 'COMPLETED',
+          completedAt: row.consumed_at ? new Date(row.consumed_at).getTime() : undefined,
+          submissionId: row.submission_id || undefined,
+          attemptId: row.attempt_id || undefined,
+        };
       }
       return { status: 'NOT_FOUND' };
     }
 
     // Genuine DB-authoritative challenge
-    if (row.consumed_at) {
-      return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+    if ((row.status as string) === 'consumed' || (row.consumed_at && row.status !== 'COMPLETED')) {
+      return {
+        status: 'CONSUMED',
+        consumedAt: row.consumed_at ? new Date(row.consumed_at).getTime() : undefined,
+        submissionId: row.submission_id || undefined,
+        attemptId: row.attempt_id || undefined,
+      };
+    }
+    if (row.status === 'COMPLETED') {
+      return {
+        status: 'COMPLETED',
+        completedAt: row.consumed_at ? new Date(row.consumed_at).getTime() : undefined,
+        submissionId: row.submission_id || undefined,
+        attemptId: row.attempt_id || undefined,
+      };
+    }
+    if (row.status === 'PROCESSING') {
+      const leaseExp = row.processing_lease_expires_at
+        ? new Date(row.processing_lease_expires_at).getTime()
+        : 0;
+      return {
+        status: 'PROCESSING',
+        attemptId: row.attempt_id || undefined,
+        fencingToken: row.fencing_token || undefined,
+        leaseExpiresAt: leaseExp,
+        isLeaseExpired: Date.now() > leaseExp,
+        challenge: {
+          challengeId: row.challenge_id,
+          nonce: row.nonce,
+          campaignId: row.campaign_id,
+          walletAddress: row.wallet_address,
+          createdAt: new Date(row.created_at).getTime(),
+          expiresAt: new Date(row.expires_at).getTime(),
+          message: row.message,
+          authority: 'db',
+        },
+      };
     }
     if (new Date(row.expires_at).getTime() <= Date.now()) {
       return { status: 'EXPIRED' };
@@ -215,8 +316,35 @@ export async function getRaidChallengeState(challengeId: string): Promise<RaidCh
     throw new Error('Authoritative Redis store is unavailable');
   }
 
-  if (row.consumed_at) {
-    return { status: 'CONSUMED', consumedAt: new Date(row.consumed_at).getTime() };
+  if (row.status === 'COMPLETED' || row.consumed_at) {
+    return {
+      status: 'COMPLETED',
+      completedAt: row.consumed_at ? new Date(row.consumed_at).getTime() : undefined,
+      submissionId: row.submission_id || undefined,
+      attemptId: row.attempt_id || undefined,
+    };
+  }
+  if (row.status === 'PROCESSING') {
+    const leaseExp = row.processing_lease_expires_at
+      ? new Date(row.processing_lease_expires_at).getTime()
+      : 0;
+    return {
+      status: 'PROCESSING',
+      attemptId: row.attempt_id || undefined,
+      fencingToken: row.fencing_token || undefined,
+      leaseExpiresAt: leaseExp,
+      isLeaseExpired: Date.now() > leaseExp,
+      challenge: {
+        challengeId: row.challenge_id,
+        nonce: row.nonce,
+        campaignId: row.campaign_id,
+        walletAddress: row.wallet_address,
+        createdAt: new Date(row.created_at).getTime(),
+        expiresAt: new Date(row.expires_at).getTime(),
+        message: row.message,
+        authority: 'db',
+      },
+    };
   }
   if (new Date(row.expires_at).getTime() <= Date.now()) {
     return { status: 'EXPIRED' };
@@ -384,4 +512,149 @@ export async function rollbackRaidChallenge(
 
   // Database-authoritative mode rollback
   return await rollbackRaidChallengeRow(challengeId);
+}
+
+/**
+ * V2.5 Ownership-Controlled Processing Lifecycle:
+ * Atomically claims a challenge for processing with a unique attempt ID and fencing token.
+ */
+export async function claimRaidChallengeProcessing(
+  challengeId: string,
+  attemptId: string,
+  leaseDurationMs = 30000
+): Promise<KvChallengeClaimResult> {
+  if (!challengeId || !attemptId) return { status: 'NOT_FOUND' };
+
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    let claimRes: KvChallengeClaimResult;
+    try {
+      claimRes = await kvClaimChallengeProcessing(key, attemptId, Date.now(), leaseDurationMs, 120);
+    } catch (err) {
+      console.error('[RaidChallenge] Authoritative Redis claim error:', err);
+      throw new Error('Authoritative Redis store is unavailable');
+    }
+
+    if (claimRes.status === 'NOT_FOUND') {
+      // Check if genuine DB-authoritative challenge
+      const row = await getRaidChallengeRow(challengeId);
+      if (!row) return { status: 'NOT_FOUND' };
+      if (row.authority === 'redis') {
+        if (row.status === 'COMPLETED' || row.consumed_at) {
+          return {
+            status: 'COMPLETED',
+            submissionId: row.submission_id || undefined,
+            attemptId: row.attempt_id || undefined,
+          };
+        }
+        return { status: 'NOT_FOUND' };
+      }
+      return await claimRaidChallengeProcessingRow(challengeId, attemptId, leaseDurationMs);
+    }
+
+    return claimRes;
+  }
+
+  // Database-authoritative mode
+  const row = await getRaidChallengeRow(challengeId);
+  if (!row) return { status: 'NOT_FOUND' };
+
+  if (row.authority === 'redis') {
+    throw new Error('Authoritative Redis store is unavailable');
+  }
+
+  return await claimRaidChallengeProcessingRow(challengeId, attemptId, leaseDurationMs);
+}
+
+/**
+ * V2.5 Finalizes processing to COMPLETED only if the worker's attemptId and fencingToken match.
+ */
+export async function finalizeRaidChallengeProcessing(
+  challengeId: string,
+  attemptId: string,
+  fencingToken: number,
+  submissionId: string
+): Promise<KvChallengeFinalizeResult> {
+  if (!challengeId || !attemptId) return { success: false, reason: 'INVALID_PARAMS' };
+
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    let finalizeRes: KvChallengeFinalizeResult;
+    try {
+      finalizeRes = await kvFinalizeChallengeProcessing(
+        key,
+        attemptId,
+        fencingToken,
+        submissionId,
+        Date.now(),
+        120
+      );
+    } catch (err) {
+      console.warn('[RaidChallenge] Redis finalization threw error:', err);
+      throw new Error('Authoritative Redis store is unavailable during finalization');
+    }
+
+    // Mirror to DB under background task
+    finalizeRaidChallengeProcessingRow(challengeId, attemptId, fencingToken, submissionId).catch(() => {});
+    return finalizeRes;
+  }
+
+  return await finalizeRaidChallengeProcessingRow(challengeId, attemptId, fencingToken, submissionId);
+}
+
+/**
+ * V2.5 Ownership-Protected Rollback:
+ * Atomically rolls back a PROCESSING challenge to ACTIVE only if the original attempt still holds ownership.
+ */
+export async function rollbackRaidChallengeProcessing(
+  challengeId: string,
+  attemptId: string,
+  fencingToken: number,
+  challenge: RaidChallenge
+): Promise<KvChallengeRollbackResult> {
+  if (!challengeId || !attemptId || !challenge) return { success: false, reason: 'INVALID_PARAMS' };
+
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    const remainingMs = challenge.expiresAt - Date.now();
+    if (remainingMs <= 0) return { success: false, reason: 'EXPIRED' };
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    try {
+      return await kvRollbackChallengeProcessing(key, attemptId, fencingToken, remainingSec);
+    } catch (err) {
+      console.error('[RaidChallenge] Ownership rollback error in Redis:', err);
+      return { success: false, reason: 'REDIS_ERROR' };
+    }
+  }
+
+  return await rollbackRaidChallengeProcessingRow(challengeId, attemptId, fencingToken);
+}
+
+/**
+ * Reconciles challenge state to COMPLETED when a retry finds the durable submission in the DB
+ * after an interrupted previous Redis finalization.
+ */
+export async function reconcileRaidChallengeCompleted(
+  challengeId: string,
+  submissionId: string
+): Promise<boolean> {
+  if (!challengeId || !submissionId) return false;
+
+  const redisActive = Boolean(KV_CONFIGURED || isKvConfigured());
+  if (redisActive) {
+    const key = challengeRedisKey(challengeId);
+    try {
+      await kvReconcileChallengeCompleted(key, submissionId, Date.now(), 120);
+    } catch (err) {
+      console.warn('[RaidChallenge] Redis reconciliation error:', err);
+    }
+  }
+
+  return await reconcileRaidChallengeCompletedRow(challengeId, submissionId);
 }

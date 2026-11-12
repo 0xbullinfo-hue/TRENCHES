@@ -198,6 +198,212 @@ export const ROLLBACK_CHALLENGE_LUA =
   "return 0";
 
 /**
+ * V2.5 State transition and ownership Lua scripts:
+ * ACTIVE -> PROCESSING -> COMPLETED
+ */
+export const CLAIM_CHALLENGE_PROCESSING_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ status = 'NOT_FOUND' }) end " +
+  "local c = cjson.decode(raw) " +
+  "local nowMs = tonumber(ARGV[2]) or 0 " +
+  "local leaseMs = tonumber(ARGV[3]) or 30000 " +
+  "local attemptId = ARGV[1] " +
+  "if c.expiresAt and nowMs > tonumber(c.expiresAt) then return cjson.encode({ status = 'EXPIRED' }) end " +
+  "if c.status == 'COMPLETED' or c.status == 'consumed' then " +
+  "  return cjson.encode({ status = 'COMPLETED', submissionId = c.submissionId, attemptId = c.attemptId, fencingToken = c.fencingToken, completedAt = c.completedAt }) " +
+  "end " +
+  "if not c.status or c.status == 'ACTIVE' or c.status == 'active' or c.status == 'pending' then " +
+  "  c.status = 'PROCESSING' " +
+  "  c.attemptId = attemptId " +
+  "  c.fencingToken = 1 " +
+  "  c.processingStartedAt = nowMs " +
+  "  c.processingLeaseExpiresAt = nowMs + leaseMs " +
+  "  local ttl = redis.call('ttl', KEYS[1]) " +
+  "  local retention = tonumber(ARGV[4]) or 120 " +
+  "  if not ttl or ttl < retention then ttl = retention end " +
+  "  redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "  return cjson.encode({ status = 'CLAIMED', attemptId = c.attemptId, fencingToken = c.fencingToken, leaseExpiresAt = c.processingLeaseExpiresAt }) " +
+  "end " +
+  "if c.status == 'PROCESSING' then " +
+  "  if c.attemptId == attemptId then " +
+  "    c.processingLeaseExpiresAt = nowMs + leaseMs " +
+  "    local ttl = redis.call('ttl', KEYS[1]) " +
+  "    local retention = tonumber(ARGV[4]) or 120 " +
+  "    if not ttl or ttl < retention then ttl = retention end " +
+  "    redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "    return cjson.encode({ status = 'RESUMED', attemptId = c.attemptId, fencingToken = c.fencingToken, leaseExpiresAt = c.processingLeaseExpiresAt }) " +
+  "  end " +
+  "  local leaseExp = tonumber(c.processingLeaseExpiresAt) or 0 " +
+  "  if nowMs > leaseExp then " +
+  "    c.attemptId = attemptId " +
+  "    c.fencingToken = (tonumber(c.fencingToken) or 0) + 1 " +
+  "    c.processingStartedAt = nowMs " +
+  "    c.processingLeaseExpiresAt = nowMs + leaseMs " +
+  "    local ttl = redis.call('ttl', KEYS[1]) " +
+  "    local retention = tonumber(ARGV[4]) or 120 " +
+  "    if not ttl or ttl < retention then ttl = retention end " +
+  "    redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "    return cjson.encode({ status = 'RECOVERED', attemptId = c.attemptId, fencingToken = c.fencingToken, leaseExpiresAt = c.processingLeaseExpiresAt }) " +
+  "  else " +
+  "    return cjson.encode({ status = 'CONFLICT', attemptId = c.attemptId, fencingToken = c.fencingToken, leaseExpiresAt = leaseExp }) " +
+  "  end " +
+  "end " +
+  "return cjson.encode({ status = 'CONFLICT' })";
+
+export const FINALIZE_CHALLENGE_PROCESSING_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ success = false, reason = 'NOT_FOUND' }) end " +
+  "local c = cjson.decode(raw) " +
+  "if c.status == 'COMPLETED' or c.status == 'consumed' then " +
+  "  if c.submissionId == ARGV[3] then " +
+  "    return cjson.encode({ success = true, status = 'ALREADY_COMPLETED' }) " +
+  "  end " +
+  "  return cjson.encode({ success = false, reason = 'COMPLETED_DIFFERENT_SUBMISSION' }) " +
+  "end " +
+  "if c.status ~= 'PROCESSING' then " +
+  "  return cjson.encode({ success = false, reason = 'NOT_PROCESSING' }) " +
+  "end " +
+  "if c.attemptId ~= ARGV[1] then " +
+  "  return cjson.encode({ success = false, reason = 'STALE_ATTEMPT' }) " +
+  "end " +
+  "if tonumber(c.fencingToken) ~= tonumber(ARGV[2]) then " +
+  "  return cjson.encode({ success = false, reason = 'STALE_FENCING_TOKEN' }) " +
+  "end " +
+  "c.status = 'consumed' " +
+  "c.processingState = 'COMPLETED' " +
+  "c.submissionId = ARGV[3] " +
+  "c.completedAt = tonumber(ARGV[4]) or 0 " +
+  "c.idempotencyKey = 'raid-submission:' .. (c.challengeId or '') " +
+  "local ttl = redis.call('ttl', KEYS[1]) " +
+  "local retention = tonumber(ARGV[5]) or 120 " +
+  "if not ttl or ttl < retention then ttl = retention end " +
+  "redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "return cjson.encode({ success = true, status = 'COMPLETED' })";
+
+export const ROLLBACK_CHALLENGE_PROCESSING_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return cjson.encode({ success = false, reason = 'NOT_FOUND' }) end " +
+  "local c = cjson.decode(raw) " +
+  "if c.status == 'COMPLETED' or c.status == 'consumed' then " +
+  "  return cjson.encode({ success = false, reason = 'ALREADY_COMPLETED' }) " +
+  "end " +
+  "if c.status ~= 'PROCESSING' then " +
+  "  return cjson.encode({ success = false, reason = 'NOT_PROCESSING' }) " +
+  "end " +
+  "if c.attemptId ~= ARGV[1] then " +
+  "  return cjson.encode({ success = false, reason = 'STALE_ATTEMPT' }) " +
+  "end " +
+  "if tonumber(c.fencingToken) ~= tonumber(ARGV[2]) then " +
+  "  return cjson.encode({ success = false, reason = 'STALE_FENCING_TOKEN' }) " +
+  "end " +
+  "c.status = 'ACTIVE' " +
+  "c.attemptId = nil " +
+  "c.fencingToken = nil " +
+  "c.processingStartedAt = nil " +
+  "c.processingLeaseExpiresAt = nil " +
+  "local ttl = tonumber(ARGV[3]) " +
+  "if ttl and ttl > 0 then " +
+  "  redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "else " +
+  "  redis.call('del', KEYS[1]) " +
+  "end " +
+  "return cjson.encode({ success = true })";
+
+export const RECONCILE_CHALLENGE_COMPLETED_LUA =
+  "local raw = redis.call('get', KEYS[1]) " +
+  "if not raw then return 0 end " +
+  "local c = cjson.decode(raw) " +
+  "c.status = 'consumed' " +
+  "c.processingState = 'COMPLETED' " +
+  "c.submissionId = ARGV[1] " +
+  "c.completedAt = tonumber(ARGV[2]) or 0 " +
+  "c.idempotencyKey = 'raid-submission:' .. (c.challengeId or '') " +
+  "local ttl = redis.call('ttl', KEYS[1]) " +
+  "local retention = tonumber(ARGV[3]) or 120 " +
+  "if not ttl or ttl < retention then ttl = retention end " +
+  "redis.call('set', KEYS[1], cjson.encode(c), 'EX', ttl) " +
+  "return 1";
+
+export type KvChallengeClaimResult =
+  | { status: 'CLAIMED'; attemptId: string; fencingToken: number; leaseExpiresAt: number }
+  | { status: 'RESUMED'; attemptId: string; fencingToken: number; leaseExpiresAt: number }
+  | { status: 'RECOVERED'; attemptId: string; fencingToken: number; leaseExpiresAt: number }
+  | { status: 'BUSY'; attemptId?: string; fencingToken?: number; leaseExpiresAt?: number }
+  | { status: 'COMPLETED'; submissionId?: string; attemptId?: string; fencingToken?: number; completedAt?: number }
+  | { status: 'EXPIRED' }
+  | { status: 'NOT_FOUND' }
+  | { status: 'CONFLICT' };
+
+export type KvChallengeFinalizeResult = {
+  success: boolean;
+  status?: string;
+  reason?: string;
+};
+
+export type KvChallengeRollbackResult = {
+  success: boolean;
+  reason?: string;
+};
+
+export async function kvClaimChallengeProcessing(
+  key: string,
+  attemptId: string,
+  nowMs = Date.now(),
+  leaseDurationMs = 30000,
+  minRetentionSec = 120
+): Promise<KvChallengeClaimResult> {
+  const res = await cmd(['EVAL', CLAIM_CHALLENGE_PROCESSING_LUA, 1, key, attemptId, nowMs, leaseDurationMs, minRetentionSec]);
+  if (!res) return { status: 'NOT_FOUND' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as KvChallengeClaimResult;
+  } catch {
+    return { status: 'CONFLICT' };
+  }
+}
+
+export async function kvFinalizeChallengeProcessing(
+  key: string,
+  attemptId: string,
+  fencingToken: number,
+  submissionId: string,
+  nowMs = Date.now(),
+  minRetentionSec = 120
+): Promise<KvChallengeFinalizeResult> {
+  const res = await cmd(['EVAL', FINALIZE_CHALLENGE_PROCESSING_LUA, 1, key, attemptId, fencingToken, submissionId, nowMs, minRetentionSec]);
+  if (!res) return { success: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as KvChallengeFinalizeResult;
+  } catch {
+    return { success: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export async function kvRollbackChallengeProcessing(
+  key: string,
+  attemptId: string,
+  fencingToken: number,
+  remainingTtlSec: number
+): Promise<KvChallengeRollbackResult> {
+  const res = await cmd(['EVAL', ROLLBACK_CHALLENGE_PROCESSING_LUA, 1, key, attemptId, fencingToken, remainingTtlSec]);
+  if (!res) return { success: false, reason: 'NO_RESPONSE' };
+  try {
+    return (typeof res === 'string' ? JSON.parse(res) : res) as KvChallengeRollbackResult;
+  } catch {
+    return { success: false, reason: 'PARSE_ERROR' };
+  }
+}
+
+export async function kvReconcileChallengeCompleted(
+  key: string,
+  submissionId: string,
+  nowMs = Date.now(),
+  minRetentionSec = 120
+): Promise<boolean> {
+  const res = await cmd(['EVAL', RECONCILE_CHALLENGE_COMPLETED_LUA, 1, key, submissionId, nowMs, minRetentionSec]);
+  return Number(res) === 1;
+}
+
+/**
  * Atomically binds a completed submission ID to the challenge tombstone in Redis.
  * Enables idempotent replay recovery where a retried request can return the existing submission.
  */

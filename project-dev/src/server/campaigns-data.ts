@@ -302,12 +302,46 @@ export async function deleteCampaign(id: string): Promise<boolean> {
   });
 }
 
+let _testFailNextSaveSubmissions: Error | null = null;
+let _testFailNextSaveCampaigns: Error | null = null;
+
+export function __setTestFailSaveSubmissions(err: Error | null): void {
+  _testFailNextSaveSubmissions = err;
+}
+
+export function __setTestFailSaveCampaigns(err: Error | null): void {
+  _testFailNextSaveCampaigns = err;
+}
+
+export async function getSubmissionByIdempotencyKey(
+  idempotencyKey: string
+): Promise<CampaignSubmission | null> {
+  if (!idempotencyKey) return null;
+  const submissions = await loadSubmissions();
+  return submissions.find((s) => s.idempotencyKey === idempotencyKey) || null;
+}
+
+export async function getSubmissionByChallengeId(
+  challengeId: string
+): Promise<CampaignSubmission | null> {
+  if (!challengeId) return null;
+  const submissions = await loadSubmissions();
+  const expectedKey = `raid-submission:${challengeId}`;
+  return (
+    submissions.find(
+      (s) => s.challengeId === challengeId || (s.idempotencyKey && s.idempotencyKey === expectedKey)
+    ) || null
+  );
+}
+
 export async function submitCampaignCompletion(payload: {
   campaignId: string;
   walletAddress: string;
   xHandle: string;
   xRetweetLink: string;
-}): Promise<{ ok: boolean; submission?: CampaignSubmission; error?: string }> {
+  challengeId?: string;
+  idempotencyKey?: string;
+}): Promise<{ ok: boolean; submission?: CampaignSubmission; error?: string; isExisting?: boolean }> {
   return withCampaignsLock(async () => {
     const campaigns = await loadCampaigns();
     const campaign = campaigns.find((c) => c.id === payload.campaignId);
@@ -341,12 +375,42 @@ export async function submitCampaignCompletion(payload: {
 
     const submissions = await loadSubmissions();
 
-    // Check for duplicate submission by this wallet on this campaign
-    const existing = submissions.find(
+    // 1. Durable Idempotency Check:
+    // If a submission exists for this challengeId or idempotencyKey, return the original submission.
+    // Never create a duplicate record, never re-increment counters, never duplicate rewards.
+    const idempotencyKey =
+      payload.idempotencyKey || (payload.challengeId ? `raid-submission:${payload.challengeId}` : undefined);
+
+    if (idempotencyKey || payload.challengeId) {
+      const existingByIdempotency = submissions.find(
+        (s) =>
+          (idempotencyKey && s.idempotencyKey === idempotencyKey) ||
+          (payload.challengeId && s.challengeId === payload.challengeId)
+      );
+      if (existingByIdempotency) {
+        // Reconcile campaign counter if previously interrupted during counter save
+        const matchingCount = submissions.filter((s) => s.campaignId === payload.campaignId).length;
+        if ((campaign.submissionsCount || 0) < matchingCount) {
+          campaign.submissionsCount = matchingCount;
+          await saveCampaigns(campaigns);
+        }
+        return { ok: true, submission: existingByIdempotency, isExisting: true };
+      }
+    }
+
+    // 2. Check for duplicate submission by this wallet on this campaign (with a different challenge)
+    const existingByWallet = submissions.find(
       (s) => s.campaignId === payload.campaignId && s.walletAddress.toLowerCase() === cleanWallet.toLowerCase()
     );
-    if (existing) {
+    if (existingByWallet) {
       return { ok: false, error: 'This wallet has already submitted proof for this campaign' };
+    }
+
+    // 3. Inject simulated test failure if active
+    if (_testFailNextSaveSubmissions) {
+      const err = _testFailNextSaveSubmissions;
+      _testFailNextSaveSubmissions = null;
+      throw err;
     }
 
     const newSubmission: CampaignSubmission = {
@@ -357,16 +421,31 @@ export async function submitCampaignCompletion(payload: {
       xRetweetLink: cleanRetweetUrl,
       status: 'PENDING',
       submittedAt: new Date().toISOString(),
+      challengeId: payload.challengeId,
+      idempotencyKey,
     };
 
     submissions.unshift(newSubmission);
-    await saveSubmissions(submissions);
+    const saveSubRes = await saveSubmissions(submissions);
+    if (!saveSubRes.success) {
+      throw new Error(saveSubRes.error || 'Failed to persist submission');
+    }
+
+    // 4. Inject simulated test failure on campaign counter update if active
+    if (_testFailNextSaveCampaigns) {
+      const err = _testFailNextSaveCampaigns;
+      _testFailNextSaveCampaigns = null;
+      throw err;
+    }
 
     // Update submission count on campaign
     campaign.submissionsCount = (campaign.submissionsCount || 0) + 1;
-    await saveCampaigns(campaigns);
+    const saveCampRes = await saveCampaigns(campaigns);
+    if (!saveCampRes.success) {
+      console.warn('[TrenchLabs Campaigns] Failed to update campaign counter, submission is durable:', saveCampRes.error);
+    }
 
-    return { ok: true, submission: newSubmission };
+    return { ok: true, submission: newSubmission, isExisting: false };
   });
 }
 

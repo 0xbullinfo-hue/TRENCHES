@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import {
   submitCampaignCompletion,
   loadCampaigns,
   loadSubmissions,
   isValidXUrl,
+  getSubmissionByChallengeId,
 } from '@/server/campaigns-data';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 import { isBase58Address } from '@/lib/config';
 import { verifySolanaSignature } from '@/server/auth';
 import {
   getRaidChallengeState,
-  consumeRaidChallengeOutcome,
-  finalizeRaidChallengeTombstone,
-  rollbackRaidChallenge,
+  claimRaidChallengeProcessing,
+  finalizeRaidChallengeProcessing,
+  rollbackRaidChallengeProcessing,
+  reconcileRaidChallengeCompleted,
 } from '@/server/raid-challenges';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +52,13 @@ export async function POST(
   const xHandle = typeof body.xHandle === 'string' ? body.xHandle.trim() : '';
   const xRetweetLink = typeof body.xRetweetLink === 'string' ? body.xRetweetLink.trim() : '';
   const signature = typeof body.signature === 'string' ? body.signature.trim() : '';
+  const explicitAttemptId = typeof body.attemptId === 'string' ? body.attemptId.trim() : '';
+  const headerAttemptId = req.headers.get('x-attempt-id')?.trim() || '';
+  const attemptId = explicitAttemptId || headerAttemptId || crypto.randomUUID();
+  const isRetry =
+    body.isRetry === true ||
+    req.headers.get('x-retry') === 'true' ||
+    Boolean(explicitAttemptId || headerAttemptId);
 
   // Mandatory server-generated challenge requirement: reject timestamp-only legacy signatures
   if (!challengeId) {
@@ -139,12 +149,44 @@ export async function POST(
     );
   }
 
-  // 3. Inspect authoritative lifecycle state
-  if (challengeState.status === 'CONSUMED') {
+  // 3. Inspect authoritative lifecycle state:
+  // COMPLETED/CONSUMED:
+  if (challengeState.status === 'COMPLETED' || challengeState.status === 'CONSUMED') {
+    const existingSubmission = await getSubmissionByChallengeId(challengeId);
+    if (
+      existingSubmission &&
+      existingSubmission.campaignId === id &&
+      existingSubmission.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+    ) {
+      if (isRetry || challengeState.attemptId === attemptId) {
+        return NextResponse.json(
+          {
+            ok: true,
+            message: 'Campaign proof successfully submitted! (Idempotent recovery)',
+            submission: existingSubmission,
+          },
+          { status: 200, headers: NO_STORE }
+        );
+      }
+      return NextResponse.json(
+        { ok: false, error: 'Challenge has already been consumed or replayed.' },
+        { status: 409, headers: NO_STORE }
+      );
+    }
     return NextResponse.json(
       { ok: false, error: 'Challenge has already been consumed or replayed.' },
       { status: 409, headers: NO_STORE }
     );
+  }
+
+  // PROCESSING:
+  if (challengeState.status === 'PROCESSING') {
+    if (!challengeState.isLeaseExpired && challengeState.attemptId !== attemptId) {
+      return NextResponse.json(
+        { ok: false, error: 'Another valid attempt is currently processing this challenge. Retry shortly.' },
+        { status: 409, headers: NO_STORE }
+      );
+    }
   }
 
   if (challengeState.status === 'NOT_FOUND') {
@@ -196,7 +238,7 @@ export async function POST(
     );
   }
 
-  // Preliminary check: Wallet rate limit (check before consumption to prevent burning challenge)
+  // Preliminary check: Wallet rate limit (check before processing claim)
   const walletLimit = await rateLimit(`submit-camp:wallet:${walletAddress}`, 5, 60);
   if (!walletLimit.ok) {
     return NextResponse.json(
@@ -205,44 +247,119 @@ export async function POST(
     );
   }
 
-  // Preliminary check: Duplicate campaign submission check (check before consumption to prevent burning challenge)
+  // Preliminary check: Duplicate campaign submission check
   const allSubmissions = await loadSubmissions();
-  const alreadySubmitted = allSubmissions.some(
+  const existingForWallet = allSubmissions.find(
     (s) => s.campaignId === id && s.walletAddress.toLowerCase() === walletAddress.toLowerCase()
   );
-  if (alreadySubmitted) {
-    return NextResponse.json(
-      { ok: false, error: 'This wallet has already submitted proof for this campaign' },
-      { status: 400, headers: NO_STORE }
-    );
-  }
+  const matchesAttempt = 'attemptId' in challengeState && challengeState.attemptId === attemptId;
 
-  // 8. Atomically consume the challenge in authoritative store (single-use replay protection)
-  let consumeOutcome;
-  try {
-    consumeOutcome = await consumeRaidChallengeOutcome(challengeId);
-  } catch (err) {
-    console.error('[API /api/campaigns/[id]/submit POST] Atomic consume error:', err);
-    return NextResponse.json(
-      { ok: false, error: 'Authoritative storage unavailable during consumption. Retry shortly.' },
-      { status: 503, headers: NO_STORE }
-    );
-  }
-
-  if (!consumeOutcome.success) {
-    if (consumeOutcome.status === 'ALREADY_CONSUMED') {
+  if (existingForWallet) {
+    // If it's for this exact challenge, it's an idempotent retry
+    if (existingForWallet.challengeId === challengeId) {
+      await reconcileRaidChallengeCompleted(challengeId, existingForWallet.id).catch(() => {});
+      if (isRetry || matchesAttempt) {
+        return NextResponse.json(
+          {
+            ok: true,
+            message: 'Campaign proof successfully submitted! (Idempotent recovery)',
+            submission: existingForWallet,
+          },
+          { status: 200, headers: NO_STORE }
+        );
+      }
       return NextResponse.json(
         { ok: false, error: 'Challenge has already been consumed or replayed.' },
         { status: 409, headers: NO_STORE }
       );
     }
     return NextResponse.json(
+      { ok: false, error: 'This wallet has already submitted proof for this campaign' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  // Check if durable submission already exists for this challengeId
+  const existingDurable = await getSubmissionByChallengeId(challengeId);
+  if (existingDurable) {
+    await reconcileRaidChallengeCompleted(challengeId, existingDurable.id).catch(() => {});
+    if (isRetry || matchesAttempt) {
+      return NextResponse.json(
+        {
+          ok: true,
+          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
+          submission: existingDurable,
+        },
+        { status: 200, headers: NO_STORE }
+      );
+    }
+    return NextResponse.json(
+      { ok: false, error: 'Challenge has already been completed with conflicting operation.' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  // 8. Atomically claim PROCESSING ownership in authoritative store
+  let claim;
+  try {
+    claim = await claimRaidChallengeProcessing(challengeId, attemptId, 30_000);
+  } catch (err) {
+    console.error('[API /api/campaigns/[id]/submit POST] Atomic claim error:', err);
+    return NextResponse.json(
+      { ok: false, error: 'Authoritative storage unavailable during claim. Retry shortly.' },
+      { status: 503, headers: NO_STORE }
+    );
+  }
+
+  if (claim.status === 'BUSY') {
+    return NextResponse.json(
+      { ok: false, error: 'Another valid attempt is currently processing this challenge. Retry shortly.' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  if (claim.status === 'COMPLETED') {
+    const existing = await getSubmissionByChallengeId(challengeId);
+    if (existing && (isRetry || claim.attemptId === attemptId)) {
+      return NextResponse.json(
+        {
+          ok: true,
+          message: 'Campaign proof successfully submitted! (Idempotent recovery)',
+          submission: existing,
+        },
+        { status: 200, headers: NO_STORE }
+      );
+    }
+    return NextResponse.json(
+      { ok: false, error: 'Challenge has already been completed with conflicting operation.' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  if (claim.status === 'EXPIRED') {
+    return NextResponse.json(
+      { ok: false, error: 'Challenge expired. Please request a fresh challenge.' },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+
+  if (claim.status === 'NOT_FOUND') {
+    return NextResponse.json(
       { ok: false, error: 'Unknown challenge ID or challenge expired.' },
       { status: 401, headers: NO_STORE }
     );
   }
 
-  // 9. Persist the submission completion
+  if (claim.status === 'CONFLICT') {
+    return NextResponse.json(
+      { ok: false, error: 'Conflicting processing claim. Retry shortly.' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  const fencingToken = claim.fencingToken || 1;
+
+  // 9. Persist the submission completion with durable idempotency key
   let result;
   try {
     result = await submitCampaignCompletion({
@@ -250,10 +367,27 @@ export async function POST(
       walletAddress,
       xHandle,
       xRetweetLink,
+      challengeId,
     });
   } catch (err) {
-    console.error('[API /api/campaigns/[id]/submit POST] Submission persistence error, rolling back challenge:', err);
-    await rollbackRaidChallenge(challengeId, challenge);
+    console.error('[API submit POST] Submission persistence error, checking durable state:', err);
+    // FIRST: Check if the submission was actually saved before rolling back
+    const durableCheck = await getSubmissionByChallengeId(challengeId);
+    if (durableCheck) {
+      // The submission was durably saved! Finalize challenge and return success:
+      finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, durableCheck.id).catch(() => {});
+      return NextResponse.json(
+        {
+          ok: true,
+          message: 'Campaign proof successfully submitted! Awaiting admin airdrop verification.',
+          submission: durableCheck,
+        },
+        { status: 201, headers: NO_STORE }
+      );
+    }
+
+    // Definitively NO durable submission exists: Safe ownership-protected rollback
+    await rollbackRaidChallengeProcessing(challengeId, attemptId, fencingToken, challenge);
     return NextResponse.json(
       { ok: false, error: 'Storage failure during submission persistence. Challenge restored, please retry.' },
       { status: 503, headers: NO_STORE }
@@ -261,27 +395,37 @@ export async function POST(
   }
 
   if (!result.ok || !result.submission) {
-    console.error('[API /api/campaigns/[id]/submit POST] submitCampaignCompletion returned error, rolling back challenge:', result.error);
-    await rollbackRaidChallenge(challengeId, challenge);
+    const durableCheck = await getSubmissionByChallengeId(challengeId);
+    if (!durableCheck) {
+      await rollbackRaidChallengeProcessing(challengeId, attemptId, fencingToken, challenge);
+    }
     return NextResponse.json(
       { ok: false, error: result.error || 'Failed to submit campaign proof' },
       { status: 400, headers: NO_STORE }
     );
   }
 
-  // 10. Finalize tombstone with persisted submissionId for idempotent retries
+  // 10. Finalize challenge processing in authoritative store
   try {
-    await finalizeRaidChallengeTombstone(challengeId, result.submission.id);
-  } catch (tombstoneErr) {
-    console.warn('[API /api/campaigns/[id]/submit POST] Failed to finalize tombstone with submissionId:', tombstoneErr);
+    await finalizeRaidChallengeProcessing(challengeId, attemptId, fencingToken, result.submission.id);
+  } catch (finalizeErr) {
+    console.warn('[API submit POST] Redis finalization error (submission remains durable):', finalizeErr);
+    // MANDATORY REQUIREMENT 7:
+    // If Redis finalization fails after the submission has been persisted:
+    // - Do not roll back the durable submission!
+    // - Do not report that the submission was never recorded!
+    // - Return a response reflecting the durable result (201).
   }
 
+  const responseStatus = result.isExisting ? 200 : 201;
   return NextResponse.json(
     {
       ok: true,
-      message: 'Campaign proof successfully submitted! Awaiting admin airdrop verification.',
+      message: result.isExisting
+        ? 'Campaign proof successfully submitted! (Idempotent recovery)'
+        : 'Campaign proof successfully submitted! Awaiting admin airdrop verification.',
       submission: result.submission,
     },
-    { status: 201, headers: NO_STORE }
+    { status: responseStatus, headers: NO_STORE }
   );
 }
