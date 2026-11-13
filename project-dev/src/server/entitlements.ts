@@ -132,19 +132,19 @@ export async function resolveWalletEntitlement(
   if (overrides?.mockHoldingTokens !== undefined) {
     balanceTokens = overrides.mockHoldingTokens;
     balanceRaw = BigInt(Math.round(balanceTokens * Math.pow(10, TOKEN_DECIMALS))).toString();
-    balanceUsd = +(balanceTokens * priceUsd).toFixed(2);
+    balanceUsd = Number((balanceTokens * priceUsd).toFixed(6));
   } else {
     try {
       const rawBigInt = await readGenesisRawBalanceCached(walletAddress);
       balanceRaw = rawBigInt.toString();
       balanceTokens = Number(rawBigInt) / Math.pow(10, TOKEN_DECIMALS);
-      balanceUsd = +(balanceTokens * priceUsd).toFixed(2);
+      balanceUsd = Number((balanceTokens * priceUsd).toFixed(6));
     } catch (err) {
       console.error(`[Entitlements] Balance lookup failed for ${walletAddress}:`, err);
       // Fall back to float cache if raw fetch errored
       try {
         balanceTokens = await readGenesisBalanceCached(walletAddress);
-        balanceUsd = +(balanceTokens * priceUsd).toFixed(2);
+        balanceUsd = Number((balanceTokens * priceUsd).toFixed(6));
       } catch {
         balanceLookupError = true;
       }
@@ -169,7 +169,7 @@ export async function resolveWalletEntitlement(
   if (overrides?.mockStakedTokens !== undefined) {
     stakedTokens = overrides.mockStakedTokens;
     totalStakedRaw = BigInt(Math.round(stakedTokens * Math.pow(10, TOKEN_DECIMALS)));
-    stakedUsd = +(stakedTokens * priceUsd).toFixed(2);
+    stakedUsd = Number((stakedTokens * priceUsd).toFixed(6));
     if (stakedTokens > 0) {
       const futureUnlock = new Date(now + 90 * 86400 * 1000).toISOString();
       validStakes = [{ amount_raw: totalStakedRaw.toString(), unlocks_at: futureUnlock, status: 'active' }];
@@ -189,7 +189,7 @@ export async function resolveWalletEntitlement(
       BigInt(0)
     );
     stakedTokens = Number(totalStakedRaw) / Math.pow(10, TOKEN_DECIMALS);
-    stakedUsd = +(stakedTokens * priceUsd).toFixed(2);
+    stakedUsd = Number((stakedTokens * priceUsd).toFixed(6));
 
     if (validStakes.length > 0) {
       earliestUnlockAt = validStakes.reduce(

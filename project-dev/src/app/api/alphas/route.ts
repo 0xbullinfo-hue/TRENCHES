@@ -169,11 +169,18 @@ export async function GET(req: NextRequest) {
     verifiedUsersCount,
   };
 
-  after(() => {
-    dispatchDelayedMemberCalls().catch((e) =>
+  try {
+    after(() => {
+      dispatchDelayedMemberCalls().catch((e) =>
+        console.error('[TrenchLabs API] Background delayed member dispatch error:', e)
+      );
+    });
+  } catch {
+    // Fallback when route handler is invoked outside Next.js request async storage (e.g. direct route tests)
+    void dispatchDelayedMemberCalls().catch((e) =>
       console.error('[TrenchLabs API] Background delayed member dispatch error:', e)
     );
-  });
+  }
 
   return NextResponse.json(body, { headers: NO_STORE });
 }

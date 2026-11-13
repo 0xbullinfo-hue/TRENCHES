@@ -18,12 +18,14 @@ export interface LedgerRecordLike {
   closed_at?: string | null;
   outcome?: string | null;
   status?: string | null;
+  callType?: string | null;
 }
 
 export interface CallRecordLike {
   id?: string;
   ticker?: string;
   status?: string | null;
+  callType?: string | null;
   outcome?: 'PROFIT' | 'LOSS' | 'PENDING' | string | null;
   takeProfits?: Array<{ hit?: boolean; multiple?: number }> | null;
 }
@@ -57,6 +59,7 @@ export function computePerformanceStats(
       // Must have valid ticker and multiplier or outcome
       if (!entry.ticker || typeof entry.ticker !== 'string') continue;
       if (entry.status === 'CANCELLED') continue;
+      if (entry.callType === 'WATCHLIST') continue;
 
       const rawMult = entry.multiplier;
       const numMult = typeof rawMult === 'number' ? rawMult : parseFloat(String(rawMult || ''));
@@ -87,6 +90,7 @@ export function computePerformanceStats(
       if (!call || typeof call !== 'object') continue;
       if (!call.ticker || typeof call.ticker !== 'string') continue;
       if (call.status === 'CANCELLED') continue;
+      if (call.callType === 'WATCHLIST') continue;
 
       if (call.status === 'LIVE' || call.outcome === 'PENDING') {
         openCalls++;

@@ -250,3 +250,74 @@ test('V1.5 Workflow 6: Admin campaign & submission API routes enforce authorizat
   );
   assert.ok(resPatch.status === 401 || resPatch.status === 403);
 });
+
+// ============================================================================
+// V1.6: EXACT MEMBERSHIP USD BOUNDARY REGRESSION TESTS
+// ============================================================================
+
+const TEST_GENESIS_PRICE = 0.0000164;
+
+const MEMBER_THRESHOLD_TOKENS = Math.ceil(20 / TEST_GENESIS_PRICE);
+const PRO_THRESHOLD_TOKENS = Math.ceil(250 / TEST_GENESIS_PRICE);
+
+test('V1.6: Exact minimum liquid token quantity unlocks MEMBER', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: MEMBER_THRESHOLD_TOKENS,
+    mockStakedTokens: 0,
+    mockPriceUsd: TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'member');
+  assert.ok(ent.memberEligibility.balanceUsd >= 20);
+  assert.equal(ent.proEligibility.eligible, false);
+  assert.equal(ent.permissions.canAccessTerminal, true);
+  assert.equal(ent.permissions.canAccessProSignals, false);
+});
+
+test('V1.6: One token below MEMBER threshold remains FREE', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: MEMBER_THRESHOLD_TOKENS - 1,
+    mockStakedTokens: 0,
+    mockPriceUsd: TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'free');
+  assert.ok(ent.memberEligibility.balanceUsd < 20);
+  assert.equal(ent.permissions.canAccessTerminal, false);
+});
+
+test('V1.6: Exact minimum StakePoint quantity unlocks PRO', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: PRO_THRESHOLD_TOKENS,
+    mockPriceUsd: TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'pro');
+  assert.ok(ent.proEligibility.stakedUsd >= 250);
+  assert.equal(ent.permissions.canAccessProSignals, true);
+});
+
+test('V1.6: One token below PRO stake threshold cannot unlock PRO', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: PRO_THRESHOLD_TOKENS - 1,
+    mockPriceUsd: TEST_GENESIS_PRICE,
+  });
+
+  assert.notEqual(ent.tier, 'pro');
+  assert.ok(ent.proEligibility.stakedUsd < 250);
+  assert.equal(ent.permissions.canAccessProSignals, false);
+});
+
+test('V1.6: Large liquid balance cannot substitute for PRO staking', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: Math.ceil(1000 / TEST_GENESIS_PRICE),
+    mockStakedTokens: 0,
+    mockPriceUsd: TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'member');
+  assert.equal(ent.proEligibility.eligible, false);
+  assert.equal(ent.permissions.canAccessProSignals, false);
+});
