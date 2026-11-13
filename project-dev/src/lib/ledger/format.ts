@@ -58,7 +58,8 @@ export function formatTicker(ticker: string): string {
 }
 
 export function formatMultiplier(multiplier: string | number): string {
-  const num = typeof multiplier === 'number' ? multiplier : Number(multiplier);
+  const raw = typeof multiplier === 'string' ? multiplier.trim().replace(/x$/i, '') : multiplier;
+  const num = typeof raw === 'number' ? raw : Number(raw);
   if (!Number.isFinite(num)) return '1.0x';
   // If integer or 1 decimal place, keep clean, e.g. 3.4x, 10x
   if (Number.isInteger(num)) return `${num}x`;
@@ -134,5 +135,56 @@ export function formatMarketCap(value?: string | null): string {
 
   return `$${standardMc.toFixed(0)}`;
 }
+
+export const SUPPORTED_DEXSCREENER_CHAINS: Record<string, string> = {
+  solana: 'solana',
+  sol: 'solana',
+  ethereum: 'ethereum',
+  eth: 'ethereum',
+  base: 'base',
+  bsc: 'bsc',
+  binance: 'bsc',
+};
+
+export function getDexScreenerUrl(
+  chain?: string | null,
+  contractAddress?: string | null
+): string | null {
+  if (!chain || !contractAddress) return null;
+  const cleanCa = contractAddress.trim();
+  if (!cleanCa) return null;
+  const mapped = SUPPORTED_DEXSCREENER_CHAINS[chain.toLowerCase().trim()];
+  if (!mapped) return null;
+  return `https://dexscreener.com/${mapped}/${encodeURIComponent(cleanCa)}`;
+}
+
+export interface PnLResult {
+  formatted: string;
+  sign: 'positive' | 'negative' | 'zero' | 'invalid';
+  value: number | null;
+}
+
+export function calculatePnL(multiplier: string | number | null | undefined): PnLResult {
+  if (multiplier === null || multiplier === undefined) {
+    return { formatted: '—', sign: 'invalid', value: null };
+  }
+  const raw = typeof multiplier === 'string' ? multiplier.trim().replace(/x$/i, '') : multiplier;
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(num) || num <= 0) {
+    return { formatted: '—', sign: 'invalid', value: null };
+  }
+  const pnl = (num - 1) * 100;
+  if (Math.abs(pnl) < 0.0001) {
+    return { formatted: '0%', sign: 'zero', value: 0 };
+  }
+  const sign = pnl > 0 ? 'positive' : 'negative';
+  const absPnl = Math.abs(pnl);
+  const formattedNum = Number.isInteger(absPnl)
+    ? `${absPnl}`
+    : `${parseFloat(absPnl.toFixed(2))}`;
+  const prefix = pnl > 0 ? '+' : '-';
+  return { formatted: `${prefix}${formattedNum}%`, sign, value: pnl };
+}
+
 
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { LedgerCard, LedgerCardData } from './LedgerCard';
+import { LedgerTableRow, LedgerCardData } from './LedgerCard';
 import { LedgerCardSkeleton } from './LedgerCardSkeleton';
 import { LEDGER_CHAINS } from '@/lib/ledger/format';
 import { ArrowUpRight, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
@@ -28,10 +28,10 @@ export function LedgerGrid({
   const searchParams = useSearchParams();
 
   const [currentChain, setCurrentChain] = useState<string>(
-    searchParams.get('chain') || initialChain
+    searchParams?.get('chain') || initialChain
   );
   const [currentSort, setCurrentSort] = useState<'newest' | 'multi'>(
-    ((searchParams.get('sort') as 'newest' | 'multi') || initialSort)
+    ((searchParams?.get('sort') as 'newest' | 'multi') || initialSort)
   );
 
   const [entries, setEntries] = useState<LedgerCardData[]>(initialEntries);
@@ -179,14 +179,9 @@ export function LedgerGrid({
         </div>
       )}
 
-      {/* Grid Content: Max 4 cards per row, same theme and size as tier cards */}
+      {/* Structured Data Table Presentation */}
       {loading && entries.length === 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
-          <LedgerCardSkeleton />
-          <LedgerCardSkeleton />
-          <LedgerCardSkeleton />
-          <LedgerCardSkeleton />
-        </div>
+        <LedgerCardSkeleton />
       ) : entries.length === 0 ? (
         /* Empty State */
         <div className="rounded-xl bg-surface border border-toxic-border/40 p-12 text-center space-y-3">
@@ -198,10 +193,27 @@ export function LedgerGrid({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
-          {entries.map((entry) => (
-            <LedgerCard key={entry.id} entry={entry} />
-          ))}
+        <div className="w-full overflow-x-auto rounded-xl border border-border-default bg-surface-card shadow-none">
+          <table className="w-full min-w-[680px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border-default/60 bg-surface/70 text-2xs uppercase tracking-wider font-sans font-bold text-muted">
+                <th scope="col" className="px-4 py-3 text-left">Ticker</th>
+                <th scope="col" className="px-4 py-3 text-right">Entry MCAP</th>
+                <th scope="col" className="px-4 py-3 text-right">Exit MCAP</th>
+                <th scope="col" className="px-4 py-3 text-right">Multiplier</th>
+                <th scope="col" className="px-4 py-3 text-right">PnL</th>
+                <th scope="col" className="px-4 py-3 text-right">DexScreener</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-default/30">
+              {entries.map((entry) => (
+                <LedgerTableRow key={entry.id} entry={entry} />
+              ))}
+            </tbody>
+          </table>
+          <div className="p-3 text-center border-t border-border-default/30 text-2xs font-mono text-muted">
+            Recorded by the TrenchLabs team · All results display verified multipliers and contract addresses.
+          </div>
         </div>
       )}
 

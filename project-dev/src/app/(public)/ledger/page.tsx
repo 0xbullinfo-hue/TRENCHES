@@ -44,16 +44,8 @@ export default async function PublicLedgerPage(props: {
           </p>
         </div>
 
-        {/* Ledger Grid wrapped in Suspense for useSearchParams */}
-        <Suspense
-          fallback={
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-              <LedgerCardSkeleton />
-              <LedgerCardSkeleton />
-              <LedgerCardSkeleton />
-            </div>
-          }
-        >
+        {/* Ledger Table wrapped in Suspense for useSearchParams */}
+        <Suspense fallback={<LedgerCardSkeleton />}>
           <LedgerGrid
             initialEntries={entries}
             initialTotal={total}

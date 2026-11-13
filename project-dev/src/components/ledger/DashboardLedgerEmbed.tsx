@@ -15,6 +15,10 @@ export function DashboardLedgerEmbed() {
   });
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#ledger-embed') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsOpen(true);
+    }
     const handleHashChange = () => {
       if (window.location.hash === '#ledger-embed') {
         setIsOpen(true);
@@ -105,16 +109,7 @@ export function DashboardLedgerEmbed() {
             </div>
           </div>
 
-          <Suspense
-            fallback={
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
-                <LedgerCardSkeleton />
-                <LedgerCardSkeleton />
-                <LedgerCardSkeleton />
-                <LedgerCardSkeleton />
-              </div>
-            }
-          >
+          <Suspense fallback={<LedgerCardSkeleton />}>
             <LedgerGrid isDashboardEmbed={true} />
           </Suspense>
         </div>
