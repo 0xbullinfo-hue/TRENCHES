@@ -1,5 +1,8 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useGenesisBalance } from '@/context/GenesisContext';
 import { TierCardProps } from './TierCard.types';
 
 export function TierCard({
@@ -15,6 +18,19 @@ export function TierCard({
   emphasized = false,
   badge,
 }: TierCardProps) {
+  const { connectWallet } = useGenesisBalance();
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    const local = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+    queueMicrotask(() => {
+      setIsLocalhost(local);
+    });
+  }, []);
+
+  const isLocalWalletCta =
+    isLocalhost && ctaDisabled && ctaLabel.toUpperCase().includes('CONNECT WALLET');
   const isExternal = ctaHref.startsWith('http');
 
   return (
@@ -68,7 +84,19 @@ export function TierCard({
 
       {/* CTA Button */}
       <div className="pt-6 mt-auto">
-        {ctaDisabled ? (
+        {isLocalWalletCta ? (
+          <button
+            type="button"
+            onClick={connectWallet}
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
+              emphasized
+                ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
+                : 'border border-toxic text-toxic hover:bg-toxic/10'
+            }`}
+          >
+            CONNECT WALLET
+          </button>
+        ) : ctaDisabled ? (
           <div className="relative group" data-target-href={ctaHref}>
             <button
               type="button"
