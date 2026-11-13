@@ -9,6 +9,77 @@ export const MEMBER_USD_THRESHOLD = 20;
 export const PRO_STAKE_USD_THRESHOLD = 250;
 export const PRO_STAKE_MIN_LOCK_DAYS = 90;
 
+function decimalToFraction(value: number): {
+  numerator: bigint;
+  denominator: bigint;
+} {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Invalid decimal value');
+  }
+
+  const text = value.toString().toLowerCase();
+  const [coefficient, exponentText] = text.split('e');
+
+  const exponent = exponentText ? Number(exponentText) : 0;
+  const [whole, fraction = ''] = coefficient.split('.');
+
+  const digits = `${whole}${fraction}`;
+
+  let numerator = BigInt(digits);
+  const scale = fraction.length - exponent;
+
+  let denominator = BigInt(1);
+
+  if (scale >= 0) {
+    denominator = BigInt(10) ** BigInt(scale);
+  } else {
+    numerator *= BigInt(10) ** BigInt(-scale);
+  }
+
+  return { numerator, denominator };
+}
+
+function decimalTokensToRawUnits(
+  tokens: number,
+  decimals: number
+): bigint {
+  if (!Number.isFinite(tokens) || tokens < 0) {
+    throw new Error('Invalid token quantity');
+  }
+
+  const { numerator, denominator } = decimalToFraction(tokens);
+
+  return (
+    numerator * (BigInt(10) ** BigInt(decimals))
+  ) / denominator;
+}
+
+function rawTokenValueMeetsUsdThreshold(
+  rawAmount: bigint,
+  priceUsd: number,
+  thresholdUsd: number,
+  tokenDecimals: number
+): boolean {
+  if (
+    rawAmount < BigInt(0) ||
+    !Number.isFinite(priceUsd) ||
+    priceUsd <= 0 ||
+    !Number.isFinite(thresholdUsd) ||
+    thresholdUsd < 0
+  ) {
+    return false;
+  }
+
+  const { numerator, denominator } = decimalToFraction(priceUsd);
+
+  const tokenScale = BigInt(10) ** BigInt(tokenDecimals);
+
+  return (
+    rawAmount * numerator >=
+    BigInt(thresholdUsd) * tokenScale * denominator
+  );
+}
+
 export interface FeaturePermissions {
   canAccessTerminal: boolean;
   canAccessProSignals: boolean;
@@ -131,7 +202,10 @@ export async function resolveWalletEntitlement(
 
   if (overrides?.mockHoldingTokens !== undefined) {
     balanceTokens = overrides.mockHoldingTokens;
-    balanceRaw = BigInt(Math.round(balanceTokens * Math.pow(10, TOKEN_DECIMALS))).toString();
+    balanceRaw = decimalTokensToRawUnits(
+      balanceTokens,
+      TOKEN_DECIMALS
+    ).toString();
     balanceUsd = Number((balanceTokens * priceUsd).toFixed(6));
   } else {
     try {
@@ -144,6 +218,12 @@ export async function resolveWalletEntitlement(
       // Fall back to float cache if raw fetch errored
       try {
         balanceTokens = await readGenesisBalanceCached(walletAddress);
+
+        balanceRaw = decimalTokensToRawUnits(
+          balanceTokens,
+          TOKEN_DECIMALS
+        ).toString();
+
         balanceUsd = Number((balanceTokens * priceUsd).toFixed(6));
       } catch {
         balanceLookupError = true;
@@ -151,7 +231,17 @@ export async function resolveWalletEntitlement(
     }
   }
 
-  const isMemberEligible = isAdmin || balanceUsd >= MEMBER_USD_THRESHOLD;
+  const isMemberEligible =
+    isAdmin ||
+    (
+      !priceUnavailable &&
+      rawTokenValueMeetsUsdThreshold(
+        BigInt(balanceRaw),
+        priceUsd,
+        MEMBER_USD_THRESHOLD,
+        TOKEN_DECIMALS
+      )
+    );
 
   // 4. Evaluate StakePoint Pro staking positions
   const now = Date.now();
@@ -211,7 +301,17 @@ export async function resolveWalletEntitlement(
     hadStake = userStakes.length > 0;
   }
 
-  const isProEligible = isAdmin || stakedUsd >= PRO_STAKE_USD_THRESHOLD;
+  const isProEligible =
+    isAdmin ||
+    (
+      !priceUnavailable &&
+      rawTokenValueMeetsUsdThreshold(
+        totalStakedRaw,
+        priceUsd,
+        PRO_STAKE_USD_THRESHOLD,
+        TOKEN_DECIMALS
+      )
+    );
   const isExpired = hadStake && validStakes.length === 0;
 
   // 5. Final Tier Determination per Rule 2:

@@ -28,7 +28,8 @@ test('CRITICAL FIX 03: Admin balance reflects real balance without artificial $2
 
 test('CRITICAL FIX 02: Entitlement Resolution Pro staker retains PRO even with 0 liquid tokens', async () => {
   // Pro staker who has staked $250 on StakePoint but has 0 liquid tokens
-  const mockStakedTokens = 250 / 0.0000164;
+  // Use Math.ceil to ensure the token count is at or above the threshold after integer conversion
+  const mockStakedTokens = Math.ceil(250 / 0.0000164);
   const entitlement = await resolveWalletEntitlement('StakePointProWallet11111111111111111111111', {
     mockHoldingTokens: 0,
     mockStakedTokens,

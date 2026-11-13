@@ -1713,7 +1713,7 @@ test('Membership [1/4]: FREE, MEMBER and PRO entitlements resolve correctly', as
   assert.equal(freeEnt.permissions.canAccessProSignals, false);
 
   // Member: holding >= $20 USD, staking $0
-  const memberTokens = 20 / 0.0000164;
+  const memberTokens = Math.ceil(20 / 0.0000164);
   const memberEnt = await resolveWalletEntitlement('MemberWallet111111111111111111111111111111', {
     mockHoldingTokens: memberTokens,
     mockStakedTokens: 0,
@@ -1724,7 +1724,7 @@ test('Membership [1/4]: FREE, MEMBER and PRO entitlements resolve correctly', as
   assert.equal(memberEnt.permissions.canAccessProSignals, false);
 
   // Pro: staking >= $250 USD on StakePoint
-  const proStakedTokens = 250 / 0.0000164;
+  const proStakedTokens = Math.ceil(250 / 0.0000164);
   const proEnt = await resolveWalletEntitlement('ProWallet11111111111111111111111111111111', {
     mockHoldingTokens: 0,
     mockStakedTokens: proStakedTokens,

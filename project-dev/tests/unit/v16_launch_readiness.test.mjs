@@ -7,6 +7,20 @@ import { installDomShim } from './helpers/dom-shim.mjs';
 
 process.env.ALLOW_FILE_PERSISTENCE = 'true';
 
+// Mock next/server's `after` to be a no-op in test context (outside Next.js request lifecycle).
+// ESM namespace objects are frozen, so we patch via require() which returns a mutable CJS wrapper.
+import { createRequire } from 'node:module';
+const _require = createRequire(import.meta.url);
+const safeAfter = (fn) => { try { if (typeof fn === 'function') fn(); } catch { /* no request context */ } };
+try {
+  const nextServerCjs = _require('next/server');
+  nextServerCjs.after = safeAfter;
+} catch { /* fallback: leave after() unpatched */ }
+try {
+  const afterInternalCjs = _require('next/dist/server/after/after.js');
+  afterInternalCjs.after = safeAfter;
+} catch { /* internal path may differ between versions */ }
+
 const dom = installDomShim();
 
 // Minimal localStorage shim for GenesisContext reload test
@@ -587,4 +601,339 @@ test('V1.6 Fix F [2/2]: Non-admin user cannot create, edit, view submissions, or
     { params: Promise.resolve({ submissionId: 'sub-1' }) }
   );
   assert.ok(resPatchSub.status === 401 || resPatchSub.status === 403);
+});
+
+
+// ============================================================================
+// V1.7 FIX E: WATCHLIST callType FULL LIFECYCLE VERIFICATION
+// ============================================================================
+
+test('V1.7 Fix E [1/5]: WATCHLIST records are excluded from ledger statistics', () => {
+  const stats = computePerformanceStats(
+    [
+      { ticker: 'WL1', multiplier: '10.0000', callType: 'WATCHLIST', outcome: 'PROFIT' },
+      { ticker: 'WL2', multiplier: '0.2000', callType: 'WATCHLIST', outcome: 'LOSS' },
+      { ticker: 'ALP', multiplier: '3.0000', callType: 'ALPHA', outcome: 'PROFIT' },
+    ],
+    []
+  );
+
+  assert.equal(stats.totalRecordedCalls, 1, 'Only ALPHA records should be counted');
+  assert.equal(stats.profitableCalls, 1);
+  assert.equal(stats.losses, 0);
+  assert.equal(stats.openCalls, 0);
+});
+
+test('V1.7 Fix E [2/5]: WATCHLIST records are excluded from call-registry statistics', () => {
+  const stats = computePerformanceStats(
+    [],
+    [
+      { ticker: 'WL_LIVE', status: 'LIVE', callType: 'WATCHLIST' },
+      { ticker: 'WL_CLOSED', status: 'CLOSED', outcome: 'PROFIT', callType: 'WATCHLIST' },
+      { ticker: 'ALP_LIVE', status: 'LIVE', callType: 'ALPHA' },
+    ]
+  );
+
+  assert.equal(stats.openCalls, 1, 'Only ALPHA open calls should count');
+  assert.equal(stats.totalRecordedCalls, 0, 'WATCHLIST closed calls should not count');
+});
+
+test('V1.7 Fix E [3/5]: WATCHLIST records do not affect win rate', () => {
+  const stats = computePerformanceStats(
+    [
+      { ticker: 'A1', multiplier: '3.0', callType: 'ALPHA' },
+      { ticker: 'A2', multiplier: '0.5', callType: 'ALPHA' },
+      // WATCHLIST records that would distort win rate if included
+      { ticker: 'WL_WIN1', multiplier: '50.0', callType: 'WATCHLIST' },
+      { ticker: 'WL_WIN2', multiplier: '100.0', callType: 'WATCHLIST' },
+      { ticker: 'WL_WIN3', multiplier: '200.0', callType: 'WATCHLIST' },
+    ],
+    []
+  );
+
+  // Without WATCHLIST: 1 win, 1 loss = 50% win rate
+  // With WATCHLIST (if counted): 4 wins, 1 loss = 80%
+  assert.equal(stats.totalRecordedCalls, 2);
+  assert.equal(stats.profitableCalls, 1);
+  assert.equal(stats.losses, 1);
+  assert.equal(stats.winRate, 50);
+});
+
+test('V1.7 Fix E [4/5]: MAX_ALPHA remains included in performance statistics', () => {
+  const stats = computePerformanceStats(
+    [
+      { ticker: 'MAX1', multiplier: '5.0', callType: 'MAX_ALPHA' },
+      { ticker: 'MAX2', multiplier: '0.3', callType: 'MAX_ALPHA' },
+      { ticker: 'ALP1', multiplier: '2.0', callType: 'ALPHA' },
+    ],
+    []
+  );
+
+  assert.equal(stats.totalRecordedCalls, 3);
+  assert.equal(stats.profitableCalls, 2); // MAX1 + ALP1
+  assert.equal(stats.losses, 1); // MAX2
+});
+
+test('V1.7 Fix E [5/5]: Missing callType defaults to inclusion (legacy ALPHA records)', () => {
+  const stats = computePerformanceStats(
+    [
+      { ticker: 'LEGACY1', multiplier: '4.0' },               // no callType
+      { ticker: 'LEGACY2', multiplier: '0.8', callType: null },  // explicit null
+      { ticker: 'LEGACY3', multiplier: '2.0', callType: undefined }, // explicit undefined
+    ],
+    []
+  );
+
+  // Missing callType is not 'WATCHLIST', so records are included (legacy behavior)
+  assert.equal(stats.totalRecordedCalls, 3);
+  assert.equal(stats.profitableCalls, 2); // LEGACY1 (4x) + LEGACY3 (2x)
+  assert.equal(stats.losses, 1); // LEGACY2 (0.8x)
+});
+
+// ============================================================================
+// V1.7 FIX F: SUCCESSFUL AUTHENTICATED ALPHA & ADMIN WORKFLOW VERIFICATION
+// ============================================================================
+
+test('V1.7 Fix F [1/6]: MEMBER can access ordinary ALPHA calls with 200 and correct tier', async () => {
+  const fx = withAlphasMockFetch();
+  try {
+    const res = await getAlphasRoute(
+      makeSignedRequest('http://127.0.0.1:3008/api/alphas?callType=ALPHA', MEMBER_KP)
+    );
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.tier, 'LAB_MEMBER');
+    assert.equal(typeof data.balance, 'number');
+    assert.equal(typeof data.serverTime, 'string');
+    assert.ok(Array.isArray(data.items));
+  } finally {
+    fx.restore();
+  }
+});
+
+test('V1.7 Fix F [2/6]: PRO can access ALPHA, MAX_ALPHA, and WATCHLIST with correct tier in each response', async () => {
+  // PRO stake should already exist from V1.6 Fix D [4/6]
+  const fx = withAlphasMockFetch();
+  try {
+    for (const ct of ['ALPHA', 'MAX_ALPHA', 'WATCHLIST']) {
+      const res = await getAlphasRoute(
+        makeSignedRequest(`http://127.0.0.1:3008/api/alphas?callType=${ct}`, PRO_KP)
+      );
+      assert.equal(res.status, 200, `Expected PRO 200 for ${ct}`);
+      const data = await res.json();
+      assert.equal(data.ok, true, `Expected ok:true for ${ct}`);
+      assert.equal(data.tier, 'PRO', `Expected PRO tier for ${ct}`);
+      assert.ok(Array.isArray(data.items), `Expected items array for ${ct}`);
+      assert.ok(Array.isArray(data.callers), `Expected callers array for ${ct}`);
+      assert.equal(typeof data.balance, 'number');
+      assert.ok(data.allocationCap !== undefined, `Expected allocationCap for ${ct}`);
+    }
+  } finally {
+    fx.restore();
+  }
+});
+
+test('V1.7 Fix F [3/6]: Client-supplied tier parameter does not grant access — FREE remains restricted', async () => {
+  const fx = withAlphasMockFetch();
+  try {
+    // FREE user trying to pass callType=ALPHA — should still get 403
+    const res = await getAlphasRoute(
+      makeSignedRequest('http://127.0.0.1:3008/api/alphas?callType=ALPHA', FREE_KP)
+    );
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.equal(data.ok, false);
+    assert.equal(data.error, 'ACCESS_DENIED_ZERO_BALANCE');
+  } finally {
+    fx.restore();
+  }
+});
+
+test('V1.7 Fix F [4/6]: MEMBER cannot access WATCHLIST even with explicit callType parameter', async () => {
+  const fx = withAlphasMockFetch();
+  try {
+    const res = await getAlphasRoute(
+      makeSignedRequest('http://127.0.0.1:3008/api/alphas?callType=WATCHLIST', MEMBER_KP)
+    );
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.equal(data.ok, false);
+    assert.equal(data.error, 'FORBIDDEN');
+  } finally {
+    fx.restore();
+  }
+});
+
+test('V1.7 Fix F [5/6]: Admin authenticated campaign create, edit, and submission management', async () => {
+  const originalFetch = globalThis.fetch;
+  const campaigns = [
+    {
+      id: 'camp-f-existing',
+      title: 'Fix F Test Raid',
+      tweetUrl: 'https://x.com/trenchlabs/status/1850000000000000777',
+      rewardAmount: '10 USDC',
+      totalPool: '100 USDC',
+      description: 'Test raid for Fix F',
+      status: 'ACTIVE',
+      pinned: false,
+      durationHours: 24,
+      createdAt: '2026-11-01T00:00:00.000Z',
+      expiresAt: '2026-11-02T00:00:00.000Z',
+      submissionsCount: 1,
+    },
+  ];
+  const submissionsByCamp = {
+    'camp-f-existing': [
+      {
+        id: 'sub-f-1',
+        campaignId: 'camp-f-existing',
+        walletAddress: WALLET_A,
+        xHandle: '@fix_f_raider',
+        xRetweetLink: 'https://x.com/fix_f_raider/status/18500000000000',
+        status: 'PENDING',
+        submittedAt: '2026-11-01T03:00:00.000Z',
+      },
+    ],
+  };
+  let capturedPostBody = null;
+  let capturedPatchBody = null;
+
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    const method = (init.method || 'GET').toUpperCase();
+    const body = init.body ? JSON.parse(String(init.body)) : null;
+
+    if (u === '/api/campaigns' && method === 'GET') {
+      return { ok: true, status: 200, json: async () => ({ ok: true, campaigns: [...campaigns] }) };
+    }
+    if (u === '/api/admin/campaigns' && method === 'POST') {
+      capturedPostBody = body;
+      const created = {
+        id: 'camp-f-new',
+        ...body,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + Number(body.durationHours || 24) * 3600000).toISOString(),
+        submissionsCount: 0,
+      };
+      campaigns.unshift(created);
+      submissionsByCamp[created.id] = [];
+      return { ok: true, status: 201, json: async () => ({ ok: true, campaign: created }) };
+    }
+    if (u === '/api/admin/campaigns/camp-f-existing/submissions' && method === 'GET') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, submissions: submissionsByCamp['camp-f-existing'] }),
+      };
+    }
+    if (u === '/api/admin/campaigns/submissions/sub-f-1' && method === 'PATCH') {
+      capturedPatchBody = body;
+      submissionsByCamp['camp-f-existing'][0].status = body.status;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, submission: submissionsByCamp['camp-f-existing'][0] }),
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ ok: true, submissions: [] }) };
+  };
+
+  const container = dom.document.createElement('div');
+  dom.document.body.appendChild(container);
+  let root;
+  const toasts = [];
+
+  try {
+    // 1. Mount AdminCampaignManager with authenticated admin
+    await act(async () => {
+      root = createRoot(container);
+      root.render(
+        React.createElement(AdminCampaignManager, {
+          onToast: (msg, type) => toasts.push({ msg, type }),
+          getAdminHeaders: async () => ({ 'x-wallet-address': ADMIN_WALLET }),
+        })
+      );
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 25));
+    });
+
+    // 2. Verify existing submissions loaded
+    assert.ok(container.textContent.includes('@fix_f_raider'));
+
+    // 3. Mark submission AIRDROPPED
+    const airdropBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent.includes('Mark Airdropped')
+    );
+    assert.ok(airdropBtn, 'Mark Airdropped button should exist');
+    await act(async () => {
+      airdropBtn.click();
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 25));
+    });
+    assert.equal(capturedPatchBody?.status, 'AIRDROPPED', 'Should persist AIRDROPPED status');
+    assert.equal(submissionsByCamp['camp-f-existing'][0].status, 'AIRDROPPED');
+
+    // 4. Create new campaign
+    const newBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent.includes('New Raid Campaign')
+    );
+    assert.ok(newBtn, 'New Raid Campaign button should exist');
+    await act(async () => {
+      newBtn.click();
+    });
+
+    const inputs = Array.from(container.querySelectorAll('input'));
+    const textarea = container.querySelector('textarea');
+    await act(async () => {
+      dom.setInputValue(inputs[0], 'V1.7 Fix F Campaign');
+      dom.setInputValue(inputs[1], 'https://x.com/trenchlabs/status/1850000000000000888');
+      dom.setInputValue(inputs[2], '50 USDC');
+      if (textarea) dom.setInputValue(textarea, 'Retweet for rewards');
+    });
+
+    await act(async () => {
+      dom.submitForm(container.querySelector('form'));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 25));
+    });
+
+    // 5. Verify campaign was created
+    assert.equal(capturedPostBody?.title, 'V1.7 Fix F Campaign');
+    assert.ok(container.textContent.includes('V1.7 Fix F Campaign'), 'Created campaign should appear in list');
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    if (container.parentNode) container.parentNode.removeChild(container);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('V1.7 Fix F [6/6]: Stale/unavailable oracle does not grant higher tier', async () => {
+  const fx = withAlphasMockFetch(() => {
+    // Override Jupiter price to return an error
+    return new Response(JSON.stringify({ error: 'unavailable' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  try {
+    const ent = await resolveWalletEntitlement(FREE_WALLET, {
+      mockHoldingTokens: 5_000_000,
+      mockStakedTokens: 50_000_000,
+      mockPriceUsd: 0,  // Oracle returns 0 = unavailable
+    });
+
+    // With oracle unavailable, tier should be 'unknown', not 'member' or 'pro'
+    assert.equal(ent.tier, 'unknown');
+    assert.equal(ent.memberEligibility.eligible, false);
+    assert.equal(ent.proEligibility.eligible, false);
+  } finally {
+    fx.restore();
+  }
 });

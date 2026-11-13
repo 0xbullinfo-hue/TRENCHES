@@ -64,12 +64,13 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
         }
       }
 
-      if ([320, 390, 768, 1440].includes(width)) {
-        await page.screenshot({
-          path: path.join(SCREENSHOT_DIR, `dashboard-social-${width}px.png`),
-          fullPage: false,
-        });
-      }
+      await page.screenshot({
+        path: path.join(
+          SCREENSHOT_DIR,
+          `dashboard-social-${width}px.png`
+        ),
+        fullPage: false,
+      });
     });
   }
 

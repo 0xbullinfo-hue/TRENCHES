@@ -2,6 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installDomShim } from './helpers/dom-shim.mjs';
 
+// Mock next/server's `after` to be a no-op in test context (outside Next.js request lifecycle).
+// ESM namespace objects are frozen, so we patch via require() which returns a mutable CJS wrapper.
+import { createRequire } from 'node:module';
+const _require = createRequire(import.meta.url);
+const safeAfter = (fn) => { try { if (typeof fn === 'function') fn(); } catch { /* no request context */ } };
+try {
+  const nextServerCjs = _require('next/server');
+  nextServerCjs.after = safeAfter;
+} catch {}
+try {
+  const afterInternalCjs = _require('next/dist/server/after/after.js');
+  afterInternalCjs.after = safeAfter;
+} catch {}
+
 const dom = installDomShim();
 
 // Minimal localStorage shim on window & globalThis for GenesisContext
@@ -33,6 +47,7 @@ const {
 } = await import('./helpers/campaign_card_harness.tsx');
 
 const { resolveWalletEntitlement } = await import('../../src/server/entitlements.ts');
+const { TOKEN_DECIMALS } = await import('../../src/lib/config.ts');
 const { GenesisProvider, useGenesisBalance } = await import('../../src/context/GenesisContext.tsx');
 const { GET: getAlphasRoute } = await import('../../src/app/api/alphas/route.ts');
 const { GET: getAdminSubmissionsRoute } = await import(
@@ -320,4 +335,91 @@ test('V1.6: Large liquid balance cannot substitute for PRO staking', async () =>
   assert.equal(ent.tier, 'member');
   assert.equal(ent.proEligibility.eligible, false);
   assert.equal(ent.permissions.canAccessProSignals, false);
+});
+
+
+// ============================================================================
+// V1.7: RAW-UNIT PRECISION MEMBERSHIP ENTITLEMENT TESTS
+// ============================================================================
+
+const V17_TEST_GENESIS_PRICE = 0.0000164;
+
+const MEMBER_THRESHOLD_RAW = BigInt(
+  Math.ceil(
+    20 / (V17_TEST_GENESIS_PRICE / Math.pow(10, TOKEN_DECIMALS))
+  )
+);
+
+const PRO_THRESHOLD_RAW = BigInt(
+  Math.ceil(
+    250 / (V17_TEST_GENESIS_PRICE / Math.pow(10, TOKEN_DECIMALS))
+  )
+);
+
+const memberThresholdTokens =
+  Number(MEMBER_THRESHOLD_RAW) / Math.pow(10, TOKEN_DECIMALS);
+
+const proThresholdTokens =
+  Number(PRO_THRESHOLD_RAW) / Math.pow(10, TOKEN_DECIMALS);
+
+test('V1.7 Fix A [1/4]: Exactly MEMBER_THRESHOLD_RAW qualifies for MEMBER', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: memberThresholdTokens,
+    mockStakedTokens: 0,
+    mockPriceUsd: V17_TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'member', `Expected MEMBER at exactly ${MEMBER_THRESHOLD_RAW} raw units`);
+  assert.equal(ent.memberEligibility.eligible, true);
+  assert.equal(ent.permissions.canAccessTerminal, true);
+});
+
+test('V1.7 Fix A [2/4]: MEMBER_THRESHOLD_RAW - 1n remains FREE', async () => {
+  const belowTokens = Number(MEMBER_THRESHOLD_RAW - 1n) / Math.pow(10, TOKEN_DECIMALS);
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: belowTokens,
+    mockStakedTokens: 0,
+    mockPriceUsd: V17_TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'free', `Expected FREE at ${MEMBER_THRESHOLD_RAW - 1n} raw units (one below threshold)`);
+  assert.equal(ent.memberEligibility.eligible, false);
+  assert.equal(ent.permissions.canAccessTerminal, false);
+});
+
+test('V1.7 Fix A [3/4]: Exactly PRO_THRESHOLD_RAW qualifies for PRO', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: proThresholdTokens,
+    mockPriceUsd: V17_TEST_GENESIS_PRICE,
+  });
+
+  assert.equal(ent.tier, 'pro', `Expected PRO at exactly ${PRO_THRESHOLD_RAW} raw staked units`);
+  assert.equal(ent.proEligibility.eligible, true);
+  assert.equal(ent.permissions.canAccessProSignals, true);
+});
+
+test('V1.7 Fix A [4/4]: PRO_THRESHOLD_RAW - 1n does not qualify for PRO', async () => {
+  const belowTokens = Number(PRO_THRESHOLD_RAW - 1n) / Math.pow(10, TOKEN_DECIMALS);
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: belowTokens,
+    mockPriceUsd: V17_TEST_GENESIS_PRICE,
+  });
+
+  assert.notEqual(ent.tier, 'pro', `Expected NOT PRO at ${PRO_THRESHOLD_RAW - 1n} raw staked units (one below threshold)`);
+  assert.equal(ent.proEligibility.eligible, false);
+  assert.equal(ent.permissions.canAccessProSignals, false);
+});
+
+test('V1.7 Fix A [5/5]: Oracle unavailability does not grant new access', async () => {
+  const ent = await resolveWalletEntitlement(WALLET_A, {
+    mockHoldingTokens: memberThresholdTokens * 100,
+    mockStakedTokens: proThresholdTokens * 100,
+    mockPriceUsd: 0,
+  });
+
+  assert.equal(ent.tier, 'unknown');
+  assert.equal(ent.memberEligibility.eligible, false);
+  assert.equal(ent.proEligibility.eligible, false);
 });
