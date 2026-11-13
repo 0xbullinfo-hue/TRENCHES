@@ -15,15 +15,6 @@ function signEd25519Hex(kp: Keypair, message: string): string {
   return crypto.sign(null, Buffer.from(message, 'utf-8'), privKey).toString('hex');
 }
 
-function signEd25519Base64(kp: Keypair, message: string): string {
-  const privKey = crypto.createPrivateKey({
-    key: Buffer.concat([ED25519_PKCS8_PREFIX, Buffer.from(kp.secretKey.subarray(0, 32))]),
-    format: 'der',
-    type: 'pkcs8',
-  });
-  return crypto.sign(null, Buffer.from(message, 'utf-8'), privKey).toString('base64');
-}
-
 test.describe('TRENCHLABS Social Posts Authenticated Browser E2E', () => {
   test('complete Social Posts UI-driven session auth, form submission, reload persistence, and replay rejection', async ({
     page,
@@ -184,7 +175,7 @@ test.describe('TRENCHLABS Social Posts Authenticated Browser E2E', () => {
           xHandle: `@e2e_${ts}`,
           xRetweetLink: `https://x.com/e2e_${ts}/status/${ts}03`,
           challengeId: 'rc_nonexistent_expired_123',
-          signature: signEd25519Base64(walletA, 'fake-challenge'),
+          signature: signEd25519Hex(walletA, 'fake-challenge'),
         },
       }
     );
@@ -350,7 +341,7 @@ test.describe('TRENCHLABS Social Posts Authenticated Browser E2E', () => {
     const challengeData = await challengeRes.json();
 
     // Sign and submit
-    const challengeSig = signEd25519Base64(walletA, challengeData.message);
+    const challengeSig = signEd25519Hex(walletA, challengeData.message);
     const submitRes = await page.request.post(
       `${BASE_URL}/api/campaigns/${activeCamp.id}/submit`,
       {
