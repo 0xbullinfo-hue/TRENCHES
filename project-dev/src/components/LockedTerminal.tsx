@@ -72,11 +72,11 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="space-y-2">
             <h3 className="font-sans text-xl font-extrabold uppercase tracking-tight text-white">
-              CONNECT WALLET TO VERIFY $GENESIS ACCESS
+              CONNECT WALLET TO VERIFY $H42 ACCESS
             </h3>
             <p className="font-sans text-sm text-muted max-w-lg mx-auto leading-relaxed">
               Connect Phantom, Solflare, Trust Wallet, or Backpack to verify your wallet holding.
-              Holding at least <strong className="text-toxic font-bold">~$20 $GENESIS</strong> unlocks full
+              Holding at least <strong className="text-toxic font-bold">~$20 $H42</strong> unlocks full
               access to live trade calls, contract addresses, and incubator allocations.
             </p>
           </div>
@@ -177,7 +177,7 @@ export const LockedTerminal: React.FC = () => {
           <ShieldAlert className="w-4 h-4" />
           <span>MEMBERSHIP REQUIREMENT NOT MET</span>
         </div>
-        <span>~$20 $GENESIS OR STAKING REQUIRED</span>
+        <span>~$20 $H42 OR STAKING REQUIRED</span>
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
@@ -188,11 +188,11 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="space-y-1">
             <h3 className="font-sans text-lg sm:text-xl font-extrabold uppercase tracking-tight text-white">
-              HOLD ~$20 WORTH OF $GENESIS TO ENTER THE LAB
+              HOLD ~$20 WORTH OF $H42 TO ENTER THE LAB
             </h3>
             <p className="font-sans text-sm text-muted leading-relaxed">
               Your wallet currently holds{' '}
-              <strong className="text-danger tnum">{formattedBalance} $GENESIS</strong>.
+              <strong className="text-danger tnum">{formattedBalance} $H42</strong>.
               You are currently on the <strong className="text-white">Free tier</strong> with access to community Social Raids, closed calls, and the performance ledger.
             </p>
           </div>
@@ -212,12 +212,12 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-muted">Verified Wallet Balance</span>
-            <span className="font-mono text-danger font-bold tnum">{formattedBalance} $GENESIS</span>
+            <span className="font-mono text-danger font-bold tnum">{formattedBalance} $H42</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-muted">Member Access</span>
-            <span className="font-mono text-toxic font-bold tnum">Hold ≥ $20 $GENESIS in Wallet</span>
+            <span className="font-mono text-toxic font-bold tnum">Hold ≥ $20 $H42 in Wallet</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between">
@@ -226,7 +226,7 @@ export const LockedTerminal: React.FC = () => {
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between gap-2">
-            <span className="text-muted shrink-0">$GENESIS Contract</span>
+            <span className="text-muted shrink-0">$H42 Contract</span>
             <div className="flex items-center gap-2 min-w-0">
               <a
                 href={SOLSCAN.token(GENESIS_MINT)}
@@ -268,7 +268,7 @@ export const LockedTerminal: React.FC = () => {
               rel="noreferrer"
               className="h-12 min-h-[44px] px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
             >
-              <span>Buy $GENESIS on Pump.fun</span>
+              <span>Buy $H42 on Pump.fun</span>
               <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
             </a>
 

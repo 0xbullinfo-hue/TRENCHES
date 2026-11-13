@@ -48,7 +48,7 @@ export function CurrentStakeCard({
               type="button"
               className="font-sans text-xs text-muted hover:text-toxic underline underline-offset-4 transition-colors"
             >
-              Stake additional $GENESIS →
+              Stake additional $H42 →
             </button>
           )}
         </div>

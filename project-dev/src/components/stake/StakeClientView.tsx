@@ -65,7 +65,7 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
       {/* Page Header */}
       <div className="space-y-2 text-center">
         <h1 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white">
-          Stake $GENESIS to unlock Pro
+          Stake $H42 to unlock Pro
         </h1>
         <p className="font-sans text-sm text-muted leading-relaxed max-w-md mx-auto">
           Real-time signals, push alerts, and full terminal access. Stake for 90 days to qualify.

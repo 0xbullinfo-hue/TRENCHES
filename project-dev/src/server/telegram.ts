@@ -217,7 +217,7 @@ export async function handleTelegramVerification(
       return {
         replyText:
           `Your wallet ${shortWallet} doesn't currently qualify.\n\n` +
-          `• Member access: Hold at least $20 in $GENESIS\n` +
+          `• Member access: Hold at least $20 in $H42\n` +
           `• Pro access: Stake $250 for 90 days\n\n` +
           `Top up on the dashboard: ${dashboard}`,
         success: false,
@@ -271,7 +271,7 @@ export async function handleTelegramVerification(
           return {
             replyText:
               `⚠️ <b>Verified as Member</b>\n\n` +
-              `Your wallet holds $20+ in $GENESIS, but you do not currently have an active $250 stake for Pro.\n\n` +
+              `Your wallet holds $20+ in $H42, but you do not currently have an active $250 stake for Pro.\n\n` +
               `👉 <b>Join Member Group:</b> ${invite}\n\n` +
               `To unlock the Pro group and high-conviction calls, stake $250 on your dashboard:\n` +
               `🔗 ${SITE_URL}/dashboard/stake`,
@@ -284,7 +284,7 @@ export async function handleTelegramVerification(
             `✅ <b>Verified as Member</b>\n\n` +
             `Welcome to TrenchLabsHQ. Join the Member group below:\n` +
             `👉 ${invite}\n\n` +
-            `Want Pro signals? Stake $250 in $GENESIS for 90 days on your dashboard:\n` +
+            `Want Pro signals? Stake $250 in $H42 for 90 days on your dashboard:\n` +
             `🔗 ${SITE_URL}/dashboard/stake`,
           success: true,
         };
@@ -391,9 +391,9 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
                 await tgSend(
                   userId,
                   `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
-                  `Your 90-day stake has completed. Because your wallet still holds $20+ in $GENESIS, you remain a <b>Member</b>.\n\n` +
+                  `Your 90-day stake has completed. Because your wallet still holds $20+ in $H42, you remain a <b>Member</b>.\n\n` +
                   memberInviteLine +
-                  `To regain full Pro access and priority signals, re-stake at least $250 in $GENESIS:\n` +
+                  `To regain full Pro access and priority signals, re-stake at least $250 in $H42:\n` +
                   `🔗 ${SITE_URL}/dashboard/stake`
                 );
               } else {
@@ -404,7 +404,7 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
                 await tgSend(
                   userId,
                   `⚠️ <b>Access Expired</b>\n\n` +
-                  `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $GENESIS.\n\n` +
+                  `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $H42.\n\n` +
                   `Top up or re-stake on the dashboard to regain access:\n` +
                   `🔗 ${SITE_URL}/dashboard`
                 );
@@ -422,7 +422,7 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
 
               await tgSend(
                 userId,
-                `⚠️ Your wallet no longer holds the minimum $20 in $GENESIS required for Member access. You have been removed from the Member group.\n\n` +
+                `⚠️ Your wallet no longer holds the minimum $20 in $H42 required for Member access. You have been removed from the Member group.\n\n` +
                 `Top up at ${SITE_URL}/dashboard to get a new invite.`
               );
             }

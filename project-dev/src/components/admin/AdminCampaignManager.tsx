@@ -512,7 +512,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 type="text"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="e.g. X RAID: TrenchLabs v2 & $GENESIS Ecosystem Announcement"
+                placeholder="e.g. X RAID: TrenchLabs v2 & $H42 Ecosystem Announcement"
                 className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none"
                 required
               />
@@ -542,7 +542,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 type="text"
                 value={formRewardAmount}
                 onChange={(e) => setFormRewardAmount(e.target.value)}
-                placeholder="e.g. 50,000 $GENESIS or 0.25 SOL"
+                placeholder="e.g. 50,000 $H42 or 0.25 SOL"
                 className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none"
                 required
               />
@@ -556,7 +556,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 type="text"
                 value={formTotalPool}
                 onChange={(e) => setFormTotalPool(e.target.value)}
-                placeholder="e.g. 1,000,000 $GENESIS Pool"
+                placeholder="e.g. 1,000,000 $H42 Pool"
                 className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white focus:outline-none"
               />
             </div>

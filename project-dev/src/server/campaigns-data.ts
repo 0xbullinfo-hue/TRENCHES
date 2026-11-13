@@ -375,7 +375,7 @@ export async function createCampaign(data: {
       description: data.description.trim(),
       tweetUrl: data.tweetUrl.trim(),
       rewardAmount: data.rewardAmount.trim(),
-      rewardToken: data.rewardToken?.trim() || '$GENESIS',
+      rewardToken: data.rewardToken?.trim() || '$H42',
       totalPool: data.totalPool?.trim(),
       targetActions: data.targetActions && data.targetActions.length > 0 ? data.targetActions : ['Like', 'Retweet', 'Comment'],
       status: data.status || 'ACTIVE',

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (!isAdminWallet(a.wallet)) {
       const userTier = await resolveTier(a.wallet);
       if (userTier === 'free') {
-        return fail(403, 'ACCESS_DENIED_ZERO_BALANCE', 'Holding at least $20 worth of $GENESIS or staking $250 on StakePoint is required for alerts.');
+        return fail(403, 'ACCESS_DENIED_ZERO_BALANCE', 'Holding at least $20 worth of $H42 or staking $250 on StakePoint is required for alerts.');
       }
     }
     const { url } = await createLinkCode(a.wallet);

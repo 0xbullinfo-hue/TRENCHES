@@ -44,7 +44,7 @@ export const Footer: React.FC = () => {
             </p>
             <div className="flex items-center gap-2 font-mono text-[11px] text-muted">
               <span className="w-2 h-2 rounded-full bg-toxic" />
-              <span>Token: $GENESIS • Solana Native</span>
+              <span>Token: $H42 • Solana Native</span>
             </div>
           </div>
 

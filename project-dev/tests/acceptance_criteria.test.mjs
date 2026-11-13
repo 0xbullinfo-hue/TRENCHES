@@ -42,7 +42,7 @@ test('Landing page HTML contains server-rendered thresholds and CTAs', async () 
   const html = await res.text();
 
   assert.ok(html.includes('Choose your access'), 'Contains section header');
-  const tokenMatches = html.match(/\d+(?:\.\d+)?[KM]?\s+\$GENESIS/g) || [];
+  const tokenMatches = html.match(/\d+(?:\.\d+)?[KM]?\s+\$H42/g) || [];
   assert.ok(
     tokenMatches.length >= 2,
     `Contains formatted member and pro token amounts (found: ${tokenMatches.join(', ')})`
@@ -67,7 +67,7 @@ test('/dashboard/stake renders 200 when valid session cookie provided', async ()
   });
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.ok(html.includes('Stake $GENESIS to unlock Pro'));
+  assert.ok(html.includes('Stake $H42 to unlock Pro'));
 });
 
 test('AC 27: /api/stake/mock does not exist (returns 404)', async () => {

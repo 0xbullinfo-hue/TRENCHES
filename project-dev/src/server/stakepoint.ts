@@ -153,7 +153,7 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    // 7. Verify token balance delta for $GENESIS mint
+    // 7. Verify token balance delta for $H42 mint
     const preBalances = tx.meta?.preTokenBalances || [];
     const postBalances = tx.meta?.postTokenBalances || [];
 
@@ -168,7 +168,7 @@ export async function verifyAndRecordStakePointPosition(
       return {
         success: false,
         status: 'REJECTED',
-        error: 'Transaction does not involve the authenticated wallet $GENESIS token account.',
+        error: 'Transaction does not involve the authenticated wallet $H42 token account.',
       };
     }
 
@@ -186,11 +186,11 @@ export async function verifyAndRecordStakePointPosition(
       return {
         success: false,
         status: 'REJECTED',
-        error: 'No outgoing $GENESIS token transfer detected in this transaction.',
+        error: 'No outgoing $H42 token transfer detected in this transaction.',
       };
     }
 
-    // Confirm that an external account/vault received incoming $GENESIS tokens
+    // Confirm that an external account/vault received incoming $H42 tokens
     const recipientBalance = postBalances.find(
       (b) => b.mint === GENESIS_MINT && b.owner !== walletAddress && accountKeys[b.accountIndex] !== walletAddress
     );
@@ -198,7 +198,7 @@ export async function verifyAndRecordStakePointPosition(
       return {
         success: false,
         status: 'REJECTED',
-        error: 'No destination or pool vault received $GENESIS tokens in this transaction.',
+        error: 'No destination or pool vault received $H42 tokens in this transaction.',
       };
     }
 
@@ -210,7 +210,7 @@ export async function verifyAndRecordStakePointPosition(
       return {
         success: false,
         status: 'REJECTED',
-        error: 'Price unavailable: $GENESIS price oracle is temporarily unreachable. Your transaction was not recorded; please retry shortly.',
+        error: 'Price unavailable: $H42 price oracle is temporarily unreachable. Your transaction was not recorded; please retry shortly.',
       };
     }
     const tokenAmountNumber = Number(amountRaw) / Math.pow(10, TOKEN_DECIMALS);

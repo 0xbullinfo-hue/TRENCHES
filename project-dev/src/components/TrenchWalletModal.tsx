@@ -256,7 +256,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 className="p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors cursor-pointer text-left flex flex-col justify-between"
               >
                 <span className="text-white font-black">🛡️ Member Tier</span>
-                <span className="text-[10px] text-muted mt-0.5">1M+ $GENESIS</span>
+                <span className="text-[10px] text-muted mt-0.5">1M+ $H42</span>
               </button>
 
               <button

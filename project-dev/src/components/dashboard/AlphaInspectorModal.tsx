@@ -160,7 +160,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {token.locked ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-amber">
                 <Lock className="w-3 h-3" />
-                <span>~$20 $GENESIS REQUIRED</span>
+                <span>~$20 $H42 REQUIRED</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-pump">
@@ -482,12 +482,12 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <Lock className="w-5 h-5 text-amber shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-sans text-sm font-bold text-white">
-                    Requires ~$20 $GENESIS in Login Wallet
+                    Requires ~$20 $H42 in Login Wallet
                   </div>
                   <p className="font-sans text-xs text-muted leading-relaxed">
                     Your current balance is{' '}
-                    <strong className="text-white">{formattedBalance} $GENESIS</strong>.
-                    Hold at least <strong className="text-amber">~$20 worth of $GENESIS</strong>{' '}
+                    <strong className="text-white">{formattedBalance} $H42</strong>.
+                    Hold at least <strong className="text-amber">~$20 worth of $H42</strong>{' '}
                     from contract <span className="font-mono text-white">{GENESIS_MINT}</span>{' '}
                     (or stake $250 on StakePoint) to unmask this Contract Address (CA) and open market links.
                   </p>
@@ -501,7 +501,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   rel="noreferrer"
                   className="h-9 px-4 rounded-md bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
                 >
-                  <span>Buy $GENESIS on Pump.fun</span>
+                  <span>Buy $H42 on Pump.fun</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
@@ -512,7 +512,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     className="h-9 px-3.5 rounded-md bg-surface border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-pump" />
-                    <span>Preview 1M $GENESIS Member →</span>
+                    <span>Preview 1M $H42 Member →</span>
                   </button>
                 )}
               </div>

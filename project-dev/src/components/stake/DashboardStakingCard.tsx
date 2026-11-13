@@ -151,7 +151,7 @@ function StakePointLiveSection({
     return (
       <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-1">
         <div className="font-sans text-xs font-bold text-white">
-          No staking pool is currently active for $GENESIS.
+          No staking pool is currently active for $H42.
         </div>
         <div className="font-sans text-2xs text-muted">
           Check back soon or follow us for updates.
@@ -321,11 +321,11 @@ export function DashboardStakingCard({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-              Staking — $GENESIS
+              Staking — $H42
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-2xs font-mono text-muted uppercase">
-                $20 $GENESIS
+                $20 $H42
               </span>
               <a
                 href={stakePointPoolUrl}
@@ -356,7 +356,7 @@ export function DashboardStakingCard({
                 MEMBER ACCESS
               </span>
               <p className="font-sans text-xs text-muted leading-relaxed">
-                Hold at least $20 worth of $GENESIS in your connected wallet to unlock Member access.
+                Hold at least $20 worth of $H42 in your connected wallet to unlock Member access.
               </p>
             </div>
 
@@ -365,7 +365,7 @@ export function DashboardStakingCard({
                 PRO ACCESS
               </span>
               <p className="font-sans text-xs text-muted leading-relaxed">
-                Stake at least $250 worth of $GENESIS through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
+                Stake at least $250 worth of $H42 through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
               </p>
             </div>
           </div>
@@ -390,7 +390,7 @@ export function DashboardStakingCard({
 
           {/* Powered by StakePoint. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
-            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
+            Your $H42 is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
       </div>
@@ -417,7 +417,7 @@ export function DashboardStakingCard({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-              Staking — $GENESIS
+              Staking — $H42
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-muted text-xs font-mono">
@@ -452,7 +452,7 @@ export function DashboardStakingCard({
             </h4>
 
             <p className="font-sans text-xs sm:text-muted leading-relaxed">
-              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $GENESIS)
+              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $H42)
             </p>
           </div>
 
@@ -495,7 +495,7 @@ export function DashboardStakingCard({
 
           {/* Powered by StakePoint. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
-            Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
+            Your $H42 is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
           </p>
         </div>
       </div>
@@ -519,14 +519,14 @@ export function DashboardStakingCard({
     : 'Upgrade to Pro';
   const subtitle = isPartialStake
     ? `You currently have ${formatUsd(currentStakedUsd)} staked. Buy and stake the remaining to reach $250.`
-    : 'Buy $250 worth of $GENESIS and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.';
+    : 'Buy $250 worth of $H42 and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.';
 
   const memberCard = (
     <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-            Staking — $GENESIS
+            Staking — $H42
           </h3>
           <div className="flex items-center gap-2">
             <span className="text-2xs font-mono text-muted uppercase">
@@ -572,7 +572,7 @@ export function DashboardStakingCard({
             rel="noopener noreferrer"
             className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
           >
-            <span>STAKE $GENESIS</span>
+            <span>STAKE $H42</span>
             <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
           </a>
         </div>
@@ -592,7 +592,7 @@ export function DashboardStakingCard({
 
         {/* Powered by StakePoint. */}
         <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
-          Your $GENESIS is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
+          Your $H42 is locked for 90 days and cannot be withdrawn until unlock. • Powered by StakePoint
         </p>
       </div>
     </div>

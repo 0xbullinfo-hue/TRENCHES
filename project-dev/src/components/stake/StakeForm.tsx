@@ -138,9 +138,9 @@ export function StakeForm({
         </div>
 
         <div className="flex items-center justify-between text-2xs font-mono pt-1 text-muted">
-          <span>≈ {formatTokenDisplay(equivalentTokens)} $GENESIS</span>
+          <span>≈ {formatTokenDisplay(equivalentTokens)} $H42</span>
           {walletBalanceTokens > 0 && (
-            <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $GENESIS</span>
+            <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $H42</span>
           )}
         </div>
       </div>
@@ -169,11 +169,11 @@ export function StakeForm({
           rel="noopener noreferrer"
           className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
         >
-          <span>Stake $GENESIS on StakePoint →</span>
+          <span>Stake $H42 on StakePoint →</span>
           <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
         </a>
         <p className="text-center font-sans text-2xs text-muted">
-          Opens the official $GENESIS pool on StakePoint. Lock for 90 days to qualify for Pro.
+          Opens the official $H42 pool on StakePoint. Lock for 90 days to qualify for Pro.
         </p>
       </div>
 
@@ -213,7 +213,7 @@ export function StakeForm({
 
       {/* Disclaimer */}
       <p className="font-sans text-2xs text-dim text-center leading-relaxed">
-        Your $GENESIS is locked for 90 days in the StakePoint contract. • Powered by StakePoint
+        Your $H42 is locked for 90 days in the StakePoint contract. • Powered by StakePoint
       </p>
     </div>
   );

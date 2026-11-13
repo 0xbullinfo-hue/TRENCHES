@@ -30,7 +30,7 @@ const STAGES = [
     title: 'PARTICIPATE',
     icon: Users,
     description:
-      'Join community activities, submit proof for Social Raids to earn airdrops, and unlock tier-based research privileges via $GENESIS.',
+      'Join community activities, submit proof for Social Raids to earn airdrops, and unlock tier-based research privileges via $H42.',
   },
 ];
 

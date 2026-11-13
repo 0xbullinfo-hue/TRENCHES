@@ -1,8 +1,8 @@
 /**
  * TrenchLabs Dynamic Access Architecture:
  * - Free: $0, public features & closed ledger.
- * - Member: Buy & hold >= $20 USD worth of $GENESIS in the connected wallet.
- * - Pro: Buy & stake >= $250 USD worth of $GENESIS on StakePoint (90-day lock).
+ * - Member: Buy & hold >= $20 USD worth of $H42 in the connected wallet.
+ * - Pro: Buy & stake >= $250 USD worth of $H42 on StakePoint (90-day lock).
  *
  * All thresholds are USD-denominated and calculated dynamically from token price,
  * completely replacing legacy fixed token gates.
@@ -34,7 +34,7 @@ export interface Tier {
 export const TIERS: Record<TierId, Tier> = {
   LOCKED: {
     id: 'LOCKED',
-    label: 'Locked (< $20 $GENESIS)',
+    label: 'Locked (< $20 $H42)',
     usdTarget: 0,
     min: 0,
     multiplier: 0,
@@ -43,7 +43,7 @@ export const TIERS: Record<TierId, Tier> = {
   },
   LAB_MEMBER: {
     id: 'LAB_MEMBER',
-    label: 'Lab Member (~$20 $GENESIS held)',
+    label: 'Lab Member (~$20 $H42 held)',
     usdTarget: MEMBER_USD_TARGET,
     min: calculateRequiredTokens(MEMBER_USD_TARGET, DEFAULT_GENESIS_USD_PRICE),
     multiplier: 1,
@@ -52,7 +52,7 @@ export const TIERS: Record<TierId, Tier> = {
   },
   PRO: {
     id: 'PRO',
-    label: 'Pro Trader (~$250 $GENESIS staked on StakePoint)',
+    label: 'Pro Trader (~$250 $H42 staked on StakePoint)',
     usdTarget: PRO_USD_TARGET,
     min: calculateRequiredTokens(PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE),
     multiplier: 2.5,

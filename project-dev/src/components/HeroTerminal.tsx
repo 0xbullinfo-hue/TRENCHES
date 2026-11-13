@@ -86,11 +86,7 @@ export const HeroTerminal: React.FC = () => {
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
-              Building, experimenting, and shipping together. A multi-chain lab running live
-              experiments — <span className="text-toxic-bright font-bold">$GENESIS</span> is
-              the incubator token, <span className="text-white font-bold">TRENCHLABS</span>{' '}
-              is the incubator. We don&apos;t chase chains, we chase trenches. If
-              there&apos;s a trench, we&apos;re in it.
+              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-toxic-bright font-bold">$H42</span>) is your access key. We don&apos;t chase chains, we chase trenches. If there&apos;s a trench, we&apos;re in it.
             </p>
 
             {/* Primary Soft-Launch Conversion Unit */}
@@ -111,7 +107,7 @@ export const HeroTerminal: React.FC = () => {
                 </p>
               </div>
 
-              {/* Secondary Actions: FOLLOW ON X + VIEW $GENESIS */}
+              {/* Secondary Actions: FOLLOW ON X + VIEW $H42 */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <a
                   href={SOCIAL_LINKS.x}
@@ -130,7 +126,7 @@ export const HeroTerminal: React.FC = () => {
                   className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <span className="text-toxic">⚡</span>
-                  <span>VIEW $GENESIS</span>
+                  <span>VIEW $H42</span>
                   <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2]" />
                 </a>
               </div>

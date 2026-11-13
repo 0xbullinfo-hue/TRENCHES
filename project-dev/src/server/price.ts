@@ -50,7 +50,7 @@ async function fetchFromJupiter(mint: string, timeoutMs = 3500): Promise<number 
 }
 
 /**
- * Retrieves the live, verified USD price of $GENESIS from trusted oracles:
+ * Retrieves the live, verified USD price of $H42 from trusted oracles:
  * 1. Central market-data service (CoinStats when enabled -> DexScreener with chain+baseToken validation -> shared Redis/memory cache).
  * 2. Jupiter Price API v2 fallback.
  * 3. Bounded stale cache -> explicit UNAVAILABLE (priceUsd: null).

@@ -13,7 +13,7 @@ function computeRawAmount(usdTarget: number, priceUsd: number): string {
 }
 
 function unavailableResponse(reason: string) {
-  // Fail closed: never publish a guessed $GENESIS price or token thresholds derived from one.
+  // Fail closed: never publish a guessed $H42 price or token thresholds derived from one.
   return NextResponse.json(
     {
       error: 'price_unavailable',
@@ -32,7 +32,7 @@ export async function GET() {
     const priceResult = await getGenesisPrice();
     const priceUsd = priceResult.priceUsd;
     if (priceUsd === null || !Number.isFinite(priceUsd) || priceUsd <= 0) {
-      return unavailableResponse('$GENESIS price oracle is temporarily unavailable');
+      return unavailableResponse('$H42 price oracle is temporarily unavailable');
     }
     const now = new Date();
     const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();

@@ -194,7 +194,7 @@ export async function resolveWalletEntitlement(
   // 2. Compute dynamic member threshold in token units (0 when the price is unavailable)
   const thresholdTokens = priceUsd > 0 ? Math.ceil(MEMBER_USD_THRESHOLD / priceUsd) : 0;
 
-  // 3. Read on-chain $GENESIS token balance
+  // 3. Read on-chain $H42 token balance
   let balanceTokens = 0;
   let balanceRaw = '0';
   let balanceUsd = 0;

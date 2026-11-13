@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       {
         ok: false,
         error: 'ACCESS_DENIED_ZERO_BALANCE',
-        message: `Access restricted. Holding at least $20 worth of $GENESIS (${GENESIS_MINT}) or staking $250 on StakePoint is required.`,
+        message: `Access restricted. Holding at least $20 worth of $H42 (${GENESIS_MINT}) or staking $250 on StakePoint is required.`,
         balance,
         items: [],
       },

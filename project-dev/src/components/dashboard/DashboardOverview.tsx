@@ -87,14 +87,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               type="button"
               onClick={onCopyGenesisCa}
               className="h-10 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Copy $GENESIS token contract address"
+              title="Copy $H42 token contract address"
             >
               {copiedGenesisCa ? (
                 <Check className="w-3.5 h-3.5 text-toxic" />
               ) : (
                 <Copy className="w-3.5 h-3.5 text-toxic" />
               )}
-              <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $GENESIS CA'}</span>
+              <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $H42 CA'}</span>
             </button>
 
             <a
@@ -103,7 +103,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               rel="noreferrer"
               className="h-10 px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <span>Buy $GENESIS</span>
+              <span>Buy $H42</span>
               <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </a>
           </div>
@@ -127,7 +127,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span className="text-toxic font-mono text-[10px]">SPL</span>
             </div>
             <div className="text-white font-black tnum">
-              {formattedBalance} $GENESIS
+              {formattedBalance} $H42
             </div>
           </div>
 

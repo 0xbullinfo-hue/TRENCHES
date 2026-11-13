@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-Passing%20(21%2F21)-brightgreen.svg)](tests/)
 
-**TrenchLabsHQ** is a high-performance, token-gated terminal and automated signal telemetry system built for **$GENESIS** holders on Solana. It provides real-time multi-chain alpha calls, verifiable closed-trade P&L ledgers, 90-day **StakePoint** staking, live StakePoint pool telemetry, and automated multi-tier Telegram community management.
+**TrenchLabsHQ** is a high-performance, token-gated terminal and automated signal telemetry system built for **$H42** holders on Solana. It provides real-time multi-chain alpha calls, verifiable closed-trade P&L ledgers, 90-day **StakePoint** staking, live StakePoint pool telemetry, and automated multi-tier Telegram community management.
 
 ---
 
@@ -26,13 +26,13 @@
 
 ## 💎 Access Model & Tier Gates
 
-TrenchLabsHQ has completely eliminated legacy fixed token gates (such as flat 1,000,000 $GENESIS rules). Access is governed dynamically by **USD-denominated targets** calculated from token market value:
+TrenchLabsHQ has completely eliminated legacy fixed token gates (such as flat 1,000,000 $H42 rules). Access is governed dynamically by **USD-denominated targets** calculated from token market value:
 
 | Tier | Requirement | Terminal & Feature Access | Telegram Benefits |
 | :--- | :--- | :--- | :--- |
 | **Free** | Public ($0) | Closed calls, verifiable P&L ledger, educational content | Public announcements channel |
-| **Member** | **Buy & Hold $\ge$ $20 USD** in **$GENESIS** | Full incubator dashboard, live trade call feed, contract address inspection, market telemetry | Access to the official **Member Group** (`https://t.me/+S5bRJX17PRkzMTE0`) |
-| **Pro** | **Buy & Stake $\ge$ $250 USD** in **$GENESIS** on **StakePoint** (90-day lock) | Priority high-conviction calls, push alerts, TP/SL triggers, analyst commentary, allocation caps | Direct bot DM call alerts + **Pro Group** (`https://t.me/+aCatLce8Dfk5ZjZk`) |
+| **Member** | **Buy & Hold $\ge$ $20 USD** in **$H42** | Full incubator dashboard, live trade call feed, contract address inspection, market telemetry | Access to the official **Member Group** (`https://t.me/+S5bRJX17PRkzMTE0`) |
+| **Pro** | **Buy & Stake $\ge$ $250 USD** in **$H42** on **StakePoint** (90-day lock) | Priority high-conviction calls, push alerts, TP/SL triggers, analyst commentary, allocation caps | Direct bot DM call alerts + **Pro Group** (`https://t.me/+aCatLce8Dfk5ZjZk`) |
 
 > **Dynamic Recalculation:** Token requirements are recalculated dynamically from the 7-day TWAP/market price (`token_amount = usd_target / twap_price_usd`).
 
@@ -42,7 +42,7 @@ TrenchLabsHQ has completely eliminated legacy fixed token gates (such as flat 1,
 
 **StakePoint** is the primary staking tool powering TrenchLabsHQ Pro membership:
 
-- **90-Day Lock:** Stakers lock their $GENESIS for a minimum of 90 days on StakePoint to earn pool APR and qualify for Pro tier.
+- **90-Day Lock:** Stakers lock their $H42 for a minimum of 90 days on StakePoint to earn pool APR and qualify for Pro tier.
 - **Live Pool Telemetry:** The dApp queries `/api/stakepoint/pools`, fetching live APR, total value locked (TVL), and direct pool links from `https://stakepoint.app/api/pools/by-token/[mint]`.
 - **One-Click CTA & Auto-Verification:** Dashboard surfaces direct one-click links to the official StakePoint pool and provides an on-chain transaction verification flow (`POST /api/stake/confirm`) to activate Pro tier immediately upon staking.
 - **Zero Streamflow Dependency:** Streamflow staking has been completely removed from the platform.
@@ -60,7 +60,7 @@ An automated Telegram bot (`@Trenchlabs_bot`) verifies on-chain holdings and sta
                                          │
                     ┌────────────────────┴────────────────────┐
                     ▼                                         ▼
-      Hold >= $20 in $GENESIS                   Stake >= $250 on StakePoint
+      Hold >= $20 in $H42                       Stake >= $250 on StakePoint
                     │                                         │
                     ▼                                         ▼
       ┌───────────────────────────┐             ┌───────────────────────────┐

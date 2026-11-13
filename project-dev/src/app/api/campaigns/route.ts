@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
   if (!rewardAmount) {
     return NextResponse.json(
-      { ok: false, error: 'Reward amount is required (e.g. 50,000 $GENESIS)' },
+      { ok: false, error: 'Reward amount is required (e.g. 50,000 $H42)' },
       { status: 400, headers: NO_STORE }
     );
   }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { isBase58Address } from '@/lib/config';
+import { formatTokenTicker } from '@/lib/format-token-ticker';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import {
   ExternalLink,
@@ -1077,7 +1078,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 AIRDROP REWARD PER USER
               </div>
               <div className="font-sans text-sm font-black text-raid-primary">
-                {campaign.rewardAmount}
+                {formatTokenTicker(campaign.rewardAmount)}
               </div>
             </div>
           </div>
@@ -1087,7 +1088,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 TOTAL POOL
               </div>
               <div className="font-mono text-xs font-bold text-white">
-                {campaign.totalPool}
+                {formatTokenTicker(campaign.totalPool)}
               </div>
             </div>
           )}
@@ -1194,7 +1195,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   </button>
                 </div>
                 <p className="text-[10px] font-sans text-dim">
-                  Connect your Solana wallet to sign verification proof and receive your $GENESIS airdrop.
+                  Connect your Solana wallet to sign verification proof and receive your $H42 airdrop.
                 </p>
               </div>
             ) : !isSigningSupported ? (

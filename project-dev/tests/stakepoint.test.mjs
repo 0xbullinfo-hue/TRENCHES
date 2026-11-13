@@ -156,7 +156,7 @@ test('§7 AC 1, 2, 8, 11: Dashboard page renders StakePoint integration and prop
   assert.equal(res.status, 200);
   const html = await res.text();
 
-  assert.ok(html.includes('Staking — $GENESIS'), 'Dashboard must render Staking — $GENESIS title');
+  assert.ok(html.includes('Staking — $H42'), 'Dashboard must render Staking — $H42 title');
 
   const cardSrc = fs.readFileSync(path.join(process.cwd(), 'src/components/staking/StakePointCard.tsx'), 'utf8');
   assert.ok(
@@ -168,7 +168,7 @@ test('§7 AC 1, 2, 8, 11: Dashboard page renders StakePoint integration and prop
     'StakePointCard must include CTA button Stake on StakePoint →'
   );
   assert.ok(
-    cardSrc.includes('No staking pool is currently active for $GENESIS'),
+    cardSrc.includes('No staking pool is currently active for $H42'),
     'StakePointCard must handle zero pools empty state'
   );
 });

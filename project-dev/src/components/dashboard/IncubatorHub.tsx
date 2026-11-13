@@ -735,7 +735,7 @@ export const IncubatorHub: React.FC = () => {
         raidsCount={activeRaidsCount}
         watchlistCount={watchlistCallsCount}
         isUnlocked={isUnlocked}
-        onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$GENESIS', e)}
+        onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$H42', e)}
         copiedGenesisCa={copiedId === 'hero-gen-ca'}
         onSelectFilter={(f) => {
           if (f === 'all') setActiveFilter('ALL');
@@ -1770,7 +1770,7 @@ export const IncubatorHub: React.FC = () => {
             <p className="font-sans text-xs text-muted leading-relaxed">
               Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
               is verified with{' '}
-              <strong className="text-toxic">{formattedBalance} $GENESIS</strong>.
+              <strong className="text-toxic">{formattedBalance} $H42</strong>.
               Optionally map a local EVM address for multi-chain notifications.
             </p>
           </div>

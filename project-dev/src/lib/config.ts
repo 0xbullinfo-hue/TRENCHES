@@ -2,7 +2,7 @@
  * Runtime configuration. See MEMORY.md §1 for the env contract.
  */
 
-/** Official $GENESIS SPL Token Mint on Solana (Pump.fun / Mainnet-Beta) */
+/** Official $H42 SPL Token Mint on Solana (Pump.fun / Mainnet-Beta) */
 export const DEFAULT_GENESIS_MINT = 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump';
 
 /** Official Master Admin Wallet with full post/edit/delete/pin privileges & gate bypass */

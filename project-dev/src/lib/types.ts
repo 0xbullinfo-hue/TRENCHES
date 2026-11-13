@@ -77,7 +77,7 @@ export interface AlphaItem {
   entryMarketCapUsd: number;
   minTier: TierId;
   minTierLabel: string;
-  /** Minimum liquid $GENESIS balance required to unlock this alpha token */
+  /** Minimum liquid $H42 balance required to unlock this alpha token */
   minBalanceRequired: number;
   locked: boolean;
   ca: string | null;

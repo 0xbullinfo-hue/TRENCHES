@@ -937,3 +937,215 @@ test('V1.7 Fix F [6/6]: Stale/unavailable oracle does not grant higher tier', as
     fx.restore();
   }
 });
+
+// ---------------------------------------------------------------------------
+// BRANDING UPDATE VERIFICATION ($H42 TICKER AND HERO MESSAGING)
+// ---------------------------------------------------------------------------
+
+const fs = await import('node:fs');
+const path = await import('node:path');
+const { formatTokenTicker } = await import('../../src/lib/format-token-ticker.ts');
+const { DEFAULT_GENESIS_MINT } = await import('../../src/lib/config.ts');
+
+const ROOT_DIR = path.resolve(process.cwd());
+
+test('Branding [1/18]: The hero contains the exact approved paragraph', () => {
+  const heroPath = path.join(ROOT_DIR, 'src/components/HeroTerminal.tsx');
+  const content = fs.readFileSync(heroPath, 'utf8');
+  assert.ok(
+    content.includes('TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-toxic-bright font-bold">$H42</span>) is your access key.'),
+    'Hero paragraph must contain exact approved copy'
+  );
+  assert.ok(
+    content.includes('We don') && content.includes('chase chains, we chase trenches. If there') && content.includes('s a trench, we') && content.includes('re in it.'),
+    'Hero paragraph must contain trenches punchline'
+  );
+});
+
+test('Branding [2/18]: The hero displays $H42', () => {
+  const heroPath = path.join(ROOT_DIR, 'src/components/HeroTerminal.tsx');
+  const content = fs.readFileSync(heroPath, 'utf8');
+  assert.ok(content.includes('$H42'), 'Hero must display $H42 ticker');
+  assert.ok(content.includes('VIEW $H42'), 'Hero CTA must say VIEW $H42');
+});
+
+test('Branding [3/18]: The hero no longer displays $GENESIS', () => {
+  const heroPath = path.join(ROOT_DIR, 'src/components/HeroTerminal.tsx');
+  const content = fs.readFileSync(heroPath, 'utf8');
+  assert.ok(!content.includes('$GENESIS'), 'Hero must not display $GENESIS');
+});
+
+test('Branding [4/18]: The public navigation and footer use $H42 wherever the ticker is shown', () => {
+  const footerPath = path.join(ROOT_DIR, 'src/components/Footer.tsx');
+  const footerContent = fs.readFileSync(footerPath, 'utf8');
+  assert.ok(footerContent.includes('Token: $H42 • Solana Native'), 'Footer must show Token: $H42');
+  assert.ok(!footerContent.includes('Token: $GENESIS'), 'Footer must not show Token: $GENESIS');
+});
+
+test('Branding [5/18]: The membership screens display $H42', () => {
+  const lockedPath = path.join(ROOT_DIR, 'src/components/LockedTerminal.tsx');
+  const lockedContent = fs.readFileSync(lockedPath, 'utf8');
+  assert.ok(lockedContent.includes('$H42'), 'LockedTerminal must display $H42');
+  assert.ok(!lockedContent.includes('$GENESIS'), 'LockedTerminal must not display $GENESIS');
+
+  const restrictPath = path.join(ROOT_DIR, 'src/components/dashboard/MembershipRestrictionScreen.tsx');
+  const restrictContent = fs.readFileSync(restrictPath, 'utf8');
+  assert.ok(restrictContent.includes('$H42'), 'MembershipRestrictionScreen must display $H42');
+  assert.ok(!restrictContent.includes('$GENESIS'), 'MembershipRestrictionScreen must not display $GENESIS');
+
+  const tierPath = path.join(ROOT_DIR, 'src/components/landing/TierSection.tsx');
+  const tierContent = fs.readFileSync(tierPath, 'utf8');
+  assert.ok(tierContent.includes('$H42'), 'TierSection must display $H42');
+  assert.ok(!tierContent.includes('$GENESIS'), 'TierSection must not display $GENESIS');
+});
+
+test('Branding [6/18]: The staking screens display $H42', () => {
+  const stakingCardPath = path.join(ROOT_DIR, 'src/components/stake/DashboardStakingCard.tsx');
+  const stakingContent = fs.readFileSync(stakingCardPath, 'utf8');
+  assert.ok(stakingContent.includes('Staking — $H42'), 'DashboardStakingCard must display Staking — $H42');
+  assert.ok(!stakingContent.includes('$GENESIS'), 'DashboardStakingCard must not display $GENESIS');
+
+  const stakeClientPath = path.join(ROOT_DIR, 'src/components/stake/StakeClientView.tsx');
+  const stakeClientContent = fs.readFileSync(stakeClientPath, 'utf8');
+  assert.ok(stakeClientContent.includes('Stake $H42 to unlock Pro'), 'StakeClientView must display Stake $H42');
+  assert.ok(!stakeClientContent.includes('$GENESIS'), 'StakeClientView must not display $GENESIS');
+
+  const stakeFormPath = path.join(ROOT_DIR, 'src/components/stake/StakeForm.tsx');
+  const stakeFormContent = fs.readFileSync(stakeFormPath, 'utf8');
+  assert.ok(stakeFormContent.includes('Stake $H42 on StakePoint →'), 'StakeForm must display Stake $H42');
+  assert.ok(!stakeFormContent.includes('$GENESIS'), 'StakeForm must not display $GENESIS');
+
+  const stakePointPath = path.join(ROOT_DIR, 'src/components/staking/StakePointCard.tsx');
+  const stakePointContent = fs.readFileSync(stakePointPath, 'utf8');
+  assert.ok(stakePointContent.includes('Staking — $H42'), 'StakePointCard must display Staking — $H42');
+  assert.ok(!stakePointContent.includes('$GENESIS'), 'StakePointCard must not display $GENESIS');
+});
+
+test('Branding [7/18]: Campaign and reward displays use $H42', () => {
+  const cardPath = path.join(ROOT_DIR, 'src/components/campaigns/CampaignCard.tsx');
+  const cardContent = fs.readFileSync(cardPath, 'utf8');
+  assert.ok(cardContent.includes('$H42 airdrop'), 'CampaignCard must display $H42 airdrop');
+  assert.ok(cardContent.includes('formatTokenTicker(campaign.rewardAmount)'), 'CampaignCard must format rewardAmount');
+  assert.ok(!cardContent.includes('$GENESIS airdrop'), 'CampaignCard must not display $GENESIS airdrop');
+
+  const sectionPath = path.join(ROOT_DIR, 'src/components/campaigns/CampaignSection.tsx');
+  const sectionContent = fs.readFileSync(sectionPath, 'utf8');
+  assert.ok(sectionContent.includes('$H42 airdrops'), 'CampaignSection must display $H42 airdrops');
+  assert.ok(!sectionContent.includes('$GENESIS airdrops'), 'CampaignSection must not display $GENESIS airdrops');
+});
+
+test('Branding [8/18]: Admin campaign placeholders use $H42', () => {
+  const adminPath = path.join(ROOT_DIR, 'src/components/admin/AdminCampaignManager.tsx');
+  const adminContent = fs.readFileSync(adminPath, 'utf8');
+  assert.ok(adminContent.includes('placeholder="e.g. 50,000 $H42 or 0.25 SOL"'), 'Admin placeholder must use $H42');
+  assert.ok(adminContent.includes('placeholder="e.g. 1,000,000 $H42 Pool"'), 'Admin pool placeholder must use $H42');
+  assert.ok(!adminContent.includes('$GENESIS'), 'AdminCampaignManager must not contain $GENESIS');
+});
+
+test('Branding [9/18]: Telegram user-facing messages use $H42', () => {
+  const tgPath = path.join(ROOT_DIR, 'src/server/telegram.ts');
+  const tgContent = fs.readFileSync(tgPath, 'utf8');
+  assert.ok(tgContent.includes('Hold at least $20 in $H42'), 'Telegram message must use $H42');
+  assert.ok(tgContent.includes('Stake $250 in $H42 for 90 days'), 'Telegram message must use $H42');
+  assert.ok(!tgContent.includes('$GENESIS'), 'Telegram server must not contain $GENESIS');
+});
+
+test('Branding [10/18]: API user-facing access messages use $H42', () => {
+  const alphasRoutePath = path.join(ROOT_DIR, 'src/app/api/alphas/route.ts');
+  const alphasContent = fs.readFileSync(alphasRoutePath, 'utf8');
+  assert.ok(alphasContent.includes('Holding at least $20 worth of $H42'), 'Alphas route error must use $H42');
+
+  const campaignsRoutePath = path.join(ROOT_DIR, 'src/app/api/campaigns/route.ts');
+  const campaignsContent = fs.readFileSync(campaignsRoutePath, 'utf8');
+  assert.ok(campaignsContent.includes('50,000 $H42'), 'Campaigns route error must use $H42');
+
+  const tgLinkPath = path.join(ROOT_DIR, 'src/app/api/telegram/link/route.ts');
+  const tgLinkContent = fs.readFileSync(tgLinkPath, 'utf8');
+  assert.ok(tgLinkContent.includes('Holding at least $20 worth of $H42'), 'Telegram link error must use $H42');
+
+  const tiersCurrentPath = path.join(ROOT_DIR, 'src/app/api/tiers/current/route.ts');
+  const tiersCurrentContent = fs.readFileSync(tiersCurrentPath, 'utf8');
+  assert.ok(tiersCurrentContent.includes('$H42 price oracle'), 'Tiers current error must use $H42');
+});
+
+test('Branding [11/18]: Legacy persisted $GENESIS content renders as $H42 where dynamic display formatting is required', () => {
+  assert.equal(formatTokenTicker('50,000 $GENESIS'), '50,000 $H42');
+  assert.equal(formatTokenTicker('Quote with $GENESIS'), 'Quote with $H42');
+  assert.equal(formatTokenTicker('Receive your $GENESIS airdrop.'), 'Receive your $H42 airdrop.');
+  assert.equal(formatTokenTicker('Pool: 1,000,000 $GENESIS'), 'Pool: 1,000,000 $H42');
+});
+
+test('Branding [12/18]: Existing $H42 content remains unchanged', () => {
+  assert.equal(formatTokenTicker('50,000 $H42'), '50,000 $H42');
+  assert.equal(formatTokenTicker('Quote with $H42'), 'Quote with $H42');
+  assert.equal(formatTokenTicker('$H42'), '$H42');
+  assert.equal(formatTokenTicker('Plain string without ticker'), 'Plain string without ticker');
+});
+
+test('Branding [13/18]: The mint address remains exactly: EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump', () => {
+  const EXPECTED_MINT = 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump';
+  assert.equal(GENESIS_MINT, EXPECTED_MINT);
+});
+
+test('Branding [14/18]: GENESIS_MINT and DEFAULT_GENESIS_MINT remain unchanged', () => {
+  const EXPECTED_MINT = 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump';
+  assert.equal(DEFAULT_GENESIS_MINT, EXPECTED_MINT);
+  assert.equal(GENESIS_MINT, DEFAULT_GENESIS_MINT);
+});
+
+test('Branding [15/18]: NEXT_PUBLIC_GENESIS_MINT remains unchanged', () => {
+  const envPath = path.join(ROOT_DIR, '.env.example');
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  assert.ok(
+    envContent.includes('NEXT_PUBLIC_GENESIS_MINT=EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump'),
+    'Env example must preserve NEXT_PUBLIC_GENESIS_MINT'
+  );
+});
+
+test('Branding [16/18]: Wallet verification and balance retrieval remain unchanged', async () => {
+  const ent = await resolveWalletEntitlement(FREE_WALLET, {
+    mockHoldingTokens: 100,
+    mockStakedTokens: 0,
+    mockPriceUsd: 0.0000164,
+  });
+  assert.ok(ent !== null && typeof ent === 'object');
+  assert.equal(ent.walletAddress, FREE_WALLET);
+  assert.equal(typeof ent.memberEligibility.balanceRaw, 'string');
+  assert.equal(typeof ent.memberEligibility.balanceTokens, 'number');
+  assert.equal(typeof ent.price.usd, 'number');
+});
+
+test('Branding [17/18]: Membership entitlement calculations remain unchanged', async () => {
+  // Free: holding $0, staking $0
+  const freeEnt = await resolveWalletEntitlement(FREE_WALLET, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: 0,
+    mockPriceUsd: 0.0000164,
+  });
+  assert.equal(freeEnt.tier, 'free');
+
+  // Member: holding >= $20 USD
+  const memberTokens = Math.ceil(20 / 0.0000164);
+  const memberEnt = await resolveWalletEntitlement(MEMBER_WALLET, {
+    mockHoldingTokens: memberTokens,
+    mockStakedTokens: 0,
+    mockPriceUsd: 0.0000164,
+  });
+  assert.equal(memberEnt.tier, 'member');
+
+  // Pro: staking >= $250 USD
+  const proStakedTokens = Math.ceil(250 / 0.0000164);
+  const proEnt = await resolveWalletEntitlement(PRO_WALLET, {
+    mockHoldingTokens: 0,
+    mockStakedTokens: proStakedTokens,
+    mockPriceUsd: 0.0000164,
+  });
+  assert.equal(proEnt.tier, 'pro');
+});
+
+test('Branding [18/18]: StakePoint verification remains unchanged', () => {
+  const stakePointPath = path.join(ROOT_DIR, 'src/server/stakepoint.ts');
+  const stakePointContent = fs.readFileSync(stakePointPath, 'utf8');
+  assert.ok(stakePointContent.includes('b.mint === GENESIS_MINT'), 'StakePoint must still verify GENESIS_MINT');
+  assert.ok(stakePointContent.includes('PRO_STAKE_USD_THRESHOLD'), 'StakePoint must enforce PRO_STAKE_USD_THRESHOLD');
+});

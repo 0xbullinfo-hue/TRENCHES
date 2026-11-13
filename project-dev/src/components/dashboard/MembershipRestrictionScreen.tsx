@@ -170,7 +170,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
             <span>MEMBER ACCESS</span>
           </div>
           <p className="text-foreground-muted text-[11px] mt-1 leading-relaxed">
-            Hold at least <strong className="text-white">$20 worth of $GENESIS</strong> in your connected wallet to unlock Member access.
+            Hold at least <strong className="text-white">$20 worth of $H42</strong> in your connected wallet to unlock Member access.
           </p>
         </div>
 
@@ -180,7 +180,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
             <span>PRO ACCESS</span>
           </div>
           <p className="text-foreground-muted text-[11px] mt-1 leading-relaxed">
-            Stake at least <strong className="text-white">$250 worth of $GENESIS</strong> through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
+            Stake at least <strong className="text-white">$250 worth of $H42</strong> through StakePoint to unlock Pro access. Qualifying stakes are verified independently of your liquid wallet balance.
           </p>
         </div>
       </div>

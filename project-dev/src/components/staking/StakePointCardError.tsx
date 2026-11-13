@@ -26,7 +26,7 @@ export function StakePointCardError({ onRetry, errorMessage }: StakePointCardErr
         {/* Title */}
         <div className="flex items-center justify-between">
           <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
-            Staking — $GENESIS
+            Staking — $H42
           </h3>
           <span className="text-2xs font-mono text-muted uppercase">STAKEPOINT</span>
         </div>

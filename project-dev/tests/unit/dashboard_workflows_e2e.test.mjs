@@ -76,7 +76,7 @@ test('V1.5 Workflow 1 [1/6]: No qualifying balance or stake -> FREE', async () =
   assert.equal(ent.permissions.canAccessProSignals, false);
 });
 
-test('V1.5 Workflow 1 [2/6]: >= $20 liquid $GENESIS -> MEMBER only (not PRO)', async () => {
+test('V1.5 Workflow 1 [2/6]: >= $20 liquid $H42 -> MEMBER only (not PRO)', async () => {
   const ent = await resolveWalletEntitlement(WALLET_A, {
     mockHoldingTokens: 1_500_000, // ~$24.60
     mockStakedTokens: 0,

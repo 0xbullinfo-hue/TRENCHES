@@ -151,7 +151,7 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
             No Active Raid Campaigns
           </h4>
           <p className="font-sans text-xs text-muted max-w-sm mx-auto">
-            Check back soon for upcoming viral X raids, retweets, and community $GENESIS airdrops.
+            Check back soon for upcoming viral X raids, retweets, and community $H42 airdrops.
           </p>
         </div>
       ) : (

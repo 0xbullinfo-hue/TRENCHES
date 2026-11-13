@@ -15,15 +15,15 @@ export function formatTokenAmountDisplay(rawString: string, decimals = TOKEN_DEC
     const tokens = Number(BigInt(rawString)) / Math.pow(10, decimals);
     if (tokens >= 1_000_000) {
       const val = tokens / 1_000_000;
-      return `${val.toFixed(1)}M $GENESIS`;
+      return `${val.toFixed(1)}M $H42`;
     }
     if (tokens >= 1_000) {
       const val = tokens / 1_000;
-      return `${val.toFixed(1)}K $GENESIS`;
+      return `${val.toFixed(1)}K $H42`;
     }
-    return `${tokens.toFixed(1)} $GENESIS`;
+    return `${tokens.toFixed(1)} $H42`;
   } catch {
-    return '1.2M $GENESIS';
+    return '1.2M $H42';
   }
 }
 
@@ -94,14 +94,14 @@ const COMPARISON_MATRIX: MatrixRow[] = [
   {
     feature: 'Eligibility Requirement',
     free: 'Free ($0)',
-    member: 'Hold ~$20 $GENESIS in Wallet',
+    member: 'Hold ~$20 $H42 in Wallet',
     pro: 'Stake ~$250 on StakePoint (90 Days)',
   },
 ];
 
 export async function TierSection() {
-  let memberTokenFormatted = '1.2M $GENESIS';
-  let proTokenFormatted = '15.2M $GENESIS';
+  let memberTokenFormatted = '1.2M $H42';
+  let proTokenFormatted = '15.2M $H42';
   let recalculatedAt = '';
   let showFootnote = false;
 
@@ -152,14 +152,14 @@ export async function TierSection() {
             Choose your access
           </h2>
           <p className="font-sans text-sm sm:text-base text-muted mt-1.5 max-w-2xl">
-            Hold $GENESIS in your wallet or stake for 90 days to unlock incubator signals and real-time alpha.
+            Hold $H42 in your wallet or stake for 90 days to unlock incubator signals and real-time alpha.
           </p>
         </div>
 
         {/* Unified Cards Grid */}
         <div className="rounded-2xl bg-surface border border-border-default p-6 sm:p-8 lg:p-10 shadow-none">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column (4 cols): $GENESIS Intro Text & Buy Actions */}
+            {/* Left Column (4 cols): $H42 Intro Text & Buy Actions */}
             <div className="lg:col-span-4 space-y-6 lg:pr-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-sans text-xs font-extrabold uppercase tracking-wider">
                 <FlaskConical className="w-4 h-4" />
@@ -171,10 +171,10 @@ export async function TierSection() {
                   REQUIRED WALLET BALANCE
                 </div>
                 <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
-                  <span className="text-toxic font-extrabold">$GENESIS</span>
+                  <span className="text-toxic font-extrabold">$H42</span>
                 </div>
                 <p className="font-sans text-sm text-muted leading-relaxed pt-1">
-                  Hold at least <strong className="text-toxic">$20 $GENESIS</strong> from contract{' '}
+                  Hold at least <strong className="text-toxic">$20 $H42</strong> from contract{' '}
                   <span className="font-mono text-xs text-white break-all">
                     {GENESIS_MINT}
                   </span>{' '}
@@ -190,7 +190,7 @@ export async function TierSection() {
                   rel="noreferrer"
                   className="w-full h-12 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
                 >
-                  <span>BUY $GENESIS ON PUMP.FUN</span>
+                  <span>BUY $H42 ON PUMP.FUN</span>
                   <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
                 </a>
 

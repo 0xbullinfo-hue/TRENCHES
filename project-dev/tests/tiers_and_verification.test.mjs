@@ -8,27 +8,27 @@ function formatTokenAmount(rawString, decimals = 9) {
   if (tokens >= 1_000_000) {
     const val = tokens / 1_000_000;
     const formatted = val >= 10 ? val.toFixed(1) : val.toFixed(1);
-    return `${Number(formatted)}M $GENESIS`;
+    return `${Number(formatted)}M $H42`;
   }
   if (tokens >= 1_000) {
     const val = tokens / 1_000;
-    return `${Number(val.toFixed(1))}K $GENESIS`;
+    return `${Number(val.toFixed(1))}K $H42`;
   }
-  return `${Number(tokens.toFixed(1))} $GENESIS`;
+  return `${Number(tokens.toFixed(1))} $H42`;
 }
 
 test('Token amount formatting math per §5.1', () => {
-  // Member: 1,219,512 tokens -> 1.2M $GENESIS
+  // Member: 1,219,512 tokens -> 1.2M $H42
   const rawMember = '1219512195121951';
-  assert.equal(formatTokenAmount(rawMember, 9), '1.2M $GENESIS');
+  assert.equal(formatTokenAmount(rawMember, 9), '1.2M $H42');
 
-  // Pro: 15,243,902 tokens -> 15.2M $GENESIS
+  // Pro: 15,243,902 tokens -> 15.2M $H42
   const rawPro = '15243902439024390';
-  assert.equal(formatTokenAmount(rawPro, 9), '15.2M $GENESIS');
+  assert.equal(formatTokenAmount(rawPro, 9), '15.2M $H42');
 
   // Edge cases
-  assert.equal(formatTokenAmount('500000000000', 9), '500 $GENESIS');
-  assert.equal(formatTokenAmount('25000000000000000', 9), '25M $GENESIS');
+  assert.equal(formatTokenAmount('500000000000', 9), '500 $H42');
+  assert.equal(formatTokenAmount('25000000000000000', 9), '25M $H42');
 });
 
 test('Tier target validation logic per §4', () => {

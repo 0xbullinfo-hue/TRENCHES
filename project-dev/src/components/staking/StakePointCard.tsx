@@ -41,7 +41,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
-              Staking — $GENESIS
+              Staking — $H42
             </h3>
             <a
               href="https://stakepoint.app/pools"
@@ -56,7 +56,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
 
           <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2">
             <p className="font-sans text-xs sm:text-sm font-semibold text-white">
-              No staking pool is currently active for $GENESIS.
+              No staking pool is currently active for $H42.
             </p>
             <p className="font-sans text-xs text-muted leading-relaxed">
               Check back soon or follow us for updates.
@@ -102,7 +102,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
         {/* Title Header with external link */}
         <div className="flex items-center justify-between">
           <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
-            Staking — $GENESIS
+            Staking — $H42
           </h3>
           <a
             href={pool.poolUrl}

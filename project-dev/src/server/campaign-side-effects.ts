@@ -200,7 +200,7 @@ export async function recordCampaignRewardAllocation(params: {
       status: 'CREATED',
       payload: {
         rewardAmount: campaign.rewardAmount,
-        rewardToken: campaign.rewardToken || '$GENESIS',
+        rewardToken: campaign.rewardToken || '$H42',
         rewardType,
       },
       attemptCount: 0,

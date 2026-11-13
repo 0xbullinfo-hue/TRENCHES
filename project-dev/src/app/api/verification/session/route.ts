@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: 'not_eligible',
-        reason: 'Member Telegram group requires holding at least $20 in $GENESIS.',
+        reason: 'Member Telegram group requires holding at least $20 in $H42.',
       },
       { status: 403 }
     );
