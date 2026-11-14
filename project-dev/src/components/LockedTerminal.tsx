@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { BUY_LINKS, GENESIS_MINT, SOLSCAN } from '@/lib/config';
 import {
@@ -86,15 +87,17 @@ export const LockedTerminal: React.FC = () => {
               <span className="text-muted block text-[10px] uppercase font-bold">Token Contract</span>
               <span className="text-white font-semibold truncate block tnum">{GENESIS_MINT}</span>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={copyContract}
-              className={`${copyError ? 'text-danger' : 'text-toxic hover:text-toxic-bright'} font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors`}
+              className={`h-auto p-0 ${copyError ? 'text-danger hover:text-danger' : 'text-toxic hover:text-toxic-bright'} font-bold inline-flex items-center gap-1 shrink-0 hover:bg-transparent`}
               aria-label="Copy token contract address"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copyError ? 'FAILED' : copied ? 'COPIED' : 'COPY'}</span>
-            </button>
+            </Button>
           </div>
 
           {apiError && (
@@ -104,14 +107,16 @@ export const LockedTerminal: React.FC = () => {
           )}
 
           <div className="max-w-md mx-auto pt-2">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="lg"
               onClick={connectWallet}
-              className="w-full h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-none"
+              className="w-full h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 shadow-none"
             >
               <Wallet className="w-4 h-4 stroke-[2.5]" />
               <span>Connect Solana Wallet</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -154,15 +159,18 @@ export const LockedTerminal: React.FC = () => {
           )}
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="lg"
               onClick={requestUnlockSignature}
               disabled={apiLoading}
-              className="h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+              loading={apiLoading}
+              className="h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2"
             >
-              <KeyRound className="w-4 h-4 stroke-[2.5]" />
+              <KeyRound className="w-4 h-4 stroke-[2.5] mr-1.5" />
               <span>{apiLoading ? 'Verifying...' : 'Sign to Unlock Alpha Calls'}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -236,10 +244,12 @@ export const LockedTerminal: React.FC = () => {
               >
                 {GENESIS_MINT}
               </a>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={copyContract}
-                className="text-muted hover:text-white cursor-pointer inline-flex items-center gap-1"
+                className="h-auto p-0 text-muted hover:text-white inline-flex items-center gap-1 hover:bg-transparent"
                 title="Copy token contract"
                 aria-label="Copy token contract"
               >
@@ -250,7 +260,7 @@ export const LockedTerminal: React.FC = () => {
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -283,14 +293,16 @@ export const LockedTerminal: React.FC = () => {
           </div>
 
           <div className="flex justify-center pt-2">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={switchWallet}
-              className="h-10 min-h-[44px] px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default font-sans text-xs font-bold text-muted hover:text-white inline-flex items-center gap-2 cursor-pointer transition-colors"
+              className="h-10 min-h-[44px] px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default font-sans text-xs font-bold text-muted hover:text-white inline-flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5 text-toxic" />
               <span>Switch to Another Wallet</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
