@@ -24,13 +24,13 @@ export default function GlobalError({
           <HexCubeLogo size={42} />
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-danger/10 border border-danger/30 text-danger font-mono text-xs font-bold uppercase">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-danger/10 border border-danger/30 text-danger font-mono text-xs font-bold">
           <AlertTriangle className="w-4 h-4" />
-          <span>TELEMETRY SYNC INTERRUPTED</span>
+          <span>Telemetry sync interrupted</span>
         </div>
 
         <h2 className="font-sans font-extrabold text-xl text-white">
-          Temporary Network Desync
+          Temporary network desync
         </h2>
 
         <p className="font-sans text-xs text-muted leading-relaxed">
@@ -41,10 +41,10 @@ export default function GlobalError({
           variant="primary"
           size="md"
           onClick={() => reset()}
-          className="w-full h-11 px-5 text-xs font-black uppercase tracking-wider gap-2"
+          className="w-full h-11 px-5 text-xs font-black gap-2"
         >
           <RefreshCw className="w-4 h-4 stroke-[2.5]" />
-          <span>RETRY CONNECTION</span>
+          <span>Retry connection</span>
         </Button>
       </div>
     </div>

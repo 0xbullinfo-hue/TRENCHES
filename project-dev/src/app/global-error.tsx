@@ -17,32 +17,50 @@ export default function GlobalError({
 
   return (
     <html lang="en" className="dark">
-      <body className="bg-[#0A0E13] text-[#eaecef] font-mono min-h-screen flex flex-col items-center justify-center p-6 text-center antialiased">
-        <div className="max-w-md w-full rounded border border-[#163A2D] bg-[#11161D] p-8 space-y-5">
+      <head>
+        <style>{`
+          :root {
+            --ge-canvas: #0A0E13;
+            --ge-surface: #11161D;
+            --ge-border: #163A2D;
+            --ge-text: #eaecef;
+            --ge-muted: #848E9C;
+            --ge-brand: #34D399;
+            --ge-brand-hover: #6EE7B7;
+            --ge-danger: #EF4444;
+          }
+          body {
+            background-color: var(--ge-canvas);
+            color: var(--ge-text);
+          }
+        `}</style>
+      </head>
+      <body className="font-mono min-h-screen flex flex-col items-center justify-center p-6 text-center antialiased">
+        <div className="max-w-md w-full rounded-2xl border border-[var(--ge-border)] bg-[var(--ge-surface)] p-8 space-y-5">
           <div className="flex justify-center">
             <HexCubeLogo size={42} />
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] text-xs font-bold uppercase">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--ge-danger)]/10 border border-[var(--ge-danger)]/30 text-[var(--ge-danger)] text-xs font-bold">
             <AlertTriangle className="w-4 h-4" />
-            <span>GLOBAL ROOT FAULT</span>
+            <span>Global root fault</span>
           </div>
 
-          <h2 className="text-lg font-bold text-white uppercase tracking-tight">
-            System Level Interrupt
+          <h2 className="font-sans text-xl font-extrabold text-white">
+            System-level interrupt
           </h2>
 
-          <p className="text-xs text-[#848E9C] leading-relaxed">
+          <p className="font-sans text-xs text-[var(--ge-muted)] leading-relaxed">
             A fatal boundary fault was intercepted. Reset to restore dashboard execution.
           </p>
 
           <button
             type="button"
             onClick={() => reset()}
-            className="w-full h-11 px-5 rounded bg-[#34D399] hover:bg-[#6EE7B7] text-[#0A0E13] font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            className="w-full h-11 px-5 rounded-lg bg-[var(--ge-brand)] hover:bg-[var(--ge-brand-hover)] text-[#0A0E13] font-sans font-black text-xs inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
             <RefreshCw className="w-4 h-4 stroke-[2.5]" />
-            <span>RESET LAB ENVIRONMENT</span>
+            <span>Reset lab environment</span>
           </button>
         </div>
       </body>
