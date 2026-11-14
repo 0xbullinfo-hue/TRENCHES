@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
 import {
   AlertCircle,
   Check,
@@ -465,23 +466,27 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={fetchCampaigns}
-            className="h-9 px-3.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary font-sans text-xs text-muted hover:text-white cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+            className="h-9 px-3.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary font-sans text-xs text-muted hover:text-white inline-flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="h-9 px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-none"
+            className="h-9 px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>{showCreateForm ? 'Hide Form' : '+ Post New Raid Campaign'}</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -513,7 +518,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
                 placeholder="e.g. X RAID: TrenchLabs v2 & $H42 Ecosystem Announcement"
-                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 required
               />
             </div>
@@ -527,13 +532,13 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTweetUrl}
                 onChange={(e) => setFormTweetUrl(e.target.value)}
                 placeholder="https://x.com/TrenchLabsHQ/status/..."
-                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
+          <div className="grid grid-cols-1 sm:row sm:items-center sm:grid-cols-2 md:grid-cols-12 gap-3">
             <div className="md:col-span-4 space-y-1">
               <label className="block font-sans text-[11px] font-bold text-muted uppercase">
                 Airdrop Reward Per User *
@@ -543,7 +548,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formRewardAmount}
                 onChange={(e) => setFormRewardAmount(e.target.value)}
                 placeholder="e.g. 50,000 $H42 or 0.25 SOL"
-                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 required
               />
             </div>
@@ -557,7 +562,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 value={formTotalPool}
                 onChange={(e) => setFormTotalPool(e.target.value)}
                 placeholder="e.g. 1,000,000 $H42 Pool"
-                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white focus:outline-none"
+                className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
             </div>
 
@@ -569,7 +574,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               <select
                 value={formDurationHours}
                 onChange={(e) => setFormDurationHours(e.target.value)}
-                className="w-full h-10 px-2.5 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none cursor-pointer"
+                className="w-full h-10 px-2.5 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
               >
                 {formDurationHours &&
                   !['12', '24', '48', '72', '168', '336'].includes(formDurationHours) && (
@@ -594,7 +599,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="Like, Retweet, and Quote tweet with your bullish take on TrenchLabs..."
-              className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+              className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             />
           </div>
 
@@ -611,32 +616,35 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </label>
 
             <div className="flex items-center gap-2 justify-end">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={handleCancelCampaignForm}
-                className="h-10 px-4 rounded-lg bg-surface border border-border-default text-xs font-sans text-muted hover:text-white cursor-pointer transition-colors"
+                className="h-10 px-4 rounded-lg bg-surface border border-border-default text-xs font-sans text-muted hover:text-white"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                size="md"
                 disabled={submittingCampaign}
-                className="h-10 px-5 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase cursor-pointer transition-colors shadow-none disabled:opacity-50 inline-flex items-center gap-1.5"
+                loading={submittingCampaign}
+                className="h-10 px-5 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase shadow-none inline-flex items-center gap-1.5"
               >
-                {submittingCampaign ? (
-                  <span>Processing...</span>
-                ) : editingCampaign ? (
+                {editingCampaign ? (
                   <>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                     <span>Save Raid Changes</span>
                   </>
                 ) : (
                   <>
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
                     <span>Publish Raid Campaign</span>
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </form>
@@ -647,13 +655,15 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
         {/* Campaign Selector / Switcher */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {campaigns.map((camp) => (
-            <button
+            <Button
               key={camp.id}
               type="button"
+              variant={selectedCampaignId === camp.id ? 'primary' : 'secondary'}
+              size="sm"
               onClick={() => selectCampaign(camp.id)}
-              className={`px-3.5 py-2 rounded-lg border font-sans text-xs font-bold shrink-0 transition-colors cursor-pointer inline-flex items-center gap-2 ${
+              className={`h-auto px-3.5 py-2 rounded-lg border font-sans text-xs font-bold shrink-0 transition-colors inline-flex items-center gap-2 ${
                 selectedCampaignId === camp.id
-                  ? 'bg-raid-bg border-raid-border text-raid-text'
+                  ? 'bg-raid-bg border-raid-border text-raid-text hover:bg-raid-bg'
                   : 'bg-surface-card border-border-default text-muted hover:text-white'
               }`}
             >
@@ -666,7 +676,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default font-mono text-[10px] text-raid-primary">
                 {camp.submissionsCount || 0}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -696,50 +706,59 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
                   type="button"
+                  variant={currentCamp.pinned ? 'primary' : 'secondary'}
+                  size="sm"
                   onClick={() => handleTogglePin(currentCamp)}
-                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border cursor-pointer transition-colors inline-flex items-center gap-1 ${
+                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border inline-flex items-center gap-1 ${
                     currentCamp.pinned
-                      ? 'bg-raid-strong text-white border-raid-border font-black'
+                      ? 'bg-raid-strong text-white border-raid-border font-black hover:bg-raid-strong'
                       : 'bg-surface border-border-default text-muted hover:text-white'
                   }`}
                   title={currentCamp.pinned ? 'Unpin Priority Raid' : 'Pin Raid as Priority'}
                 >
-                  <Pin className="w-3.5 h-3.5" />
+                  <Pin className="w-3.5 h-3.5 mr-1" />
                   <span>{currentCamp.pinned ? 'PINNED' : 'PIN'}</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => handleStartEditCampaign(currentCamp)}
-                  className="h-9 px-3 rounded-lg font-mono text-xs font-bold border border-raid-border/60 bg-raid-bg text-raid-text hover:bg-surface-3 cursor-pointer transition-colors inline-flex items-center gap-1"
+                  className="h-9 px-3 rounded-lg font-mono text-xs font-bold border border-raid-border/60 bg-raid-bg text-raid-text hover:bg-surface-3 inline-flex items-center gap-1"
                   title="Edit Raid Campaign"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
                   <span>EDIT RAID</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => handleToggleStatus(currentCamp)}
-                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border cursor-pointer transition-colors ${
+                  className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border ${
                     currentCamp.status === 'ACTIVE'
-                      ? 'bg-toxic-bg text-toxic border-toxic-border'
-                      : 'bg-surface text-muted border-border-default'
+                      ? 'bg-toxic-bg text-toxic border-toxic-border hover:bg-toxic-bg'
+                      : 'bg-surface text-muted border-border-default hover:bg-surface'
                   }`}
                 >
                   {currentCamp.status === 'ACTIVE' ? 'STATUS: ACTIVE' : 'STATUS: COMPLETED'}
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="danger"
+                  size="sm"
+                  aria-label="Delete Campaign"
                   onClick={() => handleDeleteCampaign(currentCamp)}
-                  className="h-9 w-9 rounded-lg bg-surface border border-border-default hover:border-danger text-muted hover:text-danger flex items-center justify-center cursor-pointer transition-colors"
+                  className="h-9 w-9 p-0 rounded-lg bg-surface border border-border-default hover:border-danger text-muted hover:text-danger flex items-center justify-center hover:bg-surface"
                   title="Delete Campaign"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -757,10 +776,12 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 </div>
               </div>
 
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={handleCopyPendingWallets}
-                className="h-9 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-raid-border/60 text-raid-text font-sans text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="h-9 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-raid-border/60 text-raid-text font-sans text-xs font-bold inline-flex items-center gap-1.5"
                 title="Copies list of all pending Solana wallet addresses separated by newline"
               >
                 {copiedWallets ? (
@@ -771,7 +792,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <span>
                   {copiedWallets ? 'Copied to Clipboard!' : `Copy All Unpaid Wallets (${pendingCount})`}
                 </span>
-              </button>
+              </Button>
             </div>
 
             {/* Submissions Table */}
@@ -787,13 +808,15 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                     <span>{submissionsError}</span>
                   </div>
                   <div>
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       onClick={() => selectedCampaignId && void fetchSubmissions(selectedCampaignId)}
-                      className="px-3 py-1.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary/50 text-xs font-mono text-foreground transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-surface border border-border-default hover:border-raid-primary/50 text-xs font-mono text-foreground"
                     >
                       Retry
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : submissions.length === 0 ? (
@@ -820,10 +843,13 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                             <span className="font-semibold text-white">
                               {sub.walletAddress.slice(0, 6)}...{sub.walletAddress.slice(-4)}
                             </span>
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Copy wallet"
                               onClick={() => handleCopySingleWallet(sub.walletAddress)}
-                              className="p-1 rounded-md hover:bg-surface-card text-muted hover:text-raid-primary transition-colors"
+                              className="h-6 w-6 p-0 rounded-md hover:bg-surface-card text-muted hover:text-raid-primary"
                               title="Copy wallet"
                             >
                               {copiedSingleWallet === sub.walletAddress ? (
@@ -831,7 +857,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                               ) : (
                                 <Copy className="w-3 h-3" />
                               )}
-                            </button>
+                            </Button>
                             <a
                               href={`https://solscan.io/account/${sub.walletAddress}`}
                               target="_blank"
@@ -894,18 +920,21 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                         </td>
 
                         <td className="py-3 px-4 text-right">
-                          <button
+                          <Button
                             type="button"
+                            variant={sub.status === 'AIRDROPPED' ? 'secondary' : 'primary'}
+                            size="sm"
                             disabled={updatingSubId === sub.id}
+                            loading={updatingSubId === sub.id}
                             onClick={() => handleMarkAirdropped(sub)}
-                            className={`h-8 px-3 rounded-md text-[11px] font-sans font-bold cursor-pointer transition-colors ${
+                            className={`h-8 px-3 rounded-md text-xs font-sans font-bold ${
                               sub.status === 'AIRDROPPED'
                                 ? 'bg-surface-card hover:bg-surface-3 text-muted hover:text-white border border-border-default'
                                 : 'bg-raid-strong hover:bg-raid-primary text-white shadow-none'
                             }`}
                           >
                             {sub.status === 'AIRDROPPED' ? 'Revert to Pending' : 'Mark Airdropped ✓'}
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     ))}
