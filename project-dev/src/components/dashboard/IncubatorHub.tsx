@@ -265,7 +265,8 @@ export const IncubatorHub: React.FC = () => {
         fetchCampaigns();
       }
     } catch (err) {
-      showToast(`Failed to update pin: ${(err as Error).message}`);
+      console.error('Failed to update pin:', err);
+      showToast('Could not update campaign priority. Please try again.');
     }
   };
 
@@ -303,9 +304,11 @@ export const IncubatorHub: React.FC = () => {
       if (!res.ok) {
         if (!customCa) {
           if (res.status === 429) {
-            showToast('DexScreener rate limit reached (HTTP 429). Please retry in a few seconds.');
+            console.error('DexScreener rate limit reached (HTTP 429)');
+            showToast('Rate limit reached. Please wait a few seconds and try again.');
           } else {
-            showToast(`DexScreener request failed (HTTP ${res.status}). Enter details manually.`);
+            console.error(`DexScreener request failed (HTTP ${res.status})`);
+            showToast('Could not retrieve token data. Please enter details manually.');
           }
         }
         return;
@@ -340,7 +343,8 @@ export const IncubatorHub: React.FC = () => {
         showToast('No active DEX trading pair found for this CA. Enter details manually.');
       }
     } catch (err) {
-      if (!customCa) showToast(`Network error reaching DexScreener: ${(err as Error).message || 'offline'}`);
+      console.error('Network error reaching DexScreener:', err);
+      if (!customCa) showToast('Could not connect to DexScreener. Please enter details manually.');
     } finally {
       setFetchingDex(false);
     }
@@ -421,7 +425,8 @@ export const IncubatorHub: React.FC = () => {
           setInspectedToken(null);
         }
       } else {
-        showToast('Failed to update call — ensure Admin Wallet is active.');
+        console.error('Failed to update call — ensure Admin Wallet is active.');
+        showToast('Could not update call. Please ensure your admin wallet is connected.');
       }
       return;
     }
@@ -451,7 +456,8 @@ export const IncubatorHub: React.FC = () => {
       );
       handleCancelEdit();
     } else {
-      showToast('Failed to post call — ensure Admin Wallet is active.');
+      console.error('Failed to post call — ensure Admin Wallet is active.');
+      showToast('Could not publish call. Please ensure your admin wallet is connected.');
     }
   };
 
