@@ -83,7 +83,7 @@ export const Tabs: React.FC<TabsProps> = ({
             onClick={() => onTabChange(tab.id)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
             className={cn(
-              'group relative inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              'group relative inline-flex items-center gap-2 min-h-[44px] px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand',
               isActive ? 'text-ink' : 'text-muted hover:text-ink'
             )}
           >

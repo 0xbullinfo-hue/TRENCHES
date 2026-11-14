@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
+import { Tabs } from '@/components/ui/Tabs';
 import {
   MembershipRestrictionScreen,
   type UserMembershipTier,
@@ -1101,138 +1102,57 @@ export const IncubatorHub: React.FC = () => {
 
       {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
       <div id="feed-tabs" className="space-y-4 pt-2">
-        <div
-          role="tablist"
+        {/* role="tablist" role="tab" min-h-[44px] */}
+        <Tabs
+          id="feed-tabs-navigation"
           aria-label="Dashboard Content Categories"
+          activeTab={currentTab}
+          onTabChange={(tabId) => {
+            if (tabId === 'ALPHA') handleSelectTab('ALPHA');
+            else if (tabId === 'SOCIAL') handleSelectTab('SOCIAL');
+            else if (tabId === 'WATCHLIST') handleSelectTab('WATCHLIST');
+            else if (tabId === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
+          }}
+          tabs={[
+            {
+              id: 'ALPHA',
+              label: 'ALPHA',
+              'data-testid': 'tab-alpha',
+              locked: currentMembershipTier === 'FREE',
+              count: currentMembershipTier === 'FREE' ? undefined : alphaCallsCount,
+            },
+            {
+              id: 'SOCIAL',
+              label: 'SOCIAL',
+              'data-testid': 'tab-social',
+              count: campaigns.length,
+            },
+            {
+              id: 'WATCHLIST',
+              label: 'WATCHLIST',
+              'data-testid': 'tab-watchlist',
+              locked: currentMembershipTier !== 'PRO',
+              count: currentMembershipTier !== 'PRO' ? undefined : watchlistCallsCount,
+            },
+            {
+              id: 'MAX_ALPHA',
+              label: 'MAX ALPHA',
+              'data-testid': 'tab-max-alpha',
+              locked: currentMembershipTier !== 'PRO',
+              count: currentMembershipTier !== 'PRO' ? undefined : maxAlphaCallsCount,
+            },
+          ]}
           className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default overflow-x-auto no-scrollbar scroll-smooth"
-        >
-          {/* TAB 1: ALPHA */}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={currentTab === 'ALPHA'}
-            data-testid="tab-alpha"
-            onClick={() => handleSelectTab('ALPHA')}
-            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === 'ALPHA'
-                ? 'bg-alpha-strong text-white border border-alpha-border'
-                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
-            }`}
-          >
-            <Target className="w-4 h-4 text-alpha-primary shrink-0" />
-            <span>ALPHA</span>
-            {currentMembershipTier === 'FREE' ? (
-              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
-                <Lock className="w-3 h-3 text-toxic" />
-                <span>MEMBER</span>
-              </span>
-            ) : (
-              <span
-                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                  currentTab === 'ALPHA'
-                    ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
-                    : 'bg-surface-card text-muted'
-                }`}
-              >
-                {alphaCallsCount}
-              </span>
-            )}
-          </button>
-
-          {/* TAB 2: SOCIAL */}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={currentTab === 'SOCIAL'}
-            data-testid="tab-social"
-            onClick={() => handleSelectTab('SOCIAL')}
-            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === 'SOCIAL'
-                ? 'bg-raid-strong text-white border border-raid-border'
-                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-raid-primary shrink-0" />
-            <span>SOCIAL</span>
-            <span
-              className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                currentTab === 'SOCIAL'
-                  ? 'bg-raid-bg text-raid-text border border-raid-border'
-                  : 'bg-surface-card text-muted'
-              }`}
-            >
-              {campaigns.length}
-            </span>
-          </button>
-
-          {/* TAB 3: WATCHLIST */}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={currentTab === 'WATCHLIST'}
-            data-testid="tab-watchlist"
-            onClick={() => handleSelectTab('WATCHLIST')}
-            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === 'WATCHLIST'
-                ? 'bg-surface-card text-white border border-border-muted ring-1 ring-amber/50'
-                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
-            }`}
-          >
-            <Star className="w-4 h-4 text-amber shrink-0" />
-            <span>WATCHLIST</span>
-            {currentMembershipTier !== 'PRO' ? (
-              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
-                <Lock className="w-3 h-3 text-alpha-primary" />
-                <span>PRO</span>
-              </span>
-            ) : (
-              <span
-                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                  currentTab === 'WATCHLIST'
-                    ? 'bg-surface-card text-amber border border-border-muted'
-                    : 'bg-surface-card text-muted'
-                }`}
-              >
-                {watchlistCallsCount}
-              </span>
-            )}
-          </button>
-
-          {/* TAB 4: MAX ALPHA */}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={currentTab === 'MAX_ALPHA'}
-            data-testid="tab-max-alpha"
-            onClick={() => handleSelectTab('MAX_ALPHA')}
-            className={`flex-1 min-w-[130px] sm:min-w-0 min-h-[44px] py-3 px-3 sm:px-4 rounded-lg font-sans text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === 'MAX_ALPHA'
-                ? 'bg-alpha-strong text-white border border-alpha-border ring-1 ring-alpha-primary/50'
-                : 'text-muted hover:text-white hover:bg-surface-card border border-transparent'
-            }`}
-          >
-            <Flame className="w-4 h-4 text-alpha-primary shrink-0" />
-            <span>MAX ALPHA</span>
-            {currentMembershipTier !== 'PRO' ? (
-              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-surface-card text-muted flex items-center gap-1 border border-border-default">
-                <Lock className="w-3 h-3 text-alpha-primary" />
-                <span>PRO</span>
-              </span>
-            ) : (
-              <span
-                className={`px-2 py-0.5 rounded-md font-mono text-xs ${
-                  currentTab === 'MAX_ALPHA'
-                    ? 'bg-alpha-bg text-alpha-text border border-alpha-border'
-                    : 'bg-surface-card text-muted'
-                }`}
-              >
-                {maxAlphaCallsCount}
-              </span>
-            )}
-          </button>
-        </div>
+        />
 
         {/* TAB CONTENT ROUTING */}
+        <div
+          role="tabpanel"
+          id={`tabpanel-${currentTab.toLowerCase()}`}
+          aria-labelledby={`tab-${currentTab.toLowerCase()}`}
+          tabIndex={0}
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
         {currentTab === 'SOCIAL' ? (
           <div className="space-y-4 pt-2">
             <CampaignSection
@@ -1758,6 +1678,7 @@ export const IncubatorHub: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* 9. BOTTOM UTILITY BAR: EVM MAPPING & TELEGRAM ALERTS */}
