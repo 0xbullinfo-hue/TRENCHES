@@ -31,8 +31,8 @@ TrenchLabsHQ has completely eliminated legacy fixed token gates (such as flat 1,
 | Tier | Requirement | Terminal & Feature Access | Telegram Benefits |
 | :--- | :--- | :--- | :--- |
 | **Free** | Public ($0) | Closed calls, verifiable P&L ledger, educational content | Public announcements channel |
-| **Member** | **Buy & Hold $\ge$ $20 USD** in **$H42** | Full incubator dashboard, live trade call feed, contract address inspection, market telemetry | Access to the official **Member Group** (`https://t.me/+S5bRJX17PRkzMTE0`) |
-| **Pro** | **Buy & Stake $\ge$ $250 USD** in **$H42** on **StakePoint** (90-day lock) | Priority high-conviction calls, push alerts, TP/SL triggers, analyst commentary, allocation caps | Direct bot DM call alerts + **Pro Group** (`https://t.me/+aCatLce8Dfk5ZjZk`) |
+| **Member** | **Buy & Hold $\ge$ $20 USD** in **$H42** | Full incubator dashboard, live trade call feed, contract address inspection, market telemetry | Access to the official **Member Group** (<set in environment, never committed>) |
+| **Pro** | **Buy & Stake $\ge$ $250 USD** in **$H42** on **StakePoint** (90-day lock) | Priority high-conviction calls, push alerts, TP/SL triggers, analyst commentary, allocation caps | Direct bot DM call alerts + **Pro Group** (<set in environment, never committed>) |
 
 > **Dynamic Recalculation:** Token requirements are recalculated dynamically from the 7-day TWAP/market price (`token_amount = usd_target / twap_price_usd`).
 
@@ -74,7 +74,7 @@ An automated Telegram bot (`@Trenchlabs_bot`) verifies on-chain holdings and sta
       ┌───────────────────────────┐             ┌───────────────────────────┐
       │ Verified by Bot           │             │ Verified by Bot           │
       │ Member Invite Link:       │             │ Pro Invite Link:          │
-      │ https://t.me/+S5bRJX...   │             │ https://t.me/+aCatLce...  │
+      │ <set in environment>      │             │ <set in environment>      │
       └─────────────┬─────────────┘             └─────────────┬─────────────┘
                     │                                         │
                     └────────────────────┬────────────────────┘
@@ -98,8 +98,8 @@ An automated Telegram bot (`@Trenchlabs_bot`) verifies on-chain holdings and sta
 2. The server creates an atomic, single-use 10-minute session (`vs_<session_id>`) tied to the wallet address.
 3. User opens Telegram via deep-link: `https://t.me/Trenchlabs_bot?start=vs_<session_id>`.
 4. Bot claims the session atomically, resolves the tier on-chain, and issues the single-use invite link:
-   - **Pro verified:** Receives the Pro Group link (`https://t.me/+aCatLce8Dfk5ZjZk`).
-   - **Member verified:** Receives the Member Group link (`https://t.me/+S5bRJX17PRkzMTE0`) with a prompt to stake $250 on StakePoint for Pro.
+   - **Pro verified:** Receives the Pro Group link (<set in environment, never committed>).
+   - **Member verified:** Receives the Member Group link (<set in environment, never committed>) with a prompt to stake $250 on StakePoint for Pro.
    - **Unqualified:** Warns user of insufficient balance/stake and provides links to buy or stake.
 
 ### 2. Automated Stake Expiry & Demotion Worker (`/api/telegram/sweep`)
@@ -182,8 +182,8 @@ TELEGRAM_BOT_USERNAME=Trenchlabs_bot
 TELEGRAM_WEBHOOK_SECRET=your_random_webhook_secret_string
 TELEGRAM_MEMBER_GROUP_ID=-1001234567890
 TELEGRAM_PRO_GROUP_ID=-1009876543210
-TELEGRAM_MEMBER_INVITE_URL=https://t.me/+S5bRJX17PRkzMTE0
-TELEGRAM_PRO_INVITE_URL=https://t.me/+aCatLce8Dfk5ZjZk
+TELEGRAM_MEMBER_INVITE_URL=
+TELEGRAM_PRO_INVITE_URL=
 
 # Vercel Cron Secret (protects /api/telegram/sweep)
 CRON_SECRET=your_cron_bearer_token
