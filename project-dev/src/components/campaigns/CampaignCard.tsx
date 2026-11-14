@@ -6,6 +6,7 @@ import { useGenesisBalance } from '@/context/GenesisContext';
 import { isBase58Address } from '@/lib/config';
 import { formatTokenTicker } from '@/lib/format-token-ticker';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
 import {
   ExternalLink,
   CheckCircle2,
@@ -1003,21 +1004,23 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
           {isAdmin && (
             <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
-              <button
+              <Button
                 type="button"
+                variant={campaign.pinned ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   onTogglePin?.(campaign.id, !campaign.pinned);
                 }}
-                className={`px-2 py-0.5 rounded-md border text-[10px] font-mono cursor-pointer transition-colors ${
+                className={`h-auto px-2 py-0.5 rounded-md border text-[10px] font-mono transition-colors ${
                   campaign.pinned
-                    ? 'bg-raid-strong text-white border-raid-border font-black'
+                    ? 'bg-raid-strong text-white border-raid-border font-black hover:bg-raid-strong'
                     : 'bg-surface-card hover:bg-surface-3 border-border-default text-muted hover:text-white'
                 }`}
                 title={campaign.pinned ? 'Unpin Priority Raid' : 'Pin Raid as Priority'}
               >
                 {campaign.pinned ? 'PINNED' : 'PIN'}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1130,10 +1133,12 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               </div>
               <div className="flex items-center justify-between gap-1">
                 <span>Wallet:</span>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleCopyWallet(userSubmission.walletAddress)}
-                  className="inline-flex items-center gap-1 text-white hover:text-raid-primary font-mono"
+                  className="h-auto p-0 inline-flex items-center gap-1 text-white hover:text-raid-primary font-mono hover:bg-transparent"
                   title="Click to copy wallet"
                 >
                   <span>
@@ -1145,7 +1150,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   ) : (
                     <Copy className="w-3 h-3 text-muted" />
                   )}
-                </button>
+                </Button>
               </div>
               {userSubmission.airdropTx && (
                 <div className="flex items-center justify-between gap-1 pt-1 border-t border-border-default">
@@ -1186,13 +1191,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     <Wallet className="w-3.5 h-3.5 text-raid-primary" />
                     <span>No wallet connected</span>
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="primary"
+                    size="sm"
                     onClick={openConnectWalletModal}
-                    className="px-2.5 py-1 min-h-[36px] rounded bg-raid-strong hover:bg-raid-primary text-white font-mono text-[11px] font-bold transition-colors cursor-pointer"
+                    className="px-2.5 py-1 min-h-[36px] rounded bg-raid-strong hover:bg-raid-primary text-white font-mono text-xs font-bold"
                   >
                     Connect Wallet
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] font-sans text-dim">
                   Connect your Solana wallet to sign verification proof and receive your $H42 airdrop.
@@ -1215,13 +1222,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>Wallet Address Mismatch</span>
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setWalletInput(connectedAddress || '')}
-                    className="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-amber/40 text-amber font-mono text-[10px] font-bold transition-colors cursor-pointer"
+                    className="h-auto px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-amber/40 text-amber font-mono text-[10px] font-bold"
                   >
                     Use Connected
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] font-sans text-muted">
                   Entered address differs from connected wallet ({connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}). Submissions must be signed by the receiving address.
@@ -1244,14 +1253,16 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>Session verification error</span>
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     disabled={authenticatingSession || submitting}
                     onClick={handleAuthenticateSession}
-                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-danger/40 text-white font-mono text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-danger/40 text-white font-mono text-xs font-bold disabled:opacity-50"
                   >
                     {authenticatingSession ? 'Authenticating...' : 'Retry Auth'}
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] font-sans text-danger/80">
                   {serverSession.error || 'Could not confirm server session. Re-authenticate to continue.'}
@@ -1264,14 +1275,16 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     <ShieldCheck className="w-3.5 h-3.5 text-amber" />
                     <span>Wallet connected · Authentication required</span>
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     disabled={authenticatingSession || submitting}
                     onClick={handleAuthenticateSession}
-                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-border-default text-white font-mono text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-surface-3 border border-border-default text-white font-mono text-xs font-bold disabled:opacity-50"
                   >
                     {authenticatingSession ? 'Authenticating...' : 'Authenticate'}
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] font-sans text-dim">
                   Sign a one-click session message to confirm wallet ownership with the server before submitting.
@@ -1310,13 +1323,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     Solana Wallet Address
                   </label>
                   {isWalletConnected && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleSwitchWallet?.()}
-                      className="text-[10px] font-mono text-raid-primary hover:underline cursor-pointer"
+                      className="h-auto p-0 text-[10px] font-mono text-raid-primary hover:underline hover:bg-transparent"
                     >
                       Switch Wallet
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <input
@@ -1329,7 +1344,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     isWalletMismatched
                       ? 'border-amber/60 focus:border-amber text-amber'
                       : 'border-border-default focus:border-raid-primary text-white'
-                  } font-mono text-xs placeholder:text-dim focus:outline-none`}
+                  } font-mono text-xs placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
                 />
               </div>
 
@@ -1342,7 +1357,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     value={xHandleInput}
                     onChange={(e) => setXHandleInput(e.target.value)}
                     placeholder="Your @XHandle..."
-                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
                 <div>
@@ -1353,14 +1368,16 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     value={retweetLinkInput}
                     onChange={(e) => setRetweetLinkInput(e.target.value)}
                     placeholder="Retweet Link URL..."
-                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                    className="w-full h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default focus:border-raid-primary font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
               disabled={
                 submitting ||
                 !isWalletConnected ||
@@ -1370,35 +1387,35 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 !cleanHandle ||
                 !cleanRetweet
               }
-              className="w-full h-11 min-h-[44px] px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full min-h-[44px] px-4 rounded-lg bg-raid-strong hover:bg-raid-primary text-white font-sans text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 shadow-none"
             >
               {submitting ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
                   <span>Submitting Proof...</span>
                 </>
               ) : !isWalletConnected ? (
                 <>
-                  <Wallet className="w-3.5 h-3.5" />
+                  <Wallet className="w-3.5 h-3.5 mr-1.5" />
                   <span>Connect Wallet to Submit</span>
                 </>
               ) : !isSigningSupported ? (
                 <>
-                  <AlertCircle className="w-3.5 h-3.5" />
+                  <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
                   <span>Signing Unsupported</span>
                 </>
               ) : isWalletMismatched ? (
                 <>
-                  <AlertCircle className="w-3.5 h-3.5 text-amber" />
+                  <AlertCircle className="w-3.5 h-3.5 text-amber mr-1.5" />
                   <span>Wallet Address Mismatch</span>
                 </>
               ) : (
                 <>
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-3.5 h-3.5 mr-1.5" />
                   <span>Claim Raid Airdrop</span>
                 </>
               )}
-            </button>
+            </Button>
           </form>
         )}
       </div>
