@@ -84,68 +84,6 @@
   }
 }
 
-@layer components {
-  /* Standard card: flat 1px border (#252D38), 12px radius, zero glow, zero shadow */
-  .card {
-    @apply bg-surface border border-border-default rounded-xl transition-colors duration-150 shadow-none;
-  }
-  .card-hover:hover {
-    @apply border-border-hover;
-  }
-  .card-head {
-    @apply flex h-10 items-center justify-between gap-2 border-b border-border-default px-4 font-mono text-2xs uppercase tracking-[0.08em] text-muted;
-  }
-  .label {
-    @apply font-mono text-2xs uppercase tracking-[0.08em] text-dim;
-  }
-
-  /* Standard button hierarchy */
-  .btn {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 font-sans text-xs font-bold uppercase tracking-wide transition-colors duration-150 shadow-none focus:outline-none focus-visible:ring-1 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50 select-none;
-  }
-  .btn-sm {
-    @apply h-8 px-3 text-2xs gap-1.5;
-  }
-  .btn-cta {
-    @apply h-11 sm:h-12 px-6 text-sm font-extrabold tracking-wider;
-  }
-  .btn-lg {
-    @apply h-[52px] px-8 text-base font-extrabold tracking-wider;
-  }
-  .btn-primary {
-    @apply bg-brand text-canvas hover:bg-brand-hover shadow-none;
-  }
-  .btn-secondary {
-    @apply border border-border-default bg-surface-card text-ink hover:border-brand hover:bg-surface-3 shadow-none;
-  }
-  .btn-ghost {
-    @apply text-muted hover:bg-surface-card hover:text-ink shadow-none;
-  }
-  .btn-danger {
-    @apply bg-danger text-white hover:opacity-90 shadow-none;
-  }
-
-  /* Standard category badges */
-  .badge-alpha {
-    @apply inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 text-xs font-semibold text-alpha-text tracking-wide;
-  }
-  .badge-raid {
-    @apply inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 text-xs font-semibold text-raid-text tracking-wide;
-  }
-
-  /* Chip filter */
-  .chip {
-    @apply inline-flex h-7 items-center rounded-md border border-border-default bg-surface-card px-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.06em] text-muted transition-colors duration-150 hover:text-ink shadow-none;
-  }
-  .chip-active {
-    @apply border-brand bg-toxic-bg text-brand hover:text-brand-hover shadow-none;
-  }
-
-  /* Form inputs */
-  .input {
-    @apply h-10 w-full rounded-lg border border-border-default bg-surface-card px-3 font-mono text-xs text-ink placeholder:text-dim focus:border-brand focus:outline-none shadow-none;
-  }
-}
 
 /* ── Solana wallet-adapter overrides (flat 1px theme, zero glow, 8px button radius) ─── */
 .wallet-adapter-button {
