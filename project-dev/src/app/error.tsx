@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
+import { Button } from '@/components/ui/Button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function GlobalError({
@@ -36,14 +37,15 @@ export default function GlobalError({
           The lab interface encountered a temporary connection glitch. You can safely retry or reload the page.
         </p>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="md"
           onClick={() => reset()}
-          className="w-full h-11 px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+          className="w-full h-11 px-5 text-xs font-black uppercase tracking-wider gap-2"
         >
           <RefreshCw className="w-4 h-4 stroke-[2.5]" />
           <span>RETRY CONNECTION</span>
-        </button>
+        </Button>
       </div>
     </div>
   );
