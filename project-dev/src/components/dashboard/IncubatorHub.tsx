@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
 import { Tabs } from '@/components/ui/Tabs';
+import { Button } from '@/components/ui/Button';
 import {
   MembershipRestrictionScreen,
   type UserMembershipTier,
@@ -663,7 +664,11 @@ export const IncubatorHub: React.FC = () => {
   return (
     <div className="space-y-6 pb-10">
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border border-toxic text-white font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border border-toxic text-white font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none"
+        >
           <Check className="w-4 h-4 text-toxic shrink-0" />
           <span className="truncate max-w-md">{toastMessage}</span>
         </div>
@@ -700,28 +705,22 @@ export const IncubatorHub: React.FC = () => {
                 Sign a one-time message in your wallet to verify ownership of <strong className="text-white tnum">{shortAddress}</strong> and unlock your membership access & trade calls. No transaction fee.
               </p>
               {apiError && verificationState === 'VERIFICATION_FAILED' && (
-                <p className="font-mono text-xs text-danger font-semibold">{apiError}</p>
+                <p role="alert" className="font-mono text-xs text-danger font-semibold">{apiError}</p>
               )}
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="lg"
             onClick={() => requestUnlockSignature()}
             disabled={apiLoading || verificationState === 'VERIFYING'}
-            className="h-11 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 cursor-pointer transition-colors shrink-0 shadow-none disabled:opacity-50"
+            loading={apiLoading || verificationState === 'VERIFYING'}
+            className="min-h-[44px] px-6 text-xs font-black uppercase shrink-0"
           >
-            {apiLoading || verificationState === 'VERIFYING' ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>VERIFYING...</span>
-              </>
-            ) : (
-              <>
-                <KeyRound className="w-4 h-4" />
-                <span>VERIFY WALLET</span>
-              </>
-            )}
-          </button>
+            <KeyRound className="w-4 h-4 mr-2" />
+            <span>VERIFY WALLET</span>
+          </Button>
         </div>
       )}
 
@@ -774,42 +773,40 @@ export const IncubatorHub: React.FC = () => {
                 MASTER ADMIN DESK
               </span>
               {adminDeskTab === 'CALLS' && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setShowAdminForm(!showAdminForm)}
-                  className="px-3.5 py-1.5 rounded-lg bg-surface border border-toxic font-sans text-xs font-bold text-toxic hover:bg-surface-3 cursor-pointer transition-colors"
+                  className="font-sans font-bold text-toxic border-toxic hover:bg-surface-3"
                 >
                   {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
-                </button>
+                </Button>
               )}
             </div>
 
             {/* Admin Desk Navigation Tabs */}
             <div className="flex items-center bg-surface border border-border-default rounded-lg p-0.5 font-sans text-xs">
-              <button
+              <Button
                 type="button"
+                variant={adminDeskTab === 'CALLS' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setAdminDeskTab('CALLS')}
-                className={`px-3 py-1.5 rounded-md font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                  adminDeskTab === 'CALLS'
-                    ? 'bg-alpha-strong text-white border border-alpha-border'
-                    : 'text-muted hover:text-white'
-                }`}
+                className={adminDeskTab === 'CALLS' ? 'bg-alpha-strong text-white border border-alpha-border' : 'text-muted hover:text-white'}
               >
-                <Target className="w-3.5 h-3.5" />
+                <Target className="w-3.5 h-3.5 mr-1.5" />
                 <span>Alpha Calls Desk</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={adminDeskTab === 'CAMPAIGNS' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setAdminDeskTab('CAMPAIGNS')}
-                className={`px-3 py-1.5 rounded-md font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                  adminDeskTab === 'CAMPAIGNS'
-                    ? 'bg-raid-strong text-white border border-raid-border'
-                    : 'text-muted hover:text-white'
-                }`}
+                className={adminDeskTab === 'CAMPAIGNS' ? 'bg-raid-strong text-white border border-raid-border' : 'text-muted hover:text-white'}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                 <span>⚡ X Raid Campaigns &amp; Airdrops</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -826,13 +823,15 @@ export const IncubatorHub: React.FC = () => {
                   <div className="flex items-center justify-between font-sans text-xs font-bold text-white">
                     <span>{editingCall ? `EDITING: ${editingCall.ticker}` : 'PUBLISH NEW ALPHA CALL'}</span>
                     {editingCall && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={handleCancelEdit}
-                        className="text-xs text-muted hover:text-danger underline"
+                        className="text-xs text-muted hover:text-danger underline h-auto p-0"
                       >
                         Cancel Edit
-                      </button>
+                      </Button>
                     )}
                   </div>
 
@@ -847,17 +846,20 @@ export const IncubatorHub: React.FC = () => {
                           value={formCa}
                           onChange={(e) => setFormCa(e.target.value)}
                           placeholder="Paste token contract address..."
-                          className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                          className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                           required
                         />
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
+                          size="md"
                           onClick={() => handleAutoFillDexScreener()}
                           disabled={fetchingDex}
-                          className="h-10 px-3 rounded-lg bg-surface border border-border-default hover:border-toxic text-toxic font-sans text-xs font-bold cursor-pointer shrink-0"
+                          loading={fetchingDex}
+                          className="h-10 px-3 text-toxic hover:border-toxic shrink-0"
                         >
                           {fetchingDex ? 'Fetching...' : 'Auto-fill'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -870,7 +872,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
                         placeholder="e.g. Synapse Labs"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         required
                       />
                     </div>
@@ -884,7 +886,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formTicker}
                         onChange={(e) => setFormTicker(e.target.value)}
                         placeholder="e.g. $SYN"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         required
                       />
                     </div>
@@ -898,7 +900,7 @@ export const IncubatorHub: React.FC = () => {
                       <select
                         value={formChain}
                         onChange={(e) => setFormChain(e.target.value as Chain)}
-                        className="w-full h-10 px-2 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none cursor-pointer"
+                        className="w-full h-10 px-2 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
                       >
                         {['SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'].map((c) => (
                           <option key={c} value={c}>{c}</option>
@@ -915,7 +917,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formEntryMc}
                         onChange={(e) => setFormEntryMc(e.target.value)}
                         placeholder="$250K"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -928,7 +930,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formCurrentMc}
                         onChange={(e) => setFormCurrentMc(e.target.value)}
                         placeholder="$250K"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -942,7 +944,7 @@ export const IncubatorHub: React.FC = () => {
                         max="5"
                         value={formRiskLevel}
                         onChange={(e) => setFormRiskLevel(Number(e.target.value))}
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -955,7 +957,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formStopLoss}
                         onChange={(e) => setFormStopLoss(e.target.value)}
                         placeholder="-25% SL"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -968,7 +970,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formTakeProfits}
                         onChange={(e) => setFormTakeProfits(e.target.value)}
                         placeholder="2x, 5x, 10x"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
                   </div>
@@ -982,7 +984,7 @@ export const IncubatorHub: React.FC = () => {
                       value={formSummary}
                       onChange={(e) => setFormSummary(e.target.value)}
                       placeholder="Solana AI infrastructure play with growing holder distribution..."
-                      className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                      className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     />
                   </div>
 
@@ -992,16 +994,19 @@ export const IncubatorHub: React.FC = () => {
                       Destination Tab Classification * (Single Source of Truth)
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setFormCallType('ALPHA');
                           setFormMaxAlpha(false);
                         }}
-                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                        aria-pressed={formCallType === 'ALPHA'}
+                        className={`h-auto p-3 rounded-lg border text-left block w-full transition-colors duration-150 cursor-pointer ${
                           formCallType === 'ALPHA'
-                            ? 'bg-purple-950/40 border-purple-500 text-white'
-                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                            ? 'bg-purple-950/40 border-purple-500 text-white hover:bg-purple-950/50'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted hover:bg-surface'
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -1009,18 +1014,21 @@ export const IncubatorHub: React.FC = () => {
                           <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">MEMBER+</span>
                         </div>
                         <p className="text-[11px] text-muted mt-1 leading-snug">Curated Alpha trade calls with TP/SL risk telemetry.</p>
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setFormCallType('MAX_ALPHA');
                           setFormMaxAlpha(true);
                         }}
-                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                        aria-pressed={formCallType === 'MAX_ALPHA'}
+                        className={`h-auto p-3 rounded-lg border text-left block w-full transition-colors duration-150 cursor-pointer ${
                           formCallType === 'MAX_ALPHA'
-                            ? 'bg-amber-950/40 border-amber-500 text-white'
-                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                            ? 'bg-amber-950/40 border-amber-500 text-white hover:bg-amber-950/50'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted hover:bg-surface'
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -1028,19 +1036,21 @@ export const IncubatorHub: React.FC = () => {
                           <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
                         </div>
                         <p className="text-[11px] text-muted mt-1 leading-snug">High-conviction premium Alpha reserved for PRO members.</p>
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setFormCallType('WATCHLIST');
                           setFormMaxAlpha(false);
                         }}
                         aria-pressed={formCallType === 'WATCHLIST'}
-                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                        className={`h-auto p-3 rounded-lg border text-left block w-full transition-colors duration-150 cursor-pointer ${
                           formCallType === 'WATCHLIST'
-                            ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/60 text-white'
-                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted'
+                            ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/60 text-white hover:bg-emerald-950/50'
+                            : 'bg-surface border-border-default text-foreground-muted hover:border-border-muted hover:bg-surface'
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -1050,7 +1060,7 @@ export const IncubatorHub: React.FC = () => {
                           </span>
                         </div>
                         <p className="text-[11px] text-muted mt-1 leading-snug">Curated long-term projects for ongoing research.</p>
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1066,13 +1076,16 @@ export const IncubatorHub: React.FC = () => {
                       <span>Pin Priority to Top</span>
                     </label>
 
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      size="md"
                       disabled={submittingCall}
-                      className="h-10 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-2 cursor-pointer transition-colors"
+                      loading={submittingCall}
+                      className="px-6 text-xs font-black uppercase"
                     >
                       {submittingCall ? 'Processing...' : editingCall ? 'Save Changes' : '+ Publish Call'}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
@@ -1183,18 +1196,20 @@ export const IncubatorHub: React.FC = () => {
             {/* 7. ALL CATEGORIZED ALPHA / WATCHLIST / MAX ALPHA CALLS */}
             <div className="space-y-4 pt-2">
               {apiError && (
-                <div className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
+                <div role="alert" className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
                   <div className="flex items-center gap-2.5 text-danger font-semibold">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>RPC / Telemetry Notice: {apiError}</span>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => refreshAll()}
-                    className="px-3 py-1 rounded bg-surface border border-border-default hover:border-danger text-white font-mono text-xs font-bold cursor-pointer shrink-0"
+                    className="font-mono text-xs font-bold border-border-default hover:border-danger text-white shrink-0"
                   >
                     Retry Connection ⟳
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -1214,14 +1229,16 @@ export const IncubatorHub: React.FC = () => {
                 </div>
 
                 {(searchQuery || selectedChain !== 'ALL' || activeFilter !== 'ALL') && (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={resetFilters}
-                    className="self-start sm:self-auto h-8 px-3 rounded-lg bg-surface border border-border-default hover:border-toxic text-xs font-mono font-bold text-toxic inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="self-start sm:self-auto font-mono text-xs font-bold text-toxic border-border-default hover:border-toxic inline-flex items-center gap-1.5"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Reset Filters</span>
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -1232,13 +1249,15 @@ export const IncubatorHub: React.FC = () => {
                   {ALL_CHAINS.map((ch) => {
                     const active = selectedChain === ch;
                     return (
-                      <button
+                      <Button
                         key={ch}
                         type="button"
+                        variant={active ? 'primary' : 'secondary'}
+                        size="sm"
                         onClick={() => setSelectedChain(ch)}
                         className={`h-8 px-2.5 rounded-md font-mono text-xs font-bold whitespace-nowrap border cursor-pointer transition-colors inline-flex items-center justify-center ${
                           active
-                            ? 'bg-toxic text-canvas border-toxic'
+                            ? 'bg-toxic text-canvas border-toxic hover:bg-toxic'
                             : 'bg-surface hover:bg-surface-card text-white border-border-default'
                         }`}
                       >
@@ -1246,7 +1265,7 @@ export const IncubatorHub: React.FC = () => {
                         <span className={`ml-1 text-[10px] ${active ? 'text-canvas' : 'text-toxic'}`}>
                           ({chainCounts[ch] ?? 0})
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -1265,22 +1284,24 @@ export const IncubatorHub: React.FC = () => {
                         { id: 'WATCHLIST', label: '⭐ Watchlist' },
                       ] as { id: FilterTab; label: string }[]
                     ).map((tab) => (
-                      <button
+                      <Button
                         key={tab.id}
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setActiveFilter(tab.id)}
                         className={`h-[26px] px-2 rounded font-bold cursor-pointer transition-colors inline-flex items-center justify-center text-xs ${
                           activeFilter === tab.id
                             ? tab.id === 'MAX_ALPHA'
-                              ? 'bg-alpha-strong text-white'
-                              : 'bg-toxic text-canvas'
+                              ? 'bg-alpha-strong text-white hover:bg-alpha-strong'
+                              : 'bg-toxic text-canvas hover:bg-toxic'
                             : tab.id === 'MAX_ALPHA'
                             ? 'text-alpha-primary hover:text-white'
                             : 'text-muted hover:text-white'
                         }`}
                       >
                         {tab.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
 
@@ -1290,7 +1311,7 @@ export const IncubatorHub: React.FC = () => {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as SortKey)}
-                      className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer text-xs"
+                      className="bg-transparent text-white font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer text-xs"
                     >
                       <option value="PRIORITY" className="bg-surface">Sort: Pinned &amp; Newest</option>
                       <option value="MCAP" className="bg-surface">Sort: Market Cap</option>
@@ -1301,26 +1322,30 @@ export const IncubatorHub: React.FC = () => {
 
                   {/* View Mode Toggle */}
                   <div className="h-8 inline-flex items-center bg-surface border border-border-default rounded-md p-0.5 font-sans text-xs">
-                    <button
+                    <Button
                       type="button"
+                      variant={viewMode === 'GRID' ? 'primary' : 'ghost'}
+                      size="sm"
                       onClick={() => setViewMode('GRID')}
                       className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
-                        viewMode === 'GRID' ? 'bg-toxic text-canvas font-black' : 'text-muted hover:text-white'
+                        viewMode === 'GRID' ? 'bg-toxic text-canvas font-black hover:bg-toxic' : 'text-muted hover:text-white'
                       }`}
                     >
-                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <LayoutGrid className="w-3.5 h-3.5 mr-1" />
                       <span>Cards</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant={viewMode === 'TABLE' ? 'primary' : 'ghost'}
+                      size="sm"
                       onClick={() => setViewMode('TABLE')}
                       className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
-                        viewMode === 'TABLE' ? 'bg-toxic text-canvas font-black' : 'text-muted hover:text-white'
+                        viewMode === 'TABLE' ? 'bg-toxic text-canvas font-black hover:bg-toxic' : 'text-muted hover:text-white'
                       }`}
                     >
-                      <List className="w-3.5 h-3.5" />
+                      <List className="w-3.5 h-3.5 mr-1" />
                       <span>Table</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1360,13 +1385,15 @@ export const IncubatorHub: React.FC = () => {
                         ? 'No curated Watchlist research projects match your active filter. Check back shortly for new team research.'
                         : 'No premium Max Alpha calls currently match your active filter.'}
                     </p>
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       onClick={resetFilters}
-                      className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-xs font-mono font-bold text-toxic cursor-pointer"
+                      className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border-border-default text-xs font-mono font-bold text-toxic cursor-pointer"
                     >
                       Reset All Filters
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
@@ -1418,7 +1445,7 @@ export const IncubatorHub: React.FC = () => {
                                   setInspectedToken(token);
                                 }
                               }}
-                              className="hover:bg-surface-card transition-colors cursor-pointer focus:outline-none focus:bg-surface-card"
+                              className="hover:bg-surface-card transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:bg-surface-card"
                             >
                               <td className="py-3.5 px-4">
                                 <div className="flex items-center gap-3">
@@ -1468,22 +1495,24 @@ export const IncubatorHub: React.FC = () => {
 
                               <td className="py-3.5 px-4 font-mono text-xs">
                                 {token.ca && (
-                                  <button
+                                  <Button
                                     type="button"
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={(e) =>
                                       handleCopyText(token.ca!, `tbl-${token.id}`, token.ticker, e)
                                     }
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default text-white font-semibold cursor-pointer tnum"
+                                    className="h-7 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-card hover:bg-surface-3 border border-border-default text-white font-semibold cursor-pointer tnum text-xs"
                                   >
                                     <span>
                                       {token.ca.slice(0, 6)}...{token.ca.slice(-4)}
                                     </span>
                                     {copiedId === `tbl-${token.id}` ? (
-                                      <Check className="w-3.5 h-3.5 text-toxic" />
+                                      <Check className="w-3.5 h-3.5 text-toxic shrink-0" />
                                     ) : (
-                                      <Copy className="w-3.5 h-3.5 text-toxic" />
+                                      <Copy className="w-3.5 h-3.5 text-toxic shrink-0" />
                                     )}
-                                  </button>
+                                  </Button>
                                 )}
                               </td>
 
@@ -1547,32 +1576,38 @@ export const IncubatorHub: React.FC = () => {
                                 <div className="inline-flex items-center gap-1.5">
                                   {isAdmin && (
                                     <>
-                                      <button
+                                      <Button
                                         type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        aria-label="Edit Call"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleStartEditCall(token);
                                         }}
-                                        className="p-1.5 rounded-md border border-border-default bg-surface-card text-muted hover:text-toxic hover:border-toxic cursor-pointer transition-colors"
+                                        className="h-7 w-7 p-0 rounded-md border border-border-default bg-surface-card text-muted hover:text-toxic hover:border-toxic cursor-pointer transition-colors"
                                         title="Edit Call"
                                       >
                                         <Pencil className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
+                                      </Button>
+                                      <Button
                                         type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        aria-label="Toggle Pin"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           togglePinCall(token.id, !token.pinned);
                                         }}
-                                        className={`p-1.5 rounded-md border cursor-pointer ${
+                                        className={`h-7 w-7 p-0 rounded-md border cursor-pointer ${
                                           token.pinned
-                                            ? 'bg-toxic text-canvas border-toxic'
+                                            ? 'bg-toxic text-canvas border-toxic hover:bg-toxic'
                                             : 'bg-surface-card text-muted border-border-default'
                                         }`}
                                         title="Toggle Pin"
                                       >
                                         <Pin className="w-3.5 h-3.5" />
-                                      </button>
+                                      </Button>
                                     </>
                                   )}
                                   <a
@@ -1704,14 +1739,16 @@ export const IncubatorHub: React.FC = () => {
                   value={evmDraft}
                   onChange={(e) => setEvmDraft(e.target.value)}
                   placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
-                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus:border-toxic"
+                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-toxic"
                 />
-                <button
+                <Button
                   type="submit"
+                  variant="secondary"
+                  size="md"
                   className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-toxic cursor-pointer shrink-0 transition-colors"
                 >
                   {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
-                </button>
+                </Button>
               </form>
             ) : (
               <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
@@ -1719,17 +1756,19 @@ export const IncubatorHub: React.FC = () => {
                   <span className="text-toxic font-bold uppercase text-[10px]">MAPPED:</span>
                   <span className="text-white truncate font-medium">{boundEvmAddress}</span>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setBoundEvmAddress('');
                     setEvmDraft('');
                   }}
-                  className="text-muted hover:text-danger ml-2 text-[11px] underline cursor-pointer shrink-0"
+                  className="h-auto p-0 text-muted hover:text-danger ml-2 text-xs underline cursor-pointer shrink-0 hover:bg-transparent"
                   title="Change mapped address"
                 >
                   Change
-                </button>
+                </Button>
               </div>
             )}
             <TelegramAlerts />
