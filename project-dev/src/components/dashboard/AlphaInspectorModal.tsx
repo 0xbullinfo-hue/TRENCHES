@@ -241,7 +241,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
           {isWatchlist ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans text-xs tnum">
               <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
-                <div className="text-[11px] text-muted font-bold uppercase">
+                <div className="text-xs text-muted font-bold uppercase">
                   CURRENT MARKET CAP
                 </div>
                 <div className="text-lg font-extrabold text-white font-mono">
@@ -253,7 +253,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               </div>
 
               <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
-                <div className="text-[11px] text-muted font-bold uppercase">
+                <div className="text-xs text-muted font-bold uppercase">
                   RESEARCH CLASSIFICATION
                 </div>
                 <div className="text-sm font-extrabold text-emerald-400 font-mono">
@@ -270,7 +270,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-sans text-xs tnum">
             {/* 1. Market Cap & Entry */}
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1">
-              <div className="text-[11px] text-muted font-bold uppercase">
+              <div className="text-xs text-muted font-bold uppercase">
                 ENTRY MARKET CAP
               </div>
               <div className="text-lg font-extrabold text-white font-mono">
@@ -288,10 +288,10 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {/* 2. Risk Ratio (Both: Risk Level 1-5 + R:R Ratio) */}
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted font-bold uppercase">
+                <span className="text-xs text-muted font-bold uppercase">
                   RISK RATIO (BOTH)
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-surface border border-line font-mono text-[11px] font-bold text-pump">
+                <span className="px-1.5 py-0.5 rounded bg-surface border border-line font-mono text-xs font-bold text-pump">
                   {token.riskRewardRatio}
                 </span>
               </div>
@@ -299,7 +299,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <span className="font-mono text-xs font-bold text-white">
                   Risk Level {token.risk}/5
                 </span>
-                <span className="font-mono text-[11px] text-amber">
+                <span className="font-mono text-xs text-amber">
                   {token.stopLoss}
                 </span>
               </div>
@@ -322,12 +322,12 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             {/* 3. Take Profit Multipliers (2x / 5x / 10x) */}
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted font-bold uppercase flex items-center gap-1">
+                <span className="text-xs text-muted font-bold uppercase flex items-center gap-1">
                   <Target className="w-3 h-3 text-pump" />
                   <span>TAKE PROFIT TARGETS</span>
                 </span>
                 {isAdmin && (
-                  <span className="text-[10px] text-pump font-mono">Click to mark hit</span>
+                  <span className="text-xs text-pump font-mono">Click to mark hit</span>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -349,7 +349,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     <span>{tp.label}</span>
                     {tp.targetMc && (
                       <span
-                        className={`text-[10px] font-normal ${
+                        className={`text-xs font-normal ${
                           tp.hit ? 'text-canvas' : 'text-muted'
                         }`}
                       >

@@ -963,14 +963,14 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         {/* Top Row: Category Tag + Platform + Campaign Status + Priority Pin */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border-default">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-raid-text">
+            <span className="inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 font-mono text-xs font-semibold text-raid-text">
               <Sparkles className="w-3 h-3 text-raid-primary" />
               <span>SOCIAL RAID</span>
             </span>
 
             {/* Campaign Status (Section 4.4) */}
             <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase tracking-wider ${
                 isCompleted
                   ? 'bg-surface-card border border-border-default text-muted'
                   : isPaused
@@ -995,7 +995,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             </span>
 
             {campaign.pinned && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-raid-strong text-white font-mono text-[10px] font-black uppercase">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-raid-strong text-white font-mono text-xs font-black uppercase">
                 <Pin className="w-2.5 h-2.5" />
                 <span>PRIORITY PIN</span>
               </span>
@@ -1012,7 +1012,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   e.stopPropagation();
                   onTogglePin?.(campaign.id, !campaign.pinned);
                 }}
-                className={`h-auto px-2 py-0.5 rounded-md border text-[10px] font-mono transition-colors ${
+                className={`h-auto px-2 py-0.5 rounded-md border text-xs font-mono transition-colors ${
                   campaign.pinned
                     ? 'bg-raid-strong text-white border-raid-border font-black hover:bg-raid-strong'
                     : 'bg-surface-card hover:bg-surface-3 border-border-default text-muted hover:text-white'
@@ -1049,7 +1049,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               {campaign.targetActions.map((action, i) => (
                 <span
                   key={i}
-                  className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default text-[10px] font-mono font-semibold text-muted"
+                  className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default text-xs font-mono font-semibold text-muted"
                 >
                   ✓ {action}
                 </span>
@@ -1077,7 +1077,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-raid-primary shrink-0" />
             <div>
-              <div className="font-sans text-[10px] font-bold text-muted uppercase tracking-wider">
+              <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 AIRDROP REWARD PER USER
               </div>
               <div className="font-sans text-sm font-black text-raid-primary">
@@ -1087,7 +1087,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           </div>
           {campaign.totalPool && (
             <div className="text-right">
-              <div className="font-sans text-[10px] font-bold text-muted uppercase tracking-wider">
+              <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 TOTAL POOL
               </div>
               <div className="font-mono text-xs font-bold text-white">
@@ -1109,7 +1109,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 <span>Raid Proof Submitted</span>
               </span>
               <span
-                className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-extrabold uppercase ${
+                className={`px-2 py-0.5 rounded-md font-mono text-xs font-extrabold uppercase ${
                   userSubmission.status === 'AIRDROPPED'
                     ? 'bg-toxic-bg text-toxic border border-toxic-border'
                     : 'bg-amber/15 text-amber border border-amber/40'
@@ -1119,7 +1119,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               </span>
             </div>
 
-            <div className="text-[11px] font-mono space-y-1 text-muted">
+            <div className="text-xs font-mono space-y-1 text-muted">
               <div className="flex items-center justify-between gap-1">
                 <span>X Handle:</span>
                 <a
@@ -1178,9 +1178,9 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         ) : (
           /* Submission Form (Section 6.4) */
           <form onSubmit={handleSubmit} className="space-y-2.5">
-            <div className="font-sans text-[11px] font-extrabold uppercase text-raid-primary flex items-center justify-between">
+            <div className="font-sans text-xs font-extrabold uppercase text-raid-primary flex items-center justify-between">
               <span>Submit Proof for Airdrop</span>
-              <span className="text-muted font-normal text-[10px]">Open to All Wallets</span>
+              <span className="text-muted font-normal text-xs">Open to All Wallets</span>
             </div>
 
             {/* Wallet Verification & Server Session Status Banner (Fixes A & B) */}
@@ -1201,7 +1201,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     Connect Wallet
                   </Button>
                 </div>
-                <p className="text-[10px] font-sans text-dim">
+                <p className="text-xs font-sans text-dim">
                   Connect your Solana wallet to sign verification proof and receive your $H42 airdrop.
                 </p>
               </div>
@@ -1211,7 +1211,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>Wallet signing unavailable</span>
                 </div>
-                <p className="text-[10px] font-sans text-danger/80">
+                <p className="text-xs font-sans text-danger/80">
                   Your connected wallet or browser adapter does not support message signing. Please connect with Phantom, Solflare, or Trust Wallet.
                 </p>
               </div>
@@ -1227,12 +1227,12 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     variant="secondary"
                     size="sm"
                     onClick={() => setWalletInput(connectedAddress || '')}
-                    className="h-auto px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-amber/40 text-amber font-mono text-[10px] font-bold"
+                    className="h-auto px-2 py-0.5 rounded bg-surface-card hover:bg-surface-3 border border-amber/40 text-amber font-mono text-xs font-bold"
                   >
                     Use Connected
                   </Button>
                 </div>
-                <p className="text-[10px] font-sans text-muted">
+                <p className="text-xs font-sans text-muted">
                   Entered address differs from connected wallet ({connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}). Submissions must be signed by the receiving address.
                 </p>
               </div>
@@ -1242,7 +1242,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                   <RefreshCw className="w-3.5 h-3.5 text-raid-primary animate-spin" />
                   <span>Checking server session...</span>
                 </span>
-                <span className="font-mono text-[10px] text-dim">
+                <span className="font-mono text-xs text-dim">
                   {connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}
                 </span>
               </div>
@@ -1264,7 +1264,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     {authenticatingSession ? 'Authenticating...' : 'Retry Auth'}
                   </Button>
                 </div>
-                <p className="text-[10px] font-sans text-danger/80">
+                <p className="text-xs font-sans text-danger/80">
                   {serverSession.error || 'Could not confirm server session. Re-authenticate to continue.'}
                 </p>
               </div>
@@ -1286,31 +1286,31 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     {authenticatingSession ? 'Authenticating...' : 'Authenticate'}
                   </Button>
                 </div>
-                <p className="text-[10px] font-sans text-dim">
+                <p className="text-xs font-sans text-dim">
                   Sign a one-click session message to confirm wallet ownership with the server before submitting.
                 </p>
               </div>
             ) : (
-              <div className="p-2 rounded-md bg-toxic-bg/30 border border-toxic-border/50 flex items-center justify-between gap-2 text-[11px] font-sans">
+              <div className="p-2 rounded-md bg-toxic-bg/30 border border-toxic-border/50 flex items-center justify-between gap-2 text-xs font-sans">
                 <span className="flex items-center gap-1.5 text-toxic font-semibold">
                   <CheckCircle2 className="w-3.5 h-3.5 text-toxic shrink-0" />
                   <span>Wallet Authenticated &amp; Ready</span>
                 </span>
-                <span className="font-mono text-[10px] text-muted">
+                <span className="font-mono text-xs text-muted">
                   {connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : ''}
                 </span>
               </div>
             )}
 
             {errorMsg && (
-              <div className="p-2 rounded-md bg-danger/10 border border-danger/30 text-danger text-[11px] font-sans flex items-start gap-1.5">
+              <div className="p-2 rounded-md bg-danger/10 border border-danger/30 text-danger text-xs font-sans flex items-start gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
             {successMsg && (
-              <div className="p-2 rounded-md bg-toxic-bg border border-toxic-border text-toxic text-[11px] font-sans flex items-start gap-1.5">
+              <div className="p-2 rounded-md bg-toxic-bg border border-toxic-border text-toxic text-xs font-sans flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{successMsg}</span>
               </div>
@@ -1319,7 +1319,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             <div className="space-y-2">
               <div>
                 <div className="flex items-center justify-between pb-1">
-                  <label className="text-[10px] font-mono text-muted uppercase font-bold" htmlFor={`wallet-${campaign.id}`}>
+                  <label className="text-xs font-mono text-muted uppercase font-bold" htmlFor={`wallet-${campaign.id}`}>
                     Solana Wallet Address
                   </label>
                   {isWalletConnected && (
@@ -1328,7 +1328,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSwitchWallet?.()}
-                      className="h-auto p-0 text-[10px] font-mono text-raid-primary hover:underline hover:bg-transparent"
+                      className="h-auto p-0 text-xs font-mono text-raid-primary hover:underline hover:bg-transparent"
                     >
                       Switch Wallet
                     </Button>

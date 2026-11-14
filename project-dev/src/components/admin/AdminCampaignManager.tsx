@@ -502,7 +502,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               <span>{editingCampaign ? `EDIT RAID: ${editingCampaign.title}` : 'CREATE NEW X RAID CAMPAIGN'}</span>
             </div>
             {editingCampaign && (
-              <span className="px-2 py-0.5 rounded-md bg-raid-bg text-raid-text border border-raid-border text-[10px] font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-raid-bg text-raid-text border border-raid-border text-xs font-mono">
                 EDITING MODE
               </span>
             )}
@@ -510,7 +510,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div className="md:col-span-6 space-y-1">
-              <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+              <label className="block font-sans text-xs font-bold text-muted uppercase">
                 Campaign Title *
               </label>
               <input
@@ -524,7 +524,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-6 space-y-1">
-              <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+              <label className="block font-sans text-xs font-bold text-muted uppercase">
                 Target X / Twitter Post URL *
               </label>
               <input
@@ -540,7 +540,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
           <div className="grid grid-cols-1 sm:row sm:items-center sm:grid-cols-2 md:grid-cols-12 gap-3">
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+              <label className="block font-sans text-xs font-bold text-muted uppercase">
                 Airdrop Reward Per User *
               </label>
               <input
@@ -554,7 +554,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+              <label className="block font-sans text-xs font-bold text-muted uppercase">
                 Total Reward Pool (Optional)
               </label>
               <input
@@ -567,9 +567,9 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-[11px] font-bold text-muted uppercase flex items-center justify-between">
+              <label className="block font-sans text-xs font-bold text-muted uppercase flex items-center justify-between">
                 <span>Raid Duration</span>
-                <span className="text-raid-primary font-mono text-[10px]">{formDurationHours}h window</span>
+                <span className="text-raid-primary font-mono text-xs">{formDurationHours}h window</span>
               </label>
               <select
                 value={formDurationHours}
@@ -591,7 +591,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+            <label className="block font-sans text-xs font-bold text-muted uppercase">
               Raid Instructions / Mission Thesis
             </label>
             <input
@@ -673,7 +673,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 }`}
               />
               <span className="truncate max-w-[200px]">{camp.title}</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default font-mono text-[10px] text-raid-primary">
+              <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default font-mono text-xs text-raid-primary">
                 {camp.submissionsCount || 0}
               </span>
             </Button>
@@ -826,7 +826,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-border-default bg-surface-card font-sans text-[11px] text-muted uppercase">
+                    <tr className="border-b border-border-default bg-surface-card font-sans text-xs text-muted uppercase">
                       <th className="py-3 px-4">User Wallet</th>
                       <th className="py-3 px-4">X Handle</th>
                       <th className="py-3 px-4">Retweet Proof</th>
@@ -893,13 +893,13 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                           </a>
                         </td>
 
-                        <td className="py-3 px-4 text-muted text-[11px]">
+                        <td className="py-3 px-4 text-muted text-xs">
                           {new Date(sub.submittedAt).toLocaleString()}
                         </td>
 
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase inline-flex items-center gap-1 ${
+                            className={`px-2.5 py-1 rounded-md text-xs font-black uppercase inline-flex items-center gap-1 ${
                               sub.status === 'AIRDROPPED'
                                 ? 'bg-toxic-bg text-toxic border border-toxic-border'
                                 : 'bg-amber/15 text-amber border border-amber/40'

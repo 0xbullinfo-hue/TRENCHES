@@ -188,7 +188,7 @@ export const PerformanceTrustSection: React.FC = () => {
               <div className="font-sans text-xs font-bold uppercase text-amber tracking-wider flex items-center justify-between">
                 <span>ACTIVE / OPEN CALLS</span>
                 {stats.winRateFormatted !== '—' && (
-                  <span className="text-[10px] text-muted font-mono">{stats.winRateFormatted} WR</span>
+                  <span className="text-xs text-muted font-mono">{stats.winRateFormatted} WR</span>
                 )}
               </div>
               <div className="font-sans text-3xl font-black text-amber tnum">

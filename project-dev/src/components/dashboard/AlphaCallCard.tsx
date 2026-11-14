@@ -86,7 +86,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
         {/* Top Header Row */}
         <div className="flex items-center justify-between gap-1.5 pb-2.5 border-b border-border-default text-xs font-mono">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-alpha-text">
+            <span className="inline-flex items-center gap-1 rounded-md border border-alpha-border bg-alpha-bg px-2.5 py-1 font-mono text-xs font-semibold text-alpha-text">
               <Target className="w-3 h-3 text-alpha-primary" />
               <span>
                 {coin.callType === 'WATCHLIST'
@@ -98,13 +98,13 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             </span>
 
             {isWatchlist ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider bg-surface-card border border-border-default text-emerald-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase tracking-wider bg-surface-card border border-border-default text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>RESEARCH</span>
               </span>
             ) : (
               <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] font-black uppercase tracking-wider ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase tracking-wider ${
                   isCompleted
                     ? 'bg-toxic text-canvas'
                     : isLoss
@@ -121,7 +121,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               </span>
             )}
 
-            <span className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default font-mono text-[10px] font-bold text-white">
+            <span className="px-2 py-0.5 rounded-md bg-surface-card border border-border-default font-mono text-xs font-bold text-white">
               {coin.chain === 'ROBIN' ? 'ROBIN' : coin.chain}
             </span>
 
@@ -140,7 +140,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   e.stopPropagation();
                   onEdit(coin);
                 }}
-                className="h-auto px-2 py-0.5 text-[10px] text-muted hover:text-alpha-primary gap-1"
+                className="h-auto px-2 py-0.5 text-xs text-muted hover:text-alpha-primary gap-1"
                 title="Edit Call"
                 aria-label="Edit Call"
               >
@@ -208,7 +208,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                 {coin.ticker} • {chainMeta.label}
               </p>
               {coin.age && (
-                <span className="font-mono text-[11px] text-muted">{coin.age}</span>
+                <span className="font-mono text-xs text-muted">{coin.age}</span>
               )}
             </div>
           </div>
@@ -251,11 +251,11 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           <div className="grid grid-cols-2 gap-2 font-mono text-xs">
             {/* Current Market Cap + 24h Change */}
             <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-              <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
+              <div className="text-xs text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
                 <span>CURRENT MC</span>
                 {coin.change24hPct !== null && (
                   <span
-                    className={`text-[10px] font-bold ${
+                    className={`text-xs font-bold ${
                       coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
                     }`}
                   >
@@ -270,7 +270,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
 
             {/* 24h Volume / Research Track */}
             <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-              <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">
                 {coin.volume24h && coin.volume24h !== '—' ? '24H VOLUME' : 'RESEARCH TRACK'}
               </div>
               <div className="text-sm font-extrabold text-white truncate tnum">
@@ -284,7 +284,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             <div className="grid grid-cols-2 gap-2 font-mono text-xs">
               {/* Entry Market Cap */}
               <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                <div className="text-xs text-muted uppercase font-bold tracking-wider">
                   ENTRY MC
                 </div>
                 <div className="text-base font-extrabold text-white truncate tnum">
@@ -294,11 +294,11 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
 
               {/* Current Market Cap + 24h Change */}
               <div className="h-[64px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-                <div className="text-[10px] text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
+                <div className="text-xs text-alpha-primary uppercase font-bold tracking-wider flex items-center justify-between">
                   <span>CURRENT MC</span>
                   {coin.change24hPct !== null && (
                     <span
-                      className={`text-[10px] font-bold ${
+                      className={`text-xs font-bold ${
                         coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
                       }`}
                     >
@@ -316,14 +316,14 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             <div className="grid grid-cols-2 gap-2 font-mono text-xs">
               {/* Risk Ratio */}
               <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                <div className="text-xs text-muted uppercase font-bold tracking-wider">
                   RISK RATIO
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white text-[11px]">
+                  <span className="font-bold text-white text-xs">
                     Lvl {coin.risk}/5
                   </span>
-                  <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default text-alpha-primary font-bold text-[10px]">
+                  <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border-default text-alpha-primary font-bold text-xs">
                     {coin.riskRewardRatio || '2.5:1'}
                   </span>
                 </div>
@@ -331,7 +331,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
 
               {/* Stop Loss (SL) */}
               <div className="h-[62px] p-2.5 rounded-lg bg-surface-card border border-border-default flex flex-col justify-between">
-                <div className="text-[10px] text-muted uppercase font-bold tracking-wider">
+                <div className="text-xs text-muted uppercase font-bold tracking-wider">
                   STOP LOSS (SL)
                 </div>
                 <div className="text-xs font-extrabold text-amber truncate">
@@ -342,7 +342,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
 
             {/* Target Take Profits Row */}
             <div className="p-2.5 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
-              <div className="text-[10px] text-muted uppercase font-bold tracking-wider flex items-center gap-1 shrink-0">
+              <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center gap-1 shrink-0">
                 <Target className="w-3 h-3 text-alpha-primary" />
                 <span>TARGET TP:</span>
               </div>
@@ -351,7 +351,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   coin.takeProfits.slice(0, 3).map((tp) => (
                     <span
                       key={tp.label}
-                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                      className={`px-1.5 py-0.5 rounded-md text-xs font-extrabold border ${
                         tp.hit
                           ? 'bg-toxic text-canvas border-toxic'
                           : 'bg-surface text-white border-border-default'
@@ -362,7 +362,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                     </span>
                   ))
                 ) : (
-                  <span className="text-muted text-[11px]">2x • 5x • 10x</span>
+                  <span className="text-muted text-xs">2x • 5x • 10x</span>
                 )}
               </div>
             </div>
@@ -377,7 +377,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           </div>
         ) : coin.ca ? (
           <div className="h-11 min-h-[44px] px-3 rounded-lg bg-surface-card border border-border-default flex items-center justify-between gap-2 font-mono text-xs">
-            <span className="text-muted text-[11px] shrink-0 font-bold">CA:</span>
+            <span className="text-muted text-xs shrink-0 font-bold">CA:</span>
             <span className="text-white truncate tnum">{coin.ca}</span>
             <Button
               variant="ghost"
@@ -387,7 +387,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               aria-label={`Copy ${coin.ticker} contract address`}
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span className="text-[11px]">{copied ? 'COPIED' : 'COPY'}</span>
+              <span className="text-xs">{copied ? 'COPIED' : 'COPY'}</span>
             </Button>
           </div>
         ) : null}

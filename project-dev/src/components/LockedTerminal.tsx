@@ -84,7 +84,7 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="bg-canvas border border-border-default rounded-lg p-3 font-mono text-xs flex items-center justify-between gap-2 max-w-md mx-auto">
             <div className="truncate text-left">
-              <span className="text-muted block text-[10px] uppercase font-bold">Token Contract</span>
+              <span className="text-muted block text-xs uppercase font-bold">Token Contract</span>
               <span className="text-white font-semibold truncate block tnum">{GENESIS_MINT}</span>
             </div>
             <Button
@@ -254,7 +254,7 @@ export const LockedTerminal: React.FC = () => {
                 aria-label="Copy token contract"
               >
                 {copyError ? (
-                  <span className="text-[10px] text-danger font-bold">Failed</span>
+                  <span className="text-xs text-danger font-bold">Failed</span>
                 ) : copied ? (
                   <Check className="w-3.5 h-3.5 text-toxic" />
                 ) : (

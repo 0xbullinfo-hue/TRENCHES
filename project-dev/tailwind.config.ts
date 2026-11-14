@@ -122,8 +122,8 @@ const config: Config = {
         mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       fontSize: {
-        "2xs": ["10px", { lineHeight: "14px" }],
-        xs: ["11px", { lineHeight: "16px" }],
+        "2xs": ["11px", { lineHeight: "14px" }],
+        xs: ["12px", { lineHeight: "16px" }],
         sm: ["13px", { lineHeight: "20px" }],
       },
     },

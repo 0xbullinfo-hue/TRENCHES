@@ -207,16 +207,16 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isConnectingThis ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40 inline-flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40 inline-flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         <span>CONNECTING</span>
                       </span>
                     ) : isDetected ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40">
                         DETECTED
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium text-dim border border-toxic-border flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-medium text-dim border border-toxic-border flex items-center gap-1">
                         <span>Install</span>
                         <ExternalLink className="w-2.5 h-2.5" />
                       </span>
@@ -236,11 +236,11 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
         {demoEnabled && (
           <div className="px-5 pb-4 pt-3 border-t border-toxic-border/40 bg-surface-card/30 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] font-bold text-toxic uppercase flex items-center gap-1.5">
+              <span className="font-mono text-xs font-bold text-toxic uppercase flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-toxic" />
                 <span>Localhost Quick Connect</span>
               </span>
-              <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.2 rounded border border-toxic-border/30">
+              <span className="text-xs font-mono text-muted bg-surface px-1.5 py-0.2 rounded border border-toxic-border/30">
                 Dev Mode
               </span>
             </div>
@@ -254,7 +254,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic/50 hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
                 <span className="text-toxic font-black">⚡ Master Admin</span>
-                <span className="text-[10px] text-muted mt-0.5">Admin Desk &amp; Pro</span>
+                <span className="text-xs text-muted mt-0.5">Admin Desk &amp; Pro</span>
               </Button>
 
               <Button
@@ -265,7 +265,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
                 <span className="text-white font-black">🛡️ Member Tier</span>
-                <span className="text-[10px] text-muted mt-0.5">1M+ $H42</span>
+                <span className="text-xs text-muted mt-0.5">1M+ $H42</span>
               </Button>
 
               <Button
@@ -276,7 +276,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
                 <span className="text-muted font-black">🆓 Free Tier</span>
-                <span className="text-[10px] text-muted mt-0.5">0 Tokens</span>
+                <span className="text-xs text-muted mt-0.5">0 Tokens</span>
               </Button>
             </div>
           </div>

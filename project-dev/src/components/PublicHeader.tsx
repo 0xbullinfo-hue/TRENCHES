@@ -193,20 +193,18 @@ export const PublicHeader: React.FC = () => {
 
   const getDesktopNavClass = (sectionId: string) => {
     const isActive = isHome && activeSection === sectionId;
-    return `px-3 py-2 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold transition-colors ${
-      isActive
+    return `px-3 py-2 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold transition-colors ${isActive
         ? 'text-toxic font-black bg-surface-card border border-toxic/40 shadow-none'
         : 'text-muted hover:text-toxic hover:bg-surface border border-transparent'
-    }`;
+      }`;
   };
 
   const getMobileNavClass = (sectionId: string) => {
     const isActive = isHome && activeSection === sectionId;
-    return `flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm uppercase tracking-wider transition-colors ${
-      isActive
+    return `flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm uppercase tracking-wider transition-colors ${isActive
         ? 'text-toxic font-black bg-surface-card border border-toxic/40'
         : 'text-muted hover:bg-surface-card hover:text-toxic border border-transparent'
-    }`;
+      }`;
   };
 
   const handleDisconnect = async (e: React.MouseEvent) => {
@@ -262,11 +260,10 @@ export const PublicHeader: React.FC = () => {
           </Link>
           <Link
             href="/ledger"
-            className={`px-3 py-2 rounded-lg uppercase transition-colors ${
-              isPerformanceActive
+            className={`px-3 py-2 rounded-lg uppercase transition-colors ${isPerformanceActive
                 ? 'text-toxic font-black bg-surface-card border border-toxic/40 shadow-none'
                 : 'text-muted hover:text-toxic hover:bg-surface border border-transparent'
-            }`}
+              }`}
           >
             PERFORMANCE
           </Link>
@@ -314,7 +311,7 @@ export const PublicHeader: React.FC = () => {
               disabled
               aria-disabled="true"
               title="Wallet connection coming soon"
-              className="h-9 sm:h-11 px-2.5 sm:px-4 bg-surface border border-toxic-border/60 text-muted font-sans text-[11px] sm:text-xs font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
+              className="h-9 sm:h-11 px-2.5 sm:px-4 bg-surface border border-toxic-border/60 text-muted font-sans text-xs sm:text-xs font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-muted shrink-0" />
               <span className="hidden md:inline">CONNECT WALLET · LIVE SOON</span>
@@ -395,9 +392,8 @@ export const PublicHeader: React.FC = () => {
           <Link
             href="/ledger"
             onClick={() => setMobileMenuOpen(false)}
-            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider ${
-              isPerformanceActive ? 'text-toxic font-black bg-surface-card border border-toxic/40' : 'text-muted'
-            }`}
+            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-toxic transition-colors uppercase tracking-wider ${isPerformanceActive ? 'text-toxic font-black bg-surface-card border border-toxic/40' : 'text-muted'
+              }`}
           >
             PERFORMANCE
           </Link>

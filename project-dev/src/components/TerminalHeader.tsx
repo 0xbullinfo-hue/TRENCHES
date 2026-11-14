@@ -127,7 +127,7 @@ export const TerminalHeader: React.FC = () => {
                   }`}
                 />
                 <span className="font-semibold">{shortAddress}</span>
-                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-bold bg-surface-card border border-border-default uppercase text-muted">
+                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-xs font-sans font-bold bg-surface-card border border-border-default uppercase text-muted">
                   {tier.id === 'PRO' ? 'PRO' : tier.id === 'LAB_MEMBER' ? 'MEMBER' : 'FREE'}
                 </span>
               </Button>

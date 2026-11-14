@@ -69,7 +69,7 @@ export function TelegramVerificationCard({
       <div className="pt-5 mt-auto space-y-3">
         {status === 'linked' ? (
           <div className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
-            <span className="inline-flex items-center gap-1.5 text-toxic font-bold uppercase text-[11px]">
+            <span className="inline-flex items-center gap-1.5 text-toxic font-bold uppercase text-xs">
               <Check className="w-4 h-4 stroke-[2.5]" /> Telegram alerts on
             </span>
             <Button
@@ -174,11 +174,11 @@ function StakePointLiveSection({
   return (
     <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+        <span className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
           LIVE STAKEPOINT APR
         </span>
         {pool.status && (
-          <span className="font-sans text-[11px] font-bold text-toxic uppercase">
+          <span className="font-sans text-xs font-bold text-toxic uppercase">
             ● {pool.status}
           </span>
         )}

@@ -705,7 +705,7 @@ export const IncubatorHub: React.FC = () => {
                 <span className="font-sans text-xs font-black uppercase text-toxic tracking-wide">
                   CRYPTOGRAPHIC VERIFICATION REQUIRED
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 font-bold">
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 font-bold">
                   {verificationState === 'VERIFICATION_FAILED' ? 'SIGNATURE FAILED' : 'ACTION REQUIRED'}
                 </span>
               </div>
@@ -845,7 +845,7 @@ export const IncubatorHub: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <div className="md:col-span-6 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Contract Address (CA) *
                       </label>
                       <div className="flex gap-2">
@@ -872,7 +872,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-3 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Token Name *
                       </label>
                       <input
@@ -886,7 +886,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-3 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Ticker *
                       </label>
                       <input
@@ -902,7 +902,7 @@ export const IncubatorHub: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Chain
                       </label>
                       <select
@@ -917,7 +917,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Entry MC
                       </label>
                       <input
@@ -930,7 +930,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Current MC
                       </label>
                       <input
@@ -943,7 +943,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Risk (1-5)
                       </label>
                       <input
@@ -957,7 +957,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Stop Loss (SL)
                       </label>
                       <input
@@ -970,7 +970,7 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                      <label className="block font-sans text-xs font-bold text-muted uppercase">
                         Take Profits
                       </label>
                       <input
@@ -984,7 +984,7 @@ export const IncubatorHub: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-sans text-[11px] font-bold text-muted uppercase">
+                    <label className="block font-sans text-xs font-bold text-muted uppercase">
                       Thesis / Research Summary
                     </label>
                     <input
@@ -998,7 +998,7 @@ export const IncubatorHub: React.FC = () => {
 
                   {/* Section 5: Admin Post Classification — Single Source of Truth */}
                   <div className="space-y-1.5 pt-1">
-                    <label className="block font-sans text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <label className="block font-sans text-xs font-bold text-muted uppercase tracking-wider">
                       Destination Tab Classification * (Single Source of Truth)
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1019,9 +1019,9 @@ export const IncubatorHub: React.FC = () => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-sans text-xs font-black uppercase text-purple-400">ALPHA</span>
-                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">MEMBER+</span>
+                          <span className="text-xs font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">MEMBER+</span>
                         </div>
-                        <p className="text-[11px] text-muted mt-1 leading-snug">Curated Alpha trade calls with TP/SL risk telemetry.</p>
+                        <p className="text-xs text-muted mt-1 leading-snug">Curated Alpha trade calls with TP/SL risk telemetry.</p>
                       </Button>
 
                       <Button
@@ -1041,9 +1041,9 @@ export const IncubatorHub: React.FC = () => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-sans text-xs font-black uppercase text-amber-400">MAX ALPHA</span>
-                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
+                          <span className="text-xs font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">PRO ONLY</span>
                         </div>
-                        <p className="text-[11px] text-muted mt-1 leading-snug">High-conviction premium Alpha reserved for PRO members.</p>
+                        <p className="text-xs text-muted mt-1 leading-snug">High-conviction premium Alpha reserved for PRO members.</p>
                       </Button>
 
                       <Button
@@ -1063,11 +1063,11 @@ export const IncubatorHub: React.FC = () => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-sans text-xs font-black uppercase text-emerald-400">WATCHLIST</span>
-                          <span className="text-[10px] font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">
+                          <span className="text-xs font-mono font-bold text-muted px-1.5 py-0.5 rounded bg-surface-card border border-border-default">
                             {formCallType === 'WATCHLIST' ? 'SELECTED · PRO' : 'PRO ONLY'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted mt-1 leading-snug">Curated long-term projects for ongoing research.</p>
+                        <p className="text-xs text-muted mt-1 leading-snug">Curated long-term projects for ongoing research.</p>
                       </Button>
                     </div>
                   </div>
@@ -1270,7 +1270,7 @@ export const IncubatorHub: React.FC = () => {
                         }`}
                       >
                         <span>{ch}</span>
-                        <span className={`ml-1 text-[10px] ${active ? 'text-canvas' : 'text-toxic'}`}>
+                        <span className={`ml-1 text-xs ${active ? 'text-canvas' : 'text-toxic'}`}>
                           ({chainCounts[ch] ?? 0})
                         </span>
                       </Button>
@@ -1449,25 +1449,25 @@ export const IncubatorHub: React.FC = () => {
                                         {token.ticker}
                                       </span>
                                       {isRowWatchlist ? (
-                                        <span className="px-1.5 py-0.2 rounded bg-surface-card border border-border-default text-emerald-400 font-mono text-[10px] font-black uppercase">
+                                        <span className="px-1.5 py-0.2 rounded bg-surface-card border border-border-default text-emerald-400 font-mono text-xs font-black uppercase">
                                           RESEARCH
                                         </span>
                                       ) : (
                                         <>
                                           {token.outcome === 'PROFIT' && (
-                                            <span className="px-1.5 py-0.2 rounded bg-toxic text-canvas font-mono text-[10px] font-black uppercase">
+                                            <span className="px-1.5 py-0.2 rounded bg-toxic text-canvas font-mono text-xs font-black uppercase">
                                               PROFIT ✓
                                             </span>
                                           )}
                                           {token.outcome === 'LOSS' && (
-                                            <span className="px-1.5 py-0.2 rounded bg-danger text-white font-mono text-[10px] font-black uppercase">
+                                            <span className="px-1.5 py-0.2 rounded bg-danger text-white font-mono text-xs font-black uppercase">
                                               LOSS ✕
                                             </span>
                                           )}
                                         </>
                                       )}
                                     </div>
-                                    <div className="font-mono text-[11px] text-muted flex items-center gap-2 mt-0.5">
+                                    <div className="font-mono text-xs text-muted flex items-center gap-2 mt-0.5">
                                       <span className="px-1.5 py-0.2 rounded bg-surface-card border border-border-default text-white font-bold">
                                         {token.chain}
                                       </span>
@@ -1541,7 +1541,7 @@ export const IncubatorHub: React.FC = () => {
                                         {token.takeProfits.map((tp) => (
                                           <span
                                             key={tp.label}
-                                            className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                            className={`px-1.5 py-0.5 rounded text-xs font-extrabold border ${
                                               tp.hit
                                                 ? 'bg-toxic text-canvas border-toxic'
                                                 : 'bg-surface-card text-white border-border-default'
@@ -1657,7 +1657,7 @@ export const IncubatorHub: React.FC = () => {
                             <span className="font-mono text-xs text-toxic font-bold">
                               {coin.ticker}
                             </span>
-                            <span className="px-1.5 py-0.5 rounded bg-surface-card border border-border-default font-mono text-[10px] text-white">
+                            <span className="px-1.5 py-0.5 rounded bg-surface-card border border-border-default font-mono text-xs text-white">
                               {coin.chain}
                             </span>
                           </div>
@@ -1738,7 +1738,7 @@ export const IncubatorHub: React.FC = () => {
             ) : (
               <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-toxic font-bold uppercase text-[10px]">MAPPED:</span>
+                  <span className="text-toxic font-bold uppercase text-xs">MAPPED:</span>
                   <span className="text-white truncate font-medium">{boundEvmAddress}</span>
                 </div>
                 <Button
