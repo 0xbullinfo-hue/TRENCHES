@@ -23,10 +23,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title:
-    'TrenchlabsHQ // Alpha Incubator - Token-gated Alpha Lab incubator powered by $H42 on Solana (EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump)',
+  title: 'TrenchLabsHQ: research-backed token calls on Solana',
   description:
-    'Token-gated Alpha Lab incubator powered by $H42 on Solana (EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump). Real-time multi-chain signals, verifiable ledger, and 90-day StakePoint staking.',
+    'Token-gated Alpha Lab incubator powered by $H42 on Solana. Real-time multi-chain signals, verifiable ledger, and 90-day StakePoint staking.',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -36,10 +35,9 @@ export const metadata: Metadata = {
     apple: '/icon.png',
   },
   openGraph: {
-    title:
-      'TrenchlabsHQ // Alpha Incubator - Token-gated Alpha Lab incubator powered by $H42 on Solana (EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump)',
+    title: 'TrenchLabsHQ: research-backed token calls on Solana',
     description:
-      'Token-gated Alpha Lab incubator powered by $H42 on Solana (EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump).',
+      'Token-gated Alpha Lab incubator powered by $H42 on Solana.',
     url: 'https://www.trenchlabshq.xyz',
     siteName: 'TrenchlabsHQ',
     images: [
@@ -55,10 +53,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title:
-      'TrenchlabsHQ // Alpha Incubator - Token-gated Alpha Lab incubator powered by $H42 on Solana',
+    title: 'TrenchLabsHQ: research-backed token calls on Solana',
     description:
-      'Token-gated Alpha Lab incubator powered by $H42 on Solana (EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump).',
+      'Token-gated Alpha Lab incubator powered by $H42 on Solana.',
     images: ['/images/trenchlabs-hero-removebg.png'],
   },
 };
