@@ -79,10 +79,10 @@ export const HeroTerminal: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
           {/* Left Column (6 cols): Headline + Subtext + Soft-Launch CTAs */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
-            <h1 className="font-sans font-bold tracking-tight uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[74px] xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
+            <h1 className="font-sans font-bold tracking-tight uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
               <span className="block">BUILDING THE STRONGEST</span>
-              <span className="block">COMMUNITY IN THE</span>
-              <span className="block text-toxic">TRENCHES</span>
+              <span className="block sm:whitespace-nowrap">COMMUNITY IN</span>
+              <span className="block sm:whitespace-nowrap">THE <span className="text-toxic">TRENCHES</span></span>
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
