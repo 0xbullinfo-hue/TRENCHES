@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
 import { ArrowUpRight, Check, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
@@ -70,21 +71,23 @@ export function TelegramVerificationCard({
             <span className="inline-flex items-center gap-1.5 text-toxic font-bold uppercase text-[11px]">
               <Check className="w-4 h-4 stroke-[2.5]" /> Telegram alerts on
             </span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={stop}
-              className="text-muted hover:text-danger text-xs font-sans font-bold underline cursor-pointer"
+              className="h-auto p-0 text-muted hover:text-danger text-xs font-sans font-bold underline"
             >
               Turn off
-            </button>
+            </Button>
           </div>
         ) : (
           <div>
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="md"
               onClick={start}
               disabled={!connected || !publicKeyBase58 || status === 'working' || status === 'waiting'}
-              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none disabled:opacity-60 disabled:cursor-default"
+              className="w-full sm:w-auto h-10 sm:h-11 px-6 text-xs uppercase tracking-wider font-black gap-2"
             >
               <Send className="w-3.5 h-3.5 fill-current" />
               <span>
@@ -95,7 +98,7 @@ export function TelegramVerificationCard({
                     : 'GET VERIFIED'}
               </span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -135,14 +138,15 @@ function StakePointLiveSection({
     return (
       <div className="rounded-lg bg-surface-card border border-danger/30 p-3 flex items-center justify-between text-xs">
         <span className="text-muted">Couldn&apos;t load staking data.</span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onRetry}
-          className="text-toxic hover:text-toxic-bright underline font-bold cursor-pointer inline-flex items-center gap-1"
+          className="h-auto p-0 text-toxic hover:text-toxic-bright underline font-bold gap-1"
         >
           <RefreshCw className="w-3 h-3" />
           <span>[Retry]</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -467,14 +471,15 @@ export function DashboardStakingCard({
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
             </a>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={() => setExpanded(!expanded)}
-              className="h-10 sm:h-11 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="h-10 sm:h-11 px-4 text-white text-xs font-bold gap-1.5"
             >
               <span>Details</span>
               {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
+            </Button>
           </div>
 
           {/* Expanded Progress / Details */}
