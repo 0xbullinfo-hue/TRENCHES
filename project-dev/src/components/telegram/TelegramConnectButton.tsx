@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Loader2 } from 'lucide-react';
 
 interface VerificationStatusResponse {
@@ -171,8 +172,8 @@ export function TelegramConnectButton({
   // State 4: Loading Skeleton
   if (loading && !status) {
     return (
-      <div
-        className={`rounded-md bg-surface-card border border-toxic-border/40 animate-pulse ${
+      <Skeleton
+        className={`rounded-md border border-toxic-border/40 ${
           compact ? 'h-9 w-36' : 'h-11 w-48'
         }`}
       />

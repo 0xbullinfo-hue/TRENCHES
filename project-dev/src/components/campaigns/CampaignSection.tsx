@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { CampaignCard } from './CampaignCard';
 import { Gift, RefreshCw, Sparkles } from 'lucide-react';
 
@@ -129,18 +130,18 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-xl bg-surface border border-border-default p-5 space-y-4 animate-pulse min-h-[320px]"
+              className="rounded-xl bg-surface border border-border-default p-5 space-y-4 min-h-[320px]"
             >
               <div className="flex justify-between items-center">
-                <div className="w-24 h-5 rounded-md bg-surface-card" />
-                <div className="w-16 h-5 rounded-md bg-surface-card" />
+                <Skeleton className="w-24 h-5 rounded-md" />
+                <Skeleton className="w-16 h-5 rounded-md" />
               </div>
               <div className="space-y-2">
-                <div className="w-3/4 h-5 rounded-md bg-surface-card" />
-                <div className="w-full h-12 rounded-md bg-surface-card" />
+                <Skeleton className="w-3/4 h-5 rounded-md" />
+                <Skeleton className="w-full h-12 rounded-md" />
               </div>
-              <div className="w-full h-10 rounded-lg bg-surface-card" />
-              <div className="w-full h-20 rounded-lg bg-surface-card" />
+              <Skeleton className="w-full h-10 rounded-lg" />
+              <Skeleton className="w-full h-20 rounded-lg" />
             </div>
           ))}
         </div>

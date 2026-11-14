@@ -1,10 +1,11 @@
 import React from 'react';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export function StakePointCardSkeleton() {
   return (
     <div
       data-testid="stakepoint-skeleton"
-      className="rounded-xl bg-surface border border-line p-5 sm:p-6 flex flex-col justify-between h-full animate-pulse"
+      className="rounded-xl bg-surface border border-line p-5 sm:p-6 flex flex-col justify-between h-full"
       aria-busy="true"
       aria-label="Loading staking data"
     >
@@ -19,30 +20,30 @@ export function StakePointCardSkeleton() {
 
         {/* APR Hero Box */}
         <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2">
-          <div className="h-3 w-12 bg-surface rounded" />
-          <div className="h-9 w-28 bg-surface rounded" />
+          <Skeleton className="h-3 w-12" />
+          <Skeleton className="h-9 w-28" />
         </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-3 pt-1">
           <div className="space-y-1.5">
-            <div className="h-2.5 w-10 bg-surface-card rounded" />
-            <div className="h-4 w-16 bg-surface-card rounded" />
+            <Skeleton className="h-2.5 w-10" />
+            <Skeleton className="h-4 w-16" />
           </div>
           <div className="space-y-1.5">
-            <div className="h-2.5 w-16 bg-surface-card rounded" />
-            <div className="h-4 w-14 bg-surface-card rounded" />
+            <Skeleton className="h-2.5 w-16" />
+            <Skeleton className="h-4 w-14" />
           </div>
           <div className="space-y-1.5">
-            <div className="h-2.5 w-12 bg-surface-card rounded" />
-            <div className="h-4 w-12 bg-surface-card rounded" />
+            <Skeleton className="h-2.5 w-12" />
+            <Skeleton className="h-4 w-12" />
           </div>
         </div>
       </div>
 
       {/* Button */}
       <div className="pt-5 mt-auto">
-        <div className="h-11 w-full sm:w-48 bg-surface-card rounded-lg" />
+        <Skeleton className="h-11 w-full sm:w-48 rounded-lg" />
       </div>
     </div>
   );
