@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
+import { Button } from '@/components/ui/Button';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { ArrowUpRight, LogOut, Search, Send, Sparkles, Target, Wallet, X } from 'lucide-react';
@@ -54,18 +55,19 @@ export const TerminalHeader: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search calls (token, CA, chain)..."
-              className="w-full h-10 pl-9 pr-8 rounded-lg bg-surface border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none font-sans"
+              className="w-full h-10 pl-9 pr-8 rounded-lg bg-surface border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
             />
             {searchQuery && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1 h-auto"
                 title="Clear search"
                 aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             )}
           </div>
 
@@ -107,10 +109,11 @@ export const TerminalHeader: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           {connected ? (
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={switchWallet}
-                className="h-10 px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic font-mono text-xs text-white flex items-center gap-2 transition-colors tnum cursor-pointer"
+                className="font-mono text-xs text-white flex items-center gap-2 tnum"
                 title="Switch Solana Wallet"
                 aria-label="Switch Solana Wallet"
               >
@@ -127,27 +130,29 @@ export const TerminalHeader: React.FC = () => {
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-bold bg-surface-card border border-border-default uppercase text-muted">
                   {tier.id === 'PRO' ? 'PRO' : tier.id === 'LAB_MEMBER' ? 'MEMBER' : 'FREE'}
                 </span>
-              </button>
+              </Button>
 
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleDisconnect}
-                className="h-10 w-10 rounded-lg bg-surface hover:bg-surface-card border border-border-default text-muted hover:text-danger flex items-center justify-center transition-colors cursor-pointer"
+                className="h-10 w-10 p-0 border border-border-default text-muted hover:text-danger"
                 title="Disconnect Wallet"
                 aria-label="Disconnect Wallet"
               >
                 <LogOut className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="md"
               onClick={connectWallet}
-              className="h-10 sm:h-11 px-4 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+              className="h-10 sm:h-11 px-4 sm:px-6 text-xs sm:text-sm font-black uppercase tracking-wide gap-2 shrink-0"
             >
               <Wallet className="w-4 h-4 stroke-[2.5]" />
               <span>CONNECT</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -161,17 +166,18 @@ export const TerminalHeader: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search calls (token, CA, chain)..."
-            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-card border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none font-sans"
+            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-card border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
           />
           {searchQuery && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1 h-auto"
               aria-label="Clear search"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           )}
         </div>
         <Link
