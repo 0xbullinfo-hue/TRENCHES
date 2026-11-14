@@ -4,7 +4,7 @@
 [![Solana](https://img.shields.io/badge/Solana-Mainnet--Beta-9945FF?style=flat&logo=solana)](https://solana.com/)
 [![Staking](https://img.shields.io/badge/Staking-StakePoint-00FF66?style=flat)](https://stakepoint.app/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-Passing%20(21%2F21)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-Passing%20(295%2F295)-brightgreen.svg)](tests/)
 
 **TrenchLabsHQ** is a high-performance, token-gated terminal and automated signal telemetry system built for **$H42** holders on Solana. It provides real-time multi-chain alpha calls, verifiable closed-trade P&L ledgers, 90-day **StakePoint** staking, live StakePoint pool telemetry, and automated multi-tier Telegram community management.
 
