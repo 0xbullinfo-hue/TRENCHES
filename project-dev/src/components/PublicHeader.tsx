@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
+import { Button } from '@/components/ui/Button';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { ArrowUpRight, LogOut, Menu, Send, Wallet, X } from 'lucide-react';
 
@@ -296,51 +297,55 @@ export const PublicHeader: React.FC = () => {
               <span className="xl:hidden">{shortAddress}</span>
             </Link>
           ) : enableWalletConnect ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="md"
               onClick={connectWallet}
-              className="h-9 sm:h-11 px-3 sm:px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0"
+              className="h-9 sm:h-11 px-3 sm:px-6 text-xs sm:text-sm font-black uppercase tracking-wide gap-1.5 sm:gap-2 shrink-0"
               title="Connect Solana Wallet"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               <span>CONNECT</span>
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               disabled
               aria-disabled="true"
               title="Wallet connection coming soon"
-              className="h-9 sm:h-11 px-2.5 sm:px-4 rounded-lg bg-surface border border-toxic-border/60 text-muted font-sans text-[11px] sm:text-xs font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
+              className="h-9 sm:h-11 px-2.5 sm:px-4 bg-surface border border-toxic-border/60 text-muted font-sans text-[11px] sm:text-xs font-black uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 cursor-not-allowed opacity-75 select-none shrink-0"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-muted shrink-0" />
               <span className="hidden md:inline">CONNECT WALLET · LIVE SOON</span>
               <span className="md:hidden">LIVE SOON</span>
-            </button>
+            </Button>
           )}
 
           {connected && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleDisconnect}
-              className="h-9 w-9 sm:h-11 sm:w-11 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border text-muted hover:text-danger flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="h-9 w-9 sm:h-11 sm:w-11 p-0 border border-toxic-border text-muted hover:text-danger shrink-0"
               title="Disconnect Wallet"
               aria-label="Disconnect Wallet"
             >
               <LogOut className="w-4 h-4" />
-            </button>
+            </Button>
           )}
 
           {/* Mobile Navigation Toggle Button */}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden h-10 w-10 sm:h-11 sm:w-11 min-h-[44px] min-w-[44px] rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white flex items-center justify-center transition-colors shrink-0"
+            className="lg:hidden h-10 w-10 sm:h-11 sm:w-11 min-h-[44px] min-w-[44px] p-0 text-white shrink-0"
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
           >
             {mobileMenuOpen ? <X className="w-5 h-5 text-toxic" /> : <Menu className="w-5 h-5" />}
-          </button>
+          </Button>
         </div>
       </div>
 
