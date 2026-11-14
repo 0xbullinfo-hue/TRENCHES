@@ -4,6 +4,9 @@ const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      screens: {
+        xs: "480px",
+      },
       colors: {
         // Base canvas & surfaces
         canvas: "#0A0E13", // Main background
@@ -74,14 +77,18 @@ const config: Config = {
         border: {
           DEFAULT: "#252D38",
           default: "#252D38",
+          hover: "#34404F",
         },
         line: "#252D38",
         ink: "#F8FAFC",
         muted: "#848E9C",
         dim: "#8E9BAE",
         amber: "#F59E0B",
-        idle: "#6B7280",
-        danger: "#F6465D",
+        idle: "#7C8594",
+        danger: {
+          DEFAULT: "#F6465D",
+          solid: "#B42338",
+        },
       },
       boxShadow: {
         none: "none",
@@ -119,15 +126,6 @@ const config: Config = {
         "2xs": ["10px", { lineHeight: "14px" }],
         xs: ["11px", { lineHeight: "16px" }],
         sm: ["13px", { lineHeight: "20px" }],
-      },
-      keyframes: {
-        marquee: {
-          from: { transform: "translateX(0)" },
-          to: { transform: "translateX(-50%)" },
-        },
-      },
-      animation: {
-        marquee: "marquee 60s linear infinite",
       },
     },
   },
