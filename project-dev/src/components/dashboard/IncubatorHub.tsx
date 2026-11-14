@@ -6,6 +6,7 @@ import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import {
   MembershipRestrictionScreen,
   type UserMembershipTier,
@@ -1364,12 +1365,12 @@ export const IncubatorHub: React.FC = () => {
                     {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className="rounded-xl bg-surface border border-border-default p-4 space-y-3 animate-pulse"
+                        className="rounded-xl bg-surface border border-border-default p-4 space-y-3"
                       >
-                        <div className="w-full h-12 bg-surface-card rounded-md" />
-                        <div className="h-4 bg-surface-card rounded w-3/4" />
-                        <div className="h-3 bg-surface-card rounded w-1/2" />
-                        <div className="h-10 bg-surface-card rounded w-full" />
+                        <Skeleton className="w-full h-12 rounded-md" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                        <Skeleton className="h-10 w-full" />
                       </div>
                     ))}
                   </div>

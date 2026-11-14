@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ArrowUpRight, CheckCircle2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import type { PerformanceCalculationResult } from '@/lib/ledger/performance-stats';
 
@@ -114,12 +115,12 @@ export const PerformanceTrustSection: React.FC = () => {
           </div>
         ) : loading ? (
           /* State 2: Loading Skeleton */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="p-5 rounded-xl bg-surface border border-border-default space-y-3 min-h-[120px]">
-                <div className="h-3 w-28 bg-surface-card rounded" />
-                <div className="h-8 w-16 bg-surface-card rounded" />
-                <div className="h-3 w-36 bg-surface-card rounded" />
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-36" />
               </div>
             ))}
           </div>

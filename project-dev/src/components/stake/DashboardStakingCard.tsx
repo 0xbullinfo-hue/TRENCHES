@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
 import { ArrowUpRight, Check, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
@@ -127,9 +128,9 @@ function StakePointLiveSection({
 }) {
   if (loading) {
     return (
-      <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-2 animate-pulse">
-        <div className="h-3 w-28 bg-surface rounded" />
-        <div className="h-7 w-24 bg-surface rounded" />
+      <div className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-2">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-7 w-24" />
       </div>
     );
   }
@@ -184,9 +185,8 @@ function StakePointLiveSection({
       </div>
 
       <div
-        className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${
-          aprIsPositive ? 'text-toxic' : 'text-muted'
-        }`}
+        className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${aprIsPositive ? 'text-toxic' : 'text-muted'
+          }`}
       >
         {aprValue !== null ? `${aprValue.toFixed(1)}%` : '0.0%'}
       </div>
