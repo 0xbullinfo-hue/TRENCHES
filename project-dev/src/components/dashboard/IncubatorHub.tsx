@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
   MembershipRestrictionScreen,
   type UserMembershipTier,
@@ -1373,34 +1374,11 @@ export const IncubatorHub: React.FC = () => {
                     ))}
                   </div>
                 ) : filteredTokens.length === 0 ? (
-                  <div className="rounded-xl bg-surface border border-border-default p-10 text-center space-y-3">
-                    <div className="w-10 h-10 rounded-full bg-surface-card border border-border-default mx-auto flex items-center justify-center text-muted">
-                      <Search className="w-4 h-4" />
-                    </div>
-                    <h3 className="font-sans text-base font-bold text-white">
-                      {currentTab === 'ALPHA'
-                        ? 'No Alpha Calls Found'
-                        : currentTab === 'WATCHLIST'
-                        ? 'No Watchlist Projects Found'
-                        : 'No Max Alpha Calls Found'}
-                    </h3>
-                    <p className="font-sans text-xs text-muted max-w-sm mx-auto">
-                      {currentTab === 'ALPHA'
-                        ? 'No active Alpha trade calls match your active filter or search query. Try switching blockchains or reset filters.'
-                        : currentTab === 'WATCHLIST'
-                        ? 'No curated Watchlist research projects match your active filter. Check back shortly for new team research.'
-                        : 'No premium Max Alpha calls currently match your active filter.'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={resetFilters}
-                      className="px-4 py-2 rounded-lg bg-surface-card hover:bg-surface-3 border-border-default text-xs font-mono font-bold text-toxic cursor-pointer"
-                    >
-                      Reset All Filters
-                    </Button>
-                  </div>
+                  <EmptyState
+                    message="No calls match these filters."
+                    actionLabel="Clear filters"
+                    onAction={resetFilters}
+                  />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
                     {filteredTokens.map(renderAlphaCard)}
