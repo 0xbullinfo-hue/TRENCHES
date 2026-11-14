@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 import { BUY_LINKS } from '@/lib/config';
 import {
   ArrowUpRight,
@@ -83,10 +84,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onCopyGenesisCa}
-              className="h-10 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic font-sans text-xs font-bold text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 gap-1.5"
               title="Copy $H42 token contract address"
             >
               {copiedGenesisCa ? (
@@ -95,7 +97,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <Copy className="w-3.5 h-3.5 text-toxic" />
               )}
               <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $H42 CA'}</span>
-            </button>
+            </Button>
 
             <a
               href={BUY_LINKS.pump}
@@ -158,13 +160,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
         {/* 3. Interactive Activity Summary (Section 7.2) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 border-t border-border-default font-mono text-xs">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               onSelectTab?.('ALPHA');
               onSelectFilter?.('all');
             }}
-            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-alpha-primary"
+            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
             title="View all active Alpha Calls"
           >
             <div className="space-y-0.5">
@@ -172,15 +175,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="text-base font-black text-white tnum">{alphasCount}</div>
             </div>
             <Target className="w-4 h-4 text-alpha-primary" />
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               onSelectTab?.('ALPHA');
               onSelectFilter?.('new');
             }}
-            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-toxic flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-toxic"
+            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-toxic flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
             title="Filter by new Alpha Calls"
           >
             <div className="space-y-0.5">
@@ -188,16 +192,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="text-base font-black text-toxic tnum">{newCallsCount}</div>
             </div>
             <Sparkles className="w-4 h-4 text-toxic" />
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               onSelectTab?.('SOCIAL');
               const raidsEl = document.getElementById('raids-section');
               if (raidsEl) raidsEl.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-raid-primary"
+            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
             title="Jump to Social Raids section"
           >
             <div className="space-y-0.5">
@@ -205,15 +210,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="text-base font-black text-raid-primary tnum">{raidsCount}</div>
             </div>
             <Gift className="w-4 h-4 text-raid-primary" />
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               onSelectTab?.('WATCHLIST');
               onSelectFilter?.('watchlist');
             }}
-            className="p-3 rounded-lg bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-amber"
+            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
             title="View Watchlist projects"
           >
             <div className="space-y-0.5">
@@ -221,7 +227,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
             </div>
             <Star className="w-4 h-4 text-amber" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>
