@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
 import { LedgerTableRow, LedgerCardData } from './LedgerCard';
 import { LedgerCardSkeleton } from './LedgerCardSkeleton';
 import { LEDGER_CHAINS } from '@/lib/ledger/format';
@@ -113,30 +114,32 @@ export function LedgerGrid({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-toxic-border/30">
         {/* Chain Filter Pills */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant={currentChain === 'all' ? 'primary' : 'secondary'}
+            size="sm"
             onClick={() => handleFilterChain('all')}
-            className={`h-8 px-3 rounded-lg font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+            className={`font-sans text-xs font-bold uppercase tracking-wider ${
               currentChain === 'all'
-                ? 'bg-toxic text-canvas font-black shadow-none'
-                : 'bg-surface border border-border-default text-muted hover:text-white hover:border-toxic'
+                ? 'shadow-none'
+                : 'text-muted hover:text-white'
             }`}
           >
             All
-          </button>
+          </Button>
           {LEDGER_CHAINS.map((c) => (
-            <button
+            <Button
               key={c.value}
-              type="button"
+              variant={currentChain === c.value ? 'primary' : 'secondary'}
+              size="sm"
               onClick={() => handleFilterChain(c.value)}
-              className={`h-8 px-3 rounded-lg font-sans text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              className={`font-sans text-xs font-bold uppercase tracking-wider ${
                 currentChain === c.value
-                  ? 'bg-toxic text-canvas font-black shadow-none'
-                  : 'bg-surface border border-border-default text-muted hover:text-white hover:border-toxic'
+                  ? 'shadow-none'
+                  : 'text-muted hover:text-white'
               }`}
             >
               {c.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -168,14 +171,15 @@ export function LedgerGrid({
       {error && (
         <div className="p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center justify-between">
           <span>{error}</span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => fetchLedger(currentChain, currentSort, 0, false)}
-            className="inline-flex items-center gap-1 font-bold text-rose-300 hover:text-white underline cursor-pointer"
+            className="h-auto p-0 inline-flex items-center gap-1 font-bold text-rose-300 hover:text-white underline"
           >
             <RefreshCw className="w-3 h-3" />
             <span>Retry</span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -220,21 +224,16 @@ export function LedgerGrid({
       {/* Load More Button (Only on full /ledger page) */}
       {!isDashboardEmbed && hasMore && (
         <div className="pt-6 text-center">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="md"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="h-11 px-8 rounded-lg bg-surface hover:bg-surface-elevated border border-toxic-border hover:border-toxic text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            loading={loadingMore}
+            className="h-11 px-8 text-white font-sans text-xs font-bold uppercase tracking-wider gap-2 disabled:opacity-50"
           >
-            {loadingMore ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-toxic" />
-                <span>Loading more...</span>
-              </>
-            ) : (
-              <span>Load more ({total - entries.length} remaining)</span>
-            )}
-          </button>
+            <span>Load more ({total - entries.length} remaining)</span>
+          </Button>
         </div>
       )}
 
