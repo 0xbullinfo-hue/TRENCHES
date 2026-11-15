@@ -4,7 +4,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CampaignCard } from './CampaignCard';
-import { Gift, RefreshCw, Sparkles } from 'lucide-react';
+import {
+  SocialInitiationCard,
+  INITIATION_STORAGE_KEY,
+  type InitiationRecord,
+} from './SocialInitiationCard';
+import { Gift, Lock, RefreshCw, Sparkles } from 'lucide-react';
 
 interface CampaignSectionProps {
   userWallet?: string | null;
@@ -27,6 +32,28 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
 }) => {
   const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
+  const [initiationRecord, setInitiationRecord] = useState<InitiationRecord | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(INITIATION_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as InitiationRecord;
+      return parsed && parsed.completed ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isInitiationCompleted = Boolean(initiationRecord?.completed);
+
+  const handleCompleteInitiation = useCallback((record: InitiationRecord) => {
+    setInitiationRecord(record);
+    try {
+      window.localStorage.setItem(INITIATION_STORAGE_KEY, JSON.stringify(record));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, []);
 
   const isControlled = externalCampaigns !== undefined;
   const campaigns = isControlled ? externalCampaigns : internalCampaigns;
@@ -103,6 +130,14 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
 
   return (
     <div className="space-y-4 pt-2">
+      {/* Permanent Mandatory Initiation Card (Required before live social cards activate) */}
+      <SocialInitiationCard
+        userWallet={userWallet}
+        isCompleted={isInitiationCompleted}
+        completedRecord={initiationRecord}
+        onComplete={handleCompleteInitiation}
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="px-3 py-1 rounded-md bg-raid-bg border border-raid-border text-raid-text font-mono text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none">
@@ -157,16 +192,48 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-          {campaigns.map((c) => (
-            <CampaignCard
-              key={c.id}
-              campaign={c}
-              userWallet={userWallet}
-              isAdmin={isAdmin}
-              onTogglePin={onTogglePin}
-              onSubmissionSuccess={handleInternalSubmissionSuccess}
-            />
-          ))}
+          {campaigns.map((c) =>
+            isInitiationCompleted ? (
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                userWallet={userWallet}
+                isAdmin={isAdmin}
+                onTogglePin={onTogglePin}
+                onSubmissionSuccess={handleInternalSubmissionSuccess}
+              />
+            ) : (
+              <div
+                key={c.id}
+                data-testid="locked-social-card-gate"
+                className="relative rounded-xl overflow-hidden h-full"
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none select-none opacity-35 blur-[1.5px] h-full"
+                >
+                  <CampaignCard
+                    campaign={c}
+                    userWallet={userWallet}
+                    isAdmin={isAdmin}
+                    onTogglePin={onTogglePin}
+                    onSubmissionSuccess={handleInternalSubmissionSuccess}
+                  />
+                </div>
+                <div className="absolute inset-0 bg-canvas/75 flex flex-col items-center justify-center p-6 text-center rounded-xl border border-raid-border space-y-2.5">
+                  <div className="w-10 h-10 rounded-lg bg-raid-bg border border-raid-border flex items-center justify-center text-raid-primary">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-sans text-sm font-extrabold uppercase text-white tracking-tight">
+                    Complete Assistant Initiation First
+                  </h4>
+                  <p className="font-sans text-xs text-muted max-w-xs leading-relaxed">
+                    Carry out the permanent Official TrenchLabs Assistant share task above to activate this live social card.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
