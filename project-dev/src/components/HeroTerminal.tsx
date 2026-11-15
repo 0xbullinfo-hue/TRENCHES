@@ -143,8 +143,8 @@ export const HeroTerminal: React.FC = () => {
           <div className="lg:col-span-6 flex items-center justify-center w-full min-w-0">
             <div className="relative w-full max-w-[320px] xs:max-w-[380px] sm:max-w-[460px] lg:max-w-none flex items-center justify-center">
               <Image
-                src="/images/trenchlabs-hero-removebg.png"
-                alt="TrenchLabs Mascot"
+                src="/images/trenchlabs-hero.webp"
+                alt=""
                 width={620}
                 height={620}
                 priority
