@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Send, ShieldCheck, Zap } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
@@ -125,7 +125,7 @@ export const HeroTerminal: React.FC = () => {
                   rel="noreferrer"
                   className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <span className="text-brand">⚡</span>
+                  <Zap className="w-4 h-4 text-brand shrink-0" />
                   <span>VIEW $H42</span>
                   <ArrowUpRight className="w-4 h-4 text-brand stroke-[2]" />
                 </a>
