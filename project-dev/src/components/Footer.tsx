@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS, SOLSCAN } from '@/lib/config';
+import { BUY_LINKS, BUY_LOCK, GENESIS_MINT, SOCIAL_LINKS, SOLSCAN } from '@/lib/config';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { ArrowUp, ArrowUpRight } from 'lucide-react';
 
@@ -121,15 +121,25 @@ export const Footer: React.FC = () => {
             </div>
             <ul className="space-y-2">
               <li>
-                <a
-                  href={BUY_LINKS.pump}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
-                >
-                  <span>Buy on Pump.fun</span>
-                  <ArrowUpRight className="w-3 h-3 text-brand" />
-                </a>
+                {BUY_LOCK ? (
+                  <span
+                    className="inline-flex items-center gap-1 text-muted cursor-not-allowed"
+                    aria-disabled="true"
+                    title="Available soon"
+                  >
+                    Buy on Pump.fun<span className="sr-only"> (available soon)</span>
+                  </span>
+                ) : (
+                  <a
+                    href={BUY_LINKS.pump}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-brand transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>Buy on Pump.fun</span>
+                    <ArrowUpRight className="w-3 h-3 text-brand" />
+                  </a>
+                )}
               </li>
               <li>
                 <a

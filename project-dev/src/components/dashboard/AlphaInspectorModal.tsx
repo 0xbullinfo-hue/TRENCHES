@@ -5,11 +5,13 @@ import type { AlphaItem } from '@/lib/types';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { cn } from '@/components/ui/cn';
 import { MarketDataBadge } from './MarketDataBadge';
 import {
   ADMIN_WALLET_SHORT,
   BUY_LINKS,
+  BUY_LOCK,
   CHAIN_METADATA,
   GENESIS_MINT,
   SOLSCAN,
@@ -514,15 +516,21 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line">
-                <a
-                  href={BUY_LINKS.pump}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="h-9 px-4 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
-                >
-                  <span>Buy $H42 on Pump.fun</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                {BUY_LOCK ? (
+                  <LaunchLockedButton className="h-9 px-4 rounded-md font-sans text-xs font-extrabold inline-flex items-center gap-1.5">
+                    <span>Buy $H42 on Pump.fun</span>
+                  </LaunchLockedButton>
+                ) : (
+                  <a
+                    href={BUY_LINKS.pump}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-9 px-4 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
+                  >
+                    <span>Buy $H42 on Pump.fun</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
 
                 {demoEnabled && (
                   <Button

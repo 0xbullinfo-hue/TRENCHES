@@ -3,8 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { BUY_LINKS, GENESIS_MINT, SOLSCAN } from '@/lib/config';
+import { BUY_LINKS, BUY_LOCK, GENESIS_MINT, SOLSCAN } from '@/lib/config';
 import {
   Check,
   Copy,
@@ -272,15 +273,21 @@ export const LockedTerminal: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <a
-              href={BUY_LINKS.pump}
-              target="_blank"
-              rel="noreferrer"
-              className="h-12 min-h-[44px] px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>Buy $H42 on Pump.fun</span>
-              <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
-            </a>
+            {BUY_LOCK ? (
+              <LaunchLockedButton className="h-12 min-h-[44px] px-5 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2">
+                <span>Buy $H42 on Pump.fun</span>
+              </LaunchLockedButton>
+            ) : (
+              <a
+                href={BUY_LINKS.pump}
+                target="_blank"
+                rel="noreferrer"
+                className="h-12 min-h-[44px] px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <span>Buy $H42 on Pump.fun</span>
+                <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+              </a>
+            )}
 
             <Link
               href="/dashboard/stake"

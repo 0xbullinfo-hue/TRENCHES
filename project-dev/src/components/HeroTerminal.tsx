@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { BUY_LINKS, SOCIAL_LINKS } from '@/lib/config';
-import { ArrowUpRight, Send, ShieldCheck, Zap } from 'lucide-react';
+import { BUY_LINKS, BUY_LOCK, SOCIAL_LINKS } from '@/lib/config';
+import { LaunchLockedButton } from '@/components/LaunchLockedButton';
+import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
@@ -97,7 +98,7 @@ export const HeroTerminal: React.FC = () => {
                   className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 fill-current" />
-                  <span>Get Early Access</span>
+                  <span>JOIN THE SOFT LAUNCH</span>
                   <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
                 </a>
                 <p className="font-sans text-xs text-muted text-center pt-2">
@@ -117,16 +118,23 @@ export const HeroTerminal: React.FC = () => {
                   <span>FOLLOW ON X</span>
                 </a>
 
-                <a
-                  href={BUY_LINKS.pump}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Zap className="w-4 h-4 text-brand shrink-0" />
-                  <span>VIEW $H42</span>
-                  <ArrowUpRight className="w-4 h-4 text-brand stroke-[2]" />
-                </a>
+                {BUY_LOCK ? (
+                  <LaunchLockedButton className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2">
+                    <span className="text-muted">⚡</span>
+                    <span>VIEW $H42</span>
+                  </LaunchLockedButton>
+                ) : (
+                  <a
+                    href={BUY_LINKS.pump}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="text-brand">⚡</span>
+                    <span>VIEW $H42</span>
+                    <ArrowUpRight className="w-4 h-4 text-brand stroke-[2]" />
+                  </a>
+                )}
               </div>
             </div>
           </div>

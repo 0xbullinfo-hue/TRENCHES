@@ -3,7 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { BUY_LINKS } from '@/lib/config';
+import { LaunchLockedButton } from '@/components/LaunchLockedButton';
+import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
 import {
   ArrowUpRight,
   Check,
@@ -105,15 +106,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $H42 CA'}</span>
             </Button>
 
-            <a
-              href={BUY_LINKS.pump}
-              target="_blank"
-              rel="noreferrer"
-              className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>Buy $H42</span>
-              <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-            </a>
+            {BUY_LOCK ? (
+              <LaunchLockedButton className="h-10 px-4 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center gap-1.5">
+                <span>Buy $H42</span>
+              </LaunchLockedButton>
+            ) : (
+              <a
+                href={BUY_LINKS.pump}
+                target="_blank"
+                rel="noreferrer"
+                className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Buy $H42</span>
+                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </a>
+            )}
           </div>
         </div>
 

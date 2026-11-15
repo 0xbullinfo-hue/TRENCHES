@@ -4,7 +4,8 @@ import { SignalDelayComparison } from './SignalDelayComparison';
 import { MarketDataBadge } from '@/components/dashboard/MarketDataBadge';
 import { toGenesisProvenanceItem } from '@/lib/stake/provenance';
 import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
-import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
+import { BUY_LINKS, BUY_LOCK, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
+import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import {
   ArrowUpRight,
   Check,
@@ -200,15 +201,21 @@ export async function TierSection() {
 
               {/* Action Buttons */}
               <div className="pt-2 space-y-3">
-                <a
-                  href={BUY_LINKS.pump}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full h-12 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
-                >
-                  <span>BUY $H42 ON PUMP.FUN</span>
-                  <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-                </a>
+                {BUY_LOCK ? (
+                  <LaunchLockedButton className="w-full h-12 px-6 rounded-lg font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2">
+                    <span>BUY $H42 ON PUMP.FUN</span>
+                  </LaunchLockedButton>
+                ) : (
+                  <a
+                    href={BUY_LINKS.pump}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full h-12 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                  >
+                    <span>BUY $H42 ON PUMP.FUN</span>
+                    <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                  </a>
+                )}
 
                 <a
                   href={communityUrl || SOCIAL_LINKS.telegram}
