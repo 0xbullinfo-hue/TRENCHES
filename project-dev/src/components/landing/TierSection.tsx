@@ -1,5 +1,6 @@
 import React from 'react';
 import { TierCard } from './TierCard';
+import { SignalDelayComparison } from './SignalDelayComparison';
 import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
 import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
 import {
@@ -367,6 +368,9 @@ export async function TierSection() {
             ))}
           </div>
         </div>
+
+        {/* Signal-Delay Cost Comparison Panel (Instruction 38) */}
+        <SignalDelayComparison />
 
         {/* Footnote */}
         {showFootnote && recalculatedAt && (
