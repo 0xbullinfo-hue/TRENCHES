@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { Button, getButtonClass } from '@/components/ui/Button';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { TierCardProps } from './TierCard.types';
 
 export function TierCard({
@@ -95,23 +96,20 @@ export function TierCard({
             CONNECT WALLET
           </Button>
         ) : ctaDisabled ? (
-          <div className="relative group" data-target-href={ctaHref}>
-            <Button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title={ctaTooltip || 'Available at launch'}
-              variant="secondary"
-              size="md"
-              className="w-full text-muted uppercase font-black tracking-wide cursor-not-allowed"
-            >
-              {ctaLabel.toUpperCase()}
-            </Button>
-            {ctaTooltip && (
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-[11px] text-white uppercase bg-surface-card border border-border-default rounded-md shadow-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                {ctaTooltip}
-              </span>
-            )}
+          <div data-target-href={ctaHref}>
+            <Tooltip content={ctaTooltip}>
+              <Button
+                type="button"
+                disabled
+                aria-disabled="true"
+                title={ctaTooltip || 'Available at launch'}
+                variant="secondary"
+                size="md"
+                className="w-full text-muted uppercase font-black tracking-wide cursor-not-allowed"
+              >
+                {ctaLabel.toUpperCase()}
+              </Button>
+            </Tooltip>
           </div>
         ) : isExternal ? (
           <a
