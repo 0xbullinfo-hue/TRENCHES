@@ -75,7 +75,7 @@ export function TelegramStatusBanner() {
       : '📱 Connect to Telegram — join the Member community.';
 
   return (
-    <div className="w-full bg-[#0d161d] border-b border-toxic-border/60 px-4 py-3 sm:px-6">
+    <div className="w-full bg-[#0d161d] border-b border-brand-border/60 px-4 py-3 sm:px-6">
       <div className="max-w-[1360px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         {/* Left Copy */}
         <div className="flex items-center gap-2">

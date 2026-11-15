@@ -18,7 +18,7 @@ export const Chip: React.FC<ChipProps> = ({
       className={cn(
         'inline-flex h-7 items-center rounded-md border px-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.06em] transition-colors duration-150 select-none shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         active
-          ? 'border-brand bg-toxic-bg text-brand hover:text-brand-hover'
+          ? 'border-brand bg-brand-bg text-brand hover:text-brand-hover'
           : 'border-border-default bg-surface-card text-muted hover:text-ink',
         className
       )}

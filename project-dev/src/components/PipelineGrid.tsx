@@ -125,12 +125,12 @@ export const PipelineGrid: React.FC = () => {
   };
 
   return (
-    <section id="pipeline-section" className="border-b border-toxic-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
+    <section id="pipeline-section" className="border-b border-brand-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-toxic-border">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-brand-border">
           <div>
-            <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
+            <span className="font-sans text-xs font-bold uppercase tracking-widest text-brand">
               PROVEN TRACK RECORD
             </span>
             <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
@@ -143,9 +143,9 @@ export const PipelineGrid: React.FC = () => {
 
           <Link
             href="/ledger"
-            className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-toxic text-white hover:text-toxic font-sans text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
+            className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
           >
-            <ShieldCheck className="w-4 h-4 text-toxic" />
+            <ShieldCheck className="w-4 h-4 text-brand" />
             <span>VIEW FULL PERFORMANCE LEDGER</span>
             <ArrowUpRight className="w-4 h-4" />
           </Link>
@@ -160,7 +160,7 @@ export const PipelineGrid: React.FC = () => {
             return (
               <article
                 key={token.id}
-                className="rounded-xl bg-surface border border-border-default hover:border-toxic transition-all duration-150 flex flex-col justify-between overflow-hidden group shadow-none"
+                className="rounded-xl bg-surface border border-border-default hover:border-brand transition-all duration-150 flex flex-col justify-between overflow-hidden group shadow-none"
               >
                 <div>
                   {/* Top Header Strip: Chain + Original Call Date */}
@@ -168,7 +168,7 @@ export const PipelineGrid: React.FC = () => {
                     <span className="text-muted font-mono text-[11px]">
                       Call: {token.callDate}
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-toxic-bg border border-toxic-border text-toxic font-mono text-xs font-bold">
+                    <span className="px-2 py-0.5 rounded bg-brand-bg border border-brand-border text-brand font-mono text-xs font-bold">
                       {token.chain}
                     </span>
                   </div>
@@ -189,7 +189,7 @@ export const PipelineGrid: React.FC = () => {
                           <h3 className="font-sans text-base sm:text-lg font-extrabold text-white leading-tight">
                             {token.name}
                           </h3>
-                          <div className="font-mono text-sm text-toxic font-bold mt-0.5">
+                          <div className="font-mono text-sm text-brand font-bold mt-0.5">
                             {token.ticker}
                           </div>
                         </div>
@@ -197,11 +197,11 @@ export const PipelineGrid: React.FC = () => {
 
                       {/* Max Recorded Multiple */}
                       <div className="text-right shrink-0">
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-toxic text-canvas font-sans text-base font-black tnum">
+                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand text-canvas font-sans text-base font-black tnum">
                           <TrendingUp className="w-3.5 h-3.5 stroke-[3]" />
                           <span>{token.profitMultiple}</span>
                         </div>
-                        <div className="font-sans text-[10px] text-toxic font-bold uppercase mt-1 tracking-wider">
+                        <div className="font-sans text-[10px] text-brand font-bold uppercase mt-1 tracking-wider">
                           PEAK MULTIPLE
                         </div>
                       </div>
@@ -214,7 +214,7 @@ export const PipelineGrid: React.FC = () => {
                       <button
                         type="button"
                         onClick={(e) => handleCopyCa(token.contractAddress, e)}
-                        className="text-toxic hover:text-toxic-bright font-sans text-[11px] font-bold uppercase inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                        className="text-brand hover:text-brand-bright font-sans text-[11px] font-bold uppercase inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
                         title="Copy Contract Address"
                         aria-label={`Copy ${token.name} contract address`}
                       >
@@ -222,8 +222,8 @@ export const PipelineGrid: React.FC = () => {
                           <span className="text-danger font-bold">FAILED</span>
                         ) : isCopied ? (
                           <>
-                            <Check className="w-3 h-3 text-toxic-bright" />
-                            <span className="text-toxic-bright">COPIED</span>
+                            <Check className="w-3 h-3 text-brand-bright" />
+                            <span className="text-brand-bright">COPIED</span>
                           </>
                         ) : (
                           <>
@@ -235,7 +235,7 @@ export const PipelineGrid: React.FC = () => {
                     </div>
 
                     {/* Milestone notes */}
-                    <div className="text-[11px] font-mono text-toxic-bright font-semibold">
+                    <div className="text-[11px] font-mono text-brand-bright font-semibold">
                       {token.tpMilestones}
                     </div>
 
@@ -255,11 +255,11 @@ export const PipelineGrid: React.FC = () => {
                     </div>
                     <div className="px-3.5 py-2.5 flex items-center justify-between">
                       <span className="text-muted font-medium">PEAK MARKET CAP</span>
-                      <span className="text-toxic font-black tnum">{token.peakMc}</span>
+                      <span className="text-brand font-black tnum">{token.peakMc}</span>
                     </div>
                     <div className="px-3.5 py-2.5 flex items-center justify-between">
                       <span className="text-muted font-medium">MAX RECORDED MULTIPLE</span>
-                      <span className="text-toxic-bright font-extrabold tnum">
+                      <span className="text-brand-bright font-extrabold tnum">
                         {token.profitMultiple} ({token.netGain})
                       </span>
                     </div>
@@ -270,10 +270,10 @@ export const PipelineGrid: React.FC = () => {
                     href={token.dexUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic text-white font-sans text-xs font-extrabold uppercase inline-flex items-center justify-center gap-1.5 transition-colors"
+                    className="w-full h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-extrabold uppercase inline-flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <span>VIEW ON DEXSCREENER</span>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-brand" />
                   </a>
                 </div>
               </article>

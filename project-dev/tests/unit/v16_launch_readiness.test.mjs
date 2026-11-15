@@ -953,7 +953,7 @@ test('Branding [1/18]: The hero contains the exact approved paragraph', () => {
   const heroPath = path.join(ROOT_DIR, 'src/components/HeroTerminal.tsx');
   const content = fs.readFileSync(heroPath, 'utf8');
   assert.ok(
-    content.includes('TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-toxic-bright font-bold">$H42</span>) is your access key.'),
+    content.includes('TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key.'),
     'Hero paragraph must contain exact approved copy'
   );
   assert.ok(

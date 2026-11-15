@@ -26,14 +26,14 @@ export const MaintenanceScreen: React.FC = () => {
         <div className="flex items-center justify-center gap-3">
           <HexCubeLogo size={44} />
           <span className="font-sans font-extrabold text-2xl sm:text-3xl tracking-tight text-white">
-            Trench<span className="text-toxic">Labs</span>HQ
+            Trench<span className="text-brand">Labs</span>HQ
           </span>
         </div>
 
         {/* Maintenance Box */}
-        <div className="rounded bg-surface border border-toxic-border p-6 sm:p-8 space-y-5 shadow-none">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-mono text-xs font-bold uppercase tracking-wider">
-            <ShieldAlert className="w-4 h-4 text-toxic" />
+        <div className="rounded bg-surface border border-brand-border p-6 sm:p-8 space-y-5 shadow-none">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-brand-bg border border-brand-border text-brand font-mono text-xs font-bold uppercase tracking-wider">
+            <ShieldAlert className="w-4 h-4 text-brand" />
             <span>{MAINTENANCE_CONFIG.title}</span>
           </div>
 
@@ -45,18 +45,18 @@ export const MaintenanceScreen: React.FC = () => {
             {MAINTENANCE_CONFIG.message}
           </p>
 
-          <div className="pt-2 flex items-center justify-center gap-2 font-mono text-xs text-toxic">
-            <Clock className="w-3.5 h-3.5 text-toxic" />
+          <div className="pt-2 flex items-center justify-center gap-2 font-mono text-xs text-brand">
+            <Clock className="w-3.5 h-3.5 text-brand" />
             <span>ESTIMATED DURATION: {MAINTENANCE_CONFIG.estimatedDuration}</span>
           </div>
 
           {/* Social Update Channels */}
-          <div className="pt-3 border-t border-toxic-border/60 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="pt-3 border-t border-brand-border/60 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
               href={SOCIAL_LINKS.telegram}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
             >
               <Send className="w-4 h-4 stroke-[2.5]" />
               <span>LIVE TELEGRAM ALERTS</span>
@@ -67,9 +67,9 @@ export const MaintenanceScreen: React.FC = () => {
               href={SOCIAL_LINKS.x}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-toxic-border hover:border-toxic text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-brand-border hover:border-brand text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
             >
-              <XIcon className="w-4 h-4 text-toxic" />
+              <XIcon className="w-4 h-4 text-brand" />
               <span>UPDATES ON X</span>
             </a>
           </div>

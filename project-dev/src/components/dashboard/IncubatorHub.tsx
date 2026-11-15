@@ -675,16 +675,16 @@ export const IncubatorHub: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border border-toxic text-white font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none"
+          className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border border-brand text-white font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none"
         >
-          <Check className="w-4 h-4 text-toxic shrink-0" />
+          <Check className="w-4 h-4 text-brand shrink-0" />
           <span className="truncate max-w-md">{toastMessage}</span>
         </div>
       )}
 
       {/* 1. DISCLAIMER BANNER */}
       <div className="rounded-xl bg-surface border border-border-default p-3.5 sm:p-4 flex items-center gap-3">
-        <AlertTriangle className="w-4 h-4 text-toxic shrink-0" />
+        <AlertTriangle className="w-4 h-4 text-brand shrink-0" />
         <p className="font-sans text-xs text-muted leading-relaxed">
           <strong className="text-white uppercase tracking-wider mr-1.5">
             ALPHA CALLS DISCLAIMER:
@@ -695,17 +695,17 @@ export const IncubatorHub: React.FC = () => {
 
       {/* WALLET SIGNATURE / VERIFICATION BANNER */}
       {connected && (needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED') && (
-        <div className="rounded-xl bg-surface border-2 border-toxic p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
+        <div className="rounded-xl bg-surface border-2 border-brand p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
           <div className="flex items-start sm:items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-card border border-toxic flex items-center justify-center text-toxic shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-surface-card border border-brand flex items-center justify-center text-brand shrink-0">
               <KeyRound className="w-5 h-5" />
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-sans text-xs font-black uppercase text-toxic tracking-wide">
+                <span className="font-sans text-xs font-black uppercase text-brand tracking-wide">
                   CRYPTOGRAPHIC VERIFICATION REQUIRED
                 </span>
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-toxic/15 text-toxic border border-toxic/30 font-bold">
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 font-bold">
                   {verificationState === 'VERIFICATION_FAILED' ? 'SIGNATURE FAILED' : 'ACTION REQUIRED'}
                 </span>
               </div>
@@ -774,10 +774,10 @@ export const IncubatorHub: React.FC = () => {
 
       {/* 4. ADMIN COMMAND DESK (Authoritative Admin Only) */}
       {isAdmin && (
-        <div className="rounded-xl bg-surface border-2 border-toxic overflow-hidden">
+        <div className="rounded-xl bg-surface border-2 border-brand overflow-hidden">
           <div className="px-5 py-3.5 bg-surface-card border-b border-border-default flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="px-2.5 py-0.5 rounded bg-toxic text-canvas font-mono text-xs font-black uppercase">
+              <span className="px-2.5 py-0.5 rounded bg-brand text-canvas font-mono text-xs font-black uppercase">
                 MASTER ADMIN DESK
               </span>
               {adminDeskTab === 'CALLS' && (
@@ -786,7 +786,7 @@ export const IncubatorHub: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   onClick={() => setShowAdminForm(!showAdminForm)}
-                  className="font-sans font-bold text-toxic border-toxic hover:bg-surface-3"
+                  className="font-sans font-bold text-brand border-brand hover:bg-surface-3"
                 >
                   {showAdminForm ? 'Hide Post Form' : '+ Post New Alpha Call'}
                 </Button>
@@ -854,7 +854,7 @@ export const IncubatorHub: React.FC = () => {
                           value={formCa}
                           onChange={(e) => setFormCa(e.target.value)}
                           placeholder="Paste token contract address..."
-                          className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                          className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                           required
                         />
                         <Button
@@ -864,7 +864,7 @@ export const IncubatorHub: React.FC = () => {
                           onClick={() => handleAutoFillDexScreener()}
                           disabled={fetchingDex}
                           loading={fetchingDex}
-                          className="h-10 px-3 text-toxic hover:border-toxic shrink-0"
+                          className="h-10 px-3 text-brand hover:border-brand shrink-0"
                         >
                           {fetchingDex ? 'Fetching...' : 'Auto-fill'}
                         </Button>
@@ -880,7 +880,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
                         placeholder="e.g. Synapse Labs"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         required
                       />
                     </div>
@@ -894,7 +894,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formTicker}
                         onChange={(e) => setFormTicker(e.target.value)}
                         placeholder="e.g. $SYN"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         required
                       />
                     </div>
@@ -908,7 +908,7 @@ export const IncubatorHub: React.FC = () => {
                       <select
                         value={formChain}
                         onChange={(e) => setFormChain(e.target.value as Chain)}
-                        className="w-full h-10 px-2 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
+                        className="w-full h-10 px-2 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
                       >
                         {['SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'].map((c) => (
                           <option key={c} value={c}>{c}</option>
@@ -925,7 +925,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formEntryMc}
                         onChange={(e) => setFormEntryMc(e.target.value)}
                         placeholder="$250K"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -938,7 +938,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formCurrentMc}
                         onChange={(e) => setFormCurrentMc(e.target.value)}
                         placeholder="$250K"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -952,7 +952,7 @@ export const IncubatorHub: React.FC = () => {
                         max="5"
                         value={formRiskLevel}
                         onChange={(e) => setFormRiskLevel(Number(e.target.value))}
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -965,7 +965,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formStopLoss}
                         onChange={(e) => setFormStopLoss(e.target.value)}
                         placeholder="-25% SL"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
 
@@ -978,7 +978,7 @@ export const IncubatorHub: React.FC = () => {
                         value={formTakeProfits}
                         onChange={(e) => setFormTakeProfits(e.target.value)}
                         placeholder="2x, 5x, 10x"
-                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       />
                     </div>
                   </div>
@@ -992,7 +992,7 @@ export const IncubatorHub: React.FC = () => {
                       value={formSummary}
                       onChange={(e) => setFormSummary(e.target.value)}
                       placeholder="Solana AI infrastructure play with growing holder distribution..."
-                      className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-toxic font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     />
                   </div>
 
@@ -1078,9 +1078,9 @@ export const IncubatorHub: React.FC = () => {
                         type="checkbox"
                         checked={formPinned}
                         onChange={(e) => setFormPinned(e.target.checked)}
-                        className="w-4 h-4 rounded border-border-default text-toxic"
+                        className="w-4 h-4 rounded border-border-default text-brand"
                       />
-                      <Pin className="w-3.5 h-3.5 text-toxic" />
+                      <Pin className="w-3.5 h-3.5 text-brand" />
                       <span>Pin Priority to Top</span>
                     </label>
 
@@ -1107,7 +1107,7 @@ export const IncubatorHub: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-md bg-surface border border-border-default text-white font-mono text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none">
-              <Pin className="w-3.5 h-3.5 text-toxic" />
+              <Pin className="w-3.5 h-3.5 text-brand" />
               <span>PINNED PRIORITY ({pinnedCalls.length})</span>
             </span>
             <span className="font-sans text-xs text-muted">
@@ -1231,7 +1231,7 @@ export const IncubatorHub: React.FC = () => {
                       : 'Max Alpha Premium High-Conviction Calls'}
                   </h2>
                   <p className="font-sans text-xs text-muted">
-                    Showing <strong className="text-toxic font-mono">{filteredTokens.length}</strong> calls
+                    Showing <strong className="text-brand font-mono">{filteredTokens.length}</strong> calls
                     • Multi-chain coverage across SOL, BSC, ETH, BASE, ROBIN, AVAX
                   </p>
                 </div>
@@ -1242,7 +1242,7 @@ export const IncubatorHub: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     onClick={resetFilters}
-                    className="self-start sm:self-auto font-mono text-xs font-bold text-toxic border-border-default hover:border-toxic inline-flex items-center gap-1.5"
+                    className="self-start sm:self-auto font-mono text-xs font-bold text-brand border-border-default hover:border-brand inline-flex items-center gap-1.5"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Reset Filters</span>
@@ -1265,12 +1265,12 @@ export const IncubatorHub: React.FC = () => {
                         onClick={() => setSelectedChain(ch)}
                         className={`h-8 px-2.5 rounded-md font-mono text-xs font-bold whitespace-nowrap border cursor-pointer transition-colors inline-flex items-center justify-center ${
                           active
-                            ? 'bg-toxic text-canvas border-toxic hover:bg-toxic'
+                            ? 'bg-brand text-canvas border-brand hover:bg-brand'
                             : 'bg-surface hover:bg-surface-card text-white border-border-default'
                         }`}
                       >
                         <span>{ch}</span>
-                        <span className={`ml-1 text-xs ${active ? 'text-canvas' : 'text-toxic'}`}>
+                        <span className={`ml-1 text-xs ${active ? 'text-canvas' : 'text-brand'}`}>
                           ({chainCounts[ch] ?? 0})
                         </span>
                       </Button>
@@ -1302,7 +1302,7 @@ export const IncubatorHub: React.FC = () => {
                           activeFilter === tab.id
                             ? tab.id === 'MAX_ALPHA'
                               ? 'bg-alpha-strong text-white hover:bg-alpha-strong'
-                              : 'bg-toxic text-canvas hover:bg-toxic'
+                              : 'bg-brand text-canvas hover:bg-brand'
                             : tab.id === 'MAX_ALPHA'
                             ? 'text-alpha-primary hover:text-white'
                             : 'text-muted hover:text-white'
@@ -1315,7 +1315,7 @@ export const IncubatorHub: React.FC = () => {
 
                   {/* Sort Selector */}
                   <div className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-md bg-surface border border-border-default font-sans text-xs text-muted">
-                    <Filter className="w-3.5 h-3.5 text-toxic shrink-0" />
+                    <Filter className="w-3.5 h-3.5 text-brand shrink-0" />
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -1336,7 +1336,7 @@ export const IncubatorHub: React.FC = () => {
                       size="sm"
                       onClick={() => setViewMode('GRID')}
                       className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
-                        viewMode === 'GRID' ? 'bg-toxic text-canvas font-black hover:bg-toxic' : 'text-muted hover:text-white'
+                        viewMode === 'GRID' ? 'bg-brand text-canvas font-black hover:bg-brand' : 'text-muted hover:text-white'
                       }`}
                     >
                       <LayoutGrid className="w-3.5 h-3.5 mr-1" />
@@ -1348,7 +1348,7 @@ export const IncubatorHub: React.FC = () => {
                       size="sm"
                       onClick={() => setViewMode('TABLE')}
                       className={`h-[26px] inline-flex items-center gap-1 px-2 rounded font-semibold cursor-pointer text-xs ${
-                        viewMode === 'TABLE' ? 'bg-toxic text-canvas font-black hover:bg-toxic' : 'text-muted hover:text-white'
+                        viewMode === 'TABLE' ? 'bg-brand text-canvas font-black hover:bg-brand' : 'text-muted hover:text-white'
                       }`}
                     >
                       <List className="w-3.5 h-3.5 mr-1" />
@@ -1445,7 +1445,7 @@ export const IncubatorHub: React.FC = () => {
                                   <div>
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-bold text-white">{token.name}</span>
-                                      <span className="font-mono text-xs text-toxic font-bold">
+                                      <span className="font-mono text-xs text-brand font-bold">
                                         {token.ticker}
                                       </span>
                                       {isRowWatchlist ? (
@@ -1455,7 +1455,7 @@ export const IncubatorHub: React.FC = () => {
                                       ) : (
                                         <>
                                           {token.outcome === 'PROFIT' && (
-                                            <span className="px-1.5 py-0.2 rounded bg-toxic text-canvas font-mono text-xs font-black uppercase">
+                                            <span className="px-1.5 py-0.2 rounded bg-brand text-canvas font-mono text-xs font-black uppercase">
                                               PROFIT ✓
                                             </span>
                                           )}
@@ -1493,9 +1493,9 @@ export const IncubatorHub: React.FC = () => {
                                       {token.ca.slice(0, 6)}...{token.ca.slice(-4)}
                                     </span>
                                     {copiedId === `tbl-${token.id}` ? (
-                                      <Check className="w-3.5 h-3.5 text-toxic shrink-0" />
+                                      <Check className="w-3.5 h-3.5 text-brand shrink-0" />
                                     ) : (
-                                      <Copy className="w-3.5 h-3.5 text-toxic shrink-0" />
+                                      <Copy className="w-3.5 h-3.5 text-brand shrink-0" />
                                     )}
                                   </Button>
                                 )}
@@ -1510,7 +1510,7 @@ export const IncubatorHub: React.FC = () => {
                               )}
 
                               <td className="py-3.5 px-4 text-right font-mono tnum">
-                                <div className="font-black text-toxic-bright text-sm">
+                                <div className="font-black text-brand-bright text-sm">
                                   {token.marketCap || '—'}
                                 </div>
                               </td>
@@ -1543,7 +1543,7 @@ export const IncubatorHub: React.FC = () => {
                                             key={tp.label}
                                             className={`px-1.5 py-0.5 rounded text-xs font-extrabold border ${
                                               tp.hit
-                                                ? 'bg-toxic text-canvas border-toxic'
+                                                ? 'bg-brand text-canvas border-brand'
                                                 : 'bg-surface-card text-white border-border-default'
                                             }`}
                                           >
@@ -1570,7 +1570,7 @@ export const IncubatorHub: React.FC = () => {
                                           e.stopPropagation();
                                           handleStartEditCall(token);
                                         }}
-                                        className="h-7 w-7 p-0 rounded-md border border-border-default bg-surface-card text-muted hover:text-toxic hover:border-toxic cursor-pointer transition-colors"
+                                        className="h-7 w-7 p-0 rounded-md border border-border-default bg-surface-card text-muted hover:text-brand hover:border-brand cursor-pointer transition-colors"
                                         title="Edit Call"
                                       >
                                         <Pencil className="w-3.5 h-3.5" />
@@ -1586,7 +1586,7 @@ export const IncubatorHub: React.FC = () => {
                                         }}
                                         className={`h-7 w-7 p-0 rounded-md border cursor-pointer ${
                                           token.pinned
-                                            ? 'bg-toxic text-canvas border-toxic hover:bg-toxic'
+                                            ? 'bg-brand text-canvas border-brand hover:bg-brand'
                                             : 'bg-surface-card text-muted border-border-default'
                                         }`}
                                         title="Toggle Pin"
@@ -1600,10 +1600,10 @@ export const IncubatorHub: React.FC = () => {
                                     target="_blank"
                                     rel="noreferrer"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic text-white font-extrabold"
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-extrabold"
                                   >
                                     <span>Market</span>
-                                    <ExternalLink className="w-3.5 h-3.5 text-toxic" />
+                                    <ExternalLink className="w-3.5 h-3.5 text-brand" />
                                   </a>
                                 </div>
                               </td>
@@ -1654,7 +1654,7 @@ export const IncubatorHub: React.FC = () => {
                             <span className="font-sans font-bold text-sm text-white truncate">
                               {coin.name}
                             </span>
-                            <span className="font-mono text-xs text-toxic font-bold">
+                            <span className="font-mono text-xs text-brand font-bold">
                               {coin.ticker}
                             </span>
                             <span className="px-1.5 py-0.5 rounded bg-surface-card border border-border-default font-mono text-xs text-white">
@@ -1675,7 +1675,7 @@ export const IncubatorHub: React.FC = () => {
                       <div className="text-right font-mono tnum shrink-0">
                         <div
                           className={`text-sm font-bold ${
-                            coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                            coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
                           }`}
                         >
                           {formatChangePct(coin.change24hPct)}
@@ -1685,7 +1685,7 @@ export const IncubatorHub: React.FC = () => {
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-xs text-toxic hover:underline mt-1 font-bold"
+                          className="inline-flex items-center gap-1 text-xs text-brand hover:underline mt-1 font-bold"
                         >
                           <span>Open Market</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1711,7 +1711,7 @@ export const IncubatorHub: React.FC = () => {
             <p className="font-sans text-xs text-muted leading-relaxed">
               Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
               is verified with{' '}
-              <strong className="text-toxic">{formattedBalance} $H42</strong>.
+              <strong className="text-brand">{formattedBalance} $H42</strong>.
               Optionally map a local EVM address for multi-chain notifications.
             </p>
           </div>
@@ -1724,21 +1724,21 @@ export const IncubatorHub: React.FC = () => {
                   value={evmDraft}
                   onChange={(e) => setEvmDraft(e.target.value)}
                   placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
-                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-toxic"
+                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
                 />
                 <Button
                   type="submit"
                   variant="secondary"
                   size="md"
-                  className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-toxic cursor-pointer shrink-0 transition-colors"
+                  className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-brand cursor-pointer shrink-0 transition-colors"
                 >
                   {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
                 </Button>
               </form>
             ) : (
-              <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
+              <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-toxic font-bold uppercase text-xs">MAPPED:</span>
+                  <span className="text-brand font-bold uppercase text-xs">MAPPED:</span>
                   <span className="text-white truncate font-medium">{boundEvmAddress}</span>
                 </div>
                 <Button

@@ -141,11 +141,11 @@ export async function TierSection() {
   ];
 
   return (
-    <section id="choose-your-access" className="bg-canvas py-16 border-b border-toxic-border scroll-mt-20 sm:scroll-mt-24">
+    <section id="choose-your-access" className="bg-canvas py-16 border-b border-brand-border scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
-        <div className="pb-6 border-b border-toxic-border">
-          <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
+        <div className="pb-6 border-b border-brand-border">
+          <span className="font-sans text-xs font-bold uppercase tracking-widest text-brand">
             MEMBERSHIP REQUIREMENT
           </span>
           <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
@@ -161,7 +161,7 @@ export async function TierSection() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column (4 cols): $H42 Intro Text & Buy Actions */}
             <div className="lg:col-span-4 space-y-6 lg:pr-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-toxic-bg border border-toxic-border text-toxic font-sans text-xs font-extrabold uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-brand-bg border border-brand-border text-brand font-sans text-xs font-extrabold uppercase tracking-wider">
                 <FlaskConical className="w-4 h-4" />
                 <span>OFFICIAL LAB PASS</span>
               </div>
@@ -171,10 +171,10 @@ export async function TierSection() {
                   REQUIRED WALLET BALANCE
                 </div>
                 <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
-                  <span className="text-toxic font-extrabold">$H42</span>
+                  <span className="text-brand font-extrabold">$H42</span>
                 </div>
                 <p className="font-sans text-sm text-muted leading-relaxed pt-1">
-                  Hold at least <strong className="text-toxic">$20 $H42</strong> from contract{' '}
+                  Hold at least <strong className="text-brand">$20 $H42</strong> from contract{' '}
                   <span className="font-mono text-xs text-white break-all">
                     {GENESIS_MINT}
                   </span>{' '}
@@ -188,7 +188,7 @@ export async function TierSection() {
                   href={BUY_LINKS.pump}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-12 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                  className="w-full h-12 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
                 >
                   <span>BUY $H42 ON PUMP.FUN</span>
                   <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -198,11 +198,11 @@ export async function TierSection() {
                   href={communityUrl || SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-11 px-6 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                  className="w-full h-11 px-6 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
                 >
-                  <Send className="w-4 h-4 text-toxic" />
+                  <Send className="w-4 h-4 text-brand" />
                   <span>JOIN TELEGRAM</span>
-                  <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2.5]" />
+                  <ArrowUpRight className="w-4 h-4 text-brand stroke-[2.5]" />
                 </a>
               </div>
             </div>
@@ -271,7 +271,7 @@ export async function TierSection() {
                   <th className="py-3.5 px-6 font-bold">Feature</th>
                   <th className="py-3.5 px-4 font-bold text-center w-36">Free</th>
                   <th className="py-3.5 px-4 font-bold text-center w-48 text-white">Member</th>
-                  <th className="py-3.5 px-4 font-bold text-center w-56 text-toxic">Pro</th>
+                  <th className="py-3.5 px-4 font-bold text-center w-56 text-brand">Pro</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default font-sans text-xs">
@@ -283,7 +283,7 @@ export async function TierSection() {
                     <td className="py-3.5 px-4 text-center">
                       {typeof row.free === 'boolean' ? (
                         row.free ? (
-                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                          <Check className="w-4 h-4 text-brand mx-auto" />
                         ) : (
                           <Minus className="w-4 h-4 text-muted/40 mx-auto" />
                         )
@@ -296,7 +296,7 @@ export async function TierSection() {
                     <td className="py-3.5 px-4 text-center">
                       {typeof row.member === 'boolean' ? (
                         row.member ? (
-                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                          <Check className="w-4 h-4 text-brand mx-auto" />
                         ) : (
                           <Minus className="w-4 h-4 text-muted/40 mx-auto" />
                         )
@@ -306,15 +306,15 @@ export async function TierSection() {
                     </td>
 
                     {/* Pro */}
-                    <td className="py-3.5 px-4 text-center bg-toxic-bg/10">
+                    <td className="py-3.5 px-4 text-center bg-brand-bg/10">
                       {typeof row.pro === 'boolean' ? (
                         row.pro ? (
-                          <Check className="w-4 h-4 text-toxic mx-auto" />
+                          <Check className="w-4 h-4 text-brand mx-auto" />
                         ) : (
                           <Minus className="w-4 h-4 text-muted/40 mx-auto" />
                         )
                       ) : (
-                        <span className="font-mono text-toxic font-bold">{row.pro}</span>
+                        <span className="font-mono text-brand font-bold">{row.pro}</span>
                       )}
                     </td>
                   </tr>
@@ -336,7 +336,7 @@ export async function TierSection() {
                     <div className="text-[10px] text-muted uppercase font-bold">FREE</div>
                     <div className="mt-1 flex items-center justify-center">
                       {typeof row.free === 'boolean' ? (
-                        row.free ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                        row.free ? <Check className="w-3.5 h-3.5 text-brand" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
                       ) : (
                         <span className="truncate">{row.free}</span>
                       )}
@@ -346,19 +346,19 @@ export async function TierSection() {
                     <div className="text-[10px] text-white uppercase font-bold">MEMBER</div>
                     <div className="mt-1 flex items-center justify-center">
                       {typeof row.member === 'boolean' ? (
-                        row.member ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                        row.member ? <Check className="w-3.5 h-3.5 text-brand" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
                       ) : (
                         <span className="truncate text-white font-semibold">{row.member}</span>
                       )}
                     </div>
                   </div>
-                  <div className="p-2 rounded bg-toxic-bg border border-toxic-border">
-                    <div className="text-[10px] text-toxic uppercase font-bold">PRO</div>
+                  <div className="p-2 rounded bg-brand-bg border border-brand-border">
+                    <div className="text-[10px] text-brand uppercase font-bold">PRO</div>
                     <div className="mt-1 flex items-center justify-center">
                       {typeof row.pro === 'boolean' ? (
-                        row.pro ? <Check className="w-3.5 h-3.5 text-toxic" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
+                        row.pro ? <Check className="w-3.5 h-3.5 text-brand" /> : <Minus className="w-3.5 h-3.5 text-muted/40" />
                       ) : (
-                        <span className="truncate text-toxic font-bold">{row.pro}</span>
+                        <span className="truncate text-brand font-bold">{row.pro}</span>
                       )}
                     </div>
                   </div>

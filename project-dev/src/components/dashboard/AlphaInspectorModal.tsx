@@ -142,13 +142,13 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             </span>
           )}
           {token.pinned && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-brand text-canvas font-extrabold uppercase">
               <Pin className="w-3 h-3" />
               <span>PINNED PRIORITY</span>
             </span>
           )}
           {!isWatchlist && token.outcome === 'PROFIT' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-pump text-canvas font-extrabold uppercase">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-brand text-canvas font-extrabold uppercase">
               <span>ACHIEVED (IN PROFIT) ✓</span>
             </span>
           )}
@@ -163,7 +163,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               <span>~$20 $H42 REQUIRED</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-pump">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface border border-line text-brand">
               <Unlock className="w-3 h-3" />
               <span>LAB MEMBER UNLOCKED</span>
             </span>
@@ -202,7 +202,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <div>
                   <h3 id="modal-token-name" className="font-sans text-xl font-extrabold text-white flex items-center gap-2">
                     <span>{token.name}</span>
-                    <span className="font-mono text-sm text-pump">{token.ticker}</span>
+                    <span className="font-mono text-sm text-brand">{token.ticker}</span>
                   </h3>
                   <div className="font-sans text-xs text-muted mt-0.5 flex flex-wrap items-center gap-2">
                     <span>Caller: {token.caller}</span>
@@ -212,7 +212,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                         Research Coverage
                       </span>
                     ) : (
-                      <span className="text-pump-pill font-semibold">
+                      <span className="text-brand-pill font-semibold">
                         {token.callerWinRate}
                       </span>
                     )}
@@ -225,7 +225,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <div className="text-lg font-extrabold text-white">
                     {isWatchlist ? token.marketCap || '—' : token.entryMarketCap || token.marketCap}
                   </div>
-                  <div className="text-xs font-bold text-pump">
+                  <div className="text-xs font-bold text-brand">
                     {isWatchlist ? 'CURRENT MC' : 'ENTRY MC'}
                   </div>
                 </div>
@@ -276,7 +276,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               <div className="text-lg font-extrabold text-white font-mono">
                 {token.entryMarketCap || token.marketCap}
               </div>
-              <div className="text-xs text-pump font-mono">
+              <div className="text-xs text-brand font-mono">
                 Recorded at time of call
               </div>
               <div className="flex flex-wrap items-center gap-1.5 pt-1 font-mono text-xs text-muted">
@@ -291,7 +291,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                 <span className="text-xs text-muted font-bold uppercase">
                   RISK RATIO (BOTH)
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-surface border border-line font-mono text-xs font-bold text-pump">
+                <span className="px-1.5 py-0.5 rounded bg-surface border border-line font-mono text-xs font-bold text-brand">
                   {token.riskRewardRatio}
                 </span>
               </div>
@@ -311,7 +311,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       lvl <= token.risk
                         ? token.risk >= 4
                           ? 'bg-amber'
-                          : 'bg-pump'
+                          : 'bg-brand'
                         : 'bg-canvas border border-line'
                     }`}
                   />
@@ -323,11 +323,11 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
             <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted font-bold uppercase flex items-center gap-1">
-                  <Target className="w-3 h-3 text-pump" />
+                  <Target className="w-3 h-3 text-brand" />
                   <span>TAKE PROFIT TARGETS</span>
                 </span>
                 {isAdmin && (
-                  <span className="text-xs text-pump font-mono">Click to mark hit</span>
+                  <span className="text-xs text-brand font-mono">Click to mark hit</span>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -341,9 +341,9 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     onClick={() => isAdmin && toggleTpHit(token.id, idx)}
                     className={`h-auto px-2 py-1 rounded font-mono text-xs font-extrabold inline-flex items-center gap-1 ${
                       tp.hit
-                        ? 'bg-pump text-canvas border-pump hover:bg-pump'
+                        ? 'bg-brand text-canvas border-brand hover:bg-brand'
                         : 'bg-surface text-white border-line'
-                    } ${isAdmin ? 'cursor-pointer hover:border-pump' : 'cursor-default'}`}
+                    } ${isAdmin ? 'cursor-pointer hover:border-brand' : 'cursor-default'}`}
                     title={tp.targetMc ? `Target MC: ${tp.targetMc}` : tp.label}
                   >
                     <span>{tp.label}</span>
@@ -366,8 +366,8 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
 
           {/* Admin Quick Controls Inside Inspector */}
           {isAdmin && (
-            <div className="p-3.5 rounded-lg bg-surface-card border border-pump flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
-              <div className="flex items-center gap-2 text-pump font-bold">
+            <div className="p-3.5 rounded-lg bg-surface-card border border-brand flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
+              <div className="flex items-center gap-2 text-brand font-bold">
                 <span>ADMIN CONTROLS ({ADMIN_WALLET_SHORT})</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -381,7 +381,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       onEdit(token);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded border border-pump bg-surface-card hover:bg-pump hover:text-canvas text-pump font-bold inline-flex items-center gap-1.5 transition-colors"
+                    className="px-3 py-1.5 rounded border border-brand bg-surface-card hover:bg-brand hover:text-canvas text-brand font-bold inline-flex items-center gap-1.5 transition-colors"
                     title="Edit trade call parameters"
                   >
                     <Pencil className="w-3.5 h-3.5 mr-1" />
@@ -416,8 +416,8 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   onClick={() => togglePinCall(token.id, !token.pinned)}
                   className={`px-3 py-1.5 rounded border font-bold inline-flex items-center gap-1.5 ${
                     token.pinned
-                      ? 'bg-pump text-canvas border-pump hover:bg-pump'
-                      : 'bg-surface text-white border-line hover:border-pump'
+                      ? 'bg-brand text-canvas border-brand hover:bg-brand'
+                      : 'bg-surface text-white border-line hover:border-brand'
                   }`}
                 >
                   <Pin className="w-3.5 h-3.5 mr-1" />
@@ -434,8 +434,8 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       onClick={() => setCallOutcome(token.id, 'PROFIT')}
                       className={`px-2.5 py-1.5 rounded border font-bold text-xs transition-colors ${
                         token.outcome === 'PROFIT'
-                          ? 'bg-pump text-canvas border-pump hover:bg-pump'
-                          : 'bg-surface text-muted hover:text-white border-line hover:border-pump'
+                          ? 'bg-brand text-canvas border-brand hover:bg-brand'
+                          : 'bg-surface text-muted hover:text-white border-line hover:border-brand'
                       }`}
                       title="Mark as Achieved (In Profit)"
                     >
@@ -518,7 +518,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   href={BUY_LINKS.pump}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-9 px-4 rounded-md bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
+                  className="h-9 px-4 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
                 >
                   <span>Buy $H42 on Pump.fun</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -532,7 +532,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     onClick={() => setDemoPreset('1m')}
                     className="h-9 px-3.5 rounded-md bg-surface border border-line font-sans text-xs font-bold text-white inline-flex items-center gap-1.5"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-pump mr-1" />
+                    <Sparkles className="w-3.5 h-3.5 text-brand mr-1" />
                     <span>Preview 1M $H42 Member →</span>
                   </Button>
                 )}
@@ -543,7 +543,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
               {/* Unmasked Contract Address Bar */}
               <div className="p-3.5 rounded-lg bg-surface-card border border-line space-y-2.5">
                 <div className="flex items-center justify-between font-sans text-xs">
-                  <span className="text-pump font-bold flex items-center gap-1.5">
+                  <span className="text-brand font-bold flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4" />
                     <span>VERIFIED CONTRACT ADDRESS ({token.chain})</span>
                   </span>
@@ -559,7 +559,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     variant={copyCaError ? 'danger' : 'primary'}
                     size="sm"
                     onClick={handleCopyCa}
-                    className={`px-3 py-1 rounded ${copyCaError ? 'bg-danger text-white hover:bg-danger' : 'bg-pump hover:bg-pump-hover text-canvas'} font-sans font-extrabold text-xs inline-flex items-center gap-1.5 shrink-0`}
+                    className={`px-3 py-1 rounded ${copyCaError ? 'bg-danger text-white hover:bg-danger' : 'bg-brand hover:bg-brand-hover text-canvas'} font-sans font-extrabold text-xs inline-flex items-center gap-1.5 shrink-0`}
                   >
                     {copiedCa ? (
                       <Check className="w-3.5 h-3.5 mr-1" />
@@ -585,7 +585,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     href={primaryMarketUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-10 px-5 rounded-md bg-pump hover:bg-pump-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
+                    className="h-10 px-5 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
                   >
                     <span>Open {token.ticker} Market</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -600,7 +600,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       className="h-10 px-4 rounded-md bg-surface hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center gap-1.5"
                     >
                       <span>{link.label}</span>
-                      <ExternalLink className="w-3 h-3 text-pump" />
+                      <ExternalLink className="w-3 h-3 text-brand" />
                     </a>
                   ))}
 

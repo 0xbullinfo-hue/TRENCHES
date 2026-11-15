@@ -44,7 +44,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
             {tickerFormatted}
           </span>
           {entry.chain && (
-            <span className="font-sans text-[10px] font-bold text-muted bg-surface px-1.5 py-0.5 rounded border border-toxic-border/40 uppercase tracking-wider">
+            <span className="font-sans text-[10px] font-bold text-muted bg-surface px-1.5 py-0.5 rounded border border-brand-border/40 uppercase tracking-wider">
               {formatChainLabel(entry.chain)}
             </span>
           )}
@@ -59,7 +59,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
       {/* Column 3 — Exit MCAP */}
       <td className="px-4 py-3.5 text-right font-mono text-xs sm:text-sm font-medium tnum whitespace-nowrap">
         {exitMc !== '—' ? (
-          <span className="text-toxic font-bold">{exitMc}</span>
+          <span className="text-brand font-bold">{exitMc}</span>
         ) : (
           <span className="text-muted">—</span>
         )}
@@ -67,7 +67,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
 
       {/* Column 4 — Multiplier */}
       <td className="px-4 py-3.5 text-right font-mono text-xs sm:text-sm tnum whitespace-nowrap">
-        <span className="inline-block px-2 py-0.5 rounded bg-toxic/10 border border-toxic/30 text-toxic font-bold font-mono">
+        <span className="inline-block px-2 py-0.5 rounded bg-brand/10 border border-brand/30 text-brand font-bold font-mono">
           {formatMultiplier(entry.multiplier)}
         </span>
       </td>
@@ -75,7 +75,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
       {/* Column 5 — PnL */}
       <td className="px-4 py-3.5 text-right font-mono text-xs sm:text-sm tnum whitespace-nowrap">
         {pnl.sign === 'positive' && (
-          <span className="text-toxic font-bold">{pnl.formatted}</span>
+          <span className="text-brand font-bold">{pnl.formatted}</span>
         )}
         {pnl.sign === 'negative' && (
           <span className="text-rose-400 font-bold">{pnl.formatted}</span>
@@ -96,10 +96,10 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`View ${tickerFormatted} on DexScreener`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-elevated border border-border-default hover:border-toxic text-xs font-sans font-bold text-zinc-300 hover:text-toxic transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-xs font-sans font-bold text-zinc-300 hover:text-brand transition-colors cursor-pointer group"
           >
             <span>View</span>
-            <ExternalLink className="w-3 h-3 text-muted group-hover:text-toxic transition-colors" />
+            <ExternalLink className="w-3 h-3 text-muted group-hover:text-brand transition-colors" />
           </a>
         ) : (
           <span className="text-muted font-mono text-xs">—</span>

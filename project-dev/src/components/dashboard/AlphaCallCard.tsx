@@ -106,7 +106,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               <span
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase tracking-wider ${
                   isCompleted
-                    ? 'bg-toxic text-canvas'
+                    ? 'bg-brand text-canvas'
                     : isLoss
                     ? 'bg-danger text-white'
                     : 'bg-surface-card border border-border-default text-white'
@@ -114,7 +114,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-toxic'
+                    isCompleted ? 'bg-canvas' : isLoss ? 'bg-white' : 'bg-brand'
                   }`}
                 />
                 <span>{isCompleted ? 'PROFIT ✓' : isLoss ? 'LOSS ✕' : 'ACTIVE'}</span>
@@ -256,14 +256,14 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                 {coin.change24hPct !== null && (
                   <span
                     className={`text-xs font-bold ${
-                      coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                      coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
                     }`}
                   >
                     {formatChangePct(coin.change24hPct)}
                   </span>
                 )}
               </div>
-              <div className="text-base font-black text-toxic-bright truncate tnum">
+              <div className="text-base font-black text-brand-bright truncate tnum">
                 {currentMcDisplay}
               </div>
             </div>
@@ -299,14 +299,14 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   {coin.change24hPct !== null && (
                     <span
                       className={`text-xs font-bold ${
-                        coin.change24hPct < 0 ? 'text-danger' : 'text-toxic'
+                        coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
                       }`}
                     >
                       {formatChangePct(coin.change24hPct)}
                     </span>
                   )}
                 </div>
-                <div className="text-base font-black text-toxic-bright truncate tnum">
+                <div className="text-base font-black text-brand-bright truncate tnum">
                   {currentMcDisplay}
                 </div>
               </div>
@@ -353,7 +353,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                       key={tp.label}
                       className={`px-1.5 py-0.5 rounded-md text-xs font-extrabold border ${
                         tp.hit
-                          ? 'bg-toxic text-canvas border-toxic'
+                          ? 'bg-brand text-canvas border-brand'
                           : 'bg-surface text-white border-border-default'
                       }`}
                     >

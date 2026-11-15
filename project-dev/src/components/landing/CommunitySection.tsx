@@ -21,11 +21,11 @@ export const CommunitySection: React.FC = () => {
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
 
   return (
-    <section id="community-section" className="border-b border-toxic-border bg-canvas py-16 sm:py-20">
+    <section id="community-section" className="border-b border-brand-border bg-canvas py-16 sm:py-20">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="rounded-2xl bg-surface border border-border-default p-8 sm:p-12 lg:p-16 text-center space-y-6">
           <div className="space-y-3 max-w-2xl mx-auto">
-            <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
+            <span className="font-sans text-xs font-bold uppercase tracking-widest text-brand">
               JOIN THE SYNDICATE
             </span>
             <h2 className="font-sans text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white">
@@ -41,7 +41,7 @@ export const CommunitySection: React.FC = () => {
               href={communityUrl}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-12 min-h-[44px] px-8 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto h-12 min-h-[44px] px-8 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <Send className="w-4 h-4 fill-current" />
               <span>JOIN TELEGRAM</span>
@@ -52,9 +52,9 @@ export const CommunitySection: React.FC = () => {
               href={SOCIAL_LINKS.x}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-12 min-h-[44px] px-8 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic text-white font-sans font-bold text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto h-12 min-h-[44px] px-8 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans font-bold text-sm uppercase tracking-wide inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
-              <XIcon className="w-4 h-4 text-toxic shrink-0" />
+              <XIcon className="w-4 h-4 text-brand shrink-0" />
               <span>FOLLOW ON X</span>
             </a>
           </div>

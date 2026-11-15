@@ -51,19 +51,19 @@ export const HeroTerminal: React.FC = () => {
   return (
     <section
       id="hero-section"
-      className="relative border-b border-toxic-border bg-canvas overflow-hidden scroll-mt-20 sm:scroll-mt-24"
+      className="relative border-b border-brand-border bg-canvas overflow-hidden scroll-mt-20 sm:scroll-mt-24"
     >
       <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-14">
         {/* Soft-Launch Status Strip */}
         <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <span className="text-muted">TOKEN:</span>
             <span className="text-white">LIVE</span>
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <span className="text-muted">COMMUNITY:</span>
             <span className="text-white">OPEN</span>
           </div>
@@ -82,11 +82,11 @@ export const HeroTerminal: React.FC = () => {
             <h1 className="font-sans font-bold tracking-tight uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
               <span className="block">BUILDING THE STRONGEST</span>
               <span className="block sm:whitespace-nowrap">COMMUNITY IN</span>
-              <span className="block sm:whitespace-nowrap">THE <span className="text-toxic">TRENCHES</span></span>
+              <span className="block sm:whitespace-nowrap">THE <span className="text-brand">TRENCHES</span></span>
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
-              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-toxic-bright font-bold">$H42</span>) is your access key. We don&apos;t chase chains, we chase trenches. If there&apos;s a trench, we&apos;re in it.
+              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key. We don&apos;t chase chains, we chase trenches. If there&apos;s a trench, we&apos;re in it.
             </p>
 
             {/* Primary Soft-Launch Conversion Unit */}
@@ -96,7 +96,7 @@ export const HeroTerminal: React.FC = () => {
                   href={communityUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 fill-current" />
                   <span>JOIN THE SOFT LAUNCH</span>
@@ -113,9 +113,9 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <XIcon className="w-4 h-4 text-toxic shrink-0" />
+                  <XIcon className="w-4 h-4 text-brand shrink-0" />
                   <span>FOLLOW ON X</span>
                 </a>
 
@@ -123,11 +123,11 @@ export const HeroTerminal: React.FC = () => {
                   href={BUY_LINKS.pump}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-toxic text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <span className="text-toxic">⚡</span>
+                  <span className="text-brand">⚡</span>
                   <span>VIEW $H42</span>
-                  <ArrowUpRight className="w-4 h-4 text-toxic stroke-[2]" />
+                  <ArrowUpRight className="w-4 h-4 text-brand stroke-[2]" />
                 </a>
               </div>
             </div>
@@ -154,14 +154,14 @@ export const HeroTerminal: React.FC = () => {
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default hover:border-toxic transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
+              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default hover:border-brand transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
             >
               <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
                 {m.label}
               </div>
               <div
                 className={`font-sans text-lg sm:text-xl xl:text-2xl font-semibold tracking-tight whitespace-nowrap ${
-                  m.highlight ? 'text-toxic' : 'text-white'
+                  m.highlight ? 'text-brand' : 'text-white'
                 }`}
               >
                 {m.value}

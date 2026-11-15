@@ -30,7 +30,7 @@ export const TerminalHeader: React.FC = () => {
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-toxic-border">
+    <header className="sticky top-0 z-40 w-full bg-canvas border-b border-brand-border">
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -41,7 +41,7 @@ export const TerminalHeader: React.FC = () => {
           >
             <HexCubeLogo />
             <span className="font-sans font-extrabold tracking-tight text-base sm:text-2xl text-white">
-              Trench<span className="text-toxic">Labs</span>HQ
+              Trench<span className="text-brand">Labs</span>HQ
             </span>
           </Link>
         </div>
@@ -55,7 +55,7 @@ export const TerminalHeader: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search calls (token, CA, chain)..."
-              className="w-full h-10 pl-9 pr-8 rounded-lg bg-surface border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
+              className="w-full h-10 pl-9 pr-8 rounded-lg bg-surface border border-border-default focus:border-brand text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
             />
             {searchQuery && (
               <Button
@@ -75,8 +75,8 @@ export const TerminalHeader: React.FC = () => {
             href="/dashboard"
             className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
               pathname === '/dashboard'
-                ? 'bg-surface-card border-toxic text-toxic font-black'
-                : 'bg-surface hover:bg-surface-card border-border-default hover:border-toxic text-white'
+                ? 'bg-surface-card border-brand text-brand font-black'
+                : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
             }`}
           >
             <span>Dashboard</span>
@@ -86,8 +86,8 @@ export const TerminalHeader: React.FC = () => {
             href="/ledger"
             className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
               pathname === '/ledger'
-                ? 'bg-surface-card border-toxic text-toxic font-black'
-                : 'bg-surface hover:bg-surface-card border-border-default hover:border-toxic text-white'
+                ? 'bg-surface-card border-brand text-brand font-black'
+                : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
             }`}
           >
             <span>Ledger</span>
@@ -97,7 +97,7 @@ export const TerminalHeader: React.FC = () => {
             href={communityUrl}
             target="_blank"
             rel="noreferrer"
-            className="h-10 px-3.5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
+            className="h-10 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
           >
             <Send className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Community</span>
@@ -123,7 +123,7 @@ export const TerminalHeader: React.FC = () => {
                       ? 'bg-danger'
                       : tier.id === 'PRO'
                       ? 'bg-alpha-strong'
-                      : 'bg-toxic'
+                      : 'bg-brand'
                   }`}
                 />
                 <span className="font-semibold">{shortAddress}</span>
@@ -166,7 +166,7 @@ export const TerminalHeader: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search calls (token, CA, chain)..."
-            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-card border border-border-default focus:border-toxic text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
+            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-card border border-border-default focus:border-brand text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
           />
           {searchQuery && (
             <Button
@@ -184,7 +184,7 @@ export const TerminalHeader: React.FC = () => {
           href="/dashboard"
           className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
             pathname === '/dashboard'
-              ? 'bg-surface-card border-toxic text-toxic'
+              ? 'bg-surface-card border-brand text-brand'
               : 'bg-surface-card border-border-default text-white'
           }`}
         >
@@ -194,7 +194,7 @@ export const TerminalHeader: React.FC = () => {
           href="/ledger"
           className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
             pathname === '/ledger'
-              ? 'bg-surface-card border-toxic text-toxic'
+              ? 'bg-surface-card border-brand text-brand'
               : 'bg-surface-card border-border-default text-white'
           }`}
         >

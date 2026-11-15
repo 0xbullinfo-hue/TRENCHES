@@ -118,7 +118,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Ledger Entries</span>
         </Link>
-        <span className="text-2xs font-mono px-2 py-0.5 rounded bg-pump/10 text-pump border border-pump/30 uppercase">
+        <span className="text-2xs font-mono px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/30 uppercase">
           Admin Only
         </span>
       </div>
@@ -144,7 +144,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Ticker <span className="text-pump">*</span>
+                Ticker <span className="text-brand">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-muted text-sm">$</span>
@@ -155,19 +155,19 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
                   value={ticker}
                   onChange={(e) => setTicker(e.target.value.toUpperCase().replace(/^\$/, ''))}
                   placeholder="WIF"
-                  className="w-full h-11 pl-7 pr-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+                  className="w-full h-11 pl-7 pr-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Blockchain <span className="text-pump">*</span>
+                Blockchain <span className="text-brand">*</span>
               </label>
               <select
                 value={chain}
                 onChange={(e) => setChain(e.target.value)}
-                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-sans text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-sans text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 {LEDGER_CHAINS.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -181,7 +181,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           {/* Contract Address */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-              Contract Address (CA) <span className="text-pump">*</span>
+              Contract Address (CA) <span className="text-brand">*</span>
             </label>
             <input
               type="text"
@@ -189,7 +189,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
               value={contractAddress}
               onChange={(e) => setContractAddress(e.target.value.trim())}
               placeholder={chain === 'solana' ? 'EKpQGSJtjMFqKZ9KQanrW...' : '0x...'}
-              className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+              className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             />
             <p className="text-2xs font-mono text-muted/70 mt-1">
               {chain === 'solana'
@@ -204,7 +204,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Multiplier (x-multiple) <span className="text-pump">*</span>
+                Multiplier (x-multiple) <span className="text-brand">*</span>
               </label>
               <div className="relative">
                 <input
@@ -216,7 +216,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
                   value={multiplier}
                   onChange={(e) => setMultiplier(e.target.value)}
                   placeholder="3.4"
-                  className="w-full h-11 pl-3 pr-7 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump tnum"
+                  className="w-full h-11 pl-3 pr-7 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand tnum"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-muted text-sm">x</span>
               </div>
@@ -224,14 +224,14 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                Date Closed <span className="text-pump">*</span>
+                Date Closed <span className="text-brand">*</span>
               </label>
               <input
                 type="date"
                 required
                 value={closedAt}
                 onChange={(e) => setClosedAt(e.target.value)}
-                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
               </input>
             </div>
@@ -248,7 +248,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
                 placeholder="$100K"
-                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
             </div>
 
@@ -261,7 +261,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
                 placeholder="$340K"
-                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+                className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
             </div>
           </div>
@@ -276,7 +276,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
               placeholder="https://dexscreener.com/solana/..."
-              className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump"
+              className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             />
           </div>
 
@@ -296,7 +296,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Thesis played out as expected..."
-              className="w-full p-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-sans text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump resize-none"
+              className="w-full p-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-sans text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand resize-none"
             />
           </div>
 
@@ -313,7 +313,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
             <button
               type="submit"
               disabled={submitting}
-              className="w-full h-12 rounded-md bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-full h-12 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <>

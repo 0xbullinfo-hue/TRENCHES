@@ -10,8 +10,8 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const TONE: Record<string, string> = {
-  LIVE: 'text-pump border-pump/40',
-  CACHED: 'text-pump border-line',
+  LIVE: 'text-brand border-brand/40',
+  CACHED: 'text-brand border-line',
   STALE: 'text-amber border-amber/40',
   UNAVAILABLE: 'text-danger border-danger/40',
   MANUAL: 'text-muted border-line',

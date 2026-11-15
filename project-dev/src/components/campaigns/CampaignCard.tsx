@@ -1104,14 +1104,14 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           /* User has already submitted */
           <div className="rounded-lg bg-surface-card border border-border-default p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-toxic font-sans">
-                <CheckCircle2 className="w-4 h-4 text-toxic" />
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand font-sans">
+                <CheckCircle2 className="w-4 h-4 text-brand" />
                 <span>Raid Proof Submitted</span>
               </span>
               <span
                 className={`px-2 py-0.5 rounded-md font-mono text-xs font-extrabold uppercase ${
                   userSubmission.status === 'AIRDROPPED'
-                    ? 'bg-toxic-bg text-toxic border border-toxic-border'
+                    ? 'bg-brand-bg text-brand border border-brand-border'
                     : 'bg-amber/15 text-amber border border-amber/40'
                 }`}
               >
@@ -1146,7 +1146,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     {userSubmission.walletAddress.slice(-4)}
                   </span>
                   {copiedWallet ? (
-                    <Check className="w-3 h-3 text-toxic" />
+                    <Check className="w-3 h-3 text-brand" />
                   ) : (
                     <Copy className="w-3 h-3 text-muted" />
                   )}
@@ -1154,7 +1154,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               </div>
               {userSubmission.airdropTx && (
                 <div className="flex items-center justify-between gap-1 pt-1 border-t border-border-default">
-                  <span className="text-toxic">Tx Hash:</span>
+                  <span className="text-brand">Tx Hash:</span>
                   <a
                     href={`https://solscan.io/tx/${userSubmission.airdropTx}`}
                     target="_blank"
@@ -1291,9 +1291,9 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="p-2 rounded-md bg-toxic-bg/30 border border-toxic-border/50 flex items-center justify-between gap-2 text-xs font-sans">
-                <span className="flex items-center gap-1.5 text-toxic font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-toxic shrink-0" />
+              <div className="p-2 rounded-md bg-brand-bg/30 border border-brand-border/50 flex items-center justify-between gap-2 text-xs font-sans">
+                <span className="flex items-center gap-1.5 text-brand font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-brand shrink-0" />
                   <span>Wallet Authenticated &amp; Ready</span>
                 </span>
                 <span className="font-mono text-xs text-muted">
@@ -1310,7 +1310,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             )}
 
             {successMsg && (
-              <div className="p-2 rounded-md bg-toxic-bg border border-toxic-border text-toxic text-xs font-sans flex items-start gap-1.5">
+              <div className="p-2 rounded-md bg-brand-bg border border-brand-border text-brand text-xs font-sans flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{successMsg}</span>
               </div>

@@ -111,7 +111,7 @@ export function LedgerGrid({
   return (
     <div className="space-y-6">
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-toxic-border/30">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-brand-border/30">
         {/* Chain Filter Pills */}
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -150,7 +150,7 @@ export function LedgerGrid({
             <select
               value={currentSort}
               onChange={(e) => handleFilterSort(e.target.value as 'newest' | 'multi')}
-              className="h-8 px-2.5 rounded-md bg-surface border border-toxic-border/40 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic cursor-pointer"
+              className="h-8 px-2.5 rounded-md bg-surface border border-brand-border/40 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand cursor-pointer"
             >
               <option value="newest">Newest ▾</option>
               <option value="multi">Highest multiple ▾</option>
@@ -159,7 +159,7 @@ export function LedgerGrid({
         ) : (
           <Link
             href="/ledger"
-            className="font-mono text-xs text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors self-start md:self-auto"
+            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors self-start md:self-auto"
           >
             <span>View full ledger</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -188,7 +188,7 @@ export function LedgerGrid({
         <LedgerCardSkeleton />
       ) : entries.length === 0 ? (
         /* Empty State */
-        <div className="rounded-xl bg-surface border border-toxic-border/40 p-12 text-center space-y-3">
+        <div className="rounded-xl bg-surface border border-brand-border/40 p-12 text-center space-y-3">
           <FolderOpen className="w-8 h-8 text-muted mx-auto stroke-[1.5]" />
           <p className="font-sans text-sm text-muted">
             {currentChain !== 'all'
@@ -242,7 +242,7 @@ export function LedgerGrid({
         <div className="pt-2 flex justify-end">
           <Link
             href="/ledger"
-            className="font-mono text-xs text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
+            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors"
           >
             <span>View full ledger ({total} calls)</span>
             <ArrowUpRight className="w-3.5 h-3.5" />

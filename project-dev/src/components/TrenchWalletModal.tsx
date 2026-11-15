@@ -116,9 +116,9 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
     >
       <div ref={modalRef}>
         {/* Header */}
-        <div className="px-5 py-4 bg-surface-card border-b border-toxic-border flex items-center justify-between">
+        <div className="px-5 py-4 bg-surface-card border-b border-brand-border flex items-center justify-between">
           <div className="flex items-center gap-2 text-white font-mono text-sm font-bold tracking-wide">
-            <div className="w-7 h-7 rounded-lg bg-toxic/10 border border-toxic/30 flex items-center justify-center text-toxic">
+            <div className="w-7 h-7 rounded-lg bg-brand/10 border border-brand/30 flex items-center justify-center text-brand">
               <WalletIcon className="w-4 h-4" />
             </div>
             <span id="trench-wallet-modal-title">CONNECT SOLANA WALLET</span>
@@ -131,7 +131,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
             size="sm"
             onClick={onClose}
             aria-label="Close modal dialog"
-            className="w-7 h-7 p-0 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border text-muted hover:text-white flex items-center justify-center transition-colors"
+            className="w-7 h-7 p-0 rounded-lg bg-surface hover:bg-surface-card border border-brand-border text-muted hover:text-white flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -147,9 +147,9 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
 
         {/* Active Connecting Notice with Cancel */}
         {connectingWalletName && (
-          <div className="mx-5 mt-4 p-3 rounded-lg bg-toxic/10 border border-toxic/40 flex items-center justify-between gap-2.5 text-xs font-mono text-white">
+          <div className="mx-5 mt-4 p-3 rounded-lg bg-brand/10 border border-brand/40 flex items-center justify-between gap-2.5 text-xs font-mono text-white">
             <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-toxic animate-spin" />
+              <Loader2 className="w-4 h-4 text-brand animate-spin" />
               <span>Connecting to {connectingWalletName}...</span>
             </div>
             {onCancelConnecting && (
@@ -185,7 +185,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                   size="md"
                   disabled={Boolean(connectingWalletName)}
                   onClick={() => onSelectWallet(w)}
-                  className="w-full h-auto px-4 py-3 rounded-lg bg-surface-card hover:bg-surface border border-toxic-border hover:border-toxic disabled:opacity-60 flex items-center justify-between gap-3 transition-all group text-left font-normal"
+                  className="w-full h-auto px-4 py-3 rounded-lg bg-surface-card hover:bg-surface border border-brand-border hover:border-brand disabled:opacity-60 flex items-center justify-between gap-3 transition-all group text-left font-normal"
                 >
                   <div className="flex items-center gap-3">
                     {w.adapter.icon ? (
@@ -196,27 +196,27 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                         className="w-6 h-6 rounded object-contain shrink-0"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded bg-surface border border-toxic-border flex items-center justify-center text-toxic shrink-0">
+                      <div className="w-6 h-6 rounded bg-surface border border-brand-border flex items-center justify-center text-brand shrink-0">
                         <WalletIcon className="w-3.5 h-3.5" />
                       </div>
                     )}
-                    <span className="font-mono text-xs font-bold text-white group-hover:text-toxic transition-colors">
+                    <span className="font-mono text-xs font-bold text-white group-hover:text-brand transition-colors">
                       {w.adapter.name === 'Trust' ? 'Trust Wallet' : w.adapter.name}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isConnectingThis ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40 inline-flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-brand/20 text-brand border border-brand/40 inline-flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         <span>CONNECTING</span>
                       </span>
                     ) : isDetected ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-toxic/20 text-toxic border border-toxic/40">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-brand/20 text-brand border border-brand/40">
                         DETECTED
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-xs font-mono font-medium text-dim border border-toxic-border flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-medium text-dim border border-brand-border flex items-center gap-1">
                         <span>Install</span>
                         <ExternalLink className="w-2.5 h-2.5" />
                       </span>
@@ -234,13 +234,13 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
 
         {/* Local Dev / Quick Connect Presets (Only visible when demoEnabled is true) */}
         {demoEnabled && (
-          <div className="px-5 pb-4 pt-3 border-t border-toxic-border/40 bg-surface-card/30 space-y-2">
+          <div className="px-5 pb-4 pt-3 border-t border-brand-border/40 bg-surface-card/30 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-bold text-toxic uppercase flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-toxic" />
+              <span className="font-mono text-xs font-bold text-brand uppercase flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-brand" />
                 <span>Localhost Quick Connect</span>
               </span>
-              <span className="text-xs font-mono text-muted bg-surface px-1.5 py-0.2 rounded border border-toxic-border/30">
+              <span className="text-xs font-mono text-muted bg-surface px-1.5 py-0.2 rounded border border-brand-border/30">
                 Dev Mode
               </span>
             </div>
@@ -251,9 +251,9 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 variant="secondary"
                 size="md"
                 onClick={() => onSelectDemoPreset?.('admin')}
-                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic/50 hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
+                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-brand/50 hover:border-brand text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
-                <span className="text-toxic font-black">⚡ Master Admin</span>
+                <span className="text-brand font-black">⚡ Master Admin</span>
                 <span className="text-xs text-muted mt-0.5">Admin Desk &amp; Pro</span>
               </Button>
 
@@ -262,7 +262,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 variant="secondary"
                 size="md"
                 onClick={() => onSelectDemoPreset?.('1m')}
-                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
+                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-brand-border hover:border-brand text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
                 <span className="text-white font-black">🛡️ Member Tier</span>
                 <span className="text-xs text-muted mt-0.5">1M+ $H42</span>
@@ -273,7 +273,7 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
                 variant="secondary"
                 size="md"
                 onClick={() => onSelectDemoPreset?.('0')}
-                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-toxic-border hover:border-toxic text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
+                className="h-auto p-2.5 rounded-lg bg-surface hover:bg-surface-card border border-brand-border hover:border-brand text-white font-mono text-xs transition-colors text-left flex flex-col justify-between items-start"
               >
                 <span className="text-muted font-black">🆓 Free Tier</span>
                 <span className="text-xs text-muted mt-0.5">0 Tokens</span>
@@ -283,8 +283,8 @@ export const TrenchWalletModal: React.FC<TrenchWalletModalProps> = ({
         )}
 
         {/* Footer info */}
-        <div className="px-5 py-3.5 bg-surface-card/60 border-t border-toxic-border flex items-center justify-between text-2xs font-mono text-muted">
-          <div className="flex items-center gap-1.5 text-toxic">
+        <div className="px-5 py-3.5 bg-surface-card/60 border-t border-brand-border flex items-center justify-between text-2xs font-mono text-muted">
+          <div className="flex items-center gap-1.5 text-brand">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Encrypted Web3 Authentication</span>
           </div>

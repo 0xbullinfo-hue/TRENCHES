@@ -61,7 +61,7 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-2xs font-mono px-2 py-0.5 rounded bg-pump/10 text-pump border border-pump/30 uppercase">
+            <span className="text-2xs font-mono px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/30 uppercase">
               Admin Area
             </span>
             <span className="text-2xs font-mono text-muted">{entries.length} Total Records</span>
@@ -76,7 +76,7 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
 
         <Link
           href="/admin/ledger/new"
-          className="h-11 px-5 rounded-md bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center gap-2 self-start sm:self-auto transition-colors"
+          className="h-11 px-5 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center gap-2 self-start sm:self-auto transition-colors"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
           <span>New Entry</span>
@@ -90,7 +90,7 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
             <p className="font-sans text-sm text-muted">No ledger entries posted yet.</p>
             <Link
               href="/admin/ledger/new"
-              className="inline-flex items-center gap-1.5 text-xs font-mono text-pump hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-brand hover:underline"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create the first ledger entry</span>

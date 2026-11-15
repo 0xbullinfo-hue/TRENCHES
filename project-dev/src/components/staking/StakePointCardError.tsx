@@ -44,7 +44,7 @@ export function StakePointCardError({ onRetry, errorMessage }: StakePointCardErr
             <button
               type="button"
               onClick={handleRetry}
-              className="text-pump hover:text-pump-hover underline font-bold cursor-pointer inline-flex items-center gap-1 ml-1"
+              className="text-brand hover:text-brand-hover underline font-bold cursor-pointer inline-flex items-center gap-1 ml-1"
             >
               <span>[Retry]</span>
             </button>
@@ -61,7 +61,7 @@ export function StakePointCardError({ onRetry, errorMessage }: StakePointCardErr
           onClick={handleRetry}
           className="w-full sm:w-auto h-10 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-line font-sans text-xs font-bold text-white inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-pump" />
+          <RefreshCw className="w-3.5 h-3.5 text-brand" />
           <span>Retry Loading</span>
         </button>
       </div>

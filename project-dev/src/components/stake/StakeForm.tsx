@@ -102,12 +102,12 @@ export function StakeForm({
     <div className="rounded-xl bg-surface border border-border-default p-6 sm:p-8 shadow-none space-y-6">
       <div className="flex items-center justify-between pb-4 border-b border-line">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-toxic" />
+          <ShieldCheck className="w-5 h-5 text-brand" />
           <h2 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
             Stake on StakePoint
           </h2>
         </div>
-        <span className="text-2xs font-mono text-toxic font-bold bg-toxic/10 border border-toxic/30 px-2.5 py-0.5 rounded-full uppercase">
+        <span className="text-2xs font-mono text-brand font-bold bg-brand/10 border border-brand/30 px-2.5 py-0.5 rounded-full uppercase">
           90-Day Lock
         </span>
       </div>
@@ -126,12 +126,12 @@ export function StakeForm({
             value={amountStr}
             onChange={handleInputChange}
             placeholder="250.00"
-            className="w-full h-12 pl-8 pr-16 rounded-lg bg-surface-card border border-line focus:border-toxic font-mono text-lg text-white font-bold transition-colors outline-none"
+            className="w-full h-12 pl-8 pr-16 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors outline-none"
           />
           <button
             type="button"
             onClick={handleMaxClick}
-            className="absolute right-3 px-2.5 py-1 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-toxic cursor-pointer uppercase transition-colors"
+            className="absolute right-3 px-2.5 py-1 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-brand cursor-pointer uppercase transition-colors"
           >
             Max
           </button>
@@ -157,7 +157,7 @@ export function StakeForm({
         </div>
         <div className="flex justify-between items-center text-muted">
           <span>Primary Staking Tool</span>
-          <span className="font-mono text-toxic font-bold">StakePoint</span>
+          <span className="font-mono text-brand font-bold">StakePoint</span>
         </div>
       </div>
 
@@ -167,7 +167,7 @@ export function StakeForm({
           href={stakepointUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full h-12 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+          className="w-full h-12 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
         >
           <span>Stake $H42 on StakePoint →</span>
           <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -195,12 +195,12 @@ export function StakeForm({
             value={txSignature}
             onChange={(e) => setTxSignature(e.target.value)}
             placeholder="Paste transaction signature..."
-            className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-line focus:border-toxic font-mono text-xs text-white outline-none"
+            className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none"
           />
           <button
             type="submit"
             disabled={isVerifyingSignature || !txSignature.trim()}
-            className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-3 border border-toxic/50 hover:border-toxic text-toxic font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
+            className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
           >
             {isVerifyingSignature ? 'Verifying...' : 'Verify Stake'}
           </button>

@@ -5,10 +5,10 @@ import { Target, Shield, Activity, Info } from 'lucide-react';
 
 export const AlphaIntelligencePreview: React.FC = () => {
   return (
-    <section id="alpha-intelligence" className="border-b border-toxic-border bg-canvas py-16">
+    <section id="alpha-intelligence" className="border-b border-brand-border bg-canvas py-16">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
-        <div className="pb-6 border-b border-toxic-border">
+        <div className="pb-6 border-b border-brand-border">
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-alpha-primary">
             INTELLIGENCE TELEMETRY
           </span>
@@ -36,7 +36,7 @@ export const AlphaIntelligencePreview: React.FC = () => {
               </div>
 
               <div className="p-4 rounded-xl bg-surface border border-border-default space-y-1">
-                <div className="flex items-center gap-2 text-toxic font-mono text-xs font-bold uppercase">
+                <div className="flex items-center gap-2 text-brand font-mono text-xs font-bold uppercase">
                   <Shield className="w-4 h-4" />
                   <span>Risk Parameter &amp; Invalidation (SL)</span>
                 </div>
@@ -47,7 +47,7 @@ export const AlphaIntelligencePreview: React.FC = () => {
 
               <div className="p-4 rounded-xl bg-surface border border-border-default space-y-1">
                 <div className="flex items-center gap-2 text-white font-mono text-xs font-bold uppercase">
-                  <Activity className="w-4 h-4 text-toxic" />
+                  <Activity className="w-4 h-4 text-brand" />
                   <span>Verified Contract Address &amp; Provider Freshness</span>
                 </div>
                 <p className="font-sans text-xs text-muted leading-relaxed">
@@ -105,12 +105,12 @@ export const AlphaIntelligencePreview: React.FC = () => {
 
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">TARGET 1 &amp; 2</div>
-                  <div className="text-toxic font-bold">2x ($800K) • 5x ($2.0M)</div>
+                  <div className="text-brand font-bold">2x ($800K) • 5x ($2.0M)</div>
                 </div>
 
                 <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
                   <div className="text-[10px] text-muted uppercase font-bold">TARGET 3</div>
-                  <div className="text-toxic-bright font-black">10x ($4.0M MC)</div>
+                  <div className="text-brand-bright font-black">10x ($4.0M MC)</div>
                 </div>
               </div>
 

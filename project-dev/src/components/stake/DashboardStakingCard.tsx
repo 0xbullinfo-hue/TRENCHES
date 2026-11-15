@@ -45,11 +45,11 @@ export function TelegramVerificationCard({
   const { status, message, start, stop, publicKeyBase58 } = useTelegramLink();
 
   return (
-    <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
+    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-toxic/15 text-toxic border border-toxic/30 font-sans text-xs font-black uppercase">
-            <Send className="w-3 h-3 text-toxic" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30 font-sans text-xs font-black uppercase">
+            <Send className="w-3 h-3 text-brand" />
             <span>TELEGRAM ALERTS</span>
           </span>
           <span className="text-2xs font-mono text-muted uppercase">
@@ -68,8 +68,8 @@ export function TelegramVerificationCard({
 
       <div className="pt-5 mt-auto space-y-3">
         {status === 'linked' ? (
-          <div className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg bg-toxic-bg border border-toxic-border font-mono text-xs">
-            <span className="inline-flex items-center gap-1.5 text-toxic font-bold uppercase text-xs">
+          <div className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
+            <span className="inline-flex items-center gap-1.5 text-brand font-bold uppercase text-xs">
               <Check className="w-4 h-4 stroke-[2.5]" /> Telegram alerts on
             </span>
             <Button
@@ -143,7 +143,7 @@ function StakePointLiveSection({
           variant="ghost"
           size="sm"
           onClick={onRetry}
-          className="h-auto p-0 text-toxic hover:text-toxic-bright underline font-bold gap-1"
+          className="h-auto p-0 text-brand hover:text-brand-bright underline font-bold gap-1"
         >
           <RefreshCw className="w-3 h-3" />
           <span>[Retry]</span>
@@ -178,14 +178,14 @@ function StakePointLiveSection({
           LIVE STAKEPOINT APR
         </span>
         {pool.status && (
-          <span className="font-sans text-xs font-bold text-toxic uppercase">
+          <span className="font-sans text-xs font-bold text-brand uppercase">
             ● {pool.status}
           </span>
         )}
       </div>
 
       <div
-        className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${aprIsPositive ? 'text-toxic' : 'text-muted'
+        className={`font-mono text-2xl sm:text-3xl font-extrabold leading-tight tnum ${aprIsPositive ? 'text-brand' : 'text-muted'
           }`}
       >
         {aprValue !== null ? `${aprValue.toFixed(1)}%` : '0.0%'}
@@ -335,7 +335,7 @@ export function DashboardStakingCard({
                 href={stakePointPoolUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted hover:text-toxic transition-colors"
+                className="text-muted hover:text-brand transition-colors"
                 title="Open Pool on StakePoint"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -356,7 +356,7 @@ export function DashboardStakingCard({
           {/* Access Tier Requirements */}
           <div className="space-y-3">
             <div className="space-y-1">
-              <span className="font-sans text-xs font-black text-toxic uppercase tracking-wider block">
+              <span className="font-sans text-xs font-black text-brand uppercase tracking-wider block">
                 MEMBER ACCESS
               </span>
               <p className="font-sans text-xs text-muted leading-relaxed">
@@ -379,7 +379,7 @@ export function DashboardStakingCard({
               href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
             >
               <span>STAKE ON STAKEPOINT</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -417,7 +417,7 @@ export function DashboardStakingCard({
     const daysLeft = statusData?.stake?.days_remaining ?? 90;
 
     const proCard = (
-      <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-colors flex flex-col justify-between h-full">
+      <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-colors flex flex-col justify-between h-full">
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
@@ -431,7 +431,7 @@ export function DashboardStakingCard({
                 href={stakePointPoolUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted hover:text-toxic transition-colors"
+                className="text-muted hover:text-brand transition-colors"
                 title="Open Pool on StakePoint"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -465,7 +465,7 @@ export function DashboardStakingCard({
               href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+              className="h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
             >
               <span>STAKE ADDITIONAL</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -491,7 +491,7 @@ export function DashboardStakingCard({
               </div>
               <div className="w-full h-2 bg-canvas rounded-full overflow-hidden border border-border-default">
                 <div
-                  className="h-full bg-toxic rounded-full transition-all duration-300"
+                  className="h-full bg-brand rounded-full transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -527,7 +527,7 @@ export function DashboardStakingCard({
     : 'Buy $250 worth of $H42 and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.';
 
   const memberCard = (
-    <div className="rounded-xl bg-surface border border-toxic/40 hover:border-toxic p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
+    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
@@ -541,7 +541,7 @@ export function DashboardStakingCard({
               href={stakePointPoolUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted hover:text-toxic transition-colors"
+              className="text-muted hover:text-brand transition-colors"
               title="Open Pool on StakePoint"
             >
               <ArrowUpRight className="w-4 h-4" />
@@ -575,7 +575,7 @@ export function DashboardStakingCard({
             href={stakePointPoolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
           >
             <span>STAKE $H42</span>
             <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -588,7 +588,7 @@ export function DashboardStakingCard({
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-toxic hover:text-toxic-bright inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors"
             >
               <span>View all pools →</span>
             </a>

@@ -173,7 +173,7 @@ export function TelegramConnectButton({
   if (loading && !status) {
     return (
       <Skeleton
-        className={`rounded-md border border-toxic-border/40 ${
+        className={`rounded-md border border-brand-border/40 ${
           compact ? 'h-9 w-36' : 'h-11 w-48'
         }`}
       />
@@ -187,7 +187,7 @@ export function TelegramConnectButton({
         <span>Couldn&apos;t check Telegram status.</span>
         <button
           onClick={() => refetchStatus()}
-          className="text-toxic underline underline-offset-2 hover:text-toxic-bright font-bold"
+          className="text-brand underline underline-offset-2 hover:text-brand-bright font-bold"
         >
           [Retry]
         </button>
@@ -209,7 +209,7 @@ export function TelegramConnectButton({
         href={process.env.NEXT_PUBLIC_BOT_URL || 'https://t.me/Trenchlabs_bot'}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#0d2218] border border-toxic/40 text-toxic hover:border-toxic transition-colors select-none"
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#0d2218] border border-brand/40 text-brand hover:border-brand transition-colors select-none"
       >
         <span>✅ Telegram connected{tierName ? ` (${tierName})` : ''}</span>
       </a>
@@ -222,7 +222,7 @@ export function TelegramConnectButton({
       <div className="relative group inline-block">
         <button
           disabled
-          className={`rounded-md border border-toxic-border/30 bg-[#161c24] text-muted/60 font-sans text-xs font-semibold cursor-not-allowed select-none ${
+          className={`rounded-md border border-brand-border/30 bg-[#161c24] text-muted/60 font-sans text-xs font-semibold cursor-not-allowed select-none ${
             compact ? 'px-3 py-1.5' : 'h-11 px-5'
           }`}
           title="Verify your wallet to unlock Telegram access."
@@ -244,22 +244,22 @@ export function TelegramConnectButton({
       <button
         onClick={handleConnectClick}
         disabled={opening || polling}
-        className={`rounded-lg font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
+        className={`rounded-lg font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
           compact ? 'h-9 px-4 text-xs' : 'h-11 px-6 text-sm'
         } ${
           opening || polling
-            ? 'bg-[#1b2533] border border-border-default text-toxic cursor-wait'
-            : 'bg-toxic hover:bg-toxic-bright text-canvas font-black cursor-pointer shadow-none'
+            ? 'bg-[#1b2533] border border-border-default text-brand cursor-wait'
+            : 'bg-brand hover:bg-brand-bright text-canvas font-black cursor-pointer shadow-none'
         }`}
       >
         {opening ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-toxic" />
+            <Loader2 className="w-4 h-4 animate-spin text-brand" />
             <span>Opening Telegram...</span>
           </>
         ) : polling ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-toxic" />
+            <Loader2 className="w-4 h-4 animate-spin text-brand" />
             <span>Waiting for you in Telegram...</span>
           </>
         ) : (
@@ -274,7 +274,7 @@ export function TelegramConnectButton({
       )}
 
       {retryHelper && (
-        <p className="font-sans text-xs text-toxic font-semibold">{retryHelper}</p>
+        <p className="font-sans text-xs text-brand font-semibold">{retryHelper}</p>
       )}
 
       {errorMessage && (

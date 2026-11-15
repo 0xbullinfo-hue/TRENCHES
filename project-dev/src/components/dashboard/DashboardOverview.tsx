@@ -57,7 +57,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-toxic shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-brand shrink-0">
               <Flame className="w-5 h-5" />
             </div>
             <div>
@@ -70,7 +70,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     isPro
                       ? 'bg-alpha-strong text-white border border-alpha-border'
                       : isMember
-                      ? 'bg-toxic-bg text-toxic border border-toxic-border'
+                      ? 'bg-brand-bg text-brand border border-brand-border'
                       : 'bg-surface-card text-muted border border-border-default'
                   }`}
                 >
@@ -92,9 +92,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               title="Copy $H42 token contract address"
             >
               {copiedGenesisCa ? (
-                <Check className="w-3.5 h-3.5 text-toxic" />
+                <Check className="w-3.5 h-3.5 text-brand" />
               ) : (
-                <Copy className="w-3.5 h-3.5 text-toxic" />
+                <Copy className="w-3.5 h-3.5 text-brand" />
               )}
               <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $H42 CA'}</span>
             </Button>
@@ -103,7 +103,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               href={BUY_LINKS.pump}
               target="_blank"
               rel="noreferrer"
-              className="h-10 px-4 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Buy $H42</span>
               <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -116,7 +116,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
             <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
               <span>WALLET STATUS</span>
-              <Wallet className="w-3.5 h-3.5 text-toxic" />
+              <Wallet className="w-3.5 h-3.5 text-brand" />
             </div>
             <div className="text-white font-bold truncate tnum">
               {connected ? shortAddress : 'Disconnected'}
@@ -126,7 +126,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
             <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
               <span>VERIFIED BALANCE</span>
-              <span className="text-toxic font-mono text-xs">SPL</span>
+              <span className="text-brand font-mono text-xs">SPL</span>
             </div>
             <div className="text-white font-black tnum">
               {formattedBalance} $H42
@@ -145,14 +145,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
           <Link
             href="/dashboard/stake"
-            className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-toxic"
+            className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
             title="Explore StakePoint 90-day staking for Pro Tier"
           >
-            <div className="text-xs text-muted group-hover:text-toxic uppercase font-bold tracking-wider flex items-center justify-between">
+            <div className="text-xs text-muted group-hover:text-brand uppercase font-bold tracking-wider flex items-center justify-between">
               <span>PRO STAKING STATUS</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-toxic" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-brand" />
             </div>
-            <div className="text-toxic-bright font-black">
+            <div className="text-brand-bright font-black">
               {isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}
             </div>
           </Link>
@@ -184,14 +184,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               onSelectTab?.('ALPHA');
               onSelectFilter?.('new');
             }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-toxic flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
+            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-brand flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
             title="Filter by new Alpha Calls"
           >
             <div className="space-y-0.5">
               <div className="text-xs text-muted uppercase font-bold">NEW CALLS</div>
-              <div className="text-base font-black text-toxic tnum">{newCallsCount}</div>
+              <div className="text-base font-black text-brand tnum">{newCallsCount}</div>
             </div>
-            <Sparkles className="w-4 h-4 text-toxic" />
+            <Sparkles className="w-4 h-4 text-brand" />
           </Button>
 
           <Button

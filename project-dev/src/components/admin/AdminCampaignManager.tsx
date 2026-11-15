@@ -669,7 +669,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  camp.status === 'ACTIVE' ? 'bg-toxic' : 'bg-idle'
+                  camp.status === 'ACTIVE' ? 'bg-brand' : 'bg-idle'
                 }`}
               />
               <span className="truncate max-w-[200px]">{camp.title}</span>
@@ -741,7 +741,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                   onClick={() => handleToggleStatus(currentCamp)}
                   className={`h-9 px-3 rounded-lg font-mono text-xs font-bold border ${
                     currentCamp.status === 'ACTIVE'
-                      ? 'bg-toxic-bg text-toxic border-toxic-border hover:bg-toxic-bg'
+                      ? 'bg-brand-bg text-brand border-brand-border hover:bg-brand-bg'
                       : 'bg-surface text-muted border-border-default hover:bg-surface'
                   }`}
                 >
@@ -771,7 +771,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 <div className="text-amber">
                   Pending Airdrop: <strong>{pendingCount}</strong>
                 </div>
-                <div className="text-toxic">
+                <div className="text-brand">
                   Airdropped: <strong>{airdroppedCount}</strong>
                 </div>
               </div>
@@ -785,7 +785,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                 title="Copies list of all pending Solana wallet addresses separated by newline"
               >
                 {copiedWallets ? (
-                  <Check className="w-3.5 h-3.5 text-toxic" />
+                  <Check className="w-3.5 h-3.5 text-brand" />
                 ) : (
                   <Copy className="w-3.5 h-3.5 text-raid-primary" />
                 )}
@@ -853,7 +853,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                               title="Copy wallet"
                             >
                               {copiedSingleWallet === sub.walletAddress ? (
-                                <Check className="w-3 h-3 text-toxic" />
+                                <Check className="w-3 h-3 text-brand" />
                               ) : (
                                 <Copy className="w-3 h-3" />
                               )}
@@ -901,7 +901,7 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
                           <span
                             className={`px-2.5 py-1 rounded-md text-xs font-black uppercase inline-flex items-center gap-1 ${
                               sub.status === 'AIRDROPPED'
-                                ? 'bg-toxic-bg text-toxic border border-toxic-border'
+                                ? 'bg-brand-bg text-brand border border-brand-border'
                                 : 'bg-amber/15 text-amber border border-amber/40'
                             }`}
                           >

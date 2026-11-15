@@ -343,7 +343,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
     >
       {/* Top-Left Category / Motif Pill if present */}
       {art.badgeText && (
-        <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full bg-pump text-canvas font-sans text-[10px] font-bold">
+        <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full bg-brand text-canvas font-sans text-[10px] font-bold">
           ♥ {art.badgeText}
         </div>
       )}
@@ -390,9 +390,9 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
           <span
             className={`w-2 h-2 rounded-full ${
               chain === 'SOL' || chain === 'ROBIN'
-                ? 'bg-pump'
+                ? 'bg-brand'
                 : chain === 'BASE' || chain === 'ETH'
-                ? 'bg-pump-pill'
+                ? 'bg-brand-pill'
                 : 'bg-amber'
             }`}
           />

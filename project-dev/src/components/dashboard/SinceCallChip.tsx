@@ -14,7 +14,7 @@ export function SinceCallChip({ current, entry }: { current?: number; entry?: nu
   return (
     <span
       className={`inline-flex items-center px-1.5 py-0.5 rounded-sm border font-mono tnum text-[10px] font-bold uppercase ${
-        up ? 'text-pump bg-toxic-bg border-toxic-border' : 'text-danger bg-surface-card border-line'
+        up ? 'text-brand bg-brand-bg border-brand-border' : 'text-danger bg-surface-card border-line'
       }`}
       title="Current market cap divided by market cap at the time of the call"
     >

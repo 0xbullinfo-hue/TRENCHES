@@ -19,7 +19,7 @@ export default function GlobalError({
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-md w-full rounded-2xl bg-surface border border-toxic-border p-8 space-y-5">
+      <div className="max-w-md w-full rounded-2xl bg-surface border border-brand-border p-8 space-y-5">
         <div className="flex justify-center">
           <HexCubeLogo size={42} />
         </div>

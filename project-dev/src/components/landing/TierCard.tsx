@@ -37,8 +37,8 @@ export function TierCard({
     <div
       className={`relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-colors bg-surface-card shadow-none ${
         emphasized
-          ? 'border border-toxic hover:border-toxic-bright'
-          : 'border border-border-default hover:border-toxic'
+          ? 'border border-brand hover:border-brand-bright'
+          : 'border border-border-default hover:border-brand'
       }`}
     >
       {/* Top Header & Badge */}
@@ -48,7 +48,7 @@ export function TierCard({
             {name}
           </span>
           {badge && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-toxic-bg text-toxic border border-toxic-border uppercase tracking-wide">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-bg text-brand border border-brand-border uppercase tracking-wide">
               {badge}
             </span>
           )}
@@ -61,7 +61,7 @@ export function TierCard({
           </div>
           <div className="font-sans text-xs text-muted font-medium">{subtitle}</div>
           {thresholdLabel ? (
-            <div className="font-mono text-[11px] text-toxic font-semibold pt-0.5 tnum">
+            <div className="font-mono text-[11px] text-brand font-semibold pt-0.5 tnum">
               {thresholdLabel}
             </div>
           ) : (
@@ -75,7 +75,7 @@ export function TierCard({
         <ul className="space-y-2.5 pt-4 border-t border-border-default">
           {features.map((feature, idx) => (
             <li key={idx} className="flex items-start gap-2">
-              <span className="text-toxic font-bold text-xs select-none leading-none pt-0.5">✓</span>
+              <span className="text-brand font-bold text-xs select-none leading-none pt-0.5">✓</span>
               <span className="font-sans text-xs text-ink/90 leading-tight">{feature}</span>
             </li>
           ))}
@@ -88,10 +88,10 @@ export function TierCard({
           <button
             type="button"
             onClick={connectWallet}
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
               emphasized
-                ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
-                : 'border border-toxic text-toxic hover:bg-toxic/10'
+                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
+                : 'border border-brand text-brand hover:bg-brand/10'
             }`}
           >
             CONNECT WALLET
@@ -118,10 +118,10 @@ export function TierCard({
             href={ctaHref}
             target="_blank"
             rel="noreferrer"
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
               emphasized
-                ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
-                : 'border border-toxic text-toxic hover:bg-toxic/10'
+                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
+                : 'border border-brand text-brand hover:bg-brand/10'
             }`}
           >
             {ctaLabel.toUpperCase()}
@@ -129,10 +129,10 @@ export function TierCard({
         ) : (
           <Link
             href={ctaHref}
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-toxic ${
+            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
               emphasized
-                ? 'bg-toxic hover:bg-toxic-bright text-canvas font-black'
-                : 'border border-toxic text-toxic hover:bg-toxic/10'
+                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
+                : 'border border-brand text-brand hover:bg-brand/10'
             }`}
           >
             {ctaLabel.toUpperCase()}

@@ -58,12 +58,12 @@ export const PerformanceTrustSection: React.FC = () => {
   const hasRecords = stats && stats.totalRecordedCalls > 0;
 
   return (
-    <section id="ledger-section" className="border-b border-toxic-border bg-canvas py-16">
+    <section id="ledger-section" className="border-b border-brand-border bg-canvas py-16">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-toxic-border">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-brand-border">
           <div>
-            <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
+            <span className="font-sans text-xs font-bold uppercase tracking-widest text-brand">
               TRANSPARENCY &amp; ACCOUNTABILITY
             </span>
             <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
@@ -88,7 +88,7 @@ export const PerformanceTrustSection: React.FC = () => {
 
             <Link
               href="/ledger"
-              className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-toxic text-white hover:text-toxic font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
+              className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
             >
               <span>EXPLORE FULL LEDGER</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -107,7 +107,7 @@ export const PerformanceTrustSection: React.FC = () => {
             <button
               type="button"
               onClick={fetchStats}
-              className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-2 hover:border-toxic cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-2 hover:border-brand cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry Request</span>
@@ -137,7 +137,7 @@ export const PerformanceTrustSection: React.FC = () => {
             <div className="pt-2">
               <Link
                 href="/ledger"
-                className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white hover:text-toxic font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors"
+                className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white hover:text-brand font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors"
               >
                 <span>View Ledger Route</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -160,11 +160,11 @@ export const PerformanceTrustSection: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-xl bg-surface border border-border-default space-y-2">
-              <div className="font-sans text-xs font-bold uppercase text-toxic tracking-wider flex items-center justify-between">
+              <div className="font-sans text-xs font-bold uppercase text-brand tracking-wider flex items-center justify-between">
                 <span>PROFITABLE CALLS</span>
-                <CheckCircle2 className="w-4 h-4 text-toxic" />
+                <CheckCircle2 className="w-4 h-4 text-brand" />
               </div>
-              <div className="font-sans text-3xl font-black text-toxic tnum">
+              <div className="font-sans text-3xl font-black text-brand tnum">
                 {stats.profitableCalls}
               </div>
               <div className="font-sans text-xs text-muted">
@@ -203,7 +203,7 @@ export const PerformanceTrustSection: React.FC = () => {
 
         {/* Institutional Trust & Non-Guarantee Statement */}
         <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-3">
-          <div className="flex items-center gap-2 text-toxic font-mono text-xs font-extrabold uppercase">
+          <div className="flex items-center gap-2 text-brand font-mono text-xs font-extrabold uppercase">
             <ShieldCheck className="w-4 h-4" />
             <span>INSTITUTIONAL INTEGRITY PLEDGE</span>
           </div>

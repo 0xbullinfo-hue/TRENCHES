@@ -36,14 +36,14 @@ export const Footer: React.FC = () => {
             <Link href="/" className="flex items-center gap-2.5">
               <HexCubeLogo />
               <span className="font-sans font-extrabold tracking-tight text-xl text-white">
-                Trench<span className="text-toxic">Labs</span>HQ
+                Trench<span className="text-brand">Labs</span>HQ
               </span>
             </Link>
             <p className="font-sans text-xs text-muted leading-relaxed max-w-sm">
               The premier crypto intelligence terminal in the trenches. Multi-chain curation, disciplined take-profit milestones, and community reward campaigns.
             </p>
             <div className="flex items-center gap-2 font-mono text-[11px] text-muted">
-              <span className="w-2 h-2 rounded-full bg-toxic" />
+              <span className="w-2 h-2 rounded-full bg-brand" />
               <span>Token: $H42 • Solana Native</span>
             </div>
           </div>
@@ -55,29 +55,29 @@ export const Footer: React.FC = () => {
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/#hero-section" className="hover:text-toxic transition-colors">
+                <Link href="/#hero-section" className="hover:text-brand transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works" className="hover:text-toxic transition-colors">
+                <Link href="/#how-it-works" className="hover:text-brand transition-colors">
                   How The Lab Works
                 </Link>
               </li>
               <li>
-                <Link href="/#pipeline-section" className="hover:text-toxic transition-colors">
+                <Link href="/#pipeline-section" className="hover:text-brand transition-colors">
                   Incubator Pipeline
                 </Link>
               </li>
               <li>
-                <Link href="/#choose-your-access" className="hover:text-toxic transition-colors">
+                <Link href="/#choose-your-access" className="hover:text-brand transition-colors">
                   Membership Tiers
                 </Link>
               </li>
               <li>
-                <Link href="/ledger" className="hover:text-toxic transition-colors inline-flex items-center gap-1">
+                <Link href="/ledger" className="hover:text-brand transition-colors inline-flex items-center gap-1">
                   <span>Performance Ledger</span>
-                  <ArrowUpRight className="w-3 h-3 text-toxic" />
+                  <ArrowUpRight className="w-3 h-3 text-brand" />
                 </Link>
               </li>
             </ul>
@@ -94,7 +94,7 @@ export const Footer: React.FC = () => {
                   href={communityUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-toxic transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
                 >
                   <span>Telegram</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
@@ -105,7 +105,7 @@ export const Footer: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-toxic transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
                 >
                   <span>X (Twitter)</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
@@ -125,10 +125,10 @@ export const Footer: React.FC = () => {
                   href={BUY_LINKS.pump}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-toxic transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
                 >
                   <span>Buy on Pump.fun</span>
-                  <ArrowUpRight className="w-3 h-3 text-toxic" />
+                  <ArrowUpRight className="w-3 h-3 text-brand" />
                 </a>
               </li>
               <li>
@@ -136,14 +136,14 @@ export const Footer: React.FC = () => {
                   href={SOLSCAN.token(GENESIS_MINT)}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-toxic transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
                 >
                   <span>Solscan SPL Explorer</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
                 </a>
               </li>
               <li>
-                <Link href="/dashboard" className="hover:text-toxic transition-colors">
+                <Link href="/dashboard" className="hover:text-brand transition-colors">
                   Terminal Login
                 </Link>
               </li>
@@ -164,7 +164,7 @@ export const Footer: React.FC = () => {
         {/* Bottom Copyright & Back to Top Row */}
         <div className="pt-6 border-t border-border-default/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-toxic" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <span className="text-white font-medium">
               TrenchLabsHQ © 2026 — Built in the Trenches. All rights reserved.
             </span>
@@ -173,7 +173,7 @@ export const Footer: React.FC = () => {
           <Link
             href={isHomePage ? '#hero-section' : '/#hero-section'}
             onClick={handleBackToTop}
-            className="inline-flex items-center gap-1 text-muted hover:text-toxic font-bold uppercase transition-colors"
+            className="inline-flex items-center gap-1 text-muted hover:text-brand font-bold uppercase transition-colors"
           >
             <span>BACK TO TOP</span>
             <ArrowUp className="w-3.5 h-3.5" />

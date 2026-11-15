@@ -149,8 +149,8 @@ export function TelegramAlerts() {
   return (
     <div className="w-full">
       {status === 'linked' ? (
-        <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-toxic-bg border border-toxic-border font-mono text-xs">
-          <span className="inline-flex items-center gap-1.5 text-pump font-bold uppercase text-[10px]">
+        <div className="flex items-center justify-between w-full px-3 py-2 rounded bg-brand-bg border border-brand-border font-mono text-xs">
+          <span className="inline-flex items-center gap-1.5 text-brand font-bold uppercase text-[10px]">
             <Check className="w-3.5 h-3.5" /> Telegram alerts on
           </span>
           <button
@@ -166,7 +166,7 @@ export function TelegramAlerts() {
           type="button"
           onClick={start}
           disabled={!publicKeyBase58 || status === 'working' || status === 'waiting'}
-          className="w-full h-9 rounded bg-surface-card hover:bg-pump hover:text-canvas border border-line font-sans text-xs font-bold text-pump flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default"
+          className="w-full h-9 rounded bg-surface-card hover:bg-brand hover:text-canvas border border-line font-sans text-xs font-bold text-brand flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default"
         >
           <Send className="w-3.5 h-3.5" />
           <span>

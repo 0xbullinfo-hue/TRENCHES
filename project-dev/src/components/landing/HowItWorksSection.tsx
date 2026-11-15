@@ -36,11 +36,11 @@ const STAGES = [
 
 export const HowItWorksSection: React.FC = () => {
   return (
-    <section id="how-it-works" className="border-b border-toxic-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
+    <section id="how-it-works" className="border-b border-brand-border bg-canvas py-16 scroll-mt-20 sm:scroll-mt-24">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
-        <div className="pb-6 border-b border-toxic-border">
-          <span className="font-sans text-xs font-bold uppercase tracking-widest text-toxic">
+        <div className="pb-6 border-b border-brand-border">
+          <span className="font-sans text-xs font-bold uppercase tracking-widest text-brand">
             PLATFORM ARCHITECTURE
           </span>
           <h2 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white mt-1">
@@ -58,15 +58,15 @@ export const HowItWorksSection: React.FC = () => {
             return (
               <div
                 key={stage.step}
-                className="rounded-xl bg-surface border border-border-default hover:border-toxic transition-all duration-150 p-6 flex flex-col justify-between min-h-[220px]"
+                className="rounded-xl bg-surface border border-border-default hover:border-brand transition-all duration-150 p-6 flex flex-col justify-between min-h-[220px]"
               >
                 <div>
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-border-default">
-                    <span className="font-mono text-2xl font-black text-toxic tracking-tight">
+                    <span className="font-mono text-2xl font-black text-brand tracking-tight">
                       {stage.step}
                     </span>
                     <div className="w-9 h-9 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-muted">
-                      <Icon className="w-4 h-4 text-toxic" />
+                      <Icon className="w-4 h-4 text-brand" />
                     </div>
                   </div>
                   <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-wider mb-2">

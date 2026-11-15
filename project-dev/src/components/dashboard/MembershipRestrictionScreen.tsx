@@ -123,10 +123,10 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
       {/* Category Header Badge & Icon */}
       <div className="flex flex-col items-center gap-3">
         <div className="w-14 h-14 rounded-2xl bg-surface-card border border-border-default flex items-center justify-center text-foreground-muted">
-          <Lock className="w-6 h-6 text-toxic" />
+          <Lock className="w-6 h-6 text-brand" />
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-card border border-border-default font-mono text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-          <ShieldAlert className="w-3.5 h-3.5 text-toxic" />
+          <ShieldAlert className="w-3.5 h-3.5 text-brand" />
           <span>{content.badgeText}</span>
         </div>
       </div>
@@ -153,7 +153,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
         </div>
 
         <div className="pt-2 border-t border-border-default space-y-1">
-          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-toxic">
+          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-brand">
             RECOMMENDED ACTION
           </div>
           <p className="text-xs text-foreground-muted">
@@ -164,9 +164,9 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
 
       {/* Tier Requirement Details */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto text-left font-sans text-xs">
-        <div className={`p-3.5 rounded-lg border ${content.requiredTier === 'MEMBER' ? 'bg-surface-card border-toxic/40' : 'bg-surface-card/50 border-border-default'}`}>
+        <div className={`p-3.5 rounded-lg border ${content.requiredTier === 'MEMBER' ? 'bg-surface-card border-brand/40' : 'bg-surface-card/50 border-border-default'}`}>
           <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
-            <CheckCircle2 className={`w-3.5 h-3.5 ${content.requiredTier === 'MEMBER' ? 'text-toxic' : 'text-muted'}`} />
+            <CheckCircle2 className={`w-3.5 h-3.5 ${content.requiredTier === 'MEMBER' ? 'text-brand' : 'text-muted'}`} />
             <span>MEMBER ACCESS</span>
           </div>
           <p className="text-foreground-muted text-[11px] mt-1 leading-relaxed">
@@ -191,7 +191,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
           <button
             type="button"
             onClick={onVerifyClick}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-surface border border-toxic text-toxic hover:bg-surface-3 font-sans text-xs sm:text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-surface border border-brand text-brand hover:bg-surface-3 font-sans text-xs sm:text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <span>VERIFY WALLET OWNERSHIP</span>
           </button>
@@ -200,7 +200,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
           <button
             type="button"
             onClick={onUpgradeClick}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <span>{content.ctaLabel}</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />
@@ -208,7 +208,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
         ) : (
           <Link
             href={content.ctaHref}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <span>{content.ctaLabel}</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />

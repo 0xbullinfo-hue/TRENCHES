@@ -60,14 +60,14 @@ export const LockedTerminal: React.FC = () => {
       <div className="rounded-xl border border-border-default bg-surface max-w-2xl mx-auto overflow-hidden shadow-none">
         <div className="px-6 py-4 bg-surface-card border-b border-border-default flex items-center justify-between font-sans text-xs font-bold text-muted">
           <div className="flex items-center gap-2 text-white">
-            <Lock className="w-4 h-4 text-toxic" />
+            <Lock className="w-4 h-4 text-brand" />
             <span>WALLET AUTHENTICATION REQUIRED</span>
           </div>
-          <span className="text-toxic font-mono">DISCONNECTED</span>
+          <span className="text-brand font-mono">DISCONNECTED</span>
         </div>
 
         <div className="p-6 sm:p-8 text-center space-y-5">
-          <div className="w-12 h-12 rounded-lg bg-surface-card border border-border-default mx-auto flex items-center justify-center text-toxic">
+          <div className="w-12 h-12 rounded-lg bg-surface-card border border-border-default mx-auto flex items-center justify-center text-brand">
             <Wallet className="w-5 h-5" />
           </div>
 
@@ -77,7 +77,7 @@ export const LockedTerminal: React.FC = () => {
             </h3>
             <p className="font-sans text-sm text-muted max-w-lg mx-auto leading-relaxed">
               Connect Phantom, Solflare, Trust Wallet, or Backpack to verify your wallet holding.
-              Holding at least <strong className="text-toxic font-bold">~$20 $H42</strong> unlocks full
+              Holding at least <strong className="text-brand font-bold">~$20 $H42</strong> unlocks full
               access to live trade calls, contract addresses, and incubator allocations.
             </p>
           </div>
@@ -92,7 +92,7 @@ export const LockedTerminal: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={copyContract}
-              className={`h-auto p-0 ${copyError ? 'text-danger hover:text-danger' : 'text-toxic hover:text-toxic-bright'} font-bold inline-flex items-center gap-1 shrink-0 hover:bg-transparent`}
+              className={`h-auto p-0 ${copyError ? 'text-danger hover:text-danger' : 'text-brand hover:text-brand-bright'} font-bold inline-flex items-center gap-1 shrink-0 hover:bg-transparent`}
               aria-label="Copy token contract address"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -112,7 +112,7 @@ export const LockedTerminal: React.FC = () => {
               variant="primary"
               size="lg"
               onClick={connectWallet}
-              className="w-full h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 shadow-none"
+              className="w-full h-12 min-h-[44px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center justify-center gap-2 shadow-none"
             >
               <Wallet className="w-4 h-4 stroke-[2.5]" />
               <span>Connect Solana Wallet</span>
@@ -127,7 +127,7 @@ export const LockedTerminal: React.FC = () => {
   if (needsSignature) {
     return (
       <div className="rounded-xl border border-border-default bg-surface max-w-2xl mx-auto overflow-hidden shadow-none">
-        <div className="px-6 py-4 border-b border-border-default bg-toxic-bg flex items-center justify-between font-sans text-xs font-bold text-toxic">
+        <div className="px-6 py-4 border-b border-border-default bg-brand-bg flex items-center justify-between font-sans text-xs font-bold text-brand">
           <div className="flex items-center gap-2">
             <KeyRound className="w-4 h-4" />
             <span>CRYPTOGRAPHIC VERIFICATION REQUIRED</span>
@@ -136,7 +136,7 @@ export const LockedTerminal: React.FC = () => {
         </div>
 
         <div className="p-6 sm:p-8 text-center space-y-5">
-          <div className="w-12 h-12 rounded-lg bg-surface-card border border-border-default mx-auto flex items-center justify-center text-toxic">
+          <div className="w-12 h-12 rounded-lg bg-surface-card border border-border-default mx-auto flex items-center justify-center text-brand">
             <KeyRound className="w-6 h-6" />
           </div>
 
@@ -166,7 +166,7 @@ export const LockedTerminal: React.FC = () => {
               onClick={requestUnlockSignature}
               disabled={apiLoading}
               loading={apiLoading}
-              className="h-12 min-h-[44px] px-6 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2"
+              className="h-12 min-h-[44px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-sm font-black uppercase inline-flex items-center gap-2"
             >
               <KeyRound className="w-4 h-4 stroke-[2.5] mr-1.5" />
               <span>{apiLoading ? 'Verifying...' : 'Sign to Unlock Alpha Calls'}</span>
@@ -225,12 +225,12 @@ export const LockedTerminal: React.FC = () => {
 
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-muted">Member Access</span>
-            <span className="font-mono text-toxic font-bold tnum">Hold ≥ $20 $H42 in Wallet</span>
+            <span className="font-mono text-brand font-bold tnum">Hold ≥ $20 $H42 in Wallet</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-muted">Pro Access</span>
-            <span className="font-mono text-toxic font-bold tnum">Stake ≥ $250 on StakePoint (90d)</span>
+            <span className="font-mono text-brand font-bold tnum">Stake ≥ $250 on StakePoint (90d)</span>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between gap-2">
@@ -240,7 +240,7 @@ export const LockedTerminal: React.FC = () => {
                 href={SOLSCAN.token(GENESIS_MINT)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-toxic hover:underline truncate tnum"
+                className="font-mono text-brand hover:underline truncate tnum"
               >
                 {GENESIS_MINT}
               </a>
@@ -256,7 +256,7 @@ export const LockedTerminal: React.FC = () => {
                 {copyError ? (
                   <span className="text-xs text-danger font-bold">Failed</span>
                 ) : copied ? (
-                  <Check className="w-3.5 h-3.5 text-toxic" />
+                  <Check className="w-3.5 h-3.5 text-brand" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
@@ -276,7 +276,7 @@ export const LockedTerminal: React.FC = () => {
               href={BUY_LINKS.pump}
               target="_blank"
               rel="noreferrer"
-              className="h-12 min-h-[44px] px-5 rounded-lg bg-toxic hover:bg-toxic-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
+              className="h-12 min-h-[44px] px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
             >
               <span>Buy $H42 on Pump.fun</span>
               <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -284,9 +284,9 @@ export const LockedTerminal: React.FC = () => {
 
             <Link
               href="/dashboard/stake"
-              className="h-12 min-h-[44px] px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-toxic text-white font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
+              className="h-12 min-h-[44px] px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5 text-toxic" />
+              <Sparkles className="w-3.5 h-3.5 text-brand" />
               <span>Stake on StakePoint</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
@@ -300,7 +300,7 @@ export const LockedTerminal: React.FC = () => {
               onClick={switchWallet}
               className="h-10 min-h-[44px] px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default font-sans text-xs font-bold text-muted hover:text-white inline-flex items-center gap-2"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-toxic" />
+              <RefreshCw className="w-3.5 h-3.5 text-brand" />
               <span>Switch to Another Wallet</span>
             </Button>
           </div>

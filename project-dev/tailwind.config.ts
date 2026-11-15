@@ -27,6 +27,13 @@ const config: Config = {
           DEFAULT: "#34D399",
           primary: "#34D399",
           hover: "#6EE7B7",
+          bright: "#6EE7B7",
+          muted: "#10B981",
+          border: "#252D38",
+          bg: "#0D281E",
+          pill: "#6EE7B7",
+          dim: "#065F46",
+          ink: "#0A0E13",
         },
         toxic: {
           DEFAULT: "#34D399",     // Vibrant emerald green

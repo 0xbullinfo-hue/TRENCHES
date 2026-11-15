@@ -39,14 +39,14 @@ export function CurrentStakeCard({
 
       {status === 'active' && formattedDate ? (
         <div className="space-y-2 pt-1">
-          <p className="font-sans text-sm text-toxic font-medium leading-relaxed">
+          <p className="font-sans text-sm text-brand font-medium leading-relaxed">
             Your Pro access is active until {formattedDate}. {daysRemaining} days remaining.
           </p>
           {showStakeAdditionalLink && onStakeAdditional && (
             <button
               onClick={onStakeAdditional}
               type="button"
-              className="font-sans text-xs text-muted hover:text-toxic underline underline-offset-4 transition-colors"
+              className="font-sans text-xs text-muted hover:text-brand underline underline-offset-4 transition-colors"
             >
               Stake additional $H42 →
             </button>

@@ -72,7 +72,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <span>Explore StakePoint Pools</span>
-            <ArrowUpRight className="w-4 h-4 text-pump" />
+            <ArrowUpRight className="w-4 h-4 text-brand" />
           </a>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href={pool.poolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted hover:text-pump transition-colors"
+            className="text-muted hover:text-brand transition-colors"
             title="Open Pool on StakePoint"
           >
             <ArrowUpRight className="w-4 h-4" />
@@ -122,7 +122,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
           </span>
           <div
             className={`font-mono text-[32px] font-bold leading-tight tnum ${
-              aprIsPositive ? 'text-pump' : 'text-muted'
+              aprIsPositive ? 'text-brand' : 'text-muted'
             }`}
           >
             {aprDisplay}
@@ -179,7 +179,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href={pool.poolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-pump hover:bg-pump-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-brand hover:bg-brand-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
           >
             <span>Stake on StakePoint →</span>
           </a>
@@ -191,7 +191,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-pump hover:text-pump-hover inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-bold text-brand hover:text-brand-hover inline-flex items-center gap-1 transition-colors"
             >
               <span>View all pools →</span>
             </a>

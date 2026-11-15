@@ -24,7 +24,7 @@ export default async function PublicLedgerPage(props: {
     <div className="py-12 sm:py-16 bg-canvas min-h-[calc(100vh-140px)]">
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Page Header */}
-        <div className="pb-6 border-b border-toxic-border/20 max-w-3xl space-y-2">
+        <div className="pb-6 border-b border-brand-border/20 max-w-3xl space-y-2">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans uppercase">
               <ShieldCheck className="w-3.5 h-3.5" />
