@@ -104,7 +104,6 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
   return (
     <article
-      tabIndex={0}
       aria-label={`X Raid Campaign: ${campaign.title}`}
       className="group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-150 p-4 sm:p-5 border border-raid-border hover:border-raid-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-raid-primary shadow-none"
     >

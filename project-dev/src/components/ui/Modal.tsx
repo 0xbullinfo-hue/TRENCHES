@@ -111,6 +111,9 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
+      role="button"
+      tabIndex={-1}
+      aria-label="Close modal overlay"
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center p-4 bg-canvas/80 backdrop-blur-sm',
         containerClassName
@@ -118,6 +121,13 @@ export const Modal: React.FC<ModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
         }
       }}
     >

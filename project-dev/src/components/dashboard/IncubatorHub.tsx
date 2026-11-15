@@ -845,11 +845,12 @@ export const IncubatorHub: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <div className="md:col-span-6 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-ca" className="block font-sans text-xs font-bold text-muted uppercase">
                         Contract Address (CA) *
                       </label>
                       <div className="flex gap-2">
                         <input
+                          id="alpha-form-ca"
                           type="text"
                           value={formCa}
                           onChange={(e) => setFormCa(e.target.value)}
@@ -872,10 +873,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-3 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-name" className="block font-sans text-xs font-bold text-muted uppercase">
                         Token Name *
                       </label>
                       <input
+                        id="alpha-form-name"
                         type="text"
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
@@ -886,10 +888,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-3 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-ticker" className="block font-sans text-xs font-bold text-muted uppercase">
                         Ticker *
                       </label>
                       <input
+                        id="alpha-form-ticker"
                         type="text"
                         value={formTicker}
                         onChange={(e) => setFormTicker(e.target.value)}
@@ -902,10 +905,11 @@ export const IncubatorHub: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-chain" className="block font-sans text-xs font-bold text-muted uppercase">
                         Chain
                       </label>
                       <select
+                        id="alpha-form-chain"
                         value={formChain}
                         onChange={(e) => setFormChain(e.target.value as Chain)}
                         className="w-full h-10 px-2 rounded-lg bg-surface border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
@@ -917,10 +921,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-entry-mc" className="block font-sans text-xs font-bold text-muted uppercase">
                         Entry MC
                       </label>
                       <input
+                        id="alpha-form-entry-mc"
                         type="text"
                         value={formEntryMc}
                         onChange={(e) => setFormEntryMc(e.target.value)}
@@ -930,10 +935,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-current-mc" className="block font-sans text-xs font-bold text-muted uppercase">
                         Current MC
                       </label>
                       <input
+                        id="alpha-form-current-mc"
                         type="text"
                         value={formCurrentMc}
                         onChange={(e) => setFormCurrentMc(e.target.value)}
@@ -943,10 +949,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-risk" className="block font-sans text-xs font-bold text-muted uppercase">
                         Risk (1-5)
                       </label>
                       <input
+                        id="alpha-form-risk"
                         type="number"
                         min="1"
                         max="5"
@@ -957,10 +964,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-stop-loss" className="block font-sans text-xs font-bold text-muted uppercase">
                         Stop Loss (SL)
                       </label>
                       <input
+                        id="alpha-form-stop-loss"
                         type="text"
                         value={formStopLoss}
                         onChange={(e) => setFormStopLoss(e.target.value)}
@@ -970,10 +978,11 @@ export const IncubatorHub: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2 space-y-1">
-                      <label className="block font-sans text-xs font-bold text-muted uppercase">
+                      <label htmlFor="alpha-form-take-profits" className="block font-sans text-xs font-bold text-muted uppercase">
                         Take Profits
                       </label>
                       <input
+                        id="alpha-form-take-profits"
                         type="text"
                         value={formTakeProfits}
                         onChange={(e) => setFormTakeProfits(e.target.value)}
@@ -984,10 +993,11 @@ export const IncubatorHub: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-sans text-xs font-bold text-muted uppercase">
+                    <label htmlFor="alpha-form-summary" className="block font-sans text-xs font-bold text-muted uppercase">
                       Thesis / Research Summary
                     </label>
                     <input
+                      id="alpha-form-summary"
                       type="text"
                       value={formSummary}
                       onChange={(e) => setFormSummary(e.target.value)}
@@ -998,9 +1008,9 @@ export const IncubatorHub: React.FC = () => {
 
                   {/* Section 5: Admin Post Classification — Single Source of Truth */}
                   <div className="space-y-1.5 pt-1">
-                    <label className="block font-sans text-xs font-bold text-muted uppercase tracking-wider">
+                    <span className="block font-sans text-xs font-bold text-muted uppercase tracking-wider">
                       Destination Tab Classification * (Single Source of Truth)
-                    </label>
+                    </span>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <Button
                         type="button"
@@ -1636,8 +1646,17 @@ export const IncubatorHub: React.FC = () => {
                   return (
                     <div
                       key={coin.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Inspect ${coin.name} (${coin.ticker})`}
                       onClick={() => setInspectedToken(coin)}
-                      className="py-3 flex items-center justify-between gap-3 hover:bg-surface-card/60 px-2 rounded-lg cursor-pointer transition-colors"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setInspectedToken(coin);
+                        }
+                      }}
+                      className="py-3 flex items-center justify-between gap-3 hover:bg-surface-card/60 px-2 rounded-lg cursor-pointer transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="font-mono text-xs text-muted w-4 tnum">

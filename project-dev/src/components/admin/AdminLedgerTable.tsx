@@ -181,7 +181,6 @@ export function AdminLedgerTable({ initialEntries }: { initialEntries: LedgerIte
 
             <input
               type="text"
-              autoFocus
               value={confirmTickerInput}
               onChange={(e) => setConfirmTickerInput(e.target.value)}
               placeholder={`Type "${deleteModalEntry.ticker}"`}

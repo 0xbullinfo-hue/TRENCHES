@@ -64,7 +64,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
   const currentMcDisplay = coin.marketCap || '—';
 
   return (
-    <article
+    <div
       tabIndex={0}
       role="button"
       aria-label={`Inspect ${coin.name} (${coin.ticker}) call`}
@@ -392,6 +392,6 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           </div>
         ) : null}
       </div>
-    </article>
+    </div>
   );
 };

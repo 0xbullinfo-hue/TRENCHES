@@ -510,10 +510,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div className="md:col-span-6 space-y-1">
-              <label className="block font-sans text-xs font-bold text-muted uppercase">
+              <label htmlFor="campaign-form-title" className="block font-sans text-xs font-bold text-muted uppercase">
                 Campaign Title *
               </label>
               <input
+                id="campaign-form-title"
                 type="text"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
@@ -524,10 +525,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-6 space-y-1">
-              <label className="block font-sans text-xs font-bold text-muted uppercase">
+              <label htmlFor="campaign-form-tweet-url" className="block font-sans text-xs font-bold text-muted uppercase">
                 Target X / Twitter Post URL *
               </label>
               <input
+                id="campaign-form-tweet-url"
                 type="url"
                 value={formTweetUrl}
                 onChange={(e) => setFormTweetUrl(e.target.value)}
@@ -540,10 +542,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
 
           <div className="grid grid-cols-1 sm:row sm:items-center sm:grid-cols-2 md:grid-cols-12 gap-3">
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-xs font-bold text-muted uppercase">
+              <label htmlFor="campaign-form-reward-amount" className="block font-sans text-xs font-bold text-muted uppercase">
                 Airdrop Reward Per User *
               </label>
               <input
+                id="campaign-form-reward-amount"
                 type="text"
                 value={formRewardAmount}
                 onChange={(e) => setFormRewardAmount(e.target.value)}
@@ -554,10 +557,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-xs font-bold text-muted uppercase">
+              <label htmlFor="campaign-form-total-pool" className="block font-sans text-xs font-bold text-muted uppercase">
                 Total Reward Pool (Optional)
               </label>
               <input
+                id="campaign-form-total-pool"
                 type="text"
                 value={formTotalPool}
                 onChange={(e) => setFormTotalPool(e.target.value)}
@@ -567,11 +571,12 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
             </div>
 
             <div className="md:col-span-4 space-y-1">
-              <label className="block font-sans text-xs font-bold text-muted uppercase flex items-center justify-between">
+              <label htmlFor="campaign-form-duration-hours" className="block font-sans text-xs font-bold text-muted uppercase flex items-center justify-between">
                 <span>Raid Duration</span>
                 <span className="text-raid-primary font-mono text-xs">{formDurationHours}h window</span>
               </label>
               <select
+                id="campaign-form-duration-hours"
                 value={formDurationHours}
                 onChange={(e) => setFormDurationHours(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-lg bg-surface border border-border-default focus:border-raid-primary font-mono text-xs text-raid-text focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
@@ -591,10 +596,11 @@ export const AdminCampaignManager: React.FC<AdminCampaignManagerProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="block font-sans text-xs font-bold text-muted uppercase">
+            <label htmlFor="campaign-form-description" className="block font-sans text-xs font-bold text-muted uppercase">
               Raid Instructions / Mission Thesis
             </label>
             <input
+              id="campaign-form-description"
               type="text"
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}

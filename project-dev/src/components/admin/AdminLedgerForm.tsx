@@ -143,12 +143,13 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           {/* Ticker & Chain */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-ticker" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Ticker <span className="text-brand">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-muted text-sm">$</span>
                 <input
+                  id="ledger-form-ticker"
                   type="text"
                   required
                   maxLength={20}
@@ -161,10 +162,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-chain" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Blockchain <span className="text-brand">*</span>
               </label>
               <select
+                id="ledger-form-chain"
                 value={chain}
                 onChange={(e) => setChain(e.target.value)}
                 className="w-full h-11 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-white font-sans text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
@@ -180,10 +182,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
 
           {/* Contract Address */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="ledger-form-ca" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
               Contract Address (CA) <span className="text-brand">*</span>
             </label>
             <input
+              id="ledger-form-ca"
               type="text"
               required
               value={contractAddress}
@@ -203,11 +206,12 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           {/* Multiplier & Closed Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-multiplier" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Multiplier (x-multiple) <span className="text-brand">*</span>
               </label>
               <div className="relative">
                 <input
+                  id="ledger-form-multiplier"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -223,10 +227,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-closed-at" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Date Closed <span className="text-brand">*</span>
               </label>
               <input
+                id="ledger-form-closed-at"
                 type="date"
                 required
                 value={closedAt}
@@ -240,10 +245,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           {/* Entry & Exit Market Cap (Optional) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-neutral-800/40">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-entry-price" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Entry Market Cap <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
               </label>
               <input
+                id="ledger-form-entry-price"
                 type="text"
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
@@ -253,10 +259,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="ledger-form-exit-price" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                 Exit Market Cap <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
               </label>
               <input
+                id="ledger-form-exit-price"
                 type="text"
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
@@ -268,10 +275,11 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
 
           {/* Proof URL (Optional) */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="ledger-form-proof-url" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
               Proof URL <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
             </label>
             <input
+              id="ledger-form-proof-url"
               type="url"
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
@@ -283,7 +291,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
           {/* Notes (Optional, max 280 chars) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted">
+              <label htmlFor="ledger-form-notes" className="block text-xs font-bold uppercase tracking-wider text-muted">
                 Notes / Thesis Caption <span className="text-muted/60 text-2xs font-normal">(Optional)</span>
               </label>
               <span className="text-2xs font-mono text-muted">
@@ -291,6 +299,7 @@ export function AdminLedgerForm({ initialData, isEdit = false }: AdminLedgerForm
               </span>
             </div>
             <textarea
+              id="ledger-form-notes"
               rows={3}
               maxLength={280}
               value={notes}

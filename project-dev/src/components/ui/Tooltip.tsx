@@ -52,7 +52,6 @@ export function Tooltip({
       onMouseLeave={() => setIsVisible(false)}
       onFocusCapture={() => setIsVisible(true)}
       onBlurCapture={() => setIsVisible(false)}
-      tabIndex={0}
       aria-describedby={isVisible ? tooltipId : undefined}
     >
       {children}
