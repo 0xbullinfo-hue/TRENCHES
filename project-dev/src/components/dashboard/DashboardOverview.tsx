@@ -16,6 +16,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { ProProgressBar } from './ProProgressBar';
+import { OnboardingChecklist } from './OnboardingChecklist';
 
 interface DashboardOverviewProps {
   connected: boolean;
@@ -54,6 +55,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* 0. Onboarding Checklist (Instruction 36) */}
+      <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
+
       {/* 1. Welcome Panel & Membership Summary Strip */}
       <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
