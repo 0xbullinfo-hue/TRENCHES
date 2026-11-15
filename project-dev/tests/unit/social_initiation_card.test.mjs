@@ -11,12 +11,13 @@ import {
 const ROOT_DIR = process.cwd();
 
 describe('SocialInitiationCard — permanent early campaign & social tab gate', () => {
-  it('contains exact campaign copy including $H42, #SOL, and #Trenchlabs', () => {
+  it('contains exact campaign copy including @Trenchlabshq, $H42, #SOL, and #Trenchlabs', () => {
     assert.ok(
       INITIATION_TWEET_TEXT.includes(
         "I am now an official assistant of TrenchLabs and I earn by carrying out tasks. TrenchLabs got some crazy Alpha's - check it out here www.trenchlabshq.xyz"
       )
     );
+    assert.ok(INITIATION_TWEET_TEXT.includes('@Trenchlabshq'));
     assert.ok(INITIATION_TWEET_TEXT.includes('$H42'));
     assert.ok(INITIATION_TWEET_TEXT.includes('#SOL'));
     assert.ok(INITIATION_TWEET_TEXT.includes('#Trenchlabs'));

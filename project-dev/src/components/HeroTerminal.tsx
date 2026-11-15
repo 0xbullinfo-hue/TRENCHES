@@ -4,29 +4,32 @@ import React from 'react';
 import Image from 'next/image';
 import { BUY_LINKS, BUY_LOCK, SOCIAL_LINKS } from '@/lib/config';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
-import { HeroLedgerProof } from '@/components/landing/HeroLedgerProof';
 import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
-    label: 'Access',
-    value: 'Hold or stake',
-    sub: 'Hold $20 of $H42 for Member, or stake $250 for Pro.',
+    label: 'MEMBER ACCESS',
+    value: 'HOLD OR STAKE',
+    sub: 'HOLD ~$20 OR STAKE $250 FOR ACCESS',
+    highlight: true,
   },
   {
-    label: 'Each call',
-    value: 'Entry · risk · take-profit',
-    sub: 'Curated research with structured stop-loss and take-profit levels.',
+    label: 'TRADE INTELLIGENCE',
+    value: 'ENTRY · RISK · TP',
+    sub: 'CURATED RESEARCH WITH STRUCTURED SL/TP',
+    highlight: true,
   },
   {
-    label: 'Coverage',
-    value: '6 chains',
+    label: 'MULTI-CHAIN COVERAGE',
+    value: '6 CHAINS',
     sub: 'SOL · BSC · ETH · BASE · ROBIN · AVAX',
+    highlight: false,
   },
   {
-    label: 'Execution',
-    value: 'Non-custodial',
-    sub: 'You make and execute every trade.',
+    label: 'NON-CUSTODIAL EXECUTION',
+    value: 'INDEPENDENT',
+    sub: 'YOU CONTROL & EXECUTE EVERY TRADE',
+    highlight: false,
   },
 ];
 
@@ -55,9 +58,9 @@ export const HeroTerminal: React.FC = () => {
         {/* Soft-Launch Status Strip */}
         <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <span className="text-muted">TOKEN:</span>
-            <span className="text-amber">LIVE SOON</span>
+            <span className="text-white">LIVE</span>
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
@@ -77,9 +80,9 @@ export const HeroTerminal: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
           {/* Left Column (6 cols): Headline + Subtext + Soft-Launch CTAs */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
-            <h1 className="font-sans font-semibold tracking-tight text-white text-3xl sm:text-5xl lg:text-6xl leading-[1.08] text-balance break-words">
-              A grassroots research lab for{' '}
-              <span className="text-brand whitespace-nowrap">on-chain</span> communities.
+            <h1 className="font-sans font-bold tracking-tight text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
+              A research platform for{' '}
+              <span className="text-brand-bright whitespace-nowrap">on-chain</span> communities
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
@@ -134,11 +137,6 @@ export const HeroTerminal: React.FC = () => {
                   </a>
                 )}
               </div>
-
-              <HeroLedgerProof />
-              <p className="font-sans text-[12px] leading-4 text-muted">
-                Research only, not financial advice. You make every trade decision.
-              </p>
             </div>
           </div>
 
@@ -146,8 +144,8 @@ export const HeroTerminal: React.FC = () => {
           <div className="lg:col-span-6 flex items-center justify-center w-full min-w-0">
             <div className="relative w-full max-w-[320px] xs:max-w-[380px] sm:max-w-[460px] lg:max-w-none flex items-center justify-center">
               <Image
-                src="/images/trenchlabs-hero.webp"
-                alt=""
+                src="/images/trenchlabs-hero-removebg.png"
+                alt="TrenchLabs Mascot"
                 width={620}
                 height={620}
                 priority
@@ -163,11 +161,20 @@ export const HeroTerminal: React.FC = () => {
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default flex flex-col justify-between gap-3 min-h-[140px]"
+              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default hover:border-brand transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
             >
-              <div className="font-sans text-sm font-medium text-muted">{m.label}</div>
-              <div className="font-sans text-lg sm:text-xl font-semibold tracking-tight text-white">{m.value}</div>
-              <div className="font-sans text-sm text-muted leading-snug">{m.sub}</div>
+              <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
+                {m.label}
+              </div>
+              <div
+                className={`font-sans text-lg sm:text-xl xl:text-2xl font-semibold tracking-tight whitespace-nowrap ${m.highlight ? 'text-brand' : 'text-white'
+                  }`}
+              >
+                {m.value}
+              </div>
+              <div className="font-sans text-xs font-medium text-muted uppercase tracking-wide">
+                {m.sub}
+              </div>
             </div>
           ))}
         </div>

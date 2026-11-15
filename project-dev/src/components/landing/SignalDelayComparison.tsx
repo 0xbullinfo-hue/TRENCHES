@@ -50,7 +50,7 @@ export function getTierTimingComparison(
       dispatchLabel: 'Post-resolution',
       callCoverage: 'Closed ledger archive only',
       sanitizedExampleEntry: '$A*** after trade closes',
-      executionNote: 'Visible on the public ledger and results channel once the call is resolved.',
+      executionNote: 'Visible on live social raids to earn rewards.',
     },
   ];
 }

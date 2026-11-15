@@ -9,7 +9,6 @@ import {
   Copy,
   ExternalLink,
   Lock,
-  Pin,
   Sparkles,
   Twitter,
   Unlock,
@@ -19,7 +18,7 @@ import {
 export const INITIATION_STORAGE_KEY = 'trenchlabs_social_initiation_v1';
 
 export const INITIATION_TWEET_TEXT =
-  "I am now an official assistant of TrenchLabs and I earn by carrying out tasks. TrenchLabs got some crazy Alpha's - check it out here www.trenchlabshq.xyz $H42 #SOL #Trenchlabs";
+  "I am now an official assistant of TrenchLabs and I earn by carrying out tasks. TrenchLabs got some crazy Alpha's - check it out here www.trenchlabshq.xyz @Trenchlabshq $H42 #SOL #Trenchlabs";
 
 export const INITIATION_INTENT_URL = `https://x.com/intent/tweet?text=${encodeURIComponent(
   INITIATION_TWEET_TEXT
@@ -117,32 +116,12 @@ export const SocialInitiationCard: React.FC<SocialInitiationCardProps> = ({
       data-testid="social-initiation-card"
       className="group relative rounded-xl bg-surface border border-raid-border hover:border-raid-primary transition-all duration-150 p-4 sm:p-5 shadow-none"
     >
-      {/* Top Row: Category Tag + Status + Permanent Pin */}
+      {/* Top Row: Category Tag + Status */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border-default">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="inline-flex items-center gap-1 rounded-md border border-raid-border bg-raid-bg px-2.5 py-1 font-mono text-xs font-semibold text-raid-text">
             <Sparkles className="w-3 h-3 text-raid-primary" />
             <span>OFFICIAL ASSISTANT CAMPAIGN</span>
-          </span>
-
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase tracking-wider ${
-              isCompleted
-                ? 'bg-brand-bg text-brand border border-brand-border'
-                : 'bg-amber/15 text-amber border border-amber/40'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isCompleted ? 'bg-brand' : 'bg-amber'
-              }`}
-            />
-            <span>{isCompleted ? 'COMPLETED • RAIDS UNLOCKED' : 'MANDATORY TASK #0'}</span>
-          </span>
-
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-raid-strong text-white font-mono text-xs font-black uppercase">
-            <Pin className="w-2.5 h-2.5" />
-            <span>PERMANENT CAMPAIGN</span>
           </span>
         </div>
 
@@ -213,7 +192,7 @@ export const SocialInitiationCard: React.FC<SocialInitiationCardProps> = ({
                 www.trenchlabshq.xyz
               </span>{' '}
               <span className="font-mono font-bold text-raid-primary">
-                $H42 #SOL #Trenchlabs
+                @Trenchlabshq $H42 #SOL #Trenchlabs
               </span>
               &rdquo;
             </blockquote>
