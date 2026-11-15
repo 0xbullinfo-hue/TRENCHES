@@ -65,7 +65,17 @@ export function LedgerGrid({
           )}&limit=${limit}&offset=${offset}`,
           { signal: controller.signal }
         );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          let message = "The ledger couldn't be loaded. Check your connection and try again.";
+          if (res.status === 429) {
+            message = 'Too many requests. Please wait a moment and try again.';
+          } else if (res.status >= 500) {
+            message = 'Ledger service temporarily unavailable. Please try again.';
+          } else if (res.status === 404) {
+            message = 'Ledger records not found.';
+          }
+          throw new Error(message);
+        }
         const data = await res.json();
         if (controller.signal.aborted) return;
         if (append) {
@@ -79,7 +89,11 @@ export function LedgerGrid({
         if (controller.signal.aborted || (err as Error)?.name === 'AbortError') {
           return;
         }
-        setError("Couldn't load the ledger.");
+        const message =
+          (err as Error)?.message && !(err as Error)?.message.startsWith('HTTP ')
+            ? (err as Error).message
+            : "The ledger couldn't be loaded. Check your connection and try again.";
+        setError(message);
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
