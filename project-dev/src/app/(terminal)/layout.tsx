@@ -1,6 +1,7 @@
 import React from 'react';
 import { TerminalHeader } from '@/components/TerminalHeader';
 import { TelegramStatusBanner } from '@/components/telegram/TelegramStatusBanner';
+import { CommandPalette } from '@/components/CommandPalette';
 import { Footer } from '@/components/Footer';
 
 export default function TerminalLayout({
@@ -13,6 +14,7 @@ export default function TerminalLayout({
       <TerminalHeader />
       <TelegramStatusBanner />
       <main className="flex-1 flex flex-col">{children}</main>
+      <CommandPalette />
       <Footer />
     </div>
   );
