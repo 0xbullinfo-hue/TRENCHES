@@ -17,6 +17,7 @@ export function SinceCallChip({ current, entry }: { current?: number; entry?: nu
         up ? 'text-brand bg-brand-bg border-brand-border' : 'text-danger bg-surface-card border-line'
       }`}
       title="Current market cap divided by market cap at the time of the call"
+      aria-label={label}
     >
       {label}
     </span>

@@ -36,6 +36,7 @@ export function CopyableCA({ address }: CopyableCAProps) {
           onClick={handleCopy}
           className="text-white hover:text-brand truncate text-left cursor-pointer transition-colors focus-visible:outline-none"
           title={`Click to copy full CA: ${address}`}
+          aria-label={`Copy contract address ${address}`}
         >
           {truncateAddress(address)}
         </button>
@@ -50,6 +51,7 @@ export function CopyableCA({ address }: CopyableCAProps) {
           onClick={handleCopy}
           className="text-muted hover:text-brand shrink-0 p-1 rounded transition-colors cursor-pointer"
           title="Copy full address"
+          aria-label={copied ? 'Contract address copied' : 'Copy contract address'}
         >
           {copied ? (
             <Check className="w-3.5 h-3.5 text-brand" />
