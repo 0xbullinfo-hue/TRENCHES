@@ -15,6 +15,7 @@ import {
   Target,
   Wallet,
 } from 'lucide-react';
+import { ProProgressBar } from './ProProgressBar';
 
 interface DashboardOverviewProps {
   connected: boolean;
@@ -230,6 +231,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* 4. PRO Unlock Progress Bar (Instruction 33) */}
+      <ProProgressBar isPro={isPro} />
     </div>
   );
 };
