@@ -36,7 +36,7 @@ export default function GlobalError({
         `}</style>
       </head>
       <body className="font-mono min-h-screen flex flex-col items-center justify-center p-6 text-center antialiased">
-        <div className="max-w-md w-full rounded-2xl border border-[var(--ge-border)] bg-[var(--ge-surface)] p-8 space-y-5">
+        <div className="max-w-md w-full rounded-xl border border-[var(--ge-border)] bg-[var(--ge-surface)] p-8 space-y-5">
           <div className="flex justify-center">
             <HexCubeLogo size={42} />
           </div>
