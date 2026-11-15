@@ -45,7 +45,7 @@ export function TelegramVerificationCard({
   const { status, message, start, stop, publicKeyBase58 } = useTelegramLink();
 
   return (
-    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
+    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-150 flex flex-col justify-between h-full">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30 font-sans text-xs font-black uppercase">
@@ -527,7 +527,7 @@ export function DashboardStakingCard({
     : 'Buy $250 worth of $H42 and Stake for 90 days to unlock real-time signals, push alerts, and full terminal access.';
 
   const memberCard = (
-    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between h-full">
+    <div className="rounded-xl bg-surface border border-brand/40 hover:border-brand p-5 sm:p-6 transition-all duration-150 flex flex-col justify-between h-full">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">

@@ -350,7 +350,7 @@ export const TokenArtwork: React.FC<TokenArtworkProps> = ({
 
       {/* Main Illustration / Onchain Logo */}
       <div
-        className={`w-full h-full p-4 transition-transform duration-200 group-hover:scale-105 flex items-center justify-center ${
+        className={`w-full h-full p-4 transition-transform duration-150 group-hover:scale-105 flex items-center justify-center ${
           locked ? 'opacity-65' : ''
         }`}
       >
