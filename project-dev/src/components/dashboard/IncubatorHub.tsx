@@ -1172,7 +1172,7 @@ export const IncubatorHub: React.FC = () => {
           id={`tabpanel-${currentTab.toLowerCase()}`}
           aria-labelledby={`tab-${currentTab.toLowerCase()}`}
           tabIndex={0}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="min-h-[500px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
         {currentTab === 'SOCIAL' ? (
           <div className="space-y-4 pt-2">
