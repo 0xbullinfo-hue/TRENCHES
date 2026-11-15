@@ -178,6 +178,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   const sessionCheckGenRef = useRef(0);
   const submitAttemptGenRef = useRef(0);
   const activeSubmitGenRef = useRef(0);
+  const sessionAbortControllerRef = useRef<AbortController | null>(null);
+  const submitAbortControllerRef = useRef<AbortController | null>(null);
   const latestWalletRef = useRef<{
     isConnected: boolean;
     address: string | null;
@@ -247,6 +249,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     };
   }, [campaign.expiresAt, campaign.status]);
 
+  useEffect(() => {
+    return () => {
+      sessionAbortControllerRef.current?.abort();
+      submitAbortControllerRef.current?.abort();
+    };
+  }, []);
+
   // Keep wallet input prefilled when an authoritative wallet connects
   useEffect(() => {
     let active = true;
@@ -280,9 +289,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
       setServerSession({ status: 'CHECKING', wallet: null, error: null });
 
+      sessionAbortControllerRef.current?.abort();
+      const controller = new AbortController();
+      sessionAbortControllerRef.current = controller;
+
       (async () => {
         try {
-          const res = await fetch('/api/auth/session', { credentials: 'include' });
+          const res = await fetch('/api/auth/session', { credentials: 'include', signal: controller.signal });
 
           // Ignore stale responses or wallet changes that occurred during the fetch
           const latest = latestWalletRef.current;
@@ -645,6 +658,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     }
 
     // Acquire synchronous in-flight guard & capture attempt generation
+    submitAbortControllerRef.current?.abort();
+    const submitController = new AbortController();
+    submitAbortControllerRef.current = submitController;
+
     const attemptGen = ++submitAttemptGenRef.current;
     activeSubmitGenRef.current = attemptGen;
     const isSuperseded = () => activeSubmitGenRef.current !== attemptGen;
@@ -772,6 +789,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        signal: submitController.signal,
         body: JSON.stringify({ walletAddress: capturedAddress }),
       });
 
@@ -852,6 +870,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        signal: submitController.signal,
         body: JSON.stringify({
           challengeId: activeChallengeId,
           walletAddress: capturedAddress,
@@ -912,6 +931,9 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         onSubmissionSuccess(json.submission);
       }
     } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
+        return;
+      }
       if (
         !isSuperseded() &&
         isWalletIdentityValid(capturedAddress, capturedAdapter, attemptGen)

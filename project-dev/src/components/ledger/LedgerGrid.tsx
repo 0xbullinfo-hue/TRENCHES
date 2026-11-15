@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -42,8 +42,17 @@ export function LedgerGrid({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasInitialFetchedRef = useRef(false);
+
   const fetchLedger = useCallback(
     async (chainVal: string, sortVal: string, offset = 0, append = false) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       const limit = isDashboardEmbed ? 8 : 12;
       if (append) setLoadingMore(true);
       else setLoading(true);
@@ -53,10 +62,12 @@ export function LedgerGrid({
         const res = await fetch(
           `/api/ledger?chain=${encodeURIComponent(chainVal)}&sort=${encodeURIComponent(
             sortVal
-          )}&limit=${limit}&offset=${offset}`
+          )}&limit=${limit}&offset=${offset}`,
+          { signal: controller.signal }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (controller.signal.aborted) return;
         if (append) {
           setEntries((prev) => [...prev, ...data.entries]);
         } else {
@@ -64,19 +75,30 @@ export function LedgerGrid({
         }
         setTotal(data.total);
         setHasMore(data.has_more);
-      } catch {
+      } catch (err: unknown) {
+        if (controller.signal.aborted || (err as Error)?.name === 'AbortError') {
+          return;
+        }
         setError("Couldn't load the ledger.");
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [isDashboardEmbed]
   );
 
   useEffect(() => {
-    if (entries.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (entries.length === 0 && !hasInitialFetchedRef.current) {
+      hasInitialFetchedRef.current = true;
       fetchLedger(currentChain, currentSort, 0, false);
     }
   }, [fetchLedger, currentChain, currentSort, entries.length]);

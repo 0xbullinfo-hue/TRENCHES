@@ -36,11 +36,10 @@ export function TierCard({
 
   return (
     <div
-      className={`relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-colors bg-surface-card shadow-none ${
-        emphasized
-          ? 'border border-brand hover:border-brand-bright'
-          : 'border border-border-default hover:border-brand'
-      }`}
+      className={`relative rounded-xl h-full flex flex-col justify-between p-5 sm:p-6 transition-colors bg-surface-card shadow-none ${emphasized
+        ? 'border border-brand hover:border-brand-bright'
+        : 'border border-border-default hover:border-brand'
+        }`}
     >
       {/* Top Header & Badge */}
       <div>
@@ -104,7 +103,7 @@ export function TierCard({
               title={ctaTooltip || 'LIVE SOON'}
               variant="secondary"
               size="md"
-              className="w-full text-muted uppercase font-black tracking-wide"
+              className="w-full text-muted uppercase font-black tracking-wide cursor-not-allowed"
             >
               {ctaLabel.toUpperCase()}
             </Button>
