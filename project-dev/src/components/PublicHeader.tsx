@@ -194,7 +194,7 @@ export const PublicHeader: React.FC = () => {
 
   const getDesktopNavClass = (sectionId: string) => {
     const isActive = isHome && activeSection === sectionId;
-    return `px-3 py-2 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold transition-colors ${isActive
+    return `inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors ${isActive
         ? 'text-brand font-black bg-surface-card border border-brand/40 shadow-none'
         : 'text-muted hover:text-brand hover:bg-surface border border-transparent'
       }`;
@@ -261,7 +261,7 @@ export const PublicHeader: React.FC = () => {
           </Link>
           <Link
             href="/ledger"
-            className={`px-3 py-2 rounded-lg uppercase transition-colors ${isPerformanceActive
+            className={`inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors ${isPerformanceActive
                 ? 'text-brand font-black bg-surface-card border border-brand/40 shadow-none'
                 : 'text-muted hover:text-brand hover:bg-surface border border-transparent'
               }`}
