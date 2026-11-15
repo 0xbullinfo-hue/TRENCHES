@@ -86,7 +86,7 @@ export const HeroTerminal: React.FC = () => {
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
-              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key. TrenchLabs is a research and trading-intelligence platform. Holding GENESIS ($H42) unlocks membership tiers and tools.
+              Building the strongest community in the Trenches. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key. TrenchLabs is a research and analytical Lab. Holding GENESIS ($H42) unlocks membership tiers and tools.
             </p>
 
             {/* Primary Soft-Launch Conversion Unit */}
