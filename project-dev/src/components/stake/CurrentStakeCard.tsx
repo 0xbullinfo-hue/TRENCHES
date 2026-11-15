@@ -2,6 +2,11 @@
 
 import React from 'react';
 import { formatUsd } from '@/lib/stake/format';
+import { MarketDataBadge } from '@/components/dashboard/MarketDataBadge';
+import {
+  toGenesisProvenanceItem,
+  type GenesisThresholdProvenanceInput,
+} from '@/lib/stake/provenance';
 
 interface CurrentStakeCardProps {
   amountUsd: number;
@@ -10,6 +15,7 @@ interface CurrentStakeCardProps {
   status: 'active' | 'expired' | 'none';
   onStakeAdditional?: () => void;
   showStakeAdditionalLink?: boolean;
+  provenance?: GenesisThresholdProvenanceInput | null;
 }
 
 export function CurrentStakeCard({
@@ -19,6 +25,7 @@ export function CurrentStakeCard({
   status,
   onStakeAdditional,
   showStakeAdditionalLink = false,
+  provenance,
 }: CurrentStakeCardProps) {
   const formattedDate = unlocksAt
     ? new Date(unlocksAt).toLocaleDateString('en-US', {
@@ -30,8 +37,11 @@ export function CurrentStakeCard({
 
   return (
     <div className="rounded-xl bg-surface border border-border-default p-6 shadow-none space-y-2">
-      <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-        CURRENT STAKE
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+          CURRENT STAKE
+        </div>
+        <MarketDataBadge item={toGenesisProvenanceItem(provenance)} />
       </div>
       <div className="font-sans text-3xl font-extrabold text-white tracking-tight tnum">
         {formatUsd(amountUsd)}

@@ -1,6 +1,8 @@
 import React from 'react';
 import { TierCard } from './TierCard';
 import { SignalDelayComparison } from './SignalDelayComparison';
+import { MarketDataBadge } from '@/components/dashboard/MarketDataBadge';
+import { toGenesisProvenanceItem } from '@/lib/stake/provenance';
 import { getTierThresholds, TOKEN_DECIMALS } from '@/server/db';
 import { BUY_LINKS, GENESIS_MINT, SOCIAL_LINKS } from '@/lib/config';
 import {
@@ -104,17 +106,27 @@ export async function TierSection() {
   let memberTokenFormatted = '1.2M $H42';
   let proTokenFormatted = '15.2M $H42';
   let recalculatedAt = '';
+  let priceSource = 'cached';
+  let stale = false;
   let showFootnote = false;
 
   try {
-    const { member, pro } = await getTierThresholds();
-    memberTokenFormatted = formatTokenAmountDisplay(member.token_amount, TOKEN_DECIMALS);
-    proTokenFormatted = formatTokenAmountDisplay(pro.token_amount, TOKEN_DECIMALS);
-    recalculatedAt = member.valid_from;
+    const res = await getTierThresholds();
+    memberTokenFormatted = formatTokenAmountDisplay(res.member.token_amount, TOKEN_DECIMALS);
+    proTokenFormatted = formatTokenAmountDisplay(res.pro.token_amount, TOKEN_DECIMALS);
+    recalculatedAt = res.member.valid_from;
+    priceSource = res.priceSource;
+    stale = res.stale;
     showFootnote = true;
   } catch {
     showFootnote = false;
   }
+
+  const provenanceItem = toGenesisProvenanceItem({
+    twap_source: priceSource,
+    stale,
+    recalculated_at: recalculatedAt,
+  });
 
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
   const freeCtaDisabled = false;
@@ -168,8 +180,11 @@ export async function TierSection() {
               </div>
 
               <div className="space-y-2">
-                <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
-                  REQUIRED WALLET BALANCE
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+                    REQUIRED WALLET BALANCE
+                  </div>
+                  <MarketDataBadge item={provenanceItem} />
                 </div>
                 <div className="font-sans text-4xl sm:text-5xl font-black text-white tracking-tight tnum">
                   <span className="text-brand font-extrabold">$H42</span>

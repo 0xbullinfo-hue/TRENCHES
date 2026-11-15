@@ -10,6 +10,8 @@ import { ArrowUpRight, Check, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles 
 import { StakePointPool } from '@/lib/stakepoint/types';
 import { formatTvlDisplay, formatLockPeriodDisplay } from '@/components/staking/StakePointCard';
 import { useTelegramLink } from '@/components/dashboard/TelegramAlerts';
+import { MarketDataBadge } from '@/components/dashboard/MarketDataBadge';
+import { toGenesisProvenanceItem } from '@/lib/stake/provenance';
 
 interface StakeStatusResponse {
   wallet: string;
@@ -30,6 +32,9 @@ interface StakeStatusResponse {
       genesis_usd_price: number;
       lock_days: number;
     };
+    twap_source?: string;
+    recalculated_at?: string;
+    stale?: boolean;
   };
   eligible_for_pro: boolean;
   gap_to_pro_usd: number;
@@ -455,8 +460,11 @@ export function DashboardStakingCard({
               PRO STAKE LOCK ACTIVE
             </h4>
 
-            <p className="font-sans text-xs sm:text-muted leading-relaxed">
-              {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $H42)
+            <p className="font-sans text-xs sm:text-muted leading-relaxed flex items-center gap-2 flex-wrap">
+              <span>
+                {formatUsd(Number(statusData?.stake?.amount_usd || 250))} staked ({formatTokenDisplay(statusData?.stake?.amount_genesis || 0)} $H42)
+              </span>
+              <MarketDataBadge item={toGenesisProvenanceItem(statusData?.thresholds)} />
             </p>
           </div>
 
@@ -561,9 +569,12 @@ export function DashboardStakingCard({
       <div className="pt-5 mt-auto space-y-3">
         {/* On top of the buttons */}
         <div className="space-y-1.5">
-          <h4 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
-            {title}
-          </h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              {title}
+            </h4>
+            <MarketDataBadge item={toGenesisProvenanceItem(statusData?.thresholds)} />
+          </div>
 
           <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
             {subtitle}

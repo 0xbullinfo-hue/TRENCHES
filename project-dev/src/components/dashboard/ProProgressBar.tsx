@@ -4,6 +4,11 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, CheckCircle2, Lock, Sparkles } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { MarketDataBadge } from './MarketDataBadge';
+import {
+  toGenesisProvenanceItem,
+  type GenesisThresholdProvenanceInput,
+} from '@/lib/stake/provenance';
 
 interface StakeStatusResponse {
   ok?: boolean;
@@ -14,6 +19,9 @@ interface StakeStatusResponse {
     pro?: {
       usd_target?: number;
     };
+    twap_source?: string;
+    recalculated_at?: string;
+    stale?: boolean;
   };
 }
 
@@ -27,6 +35,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
   const [gapToPro, setGapToPro] = useState<number | null>(null);
   const [targetUsd, setTargetUsd] = useState<number>(250);
   const [unlocked, setUnlocked] = useState<boolean>(isPro);
+  const [provenance, setProvenance] = useState<GenesisThresholdProvenanceInput | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -49,6 +58,11 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
         if (mounted) {
           const proTarget = data.thresholds?.pro?.usd_target ?? 250;
           setTargetUsd(proTarget);
+          setProvenance({
+            twap_source: data.thresholds?.twap_source,
+            recalculated_at: data.thresholds?.recalculated_at,
+            stale: data.thresholds?.stale,
+          });
 
           if (data.current_tier === 'pro' || data.eligible_for_pro || data.gap_to_pro_usd === 0) {
             setUnlocked(true);
@@ -112,17 +126,18 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
           </span>
         </div>
 
-        <div className="font-mono text-xs text-muted flex items-center gap-1.5">
+        <div className="font-mono text-xs text-muted flex items-center gap-2 flex-wrap">
           {unlocked || isPro ? (
             <span className="text-brand font-bold inline-flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              Maximum Alpha & Instant Telegram Calls Active
+              Maximum Alpha &amp; Instant Telegram Calls Active
             </span>
           ) : (
             <span>
               <strong className="text-white font-bold">${effectiveGap.toFixed(2)}</strong> remaining of ${targetUsd} target
             </span>
           )}
+          <MarketDataBadge item={toGenesisProvenanceItem(provenance)} />
         </div>
       </div>
 

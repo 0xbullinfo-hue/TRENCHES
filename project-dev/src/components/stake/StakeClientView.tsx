@@ -25,6 +25,9 @@ interface InitialStakeData {
       genesis_usd_price: number;
       token_amount: string;
     };
+    twap_source?: string;
+    recalculated_at?: string;
+    stale?: boolean;
   };
   eligible_for_pro: boolean;
   gap_to_pro_usd: number;
@@ -80,6 +83,7 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
         status={stakeData.stake.status}
         showStakeAdditionalLink={isActivePro && !showAdditionalForm}
         onStakeAdditional={() => setShowAdditionalForm(true)}
+        provenance={stakeData.thresholds}
       />
 
       {/* Primary Card: Stake Form OR Active Pro Summary */}
