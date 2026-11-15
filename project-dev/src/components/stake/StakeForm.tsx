@@ -131,15 +131,15 @@ export function StakeForm({
   };
 
   return (
-    <div className="rounded-xl bg-surface border border-border-default p-6 sm:p-8 shadow-none space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-line">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-brand" />
-          <h2 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+    <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 shadow-none space-y-5 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2 pb-4 border-b border-line">
+        <div className="flex items-center gap-2 min-w-0">
+          <ShieldCheck className="w-5 h-5 text-brand shrink-0" />
+          <h2 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight truncate">
             Stake on StakePoint
           </h2>
         </div>
-        <span className="text-2xs font-mono text-brand font-bold bg-brand/10 border border-brand/30 px-2.5 py-0.5 rounded-full uppercase">
+        <span className="text-2xs font-mono text-brand font-bold bg-brand/10 border border-brand/30 px-2.5 py-0.5 rounded-full uppercase shrink-0">
           90-Day Lock
         </span>
       </div>
@@ -158,18 +158,18 @@ export function StakeForm({
             value={amountStr}
             onChange={handleInputChange}
             placeholder="250.00"
-            className="w-full h-12 pl-8 pr-16 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors outline-none"
+            className="w-full min-h-[44px] h-12 pl-8 pr-20 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors outline-none"
           />
           <button
             type="button"
             onClick={handleMaxClick}
-            className="absolute right-3 px-2.5 py-1 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-brand cursor-pointer uppercase transition-colors"
+            className="absolute right-2 min-h-[36px] px-3 py-1.5 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-brand cursor-pointer uppercase transition-colors"
           >
             Max
           </button>
         </div>
 
-        <div className="flex items-center justify-between text-2xs font-mono pt-1 text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-2xs font-mono pt-1 text-muted">
           <span>≈ {formatTokenDisplay(equivalentTokens)} $H42</span>
           {walletBalanceTokens > 0 && (
             <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $H42</span>
@@ -178,16 +178,16 @@ export function StakeForm({
       </div>
 
       {/* Lock Duration Info */}
-      <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2 font-sans text-xs">
-        <div className="flex justify-between items-center text-muted">
+      <div className="rounded-lg bg-surface-card border border-line p-4 space-y-2.5 font-sans text-xs">
+        <div className="flex justify-between items-center gap-2 text-muted">
           <span>Lock Period</span>
           <span className="font-mono text-white font-bold">90 Days</span>
         </div>
-        <div className="flex justify-between items-center text-muted">
+        <div className="flex justify-between items-center gap-2 text-muted">
           <span>Unlock Date</span>
           <span className="font-mono text-white font-bold">{unlockDateFormatted}</span>
         </div>
-        <div className="flex justify-between items-center text-muted">
+        <div className="flex justify-between items-center gap-2 text-muted">
           <span>Primary Staking Tool</span>
           <span className="font-mono text-brand font-bold">StakePoint</span>
         </div>
@@ -199,35 +199,41 @@ export function StakeForm({
           href={stakepointUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full h-12 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+          className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
         >
           <span>Stake $H42 on StakePoint →</span>
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+          <ArrowUpRight className="w-4 h-4 stroke-[2.5] shrink-0" />
         </a>
-        <p className="text-center font-sans text-2xs text-muted">
+        <p className="text-center font-sans text-2xs text-muted leading-relaxed">
           Opens the official $H42 pool on StakePoint. Lock for 90 days to qualify for Pro.
         </p>
+        <div
+          data-testid="mobile-deeplink-guidance"
+          className="rounded-lg bg-surface-card border border-border-default p-3 font-sans text-xs text-muted leading-relaxed"
+        >
+          <strong className="text-white font-semibold">Mobile wallet tip:</strong> After confirming your 90-day stake on StakePoint, copy your Solana transaction signature and return to this tab to verify below.
+        </div>
       </div>
 
       {/* Manual Signature Verification Form */}
-      <form onSubmit={handleVerifyTx} className="pt-4 border-t border-line space-y-3">
+      <form onSubmit={handleVerifyTx} className="pt-4 border-t border-line space-y-3.5">
         <div className="space-y-1.5">
           <label htmlFor="tx-sig" className="block font-sans text-xs font-bold text-white uppercase">
             Already Staked? Verify Transaction
           </label>
-          <p className="font-sans text-2xs text-muted">
+          <p className="font-sans text-2xs text-muted leading-relaxed">
             Paste your Solana transaction signature from StakePoint to immediately activate Pro status.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <input
             id="tx-sig"
             type="text"
             value={txSignature}
             onChange={(e) => setTxSignature(e.target.value)}
             placeholder="Paste transaction signature..."
-            className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none"
+            className="flex-1 min-h-[44px] h-11 px-3.5 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none"
           />
           <button
             type="submit"
@@ -236,7 +242,7 @@ export function StakeForm({
               isTimelineStepInProgress(timelineStep) ||
               !txSignature.trim()
             }
-            className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
+            className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
           >
             {isVerifyingSignature || isTimelineStepInProgress(timelineStep)
               ? 'Verifying...'
