@@ -221,8 +221,9 @@ export function TelegramConnectButton({
     return (
       <div className="relative group inline-block">
         <button
+          type="button"
           disabled
-          className={`rounded-md border border-brand-border/30 bg-surface-card text-muted/60 font-sans text-xs font-semibold cursor-not-allowed select-none ${
+          className={`rounded-md border border-brand-border/30 bg-surface-card text-muted disabled:opacity-50 cursor-not-allowed font-sans text-xs font-semibold select-none ${
             compact ? 'px-3 py-1.5' : 'h-11 px-5'
           }`}
           title="Verify your wallet to unlock Telegram access."
@@ -242,9 +243,10 @@ export function TelegramConnectButton({
   return (
     <div className="space-y-1.5">
       <button
+        type="button"
         onClick={handleConnectClick}
         disabled={opening || polling}
-        className={`rounded-lg font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
+        className={`rounded-lg font-sans font-bold flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed ${
           compact ? 'h-9 px-4 text-xs' : 'h-11 px-6 text-sm'
         } ${
           opening || polling
