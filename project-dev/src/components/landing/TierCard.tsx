@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { Button, getButtonClass } from '@/components/ui/Button';
 import { TierCardProps } from './TierCard.types';
 
 export function TierCard({
@@ -85,28 +86,28 @@ export function TierCard({
       {/* CTA Button */}
       <div className="pt-6 mt-auto">
         {isLocalWalletCta ? (
-          <button
+          <Button
             type="button"
+            variant={emphasized ? 'primary' : 'secondary'}
+            size="md"
             onClick={connectWallet}
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
-              emphasized
-                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
-                : 'border border-brand text-brand hover:bg-brand/10'
-            }`}
+            className="w-full uppercase font-bold tracking-wide"
           >
             CONNECT WALLET
-          </button>
+          </Button>
         ) : ctaDisabled ? (
           <div className="relative group" data-target-href={ctaHref}>
-            <button
+            <Button
               type="button"
               disabled
               aria-disabled="true"
               title={ctaTooltip || 'LIVE SOON'}
-              className="w-full h-10 px-4 rounded-lg border border-border-default bg-surface text-muted cursor-not-allowed font-sans text-xs font-black uppercase tracking-wide flex items-center justify-center select-none opacity-80"
+              variant="secondary"
+              size="md"
+              className="w-full text-muted uppercase font-black tracking-wide"
             >
               {ctaLabel.toUpperCase()}
-            </button>
+            </Button>
             {ctaTooltip && (
               <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-[11px] text-white uppercase bg-surface-card border border-border-default rounded-md shadow-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
                 {ctaTooltip}
@@ -118,22 +119,22 @@ export function TierCard({
             href={ctaHref}
             target="_blank"
             rel="noreferrer"
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
-              emphasized
-                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
-                : 'border border-brand text-brand hover:bg-brand/10'
-            }`}
+            className={getButtonClass({
+              variant: emphasized ? 'primary' : 'secondary',
+              size: 'md',
+              className: 'w-full uppercase font-bold tracking-wide',
+            })}
           >
             {ctaLabel.toUpperCase()}
           </a>
         ) : (
           <Link
             href={ctaHref}
-            className={`w-full h-10 px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wide flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand ${
-              emphasized
-                ? 'bg-brand hover:bg-brand-bright text-canvas font-black'
-                : 'border border-brand text-brand hover:bg-brand/10'
-            }`}
+            className={getButtonClass({
+              variant: emphasized ? 'primary' : 'secondary',
+              size: 'md',
+              className: 'w-full uppercase font-bold tracking-wide',
+            })}
           >
             {ctaLabel.toUpperCase()}
           </Link>
