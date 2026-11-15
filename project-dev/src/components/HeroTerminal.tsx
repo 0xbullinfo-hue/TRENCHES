@@ -4,6 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { BUY_LINKS, BUY_LOCK, SOCIAL_LINKS } from '@/lib/config';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
+import { HeroLedgerProof } from '@/components/landing/HeroLedgerProof';
 import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
 
 const TRUST_METRICS = [
@@ -137,6 +138,11 @@ export const HeroTerminal: React.FC = () => {
                   </a>
                 )}
               </div>
+
+              <HeroLedgerProof />
+              <p className="font-sans text-[12px] leading-4 text-muted">
+                Research only, not financial advice. You make every trade decision.
+              </p>
             </div>
           </div>
 
