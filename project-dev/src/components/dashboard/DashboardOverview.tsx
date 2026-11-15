@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ProProgressBar } from './ProProgressBar';
 import { OnboardingChecklist } from './OnboardingChecklist';
+import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
 
 interface DashboardOverviewProps {
   connected: boolean;
@@ -238,6 +239,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* 4. PRO Unlock Progress Bar (Instruction 33) */}
       <ProProgressBar isPro={isPro} />
+
+      {/* 5. Weekly Tier Performance Digest (Instruction 37) */}
+      <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
     </div>
   );
 };
