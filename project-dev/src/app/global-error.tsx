@@ -43,15 +43,15 @@ export default function GlobalError({
 
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--ge-danger)]/10 border border-[var(--ge-danger)]/30 text-[var(--ge-danger)] text-xs font-bold">
             <AlertTriangle className="w-4 h-4" />
-            <span>Global root fault</span>
+            <span>Error</span>
           </div>
 
           <h2 className="font-sans text-xl font-extrabold text-white">
-            System-level interrupt
+            Something went wrong
           </h2>
 
           <p className="font-sans text-xs text-[var(--ge-muted)] leading-relaxed">
-            A fatal boundary fault was intercepted. Reset to restore dashboard execution.
+            The application encountered an unexpected error. Your data is safe — retry or reload the page.
           </p>
 
           <button

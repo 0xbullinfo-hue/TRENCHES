@@ -26,15 +26,15 @@ export default function GlobalError({
 
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-danger/10 border border-danger/30 text-danger font-mono text-xs font-bold">
           <AlertTriangle className="w-4 h-4" />
-          <span>Telemetry sync interrupted</span>
+          <span>Error</span>
         </div>
 
         <h2 className="font-sans font-extrabold text-xl text-white">
-          Temporary network desync
+          Something went wrong
         </h2>
 
         <p className="font-sans text-xs text-muted leading-relaxed">
-          The lab interface encountered a temporary connection glitch. You can safely retry or reload the page.
+          The application encountered an unexpected error. Your data is safe — retry or reload the page.
         </p>
 
         <Button
