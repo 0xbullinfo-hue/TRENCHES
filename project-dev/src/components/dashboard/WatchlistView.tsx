@@ -139,7 +139,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
                     </span>
                   </div>
                   <div className="font-mono text-xs text-muted truncate mt-0.5">
-                    {token.chain} â€¢ {shortCa}
+                    {token.chain} &bull; {shortCa}
                   </div>
                 </div>
 

@@ -148,7 +148,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
       {!(unlocked || isPro) && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
           <p className="font-sans text-xs text-muted">
-            Stake $H42 for 90 days or hold equivalent balance to unlock instant calls and the closed calls ledger.
+            Stake $250 of $H42 for 90 days on StakePoint to unlock instant Pro calls and full terminal access.
           </p>
           <Link
             href="/dashboard/stake"

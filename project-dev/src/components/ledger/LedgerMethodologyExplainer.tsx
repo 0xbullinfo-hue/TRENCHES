@@ -70,7 +70,7 @@ export const LedgerMethodologyExplainer: React.FC<{ className?: string }> = ({ c
           </div>
           <div>
             <h2 className="font-sans text-sm sm:text-base font-bold uppercase tracking-wider text-white">
-              How This Ledger Works â€” Recording &amp; Calculation Methodology
+              How This Ledger Works &mdash; Recording &amp; Calculation Methodology
             </h2>
             <p className="font-sans text-xs text-muted">
               Honest, verifiable performance tracking derived strictly from recorded on-chain calls.
@@ -133,7 +133,7 @@ export const LedgerMethodologyExplainer: React.FC<{ className?: string }> = ({ c
             <span>Strict CA Validation</span>
           </div>
           <p className="font-sans text-xs text-muted">
-            All Solana (32â€“44 Base58) and EVM (0x40 Hex) contract addresses are cryptographically validated.
+            All Solana (32&ndash;44 Base58) and EVM (0x40 Hex) contract addresses are cryptographically validated.
           </p>
         </div>
       </div>
@@ -143,11 +143,11 @@ export const LedgerMethodologyExplainer: React.FC<{ className?: string }> = ({ c
         <div className="pt-3 border-t border-border-default space-y-2 text-xs font-sans text-muted leading-relaxed">
           <h4 className="font-bold text-white uppercase font-mono text-xs">Mathematical Formula:</h4>
           <div className="p-3 rounded-lg bg-canvas font-mono text-xs text-brand border border-border-default">
-            Win Rate = (Profitable Calls / (Profitable Calls + Losses)) Ã— 100
+            Win Rate = (Profitable Calls / (Profitable Calls + Losses)) &times; 100
           </div>
           <ul className="list-disc list-inside space-y-1 pt-1">
-            <li><strong>Profitable Outcomes:</strong> Recorded calls achieving peak multiple â‰¥ 1.0Ã— or designated take-profit hit.</li>
-            <li><strong>Loss Outcomes:</strong> Recorded calls hitting stop-loss parameters or closing below 1.0Ã— multiple.</li>
+            <li><strong>Profitable Outcomes:</strong> Recorded calls achieving peak multiple &ge; 1.0&times; or designated take-profit hit.</li>
+            <li><strong>Loss Outcomes:</strong> Recorded calls hitting stop-loss parameters or closing below 1.0&times; multiple.</li>
             <li><strong>Multi-Chain Compatibility:</strong> Supports Solana SPL tokens and EVM contracts across Ethereum, Base, and BSC.</li>
           </ul>
         </div>

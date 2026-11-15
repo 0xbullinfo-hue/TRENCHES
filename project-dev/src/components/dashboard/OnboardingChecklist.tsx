@@ -202,7 +202,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
             onClick={onExploreCalls}
             className="p-0 h-auto font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 text-xs text-left"
           >
-            <span>Browse Calls â†’</span>
+            <span>Browse Calls &rarr;</span>
           </Button>
         </div>
       </div>
