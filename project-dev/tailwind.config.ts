@@ -35,28 +35,6 @@ const config: Config = {
           dim: "#065F46",
           ink: "#0A0E13",
         },
-        toxic: {
-          DEFAULT: "#34D399",     // Vibrant emerald green
-          bright: "#6EE7B7",      // Hover active state
-          muted: "#10B981",       // Medium green
-          border: "#252D38",      // Standard hairline border
-          bg: "#0D281E",          // Flat dark-tinted badge fill
-        },
-        pump: {
-          DEFAULT: "#34D399",
-          pill: "#6EE7B7",
-          dim: "#065F46",
-          hover: "#6EE7B7",
-          border: "#252D38",
-          glow: "transparent",
-          bg: "#0D281E",
-        },
-        accent: {
-          DEFAULT: "#34D399",
-          hover: "#6EE7B7",
-          pill: "#6EE7B7",
-          ink: "#0A0E13",
-        },
 
         // Category colours: Alpha Calls (Permanently Purple)
         alpha: {
