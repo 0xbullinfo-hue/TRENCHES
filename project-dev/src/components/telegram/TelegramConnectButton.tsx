@@ -209,7 +209,7 @@ export function TelegramConnectButton({
         href={process.env.NEXT_PUBLIC_BOT_URL || 'https://t.me/Trenchlabs_bot'}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#0d2218] border border-brand/40 text-brand hover:border-brand transition-colors select-none"
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-bg border border-brand/40 text-brand hover:border-brand transition-colors select-none"
       >
         <span>✅ Telegram connected{tierName ? ` (${tierName})` : ''}</span>
       </a>
@@ -222,7 +222,7 @@ export function TelegramConnectButton({
       <div className="relative group inline-block">
         <button
           disabled
-          className={`rounded-md border border-brand-border/30 bg-[#161c24] text-muted/60 font-sans text-xs font-semibold cursor-not-allowed select-none ${
+          className={`rounded-md border border-brand-border/30 bg-surface-card text-muted/60 font-sans text-xs font-semibold cursor-not-allowed select-none ${
             compact ? 'px-3 py-1.5' : 'h-11 px-5'
           }`}
           title="Verify your wallet to unlock Telegram access."
@@ -248,7 +248,7 @@ export function TelegramConnectButton({
           compact ? 'h-9 px-4 text-xs' : 'h-11 px-6 text-sm'
         } ${
           opening || polling
-            ? 'bg-[#1b2533] border border-border-default text-brand cursor-wait'
+            ? 'bg-surface-3 border border-border-default text-brand cursor-wait'
             : 'bg-brand hover:bg-brand-bright text-canvas font-black cursor-pointer shadow-none'
         }`}
       >
