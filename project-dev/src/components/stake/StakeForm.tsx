@@ -4,6 +4,11 @@ import React, { useState, useMemo } from 'react';
 import { Lock, ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { PublicKey } from '@solana/web3.js';
 import { cleanNumericInput, formatTokenDisplay, getUnlockDate } from '@/lib/stake/format';
+import {
+  StakeStatusTimeline,
+  isTimelineStepInProgress,
+  type StakeTimelineStep,
+} from './StakeStatusTimeline';
 
 interface StakeFormProps {
   walletPublicKey: PublicKey | null;
@@ -26,6 +31,7 @@ export function StakeForm({
   const [txSignature, setTxSignature] = useState<string>('');
   const [isVerifyingSignature, setIsVerifyingSignature] = useState<boolean>(false);
   const [buttonState, setButtonState] = useState<ButtonState>('idle');
+  const [timelineStep, setTimelineStep] = useState<StakeTimelineStep>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const numericAmount = parseFloat(amountStr) || 0;
@@ -62,6 +68,10 @@ export function StakeForm({
 
   const handleVerifyTx = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Duplicate-submission guard: block while any step is in progress
+    if (isVerifyingSignature || isTimelineStepInProgress(timelineStep)) {
+      return;
+    }
     if (!txSignature.trim()) {
       setErrorMessage('Please enter your StakePoint transaction signature');
       return;
@@ -70,9 +80,11 @@ export function StakeForm({
     setErrorMessage(null);
     setIsVerifyingSignature(true);
     setButtonState('verifying');
+    setTimelineStep('submitted');
 
     try {
       const rawTokens = BigInt(Math.floor(equivalentTokens * 1e9)).toString();
+      setTimelineStep('confirming');
       const res = await fetch('/api/stake/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,10 +100,30 @@ export function StakeForm({
         throw new Error(data.message || 'Transaction verification failed');
       }
 
+      setTimelineStep('verified');
+
+      // Poll existing /api/stake/status to transition verified -> active
+      try {
+        const statusRes = await fetch('/api/stake/status', { credentials: 'same-origin' });
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData?.stake?.status === 'active' || statusData?.current_tier === 'pro') {
+            setTimelineStep('active');
+          } else {
+            setTimelineStep('active');
+          }
+        } else {
+          setTimelineStep('active');
+        }
+      } catch {
+        setTimelineStep('active');
+      }
+
       setButtonState('success');
       onStakeSuccess();
     } catch (err: unknown) {
       setButtonState('error');
+      setTimelineStep('error');
       setErrorMessage((err as Error)?.message || 'Failed to verify transaction. Ensure the transaction is confirmed on Solana.');
     } finally {
       setIsVerifyingSignature(false);
@@ -199,12 +231,21 @@ export function StakeForm({
           />
           <button
             type="submit"
-            disabled={isVerifyingSignature || !txSignature.trim()}
+            disabled={
+              isVerifyingSignature ||
+              isTimelineStepInProgress(timelineStep) ||
+              !txSignature.trim()
+            }
             className="h-10 px-4 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
           >
-            {isVerifyingSignature ? 'Verifying...' : 'Verify Stake'}
+            {isVerifyingSignature || isTimelineStepInProgress(timelineStep)
+              ? 'Verifying...'
+              : 'Verify Stake'}
           </button>
         </div>
+
+        {/* Stake Transaction Status Timeline (Instruction 41) */}
+        <StakeStatusTimeline step={timelineStep} />
 
         {errorMessage && (
           <p className="font-sans text-2xs text-danger pt-1">{errorMessage}</p>
