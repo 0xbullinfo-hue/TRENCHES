@@ -33,6 +33,7 @@ import { CampaignSection } from '@/components/campaigns/CampaignSection';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { AdminCampaignManager } from '@/components/admin/AdminCampaignManager';
 import { DashboardOverview } from './DashboardOverview';
+import { WatchlistView } from './WatchlistView';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -1367,6 +1368,16 @@ export const IncubatorHub: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Personal Watchlist Management with Opt-In Alerts (Instruction 34) */}
+              {activeFilter === 'WATCHLIST' && (
+                <WatchlistView
+                  watchlistIds={watchlist}
+                  allCalls={alphas}
+                  onToggleWatchlist={toggleWatchlist}
+                  className="mb-4"
+                />
+              )}
 
               {/* View Mode A: Grid */}
               {viewMode === 'GRID' ? (
