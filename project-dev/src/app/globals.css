@@ -85,6 +85,16 @@
   }
 }
 
+@layer components {
+  .btn {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  }
+  .chip,
+  .chip-active {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand;
+  }
+}
+
 
 /* ── Solana wallet-adapter overrides (flat 1px theme, zero glow, 8px button radius) ─── */
 .wallet-adapter-button {
