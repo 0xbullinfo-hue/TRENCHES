@@ -9,28 +9,24 @@ import { ArrowUpRight, Send, ShieldCheck } from 'lucide-react';
 
 const TRUST_METRICS = [
   {
-    label: 'MEMBER ACCESS',
-    value: 'HOLD OR STAKE',
-    sub: 'HOLD ~$20 OR STAKE $250 FOR ACCESS',
-    highlight: true,
+    label: 'Access',
+    value: 'Hold or stake',
+    sub: 'Hold $20 of $H42 for Member, or stake $250 for Pro.',
   },
   {
-    label: 'TRADE INTELLIGENCE',
-    value: 'ENTRY · RISK · TP',
-    sub: 'CURATED RESEARCH WITH STRUCTURED SL/TP',
-    highlight: true,
+    label: 'Each call',
+    value: 'Entry · risk · take-profit',
+    sub: 'Curated research with structured stop-loss and take-profit levels.',
   },
   {
-    label: 'MULTI-CHAIN COVERAGE',
-    value: '6 CHAINS',
+    label: 'Coverage',
+    value: '6 chains',
     sub: 'SOL · BSC · ETH · BASE · ROBIN · AVAX',
-    highlight: false,
   },
   {
-    label: 'NON-CUSTODIAL EXECUTION',
-    value: 'INDEPENDENT',
-    sub: 'YOU CONTROL & EXECUTE EVERY TRADE',
-    highlight: false,
+    label: 'Execution',
+    value: 'Non-custodial',
+    sub: 'You make and execute every trade.',
   },
 ];
 
@@ -167,21 +163,11 @@ export const HeroTerminal: React.FC = () => {
           {TRUST_METRICS.map((m) => (
             <div
               key={m.label}
-              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default hover:border-brand transition-colors flex flex-col justify-between gap-3 min-h-[140px]"
+              className="p-5 sm:p-6 rounded-xl bg-surface border border-border-default flex flex-col justify-between gap-3 min-h-[140px]"
             >
-              <div className="font-sans text-xs font-bold text-muted uppercase tracking-wider">
-                {m.label}
-              </div>
-              <div
-                className={`font-sans text-lg sm:text-xl xl:text-2xl font-semibold tracking-tight whitespace-nowrap ${
-                  m.highlight ? 'text-brand' : 'text-white'
-                }`}
-              >
-                {m.value}
-              </div>
-              <div className="font-sans text-xs font-medium text-muted uppercase tracking-wide">
-                {m.sub}
-              </div>
+              <div className="font-sans text-sm font-medium text-muted">{m.label}</div>
+              <div className="font-sans text-lg sm:text-xl font-semibold tracking-tight text-white">{m.value}</div>
+              <div className="font-sans text-sm text-muted leading-snug">{m.sub}</div>
             </div>
           ))}
         </div>
