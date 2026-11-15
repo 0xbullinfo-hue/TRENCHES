@@ -38,6 +38,18 @@ export const BUY_LINKS = {
   dexscreener: `https://dexscreener.com/solana/${GENESIS_MINT}`,
 };
 
+/**
+ * While true, every $H42 buy button renders as a disabled "available soon" control.
+ * Keep locked until the new contract address is configured, then set NEXT_PUBLIC_BUY_LOCK=false and redeploy.
+ */
+export const BUY_LOCK = process.env.NEXT_PUBLIC_BUY_LOCK !== 'false';
+
+/**
+ * While true, public-site wallet-connect buttons render as disabled "available soon" controls.
+ * Set NEXT_PUBLIC_WALLET_LOCK=false and redeploy to restore them.
+ */
+export const WALLET_LOCK = process.env.NEXT_PUBLIC_WALLET_LOCK !== 'false';
+
 /** Official Social & Community Links */
 export const SOCIAL_LINKS = {
   telegram: 'https://t.me/TrenchLabsHQ',
