@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { getLedgerEntries } from '@/server/db';
 import { LedgerGrid } from '@/components/ledger/LedgerGrid';
 import { LedgerCardSkeleton } from '@/components/ledger/LedgerCardSkeleton';
+import { LedgerMethodologyExplainer } from '@/components/ledger/LedgerMethodologyExplainer';
 import { ShieldCheck } from 'lucide-react';
 
 export const revalidate = 60;
@@ -43,6 +44,9 @@ export default async function PublicLedgerPage(props: {
             verified multipliers, timestamps, and contract addresses.
           </p>
         </div>
+
+        {/* Dismissible Methodology Explainer (Instruction 35) */}
+        <LedgerMethodologyExplainer />
 
         {/* Ledger Table wrapped in Suspense for useSearchParams */}
         <Suspense fallback={<LedgerCardSkeleton />}>
