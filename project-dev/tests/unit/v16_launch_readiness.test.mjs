@@ -957,8 +957,8 @@ test('Branding [1/18]: The hero contains the exact approved paragraph', () => {
     'Hero paragraph must contain exact approved copy'
   );
   assert.ok(
-    content.includes('We don') && content.includes('chase chains, we chase trenches. If there') && content.includes('s a trench, we') && content.includes('re in it.'),
-    'Hero paragraph must contain trenches punchline'
+    content.includes('TrenchLabs is a research and trading-intelligence platform. Holding GENESIS ($H42) unlocks membership tiers and tools.'),
+    'Hero paragraph must contain updated approved copy'
   );
 });
 

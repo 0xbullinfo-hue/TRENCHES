@@ -62,7 +62,7 @@ export function TelegramVerificationCard({
         </h3>
 
         <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
-          After buying GENESIS on your preferred tier get instant notifications on all calls fast on Telegram. More call Details remain here on dashboard
+          Connect Telegram to receive call alerts instantly. Full call details and history remain on this dashboard.
         </p>
       </div>
 

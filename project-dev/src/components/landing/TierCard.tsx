@@ -100,7 +100,7 @@ export function TierCard({
               type="button"
               disabled
               aria-disabled="true"
-              title={ctaTooltip || 'LIVE SOON'}
+              title={ctaTooltip || 'Available at launch'}
               variant="secondary"
               size="md"
               className="w-full text-muted uppercase font-black tracking-wide cursor-not-allowed"

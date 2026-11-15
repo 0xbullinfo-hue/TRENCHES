@@ -79,14 +79,12 @@ export const HeroTerminal: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
           {/* Left Column (6 cols): Headline + Subtext + Soft-Launch CTAs */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
-            <h1 className="font-sans font-bold tracking-tight uppercase text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
-              <span className="block">BUILDING THE STRONGEST</span>
-              <span className="block sm:whitespace-nowrap">COMMUNITY IN</span>
-              <span className="block sm:whitespace-nowrap">THE <span className="text-brand">TRENCHES</span></span>
+            <h1 className="font-sans font-bold tracking-tight text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
+              A research platform for on-chain communities
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
-              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key. We don&apos;t chase chains, we chase trenches. If there&apos;s a trench, we&apos;re in it.
+              Building, experimenting, and shipping together. TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key. TrenchLabs is a research and trading-intelligence platform. Holding GENESIS ($H42) unlocks membership tiers and tools.
             </p>
 
             {/* Primary Soft-Launch Conversion Unit */}
@@ -99,7 +97,7 @@ export const HeroTerminal: React.FC = () => {
                   className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Send className="w-4 h-4 fill-current" />
-                  <span>JOIN THE SOFT LAUNCH</span>
+                  <span>Get Early Access</span>
                   <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
                 </a>
                 <p className="font-sans text-xs text-muted text-center pt-2">
