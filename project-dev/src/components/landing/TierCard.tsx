@@ -65,7 +65,7 @@ export function TierCard({
               {thresholdLabel}
             </div>
           ) : (
-            <div className="font-mono text-[11px] text-muted/40 font-medium pt-0.5 select-none">
+            <div className="font-mono text-[11px] text-muted font-medium pt-0.5 select-none">
               —
             </div>
           )}

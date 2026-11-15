@@ -66,8 +66,8 @@ const config: Config = {
         },
         line: "#252D38",
         ink: "#F8FAFC",
-        muted: "#848E9C",
-        dim: "#8E9BAE",
+        muted: "#9AA3B2",
+        dim: "#A5AFC0",
         amber: "#F59E0B",
         idle: "#7C8594",
         danger: {
