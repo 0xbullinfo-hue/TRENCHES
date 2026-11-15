@@ -58,9 +58,9 @@ export const HeroTerminal: React.FC = () => {
         {/* Soft-Launch Status Strip */}
         <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber" />
             <span className="text-muted">TOKEN:</span>
-            <span className="text-white">LIVE</span>
+            <span className="text-amber">LIVE SOON</span>
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
@@ -80,8 +80,9 @@ export const HeroTerminal: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-center">
           {/* Left Column (6 cols): Headline + Subtext + Soft-Launch CTAs */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-5 sm:space-y-6 min-w-0">
-            <h1 className="font-sans font-bold tracking-tight text-white text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-[54px] xl:text-[68px] 2xl:text-[82px] leading-[0.96] tracking-[0.015em] break-words">
-              A research platform for on-chain communities
+            <h1 className="font-sans font-semibold tracking-tight text-white text-3xl sm:text-5xl lg:text-6xl leading-[1.08] text-balance break-words">
+              A grassroots research lab for{' '}
+              <span className="text-brand whitespace-nowrap">on-chain</span> communities.
             </h1>
 
             <p className="font-sans text-sm sm:text-lg lg:text-xl font-medium text-muted leading-relaxed">
