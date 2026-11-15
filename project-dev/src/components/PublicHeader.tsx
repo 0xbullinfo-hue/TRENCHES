@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { Button } from '@/components/ui/Button';
-import { SOCIAL_LINKS } from '@/lib/config';
+import { SOCIAL_LINKS, WALLET_LOCK } from '@/lib/config';
 import { ArrowUpRight, LogOut, Menu, Send, Wallet, X } from 'lucide-react';
 
 const LANDING_SECTIONS = [
@@ -30,9 +30,10 @@ export const PublicHeader: React.FC = () => {
       window.location.hostname === '0.0.0.0');
 
   const enableWalletConnect =
-    isLocalhost ||
-    process.env.NODE_ENV !== 'production' ||
-    process.env.NEXT_PUBLIC_ENABLE_WALLET === 'true';
+    !WALLET_LOCK &&
+    (isLocalhost ||
+      process.env.NODE_ENV !== 'production' ||
+      process.env.NEXT_PUBLIC_ENABLE_WALLET === 'true');
   const [activeSection, setActiveSection] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');

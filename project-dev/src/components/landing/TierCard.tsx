@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { WALLET_LOCK } from '@/lib/config';
 import { Button, getButtonClass } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { TierCardProps } from './TierCard.types';
@@ -32,7 +33,10 @@ export function TierCard({
   }, []);
 
   const isLocalWalletCta =
-    isLocalhost && ctaDisabled && ctaLabel.toUpperCase().includes('CONNECT WALLET');
+    !WALLET_LOCK &&
+    isLocalhost &&
+    ctaDisabled &&
+    ctaLabel.toUpperCase().includes('CONNECT WALLET');
   const isExternal = ctaHref.startsWith('http');
 
   return (
