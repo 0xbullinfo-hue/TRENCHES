@@ -52,7 +52,7 @@ async function renderComponent(ui) {
   };
 }
 
-test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle all 6 workspaces', () => {
+test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle all workspaces', () => {
   assert.equal(readWorkspaceFromSearch(''), 'OVERVIEW');
   assert.equal(readWorkspaceFromSearch('?tab=unknown'), 'OVERVIEW');
   assert.equal(readWorkspaceFromSearch('?tab=alpha'), 'ALPHA');
@@ -60,6 +60,7 @@ test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle
   assert.equal(readWorkspaceFromSearch('?tab=WATCHLIST'), 'WATCHLIST');
   assert.equal(readWorkspaceFromSearch('?tab=SOCIAL'), 'SOCIAL');
   assert.equal(readWorkspaceFromSearch('?tab=stake'), 'STAKE');
+  assert.equal(readWorkspaceFromSearch('?tab=admin'), 'ADMIN');
 
   assert.equal(workspaceHref('OVERVIEW'), '/dashboard');
   assert.equal(workspaceHref('ALPHA'), '/dashboard?tab=ALPHA');
@@ -67,6 +68,7 @@ test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle
   assert.equal(workspaceHref('WATCHLIST'), '/dashboard?tab=WATCHLIST');
   assert.equal(workspaceHref('SOCIAL'), '/dashboard?tab=SOCIAL');
   assert.equal(workspaceHref('STAKE'), '/dashboard?tab=STAKE');
+  assert.equal(workspaceHref('ADMIN'), '/dashboard?tab=ADMIN');
 });
 
 test('DashboardSidebar renders all 6 workspaces, active state, counts, and collapse toggle', async () => {
@@ -88,6 +90,20 @@ test('DashboardSidebar renders all 6 workspaces, active state, counts, and colla
     const expectedIds = ['tab-overview', 'tab-alpha', 'tab-max-alpha', 'tab-watchlist', 'tab-social', 'tab-stake'];
     for (const id of expectedIds) {
       assert.ok(view.container.querySelector(`[data-testid="${id}"]`), `Missing sidebar item ${id}`);
+    }
+    assert.equal(view.container.querySelector('[data-testid="tab-admin"]'), null, 'Non-admin must not see Admin sidebar item');
+
+    const adminView = await renderComponent(
+      React.createElement(DashboardSidebar, {
+        active: 'ADMIN',
+        isAdmin: true,
+        onSelect: () => { },
+      })
+    );
+    try {
+      assert.ok(adminView.container.querySelector('[data-testid="tab-admin"]'), 'Admin must see Admin sidebar item');
+    } finally {
+      await adminView.cleanup();
     }
 
     const activeBtn = view.container.querySelector('[data-testid="tab-alpha"]');
@@ -171,7 +187,7 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
     assert.ok(text.includes('ACTIVE CALLS'));
     assert.ok(text.includes('NEW CALLS'));
     assert.ok(text.includes('ACTIVE RAIDS'));
-    assert.ok(text.includes('PLATFORM WATCHLIST'));
+    assert.ok(text.includes('SAVED WATCHLIST'));
     assert.ok(view.container.querySelector('[data-testid="pro-progress-bar"]'));
     assert.ok(view.container.querySelector('[data-testid="weekly-performance-digest"]'));
 
@@ -194,17 +210,31 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
   }
 });
 
-test('Watchlist workspace checks saved IDs (`watchlist.includes`) independently of callType', () => {
+test('Architecture constraints: Watchlist saved-IDs only, dedicated Admin workspace, isolated filters, no duplicate Staking card', () => {
   const hubSrc = fs.readFileSync(
     path.join(process.cwd(), 'src/components/dashboard/IncubatorHub.tsx'),
     'utf-8'
   );
   assert.ok(
-    hubSrc.includes('watchlist.includes(a.id)') && hubSrc.includes("watchlistMode === 'SAVED'"),
-    'Saved Watchlist mode must resolve from watchlist.includes(a.id), not callType === WATCHLIST'
+    hubSrc.includes('watchlist.includes(a.id)') && !hubSrc.includes('watchlistMode'),
+    'Watchlist workspace must resolve strictly from personal watchlist.includes(a.id), not a fake platform feed mode'
   );
   assert.ok(
-    hubSrc.includes("a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha)"),
+    /a\.callType === 'MAX_ALPHA'\s*\|\|\s*Boolean\(a\.isMaxAlpha\)/.test(hubSrc),
     'Max Alpha workspace must preserve existing isMaxAlpha / callType classification'
+  );
+  assert.ok(
+    !hubSrc.includes('MASTER ADMIN DESK') && hubSrc.includes('<AdminWorkspace'),
+    'Admin publishing must live exclusively in dedicated AdminWorkspace'
+  );
+  assert.ok(
+    hubSrc.includes('filtersByWorkspace') && hubSrc.includes('<WorkspaceFilterBar'),
+    'IncubatorHub must isolate filters per workspace via filtersByWorkspace and WorkspaceFilterBar'
+  );
+  const stakingOccurrences = hubSrc.match(/<DashboardStakingCard/g) || [];
+  assert.equal(
+    stakingOccurrences.length,
+    1,
+    'DashboardStakingCard must appear once in STAKE workspace only (no duplicate in Overview)'
   );
 });

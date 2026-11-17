@@ -46,31 +46,17 @@ function getRestrictionContent(
   }
 
   if (category === 'WATCHLIST') {
-    if (userTier === 'MEMBER') {
-      // 4.3 MEMBER user opening WATCHLIST
-      return {
-        categoryName: 'WATCHLIST',
-        categoryDescription:
-          'Discover curated long-term projects selected by the TRENCHLABS team for ongoing monitoring.',
-        requiredTier: 'PRO',
-        restrictionMessage: 'This category is available exclusively to PRO members.',
-        recommendation: 'Upgrade your membership to PRO to unlock WATCHLIST.',
-        ctaLabel: 'UPGRADE TO PRO',
-        ctaHref: '/dashboard/stake',
-        badgeText: 'PRO EXCLUSIVE',
-      };
-    }
-    // 4.2 FREE user opening WATCHLIST
+    // FREE user opening WATCHLIST
     return {
-      categoryName: 'WATCHLIST',
+      categoryName: 'PERSONAL WATCHLIST',
       categoryDescription:
-        'Discover curated long-term projects selected by the TRENCHLABS team for ongoing monitoring.',
-      requiredTier: 'PRO',
-      restrictionMessage: 'WATCHLIST access is exclusive to PRO members.',
-      recommendation: 'Upgrade to PRO to access long-term project research and monitoring.',
-      ctaLabel: 'UPGRADE TO PRO',
-      ctaHref: '/dashboard/stake',
-      badgeText: 'PRO EXCLUSIVE',
+        'Save Alpha Calls and Max Alpha setups to your personal watchlist with custom per-token Telegram TP/SL alerts.',
+      requiredTier: userTier === 'MEMBER' ? 'PRO' : 'MEMBER',
+      restrictionMessage: 'Unlock Member or PRO access via $H42 balance or StakePoint to save calls into your personal Watchlist.',
+      recommendation: 'Hold ~$20 in $H42 for Member access or stake $250 on StakePoint for full PRO Watchlist coverage.',
+      ctaLabel: 'UNLOCK WATCHLIST ACCESS',
+      ctaHref: '/dashboard?tab=STAKE',
+      badgeText: 'MEMBER+ ACCESS REQUIRED',
     };
   }
 

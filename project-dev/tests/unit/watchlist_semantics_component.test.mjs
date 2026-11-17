@@ -241,27 +241,24 @@ test('V1.4 Watchlist [4/5]: AlphaInspectorModal shows trade targets and admin ou
   }
 });
 
-test('V1.4 Watchlist [5/5]: IncubatorHub excludes WATCHLIST from topWinningCoins, clarifies Admin selection, and adapts table view', () => {
+test('V1.4 Watchlist [5/5]: Watchlist workspace uses user-saved IDs and AdminWorkspace excludes WATCHLIST auto-publishing', () => {
   const hubSource = fs.readFileSync(
     path.resolve(process.cwd(), 'src/components/dashboard/IncubatorHub.tsx'),
     'utf8'
   );
-  assert.ok(
-    hubSource.includes("a.callType !== 'WATCHLIST'"),
-    'topWinningCoins must exclude WATCHLIST items'
+  const adminSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/components/admin/AdminWorkspace.tsx'),
+    'utf8'
   );
   assert.ok(
-    hubSource.includes("aria-pressed={formCallType === 'WATCHLIST'}"),
-    'Admin Alpha Desk WATCHLIST button must expose aria-pressed selection state'
+    hubSource.includes('watchlist.includes(a.id)') && hubSource.includes("a.callType !== 'WATCHLIST'"),
+    'User feeds must exclude fake WATCHLIST callType and Watchlist workspace must rely strictly on saved IDs'
   );
   assert.ok(
-    hubSource.includes('SELECTED · PRO'),
-    'Admin Alpha Desk WATCHLIST button must clearly indicate active selection'
-  );
-  assert.ok(
-    hubSource.includes("currentTab !== 'WATCHLIST'") &&
-      hubSource.includes("const isRowWatchlist = token.callType === 'WATCHLIST'"),
-    'Table view must omit trading columns on WATCHLIST tab'
+    adminSource.includes('dest-select-alpha') &&
+      adminSource.includes('dest-select-max-alpha') &&
+      !adminSource.includes('dest-select-watchlist'),
+    'AdminWorkspace must support Alpha Calls & Max Alpha destinations without auto-populating user Watchlist'
   );
 });
 

@@ -5,6 +5,8 @@ export type QuoteToken = 'PUMP' | 'SOL' | 'ETH' | 'USDC' | 'WBTC' | 'ZEC' | 'BNB
 export type AlphaStatus = 'LIVE' | 'INCUBATING' | 'UPCOMING' | 'CLOSED';
 export type AlphaCategory = 'MOVERS' | 'NEW' | 'HOLDER_REWARDS' | 'AI_AGENT' | 'STEALTH' | 'CHARITY';
 export type CallType = 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST';
+export type PublicationStatus = 'PUBLISHED' | 'DRAFT' | 'ARCHIVED';
+export type PublishingDestination = 'ALPHA' | 'MAX_ALPHA';
 export type ArtMotif =
   | 'pill'
   | 'baton'
@@ -108,6 +110,14 @@ export interface AlphaItem {
   callType: CallType;
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
+  /** Multi-destination publishing channels on a single database record (no duplication) */
+  destinations?: PublishingDestination[];
+  /** Publication lifecycle state managed in the Admin workspace */
+  publishStatus?: PublicationStatus;
+  /** ISO timestamp when first published */
+  publishedAt?: string | null;
+  /** ISO timestamp of last admin update */
+  updatedAt?: string | null;
   /** Direct onchain or DexScreener token logo image URL */
   logoUrl?: string;
   sparkline: number[];
@@ -166,6 +176,8 @@ export interface AlphasOk {
   isAdmin: boolean;
   genesisMint: string;
   items: AlphaItem[];
+  /** Full inventory including drafts and archived posts, returned exclusively for authorized admins */
+  adminItems?: AlphaItem[];
   callers: SyndicateCaller[];
   portfolio: Portfolio;
   serverTime: string;

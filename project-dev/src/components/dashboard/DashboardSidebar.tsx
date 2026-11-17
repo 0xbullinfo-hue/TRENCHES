@@ -11,6 +11,7 @@ import {
   Menu,
   RadioTower,
   Shield,
+  ShieldCheck,
   Star,
   Target,
   X,
@@ -38,10 +39,18 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { id: 'OVERVIEW', label: 'Overview', description: 'Account, holdings and membership', icon: LayoutDashboard, testId: 'tab-overview' },
   { id: 'ALPHA', label: 'Alpha Calls', description: 'Curated trade intelligence', icon: Target, testId: 'tab-alpha' },
   { id: 'MAX_ALPHA', label: 'Max Alpha', description: 'Premium high-conviction calls', icon: Zap, testId: 'tab-max-alpha' },
-  { id: 'WATCHLIST', label: 'Watchlist', description: 'Saved tokens and curated research', icon: Star, testId: 'tab-watchlist' },
+  { id: 'WATCHLIST', label: 'Watchlist', description: 'Your saved tokens and opt-in alerts', icon: Star, testId: 'tab-watchlist' },
   { id: 'SOCIAL', label: 'Raid', description: 'Community campaigns and raids', icon: RadioTower, testId: 'tab-social' },
   { id: 'STAKE', label: 'Stake', description: 'StakePoint staking and Pro access', icon: Coins, testId: 'tab-stake' },
 ];
+
+export const ADMIN_NAV_ITEM: NavItem = {
+  id: 'ADMIN',
+  label: 'Admin',
+  description: 'Centralized content & campaign management',
+  icon: ShieldCheck,
+  testId: 'tab-admin',
+};
 
 const COLLAPSE_STORAGE_KEY = 'trench_dashboard_sidebar_collapsed';
 
@@ -49,15 +58,18 @@ interface DashboardSidebarProps {
   active?: DashboardWorkspace;
   onSelect?: (workspace: DashboardWorkspace) => void;
   itemState?: SidebarItemStateMap;
+  isAdmin?: boolean;
 }
 
 export function DashboardSidebar({
   active: activeProp,
   onSelect: onSelectProp,
   itemState: itemStateProp,
+  isAdmin: isAdminProp,
 }: DashboardSidebarProps = {}) {
   const navCtx = useDashboardNavigation();
   const genesis = React.useContext(GenesisContext);
+  const isAdmin = isAdminProp ?? Boolean(genesis?.isAdmin);
 
   const active = activeProp ?? navCtx?.activeWorkspace ?? 'OVERVIEW';
   const onSelect = onSelectProp ?? navCtx?.selectWorkspace;
@@ -128,23 +140,28 @@ export function DashboardSidebar({
     });
   };
 
-  const activeItem = DASHBOARD_NAV_ITEMS.find((i) => i.id === active) ?? DASHBOARD_NAV_ITEMS[0];
+  const availableItems = useMemo(
+    () => (isAdmin ? [...DASHBOARD_NAV_ITEMS, ADMIN_NAV_ITEM] : DASHBOARD_NAV_ITEMS),
+    [isAdmin]
+  );
+  const activeItem = availableItems.find((i) => i.id === active) ?? DASHBOARD_NAV_ITEMS[0];
   const ActiveIcon = activeItem.icon;
 
   // Labels are always visible inside the mobile drawer; on md+ they follow `collapsed`.
   const labelClass = collapsed ? 'md:hidden' : 'inline';
   const blockClass = collapsed ? 'md:hidden' : 'block';
-  const desktopWidthClass = collapsed ? 'md:w-[72px]' : 'md:w-[228px] lg:w-[248px]';
+  const desktopWidthClass = collapsed
+    ? 'md:w-[72px] md:min-w-[72px]'
+    : 'md:w-[228px] md:min-w-[228px] lg:w-[248px] lg:min-w-[248px]';
 
   const renderItem = (item: NavItem) => {
     const isActive = item.id === active;
     const state = itemState[item.id] ?? {};
     const Icon = item.icon;
-    const classes = `group relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 text-left font-sans text-[13px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-      isActive
-        ? 'bg-brand-bg text-white border border-brand-border'
-        : 'border border-transparent text-muted hover:bg-surface-card hover:text-white'
-    } ${collapsed ? 'md:justify-center md:px-0' : ''}`;
+    const classes = `group relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 text-left font-sans text-[13px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isActive
+      ? 'bg-brand-bg text-white border border-brand-border'
+      : 'border border-transparent text-muted hover:bg-surface-card hover:text-white'
+      } ${collapsed ? 'md:justify-center md:px-0' : ''}`;
 
     const content = (
       <>
@@ -273,6 +290,14 @@ export function DashboardSidebar({
 
         <nav aria-label="Dashboard sections" className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {DASHBOARD_NAV_ITEMS.map(renderItem)}
+          {isAdmin && (
+            <div className="pt-3 mt-3 border-t border-border-default space-y-1">
+              <div className={`px-3 pb-1 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-dim ${blockClass}`}>
+                Administration
+              </div>
+              {renderItem(ADMIN_NAV_ITEM)}
+            </div>
+          )}
         </nav>
 
         <div className={`px-4 pb-4 ${blockClass}`}>

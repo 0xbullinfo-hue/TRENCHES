@@ -13,6 +13,8 @@ import {
   buildTakeProfits,
   formatCompactUsd,
   loadCallsRegistry,
+  resolveDestinations,
+  resolvePublishStatus,
   samplePortfolio,
   saveCallsRegistry,
   withRegistryLock,
@@ -25,11 +27,14 @@ import { notifyNewCall, dispatchDelayedMemberCalls } from '@/server/telegram';
 import { getMarketData } from '@/server/market-data';
 import { hydrateAlphaItems } from '@/server/market-view';
 import type {
+  AlphaCategory,
   AlphasErr,
   AlphasOk,
   ArtMotif,
   CallType,
   Chain,
+  PublicationStatus,
+  PublishingDestination,
   QuoteToken,
 } from '@/lib/types';
 
@@ -54,6 +59,24 @@ const MOTIFS: ArtMotif[] = [
 ];
 
 const VALID_CHAINS: Chain[] = ['SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
+const VALID_CATEGORIES: AlphaCategory[] = ['MOVERS', 'NEW', 'HOLDER_REWARDS', 'AI_AGENT', 'STEALTH', 'CHARITY'];
+
+function normalizePublishStatus(raw: unknown): PublicationStatus | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const upper = raw.trim().toUpperCase();
+  if (upper === 'PUBLISHED' || upper === 'DRAFT' || upper === 'ARCHIVED') {
+    return upper;
+  }
+  return undefined;
+}
+
+function normalizeDestinations(raw: unknown): PublishingDestination[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const clean = raw
+    .map((d) => String(d).trim().toUpperCase())
+    .filter((d): d is PublishingDestination => d === 'ALPHA' || d === 'MAX_ALPHA');
+  return clean.length > 0 ? Array.from(new Set(clean)) : undefined;
+}
 
 function err(status: number, error: AlphasErr['error'], message: string) {
   const body: AlphasErr = { ok: false, error, message, items: [] };
@@ -96,6 +119,14 @@ export async function GET(req: NextRequest) {
   if (!walletLimit.ok) return tooMany(walletLimit.retryAfter);
 
   const isAdmin = isAdminWallet(wallet);
+  const scope = req.nextUrl.searchParams.get('scope')?.toLowerCase();
+  if (scope === 'admin' && !isAdmin) {
+    return err(
+      403,
+      'UNAUTHORIZED_ADMIN',
+      `Only Master Admin (${ADMIN_WALLET}) is authorized for admin scope.`
+    );
+  }
   let balance = 0;
   try {
     balance = await readGenesisBalanceCached(wallet);
@@ -135,7 +166,7 @@ export async function GET(req: NextRequest) {
   } catch {
     return storeDown();
   }
-  const baseItems = await alphasForTier(tier.id, Date.now(), registry, isAdmin);
+  const baseItems = await alphasForTier(tier.id, Date.now(), registry, isAdmin, false);
 
   // Wire validated market telemetry into calls. Every item is labelled LIVE / CACHED / STALE /
   // UNAVAILABLE / MANUAL so the UI never presents recorded or stale numbers as live provider data.
@@ -143,6 +174,10 @@ export async function GET(req: NextRequest) {
   if (requestedCallType) {
     items = items.filter((it) => it.callType === requestedCallType);
   }
+
+  const adminItems = isAdmin
+    ? await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), registry, true, true))
+    : undefined;
 
   let verifiedUsersCount = 0;
   try {
@@ -163,6 +198,7 @@ export async function GET(req: NextRequest) {
     isAdmin,
     genesisMint: GENESIS_MINT,
     items,
+    ...(adminItems ? { adminItems } : {}),
     callers: buildCallers(registry),
     portfolio: samplePortfolio(),
     serverTime: new Date().toISOString(),
@@ -291,13 +327,22 @@ export async function POST(req: NextRequest) {
     const takeProfits = buildTakeProfits(entryMcUsd, currentMcUsd, multipliers);
 
     const pinned = Boolean(payload.pinned);
+    const publishStatus: PublicationStatus = normalizePublishStatus(payload.publishStatus) ?? 'PUBLISHED';
+    const explicitDestinations = normalizeDestinations(payload.destinations);
     let callType: CallType = 'ALPHA';
-    if (payload.callType === 'ALPHA' || payload.callType === 'MAX_ALPHA' || payload.callType === 'WATCHLIST') {
+    if (explicitDestinations) {
+      callType = explicitDestinations.includes('MAX_ALPHA') ? 'MAX_ALPHA' : 'ALPHA';
+    } else if (payload.callType === 'ALPHA' || payload.callType === 'MAX_ALPHA' || payload.callType === 'WATCHLIST') {
       callType = payload.callType;
     } else if (payload.isMaxAlpha) {
       callType = 'MAX_ALPHA';
     }
     const isMaxAlpha = callType === 'MAX_ALPHA' || Boolean(payload.isMaxAlpha);
+    const destinations =
+      explicitDestinations ?? (isMaxAlpha ? ['MAX_ALPHA'] : callType === 'WATCHLIST' ? [] : ['ALPHA']);
+    const categoryRaw = String(payload.category || '').trim().toUpperCase() as AlphaCategory;
+    const category: AlphaCategory = VALID_CATEGORIES.includes(categoryRaw) ? categoryRaw : 'NEW';
+    const nowIso = new Date().toISOString();
     const quoteMap: Record<Chain, QuoteToken> = {
       SOL: 'SOL',
       BSC: 'BNB',
@@ -350,8 +395,15 @@ export async function POST(req: NextRequest) {
       chain,
       quoteToken,
       status: 'LIVE',
-      statusLabel: pinned ? 'PRIORITY CALL' : 'LIVE CALL',
-      category: 'NEW',
+      statusLabel:
+        publishStatus === 'DRAFT'
+          ? 'DRAFT'
+          : publishStatus === 'ARCHIVED'
+          ? 'ARCHIVED'
+          : pinned
+          ? 'PRIORITY CALL'
+          : 'LIVE CALL',
+      category,
       allocationLabel: 'Allocation',
       allocation: '15.0 SOL',
       timer: { cycleMin: 90, phaseMin: 0 },
@@ -363,6 +415,10 @@ export async function POST(req: NextRequest) {
       pinnedAt: pinned ? new Date().toISOString() : null,
       callType,
       isMaxAlpha,
+      destinations,
+      publishStatus,
+      publishedAt: publishStatus === 'PUBLISHED' ? nowIso : null,
+      updatedAt: nowIso,
       logoUrl:
         typeof payload.logoUrl === 'string' && payload.logoUrl.trim().startsWith('http')
           ? payload.logoUrl.trim()
@@ -431,11 +487,18 @@ export async function POST(req: NextRequest) {
       return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
     }
 
-    // Push to Telegram subscribers AFTER the response is sent; never blocks or fails the admin action.
-    after(() => notifyNewCall(newRecord).catch((e) => console.error('[TrenchLabs] Telegram fan-out failed:', e)));
+    // Push to Telegram subscribers AFTER the response is sent (only when published, never for drafts).
+    if (publishStatus === 'PUBLISHED') {
+      after(() => notifyNewCall(newRecord).catch((e) => console.error('[TrenchLabs] Telegram fan-out failed:', e)));
+    }
 
+    const updatedRegistry = await loadCallsRegistry();
     return NextResponse.json(
-      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
+      {
+        ok: true,
+        items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, false)),
+        adminItems: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, true)),
+      },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -462,7 +525,7 @@ export async function PATCH(req: NextRequest) {
     const id = String(payload.id || '');
     if (!id) return err(400, 'BAD_REQUEST', 'Call id is required');
 
-    const saveRes = await withRegistryLock(async () => {
+    const lockResult = await withRegistryLock(async () => {
       const registry = await loadCallsRegistry();
       const idx = registry.findIndex((r) => r.id === id);
       if (idx === -1) {
@@ -470,6 +533,7 @@ export async function PATCH(req: NextRequest) {
       }
 
       const target = { ...registry[idx] };
+      const wasPublished = resolvePublishStatus(target) === 'PUBLISHED';
 
       if (typeof payload.name === 'string' && payload.name.trim()) {
         target.name = payload.name.trim().slice(0, 64);
@@ -608,18 +672,35 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      if (typeof payload.callType === 'string') {
+      const nextDestinations = normalizeDestinations(payload.destinations);
+      if (nextDestinations) {
+        target.destinations = nextDestinations;
+        if (nextDestinations.includes('MAX_ALPHA')) {
+          target.callType = 'MAX_ALPHA';
+          target.isMaxAlpha = true;
+          target.minTier = 'PRO';
+        } else {
+          target.callType = 'ALPHA';
+          target.isMaxAlpha = false;
+          if (!payload.minTier) {
+            target.minTier = 'LAB_MEMBER';
+          }
+        }
+      } else if (typeof payload.callType === 'string') {
         const ct = payload.callType.toUpperCase() as CallType;
         if (ct === 'ALPHA' || ct === 'MAX_ALPHA' || ct === 'WATCHLIST') {
           target.callType = ct;
           if (ct === 'MAX_ALPHA') {
             target.isMaxAlpha = true;
             target.minTier = 'PRO';
+            target.destinations = ['MAX_ALPHA'];
           } else if (ct === 'WATCHLIST') {
             target.isMaxAlpha = false;
             target.minTier = 'PRO';
+            target.destinations = [];
           } else if (ct === 'ALPHA') {
             target.isMaxAlpha = false;
+            target.destinations = ['ALPHA'];
             if (!payload.minTier) {
               target.minTier = 'LAB_MEMBER';
             }
@@ -630,14 +711,31 @@ export async function PATCH(req: NextRequest) {
         if (payload.isMaxAlpha) {
           target.callType = 'MAX_ALPHA';
           target.minTier = 'PRO';
+          target.destinations = resolveDestinations({ ...target, callType: 'MAX_ALPHA', isMaxAlpha: true });
         } else if (target.callType === 'MAX_ALPHA') {
           target.callType = 'ALPHA';
           target.minTier = 'LAB_MEMBER';
+          target.destinations = ['ALPHA'];
         }
       }
 
       if (payload.minTier === 'PRO' || payload.minTier === 'LAB_MEMBER' || payload.minTier === 'LOCKED') {
         target.minTier = payload.minTier;
+      }
+
+      if (typeof payload.category === 'string') {
+        const cat = payload.category.trim().toUpperCase() as AlphaCategory;
+        if (VALID_CATEGORIES.includes(cat)) {
+          target.category = cat;
+        }
+      }
+
+      if (typeof payload.caller === 'string' && payload.caller.trim()) {
+        target.caller = payload.caller.trim().slice(0, 40);
+      }
+
+      if (typeof payload.serialTag === 'string' && payload.serialTag.trim()) {
+        target.serialTag = payload.serialTag.trim().slice(0, 16);
       }
 
       if (
@@ -648,16 +746,47 @@ export async function PATCH(req: NextRequest) {
         target.outcome = payload.outcome;
       }
 
+      const nextPubStatus = normalizePublishStatus(payload.publishStatus);
+      let newlyPublished: AlphaRecord | null = null;
+      if (nextPubStatus) {
+        target.publishStatus = nextPubStatus;
+        if (nextPubStatus === 'PUBLISHED') {
+          if (!target.publishedAt) target.publishedAt = new Date().toISOString();
+          if (!payload.statusLabel) {
+            target.statusLabel = target.pinned ? 'PRIORITY CALL' : 'LIVE CALL';
+          }
+          if (!wasPublished) {
+            newlyPublished = target;
+          }
+        } else if (nextPubStatus === 'DRAFT' && !payload.statusLabel) {
+          target.statusLabel = 'DRAFT';
+        } else if (nextPubStatus === 'ARCHIVED' && !payload.statusLabel) {
+          target.statusLabel = 'ARCHIVED';
+        }
+      }
+      target.updatedAt = new Date().toISOString();
+
       registry[idx] = target;
-      return await saveCallsRegistry(registry);
+      const saveRes = await saveCallsRegistry(registry);
+      return { saveRes, newlyPublished };
     });
 
-    if (!saveRes.success) {
-      return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
+    if (!lockResult.saveRes.success) {
+      return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${lockResult.saveRes.error}`);
     }
 
+    if (lockResult.newlyPublished) {
+      const recordToNotify = lockResult.newlyPublished;
+      after(() => notifyNewCall(recordToNotify).catch((e) => console.error('[TrenchLabs] Telegram fan-out failed:', e)));
+    }
+
+    const updatedRegistry = await loadCallsRegistry();
     return NextResponse.json(
-      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
+      {
+        ok: true,
+        items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, false)),
+        adminItems: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, true)),
+      },
       { headers: NO_STORE }
     );
   } catch (e) {
@@ -694,8 +823,13 @@ export async function DELETE(req: NextRequest) {
       return err(500, 'STORE_UNAVAILABLE', `Persistence failed: ${saveRes.error}`);
     }
 
+    const updatedRegistry = await loadCallsRegistry();
     return NextResponse.json(
-      { ok: true, items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), undefined, true)) },
+      {
+        ok: true,
+        items: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, false)),
+        adminItems: await hydrateAlphaItems(await alphasForTier('PRO', Date.now(), updatedRegistry, true, true)),
+      },
       { headers: NO_STORE }
     );
   } catch (e) {

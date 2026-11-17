@@ -34,8 +34,8 @@ interface DashboardOverviewProps {
   isUnlocked: boolean;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
-  onSelectFilter?: (filter: 'all' | 'new' | 'watchlist') => void;
-  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'alphas' | 'raids') => void;
+  onSelectFilter?: (filter: 'all' | 'new') => void;
+  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'STAKE' | 'alphas' | 'raids') => void;
   /** Extra account sections rendered below the performance digest (e.g. Telegram, Staking, Verified Ledger). */
   children?: React.ReactNode;
 }
@@ -163,16 +163,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           <Link
-            href="/dashboard/stake"
+            href="/dashboard?tab=STAKE"
+            onClick={(e) => {
+              if (onSelectTab) {
+                e.preventDefault();
+                onSelectTab('STAKE');
+              }
+            }}
             className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
-            title="Explore StakePoint 90-day staking for Pro Tier"
+            title="Open Stake $H42 workspace for 90-day Pro staking"
           >
             <div className="text-xs text-muted group-hover:text-brand uppercase font-bold tracking-wider flex items-center justify-between">
               <span>PRO STAKING STATUS</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-brand" />
             </div>
             <div className="text-brand-bright font-black">
-              {isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}
+              {isPro ? 'Pro Eligible (Manage Stake)' : 'Stake on StakePoint ↗'}
             </div>
           </Link>
         </div>
@@ -253,13 +259,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             size="sm"
             onClick={() => {
               onSelectTab?.('WATCHLIST');
-              onSelectFilter?.('watchlist');
             }}
             className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="View Watchlist projects"
+            title="Open your saved Watchlist"
           >
             <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">PLATFORM WATCHLIST</div>
+              <div className="text-xs text-muted uppercase font-bold">SAVED WATCHLIST</div>
               <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
             </div>
             <Star className="w-4 h-4 text-amber" />

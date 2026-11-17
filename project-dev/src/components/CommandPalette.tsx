@@ -41,7 +41,7 @@ const STATIC_NAV_ITEMS: CommandPaletteItem[] = [
   {
     id: 'nav-watchlist',
     label: 'Watchlist Workspace',
-    subtitle: 'Your saved tokens & Lab-curated research',
+    subtitle: 'Your saved tokens & opt-in Telegram alerts',
     category: 'Navigation',
     href: '/dashboard?tab=WATCHLIST',
   },
@@ -77,7 +77,8 @@ const STATIC_NAV_ITEMS: CommandPaletteItem[] = [
 
 export function filterCommandPaletteItems(
   query: string,
-  alphas: AlphaItem[] = []
+  alphas: AlphaItem[] = [],
+  includeAdmin = false
 ): CommandPaletteItem[] {
   const q = query.trim().toLowerCase();
 
@@ -101,7 +102,20 @@ export function filterCommandPaletteItems(
       href: '/dashboard?tab=ALPHA',
     }));
 
-  const navItems = STATIC_NAV_ITEMS.filter((item) => {
+  const baseNav = includeAdmin
+    ? [
+      ...STATIC_NAV_ITEMS,
+      {
+        id: 'nav-admin',
+        label: 'Admin Workspace',
+        subtitle: 'Content publishing, drafts, archive & campaign management',
+        category: 'Navigation' as const,
+        href: '/dashboard?tab=ADMIN',
+      },
+    ]
+    : STATIC_NAV_ITEMS;
+
+  const navItems = baseNav.filter((item) => {
     if (!q) return true;
     return (
       item.label.toLowerCase().includes(q) ||
@@ -111,15 +125,15 @@ export function filterCommandPaletteItems(
 
   const filterAction: CommandPaletteItem[] = q
     ? [
-        {
-          id: `filter-${q}`,
-          label: `Filter terminal calls for "${query.trim()}"`,
-          subtitle: 'Apply search filter in TerminalHeader',
-          category: 'Search Filter',
-          searchFilter: query.trim(),
-          href: '/dashboard?tab=ALPHA',
-        },
-      ]
+      {
+        id: `filter-${q}`,
+        label: `Filter terminal calls for "${query.trim()}"`,
+        subtitle: 'Apply search filter in TerminalHeader',
+        category: 'Search Filter',
+        searchFilter: query.trim(),
+        href: '/dashboard?tab=ALPHA',
+      },
+    ]
     : [];
 
   return [...filterAction, ...alphaItems, ...navItems];
@@ -152,8 +166,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   );
 
   const items = useMemo(
-    () => filterCommandPaletteItems(localQuery, alphas),
-    [localQuery, alphas]
+    () => filterCommandPaletteItems(localQuery, alphas, Boolean(genesis?.isAdmin)),
+    [localQuery, alphas, genesis?.isAdmin]
   );
 
   const openPalette = useCallback(() => {
@@ -239,8 +253,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <>
-      {/* Accessible quick-launch trigger in bottom-right corner */}
-      <div className="fixed bottom-4 right-4 z-40 hidden sm:block">
+      {/* Screen-reader / focusable quick-launch trigger (visual trigger lives in TerminalHeader without overlapping content) */}
+      <div className="fixed bottom-4 right-4 z-40 sr-only focus-within:not-sr-only">
         <Button
           type="button"
           variant="secondary"

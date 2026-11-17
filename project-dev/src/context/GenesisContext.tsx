@@ -51,6 +51,8 @@ export interface GenesisContextValue {
   isAdmin: boolean;
 
   alphas: AlphaItem[];
+  adminAlphas?: AlphaItem[];
+  adminActionError?: string | null;
   callers: SyndicateCaller[];
   portfolio: Portfolio | null;
   verifiedUsersCount: number;

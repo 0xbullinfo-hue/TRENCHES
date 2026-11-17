@@ -7,7 +7,7 @@ import { HexCubeLogo } from '@/components/HexCubeLogo';
 import { Button } from '@/components/ui/Button';
 import { SOCIAL_LINKS } from '@/lib/config';
 import { useGenesisBalance } from '@/context/GenesisContext';
-import { ArrowUpRight, LogOut, Search, Send, Sparkles, Target, Wallet, X } from 'lucide-react';
+import { ArrowUpRight, Command, LogOut, Search, Send, Wallet } from 'lucide-react';
 
 export const TerminalHeader: React.FC = () => {
   const pathname = usePathname();
@@ -18,9 +18,12 @@ export const TerminalHeader: React.FC = () => {
     connectWallet,
     switchWallet,
     disconnectDemoOrWallet,
-    searchQuery,
-    setSearchQuery,
   } = useGenesisBalance();
+
+  const handleOpenCommandPalette = () => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+  };
 
   const handleDisconnect = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -46,30 +49,23 @@ export const TerminalHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* Center: Search & Navigation Tabs (Desktop) */}
-        <div className="hidden md:flex items-center gap-2 sm:gap-3 flex-1 max-w-xl mx-4">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search calls (token, CA, chain)..."
-              className="w-full h-10 pl-9 pr-8 rounded-lg bg-surface border border-border-default focus:border-brand text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1 h-auto"
-                title="Clear search"
-                aria-label="Clear search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            )}
-          </div>
+        {/* Center: Quick Jump Palette Trigger & Primary App Routes (Desktop) */}
+        <div className="hidden md:flex items-center gap-2 sm:gap-3 flex-1 justify-end max-w-xl mx-4">
+          <button
+            type="button"
+            onClick={handleOpenCommandPalette}
+            className="flex-1 max-w-[260px] h-10 px-3 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center justify-between gap-2 transition-colors cursor-pointer"
+            title="Open quick jump & call lookup (Ctrl+K)"
+            aria-label="Quick jump and call lookup"
+          >
+            <span className="inline-flex items-center gap-2 truncate">
+              <Search className="w-3.5 h-3.5 text-brand shrink-0" />
+              <span className="truncate">Quick jump &amp; token lookup...</span>
+            </span>
+            <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-card border border-border-default font-mono text-[10px] font-bold text-dim shrink-0">
+              <Command className="w-2.5 h-2.5" />K
+            </kbd>
+          </button>
 
           <Link
             href="/dashboard"
@@ -157,29 +153,17 @@ export const TerminalHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Sub-bar: Search Input on Mobile */}
+      {/* Mobile Sub-bar: Quick Jump + Route Shortcuts on Mobile */}
       <div className="md:hidden px-3 py-2 border-t border-border-default bg-surface flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search calls (token, CA, chain)..."
-            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-card border border-border-default focus:border-brand text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-sans"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-white p-1 h-auto"
-              aria-label="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={handleOpenCommandPalette}
+          className="flex-1 h-9 px-3 rounded-lg bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center gap-2 font-sans cursor-pointer truncate"
+          aria-label="Quick jump and token lookup"
+        >
+          <Search className="w-3.5 h-3.5 text-brand shrink-0" />
+          <span className="truncate">Quick jump...</span>
+        </button>
         <Link
           href="/dashboard"
           className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${

@@ -4,10 +4,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { usePathname, useRouter } from 'next/navigation';
 
 /**
- * All 6 primary dashboard workspaces.
+ * All dashboard workspaces.
  * Note: 'SOCIAL' maps to the Raid workspace so existing `?tab=SOCIAL` links keep working.
+ * 'ADMIN' is restricted exclusively to authorized administrator wallets.
  */
-export type DashboardWorkspace = 'OVERVIEW' | 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST' | 'SOCIAL' | 'STAKE';
+export type DashboardWorkspace = 'OVERVIEW' | 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST' | 'SOCIAL' | 'STAKE' | 'ADMIN';
 
 export interface SidebarItemState {
   count?: number;
@@ -23,6 +24,7 @@ export const DASHBOARD_WORKSPACES: DashboardWorkspace[] = [
   'WATCHLIST',
   'SOCIAL',
   'STAKE',
+  'ADMIN',
 ];
 
 export const readWorkspaceFromSearch = (search: string): DashboardWorkspace => {

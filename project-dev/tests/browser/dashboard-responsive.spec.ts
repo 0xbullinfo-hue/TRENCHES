@@ -144,11 +144,21 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page).toHaveURL(/tab=ALPHA/i);
     await expect(page.locator('body')).toContainText(/GENESIS|MEMBER|UNLOCK|Access/i);
 
-    // Switch to WATCHLIST -> restriction screen shown
+    // Switch to WATCHLIST -> restriction screen shown + Admin item hidden for non-admin
     await page.getByTestId('mobile-nav-trigger').click();
+    await expect(page.getByTestId('tab-admin')).toHaveCount(0);
     await page.getByTestId('tab-watchlist').click();
     await expect(page).toHaveURL(/tab=WATCHLIST/i);
     await expect(page.locator('body')).toContainText(/PRO|StakePoint|UNLOCK|Access/i);
+
+    // Direct navigation to ?tab=ADMIN fails closed both before and after non-admin wallet connect
+    await page.goto(`${BASE_URL}/dashboard?tab=ADMIN`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await connectInjectedPhantom(page);
+    await expect(page.getByTestId('admin-unauthorized-panel')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('mobile-nav-trigger').click();
+    await page.getByTestId('tab-overview').click();
+    await expect(page).toHaveURL(/\/dashboard$/);
 
     // Switch to STAKE -> Staking workspace shown (never silently bounced to Overview)
     await page.getByTestId('mobile-nav-trigger').click();
@@ -176,7 +186,7 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page.getByTestId('sidebar-collapse-toggle')).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('all 6 workspaces, overview sections, saved watchlist, and stake view render cleanly on desktop and tablet', async ({ page }) => {
+  test('all 7 workspaces, admin isolation, independent filters, personal watchlist, and stake view work cleanly on desktop and tablet', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
 
@@ -189,7 +199,7 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     }
     await adminPresetBtn.click();
 
-    // 1. Overview shows all key account sections & ledger embed
+    // 1. Overview shows consolidated account sections, Telegram + EVM binding, ledger embed — NO repeated Admin Desk or full Staking card
     await expect(page.locator('body')).toContainText(/Welcome to the Lab/i, { timeout: 15000 });
     await expect(page.locator('body')).toContainText(/VERIFIED BALANCE/i);
     await expect(page.locator('body')).toContainText(/RESEARCH ACCESS/i);
@@ -198,38 +208,64 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page.getByTestId('weekly-performance-digest')).toBeVisible();
     await expect(page.locator('body')).toContainText(/Recent Call Performance Ledger/i);
     await expect(page.locator('body')).toContainText(/GET CALL NOTIFICATIONS/i);
-    await expect(page.locator('body')).toContainText(/Staking — \$H42/i);
+    await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
+    await expect(page.locator('body')).not.toContainText(/Staking — \$H42/i);
 
-    // 2. Alpha Calls workspace
+    // 2. Alpha Calls workspace + apply workspace-local filters (chain=SOL, search=NONEXISTENT, view=TABLE)
     await page.getByTestId('tab-alpha').click();
     await expect(page).toHaveURL(/tab=ALPHA/i);
-    await expect(page.locator('body')).toContainText(/Curated Alpha Trade Calls/i);
-    await expect(page.locator('body')).toContainText(/Top Performing Alpha Calls/i);
+    await expect(page.getByTestId('filter-bar-alpha')).toBeVisible();
+    await expect(page.locator('body')).toContainText(/Alpha Calls/i);
+    await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
 
-    // 3. Max Alpha workspace
+    await page.getByTestId('chain-alpha-sol').click();
+    await page.getByTestId('view-table-alpha').click();
+    await page.getByTestId('search-input-alpha').fill('ALPHA_ONLY_QUERY');
+
+    // 3. Max Alpha workspace maintains completely independent filter state
     await page.getByTestId('tab-max-alpha').click();
     await expect(page).toHaveURL(/tab=MAX_ALPHA/i);
-    await expect(page.locator('body')).toContainText(/Max Alpha Premium High-Conviction Calls/i);
+    await expect(page.getByTestId('filter-bar-max_alpha')).toBeVisible();
+    await expect(page.getByTestId('search-input-max_alpha')).toHaveValue('');
+    await expect(page.getByTestId('view-grid-max_alpha')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
 
-    // 4. Watchlist workspace (both Saved & Lab Curated Research modes)
+    // Return to Alpha -> verify Alpha's own filter state was preserved without interference
+    await page.getByTestId('tab-alpha').click();
+    await expect(page.getByTestId('search-input-alpha')).toHaveValue('ALPHA_ONLY_QUERY');
+    await expect(page.getByTestId('view-table-alpha')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('reset-filters-alpha').click();
+
+    // 4. Watchlist workspace displays ONLY personal saved tokens (no Lab Curated fake feed toggle)
     await page.getByTestId('tab-watchlist').click();
     await expect(page).toHaveURL(/tab=WATCHLIST/i);
-    await expect(page.getByTestId('watchlist-mode-saved')).toBeVisible();
-    await expect(page.getByTestId('watchlist-mode-platform')).toBeVisible();
-    await page.getByTestId('watchlist-mode-platform').click();
-    await expect(page.locator('body')).toContainText(/Curated Watchlist & Research Projects/i);
-    await page.getByTestId('watchlist-mode-saved').click();
+    await expect(page.getByTestId('filter-bar-watchlist')).toBeVisible();
+    await expect(page.getByTestId('watchlist-mode-platform')).toHaveCount(0);
 
     // 5. Raid workspace
     await page.getByTestId('tab-social').click();
     await expect(page).toHaveURL(/tab=SOCIAL/i);
     await expect(page.locator('body')).toContainText(/COMMUNITY REWARD RAIDS/i);
+    await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
 
-    // 6. Stake workspace
+    // 6. Stake workspace (exclusive home for DashboardStakingCard + StakeClientView)
     await page.getByTestId('tab-stake').click();
     await expect(page).toHaveURL(/tab=STAKE/i);
     await expect(page.getByTestId('stake-workspace')).toBeVisible();
     await expect(page.locator('body')).toContainText(/Staking — \$H42/i);
+
+    // 7. Dedicated Admin workspace
+    await page.getByTestId('tab-admin').click();
+    await expect(page).toHaveURL(/tab=ADMIN/i);
+    await expect(page.getByTestId('admin-workspace')).toBeVisible();
+    await expect(page.locator('body')).toContainText(/Publishing Overview/i);
+    await page.getByTestId('admin-create-call-btn').click();
+    await expect(page.getByTestId('dest-select-alpha')).toBeVisible();
+    await expect(page.getByTestId('dest-select-max-alpha')).toBeVisible();
+    await expect(page.locator('body')).toContainText(/Live Card Preview/i);
+    await page.getByTestId('admin-subtab-campaigns').click();
+    await expect(page.locator('body')).toContainText(/X RAID CAMPAIGNS & AIRDROP REWARD DESK/i);
+    await expect(page.locator('body')).toContainText(/\+ Post New Raid Campaign/i);
 
     // Tablet viewport check (768px) keeps sidebar accessible without overflow
     await page.setViewportSize({ width: 768, height: 900 });

@@ -87,7 +87,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
             Your Personal Watchlist is Empty
           </h3>
           <p className="font-sans text-xs text-muted max-w-md mx-auto">
-            Star any Alpha Call or research project to pin it here. You can configure instant Telegram TP/SL alerts for each pinned token.
+            Star any Alpha Call or Max Alpha setup to save it to your personal Watchlist and manage per-token opt-in Telegram alerts.
           </p>
         </div>
       </div>
@@ -112,7 +112,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
 
         <div className="font-mono text-xs text-muted flex items-center gap-1.5">
           <span className={cn('w-2 h-2 rounded-full', effectiveLinked ? 'bg-brand' : 'bg-amber')} />
-          <span>{effectiveLinked ? 'Telegram Alerts Linked' : 'Telegram Not Connected (Connect to receive alerts)'}</span>
+          <span>{effectiveLinked ? 'Telegram Alerts Ready' : 'Link Telegram in Overview to receive alerts'}</span>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
                       {token.name}
                     </span>
                     <span className="font-mono text-xs px-1.5 py-0.2 rounded bg-surface-card border border-border-default text-brand font-bold">
-                      ${token.ticker}
+                      {token.ticker.startsWith('$') ? token.ticker : `$${token.ticker}`}
                     </span>
                   </div>
                   <div className="font-mono text-xs text-muted truncate mt-0.5">

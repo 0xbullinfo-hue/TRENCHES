@@ -38,6 +38,8 @@ interface AlphaInspectorModalProps {
   token: AlphaItem | null;
   onClose: () => void;
   onEdit?: (token: AlphaItem) => void;
+  /** Restricts admin controls strictly to Admin workspace while preserving default true for unit tests. */
+  showAdminControls?: boolean;
 }
 
 export function getPrimaryMarketUrl(token: AlphaItem): string {
@@ -64,6 +66,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
   token,
   onClose,
   onEdit,
+  showAdminControls = true,
 }) => {
   const {
     formattedBalance,
@@ -112,6 +115,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
     }
   };
 
+  const effectiveAdmin = Boolean(isAdmin && showAdminControls);
   const isWatchlist = token.callType === 'WATCHLIST';
   const primaryMarketUrl = getPrimaryMarketUrl(token);
   const chainMeta = CHAIN_METADATA[token.chain] || CHAIN_METADATA.SOL;
@@ -328,7 +332,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                   <Target className="w-3 h-3 text-brand" />
                   <span>TAKE PROFIT TARGETS</span>
                 </span>
-                {isAdmin && (
+                {effectiveAdmin && (
                   <span className="text-xs text-brand font-mono">Click to mark hit</span>
                 )}
               </div>
@@ -339,13 +343,13 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     type="button"
                     variant={tp.hit ? 'primary' : 'secondary'}
                     size="sm"
-                    disabled={!isAdmin}
-                    onClick={() => isAdmin && toggleTpHit(token.id, idx)}
+                    disabled={!effectiveAdmin}
+                    onClick={() => effectiveAdmin && toggleTpHit(token.id, idx)}
                     className={`h-auto px-2 py-1 rounded font-mono text-xs font-extrabold inline-flex items-center gap-1 ${
                       tp.hit
                         ? 'bg-brand text-canvas border-brand hover:bg-brand'
                         : 'bg-surface text-white border-line'
-                    } ${isAdmin ? 'cursor-pointer hover:border-brand' : 'cursor-default'}`}
+                    } ${effectiveAdmin ? 'cursor-pointer hover:border-brand' : 'cursor-default'}`}
                     title={tp.targetMc ? `Target MC: ${tp.targetMc}` : tp.label}
                   >
                     <span>{tp.label}</span>
@@ -367,7 +371,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
           )}
 
           {/* Admin Quick Controls Inside Inspector */}
-          {isAdmin && (
+          {effectiveAdmin && (
             <div className="p-3.5 rounded-lg bg-surface-card border border-brand flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
               <div className="flex items-center gap-2 text-brand font-bold">
                 <span>ADMIN CONTROLS ({ADMIN_WALLET_SHORT})</span>

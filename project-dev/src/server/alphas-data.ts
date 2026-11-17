@@ -22,6 +22,8 @@ import type {
   CallType,
   Chain,
   Portfolio,
+  PublicationStatus,
+  PublishingDestination,
   QuoteToken,
   SyndicateCaller,
   TakeProfitTarget,
@@ -81,6 +83,12 @@ export interface AlphaRecord {
   callType?: CallType;
   /** Whether marked by Admin as Max Alpha (special orange outline highlight) */
   isMaxAlpha?: boolean;
+  /** Multi-destination publishing channels on a single database record */
+  destinations?: PublishingDestination[];
+  /** Publication lifecycle state (defaults to 'PUBLISHED' when omitted) */
+  publishStatus?: PublicationStatus;
+  publishedAt?: string | null;
+  updatedAt?: string | null;
   /** Direct onchain or DexScreener token logo image URL */
   logoUrl?: string;
   sparkline: number[];
@@ -453,12 +461,37 @@ export function getCallType(r: { callType?: CallType; isMaxAlpha?: boolean }): C
   return 'ALPHA';
 }
 
+export function resolvePublishStatus(r: { publishStatus?: PublicationStatus }): PublicationStatus {
+  if (r.publishStatus === 'DRAFT' || r.publishStatus === 'ARCHIVED') {
+    return r.publishStatus;
+  }
+  return 'PUBLISHED';
+}
+
+export function resolveDestinations(r: {
+  callType?: CallType;
+  isMaxAlpha?: boolean;
+  destinations?: PublishingDestination[];
+}): PublishingDestination[] {
+  if (Array.isArray(r.destinations) && r.destinations.length > 0) {
+    const clean = r.destinations.filter(
+      (d): d is PublishingDestination => d === 'ALPHA' || d === 'MAX_ALPHA'
+    );
+    if (clean.length > 0) return Array.from(new Set(clean));
+  }
+  const ct = getCallType(r);
+  if (ct === 'MAX_ALPHA' || r.isMaxAlpha) return ['MAX_ALPHA'];
+  if (ct === 'WATCHLIST') return [];
+  return ['ALPHA'];
+}
+
 /** Project registry onto a viewer's tier, masking anything above it, sorting pinned calls first. */
 export async function alphasForTier(
   tier: TierId,
   now = Date.now(),
   preloaded?: AlphaRecord[],
-  isAdmin = false
+  isAdmin = false,
+  includeUnpublished = false
 ): Promise<AlphaItem[]> {
   const rank = TIERS[tier].rank;
   const isProViewer = rank >= TIERS.PRO.rank || isAdmin;
@@ -488,6 +521,11 @@ export async function alphasForTier(
   });
 
   const filtered = sorted.filter((r) => {
+    const pubStatus = resolvePublishStatus(r);
+    // Drafts and archived posts never appear on standard user feeds; only admin workspace fetches them when authorized.
+    if (!includeUnpublished && pubStatus !== 'PUBLISHED') {
+      return false;
+    }
     const callType = getCallType(r);
     // Section 7: A MEMBER must never receive WATCHLIST or MAX ALPHA records.
     if (!isProViewer) {
@@ -500,6 +538,8 @@ export async function alphasForTier(
 
   return filtered.map((r, idx) => {
     const callType = getCallType(r);
+    const publishStatus = resolvePublishStatus(r);
+    const destinations = resolveDestinations(r);
     const locked = TIERS[r.minTier].rank > rank;
     const minBalanceRequired = TIERS[r.minTier].min;
     const serialTag = r.serialTag || `EXP${String(idx + 1).padStart(2, '0')}`;
@@ -552,6 +592,10 @@ export async function alphasForTier(
       outcome: r.outcome ?? (r.takeProfits && r.takeProfits.some((t) => t.hit) ? 'PROFIT' : 'PENDING'),
       callType,
       isMaxAlpha: callType === 'MAX_ALPHA' || Boolean(r.isMaxAlpha),
+      destinations,
+      publishStatus,
+      publishedAt: r.publishedAt ?? null,
+      updatedAt: r.updatedAt ?? null,
       logoUrl: r.logoUrl,
       sparkline: r.sparkline,
       art: r.art,

@@ -435,11 +435,11 @@ test('Restriction Screen Copy Matrix (§4.1 - §4.5): verified in MembershipRest
   assert.ok(src.includes('Upgrade to Member or PRO to unlock Alpha Calls.'));
   assert.ok(src.includes('BECOME A MEMBER'));
 
-  // 4.2 & 4.3 WATCHLIST
-  assert.ok(src.includes('Discover curated long-term projects selected by the TRENCHLABS team for ongoing monitoring.'));
-  assert.ok(src.includes('WATCHLIST access is exclusive to PRO members.'));
-  assert.ok(src.includes('This category is available exclusively to PRO members.'));
-  assert.ok(src.includes('Upgrade your membership to PRO to unlock WATCHLIST.'));
+  // 4.2 Personal WATCHLIST restriction for FREE users (MEMBER & PRO can access their own saved items)
+  assert.ok(src.includes('PERSONAL WATCHLIST'));
+  assert.ok(src.includes('Save Alpha Calls and Max Alpha setups to your personal watchlist'));
+  assert.ok(src.includes('UNLOCK WATCHLIST ACCESS'));
+  assert.ok(src.includes('MEMBER+ ACCESS REQUIRED'));
   assert.ok(src.includes('UPGRADE TO PRO'));
 
   // 4.4 & 4.5 MAX ALPHA

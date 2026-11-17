@@ -13,12 +13,15 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { ADMIN_WALLET } from '@/lib/config';
 import type { TierId } from '@/lib/tiers';
 import type {
+  AlphaCategory,
   AlphaItem,
   AlphasErr,
   AlphasResponse,
   CallType,
   Chain,
   Portfolio,
+  PublicationStatus,
+  PublishingDestination,
   SyndicateCaller,
 } from '@/lib/types';
 import {
@@ -41,6 +44,10 @@ export interface CreateCallPayload {
   pinned: boolean;
   callType?: CallType;
   isMaxAlpha?: boolean;
+  destinations?: PublishingDestination[];
+  publishStatus?: PublicationStatus;
+  category?: AlphaCategory;
+  caller?: string;
   minTier?: TierId;
   summary?: string;
   serialTag?: string;
@@ -57,6 +64,8 @@ export type VerificationState =
 
 export interface AuthContextValue {
   alphas: AlphaItem[];
+  adminAlphas: AlphaItem[];
+  adminActionError: string | null;
   callers: SyndicateCaller[];
   portfolio: Portfolio | null;
   verifiedUsersCount: number;
@@ -119,6 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   } = walletState;
 
   const [alphas, setAlphas] = useState<AlphaItem[]>([]);
+  const [adminAlphas, setAdminAlphas] = useState<AlphaItem[]>([]);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
   const [callers, setCallers] = useState<SyndicateCaller[]>([]);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [verifiedUsersCount, setVerifiedUsersCount] = useState<number>(0);
@@ -180,6 +191,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         queueMicrotask(() => {
           setAlphas([]);
+          setAdminAlphas([]);
+          setAdminActionError(null);
           setCallers([]);
           setPortfolio(null);
           setWatchlist([]);
@@ -339,6 +352,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (interactiveAuth = false, generation?: number) => {
       if (!connected) {
         setAlphas([]);
+        setAdminAlphas([]);
+        setAdminActionError(null);
         setCallers([]);
         setPortfolio(null);
         setApiError(null);
@@ -354,7 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const res = await fetch('/api/alphas/fixture', { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
-            setAlphas(data.items || []);
+            const items = data.items || [];
+            setAlphas(items);
+            setAdminAlphas(Array.isArray(data.adminItems) ? data.adminItems : isAdmin ? items : []);
             setCallers(data.callers || []);
             setPortfolio(data.portfolio || null);
             setApiError(null);
@@ -376,6 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOnChainBalance(0);
         setServerTier(null);
         setAlphas([]);
+        setAdminAlphas([]);
         setCallers([]);
         setPortfolio(null);
         setNeedsSignature(true);
@@ -405,6 +423,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setOnChainBalance(data.balance);
           }
           setAlphas([]);
+          setAdminAlphas([]);
           setCallers([]);
           setPortfolio(null);
           setVerifiedUsersCount(0);
@@ -421,6 +440,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setServerTier(data.tier);
           }
           setAlphas(data.items);
+          setAdminAlphas(Array.isArray(data.adminItems) ? data.adminItems : []);
           setCallers(data.callers ?? []);
           setPortfolio(data.portfolio);
           setVerifiedUsersCount(typeof data.verifiedUsersCount === 'number' ? data.verifiedUsersCount : 0);
@@ -440,7 +460,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [connected, demoPreset, getAccessHeaders, setOnChainBalance, setServerTier]
+    [connected, demoPreset, isAdmin, getAccessHeaders, setOnChainBalance, setServerTier]
   );
 
   useEffect(() => {
@@ -566,6 +586,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const createAlphaCall = useCallback(
     async (payload: CreateCallPayload): Promise<boolean> => {
       try {
+        setAdminActionError(null);
         const bodyStr = JSON.stringify(payload);
         const headers = await getAdminHeaders('POST', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
@@ -576,11 +597,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) {
+            setAdminAlphas(json.adminItems);
+          }
           return true;
         }
+        setAdminActionError(json.message || 'Could not publish call.');
         return false;
       } catch (err) {
         console.error('[TrenchLabs] createAlphaCall error:', err);
+        setAdminActionError((err as Error)?.message || 'Admin request failed.');
         return false;
       }
     },
@@ -590,6 +616,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateAlphaCall = useCallback(
     async (id: string, updates: Record<string, unknown>): Promise<boolean> => {
       try {
+        setAdminActionError(null);
         const bodyStr = JSON.stringify({ id, ...updates });
         const headers = await getAdminHeaders('PATCH', '/api/alphas', bodyStr);
         const res = await fetch('/api/alphas', {
@@ -600,11 +627,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) {
+            setAdminAlphas(json.adminItems);
+          }
           return true;
         }
+        setAdminActionError(json.message || 'Could not update call.');
         return false;
       } catch (err) {
         console.error('[TrenchLabs] updateAlphaCall error:', err);
+        setAdminActionError((err as Error)?.message || 'Admin update failed.');
         return false;
       }
     },
@@ -624,6 +656,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -648,6 +681,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -672,6 +706,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -696,6 +731,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -720,6 +756,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -744,6 +781,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
         return false;
@@ -758,6 +796,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteAlphaCall = useCallback(
     async (id: string): Promise<boolean> => {
       try {
+        setAdminActionError(null);
         const urlPath = `/api/alphas?id=${encodeURIComponent(id)}`;
         const headers = await getAdminHeaders('DELETE', urlPath, '');
         const res = await fetch(urlPath, {
@@ -767,11 +806,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (res.ok && json.ok && Array.isArray(json.items)) {
           setAlphas(json.items);
+          if (Array.isArray(json.adminItems)) setAdminAlphas(json.adminItems);
           return true;
         }
+        setAdminActionError(json.message || 'Could not delete call.');
         return false;
       } catch (err) {
         console.error('[TrenchLabs] deleteAlphaCall error:', err);
+        setAdminActionError((err as Error)?.message || 'Admin delete failed.');
         return false;
       }
     },
@@ -783,6 +825,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     signCacheRef.current.clear();
     setAlphas([]);
+    setAdminAlphas([]);
+    setAdminActionError(null);
     setCallers([]);
     setPortfolio(null);
     setVerifiedUsersCount(0);
@@ -803,6 +847,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextValue = {
     alphas,
+    adminAlphas,
+    adminActionError,
     callers,
     portfolio,
     verifiedUsersCount,
