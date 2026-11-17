@@ -16,9 +16,6 @@ import {
   Target,
   Wallet,
 } from 'lucide-react';
-import { ProProgressBar } from './ProProgressBar';
-import { OnboardingChecklist } from './OnboardingChecklist';
-import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
 
 interface DashboardOverviewProps {
   connected: boolean;
@@ -57,9 +54,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* 0. Onboarding Checklist (Instruction 36) */}
-      <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
-
       {/* 1. Welcome Panel & Membership Summary Strip */}
       <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
@@ -124,131 +118,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* 2. Membership Telemetry Grid (Section 4.2 B) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
+        {/* Holdings-first overview: only the connected wallet and verified $H42 balance. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
+          <div className="p-4 rounded-lg bg-surface-card border border-border-default space-y-1">
             <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>WALLET STATUS</span>
+              <span>CONNECTED WALLET</span>
               <Wallet className="w-3.5 h-3.5 text-brand" />
             </div>
-            <div className="text-white font-bold truncate tnum">
-              {connected ? shortAddress : 'Disconnected'}
-            </div>
+            <div className="text-white font-bold truncate tnum">{connected ? shortAddress : 'Disconnected'}</div>
           </div>
-
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
+          <div className="p-4 rounded-lg bg-surface-card border border-border-default space-y-1">
             <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>VERIFIED BALANCE</span>
+              <span>VERIFIED $H42 HOLDING</span>
               <span className="text-brand font-mono text-xs">SPL</span>
             </div>
-            <div className="text-white font-black tnum">
-              {formattedBalance} $H42
-            </div>
+            <div className="text-white font-black tnum">{formattedBalance} $H42</div>
           </div>
-
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>RESEARCH ACCESS</span>
-              <Target className="w-3.5 h-3.5 text-alpha-primary" />
-            </div>
-            <div className="text-white font-bold">
-              {isUnlocked ? 'Unlocked (Standard Calls)' : 'Locked (~$20 Required)'}
-            </div>
-          </div>
-
-          <Link
-            href="/dashboard/stake"
-            className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
-            title="Explore StakePoint 90-day staking for Pro Tier"
-          >
-            <div className="text-xs text-muted group-hover:text-brand uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>PRO STAKING STATUS</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-brand" />
-            </div>
-            <div className="text-brand-bright font-black">
-              {isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}
-            </div>
-          </Link>
-        </div>
-
-        {/* 3. Interactive Activity Summary (Section 7.2) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 border-t border-border-default font-mono text-xs">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onSelectTab?.('ALPHA');
-              onSelectFilter?.('all');
-            }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="View all active Alpha Calls"
-          >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">ACTIVE CALLS</div>
-              <div className="text-base font-black text-white tnum">{alphasCount}</div>
-            </div>
-            <Target className="w-4 h-4 text-alpha-primary" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onSelectTab?.('ALPHA');
-              onSelectFilter?.('new');
-            }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-brand flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="Filter by new Alpha Calls"
-          >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">NEW CALLS</div>
-              <div className="text-base font-black text-brand tnum">{newCallsCount}</div>
-            </div>
-            <Sparkles className="w-4 h-4 text-brand" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onSelectTab?.('SOCIAL');
-              const raidsEl = document.getElementById('raids-section');
-              if (raidsEl) raidsEl.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="Jump to Social Raids section"
-          >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">ACTIVE RAIDS</div>
-              <div className="text-base font-black text-raid-primary tnum">{raidsCount}</div>
-            </div>
-            <Gift className="w-4 h-4 text-raid-primary" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onSelectTab?.('WATCHLIST');
-              onSelectFilter?.('watchlist');
-            }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="View Watchlist projects"
-          >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">PLATFORM WATCHLIST</div>
-              <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
-            </div>
-            <Star className="w-4 h-4 text-amber" />
-          </Button>
         </div>
       </div>
 
-      {/* 4. PRO Unlock Progress Bar (Instruction 33) */}
-      <ProProgressBar isPro={isPro} />
 
-      {/* 5. Weekly Tier Performance Digest (Instruction 37) */}
-      <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
     </div>
   );
 };
