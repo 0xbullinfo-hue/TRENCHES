@@ -748,6 +748,7 @@ export const IncubatorHub: React.FC = () => {
         shortAddress={shortAddress}
         tier={tier}
         formattedBalance={formattedBalance}
+        onExploreCalls={() => handleSelectTab('ALPHA')}
       />}
       {currentTab === 'OVERVIEW' && (
         <>
@@ -757,7 +758,6 @@ export const IncubatorHub: React.FC = () => {
               Additional dashboard tools <span className="ml-2 text-xs font-normal text-muted">Onboarding, membership progress, staking and Telegram</span>
             </summary>
             <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
-              <OnboardingChecklist onExploreCalls={() => handleSelectTab('ALPHA')} />
               <ProProgressBar isPro={isProOrAdmin} />
               <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
