@@ -743,28 +743,6 @@ export const IncubatorHub: React.FC = () => {
         shortAddress={shortAddress}
         tier={tier}
         formattedBalance={formattedBalance}
-        alphasCount={alphaCallsCount}
-        newCallsCount={newCallsCount}
-        raidsCount={activeRaidsCount}
-        watchlistCount={watchlistCallsCount}
-        isUnlocked={isUnlocked}
-        onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$H42', e)}
-        copiedGenesisCa={copiedId === 'hero-gen-ca'}
-        onSelectFilter={(f) => {
-          if (f === 'all') setActiveFilter('ALL');
-          else if (f === 'new') setActiveFilter('NEW');
-          else if (f === 'watchlist') {
-            handleSelectTab('WATCHLIST');
-          }
-        }}
-        onSelectTab={(tab) => {
-          if (tab === 'ALPHA' || tab === 'alphas') handleSelectTab('ALPHA');
-          else if (tab === 'SOCIAL' || tab === 'raids') handleSelectTab('SOCIAL');
-          else if (tab === 'WATCHLIST') handleSelectTab('WATCHLIST');
-          else if (tab === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
-          const listEl = document.getElementById('feed-tabs');
-          if (listEl) listEl.scrollIntoView({ behavior: 'smooth' });
-        }}
       />}
       {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
 
