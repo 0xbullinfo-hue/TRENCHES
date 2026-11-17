@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
-import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -24,8 +22,6 @@ import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDat
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
 import {
-  DashboardStakingCard,
-  TelegramVerificationCard,
 } from '@/components/stake/DashboardStakingCard';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
@@ -69,7 +65,6 @@ type ViewMode = 'GRID' | 'TABLE';
 const ALL_CHAINS: (Chain | 'ALL')[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
 
 export const IncubatorHub: React.FC = () => {
-  const router = useRouter();
   const {
     connected,
     connectWallet,
