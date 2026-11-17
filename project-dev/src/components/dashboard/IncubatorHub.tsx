@@ -761,17 +761,16 @@ export const IncubatorHub: React.FC = () => {
       {currentTab === 'OVERVIEW' && (
         <>
           <DashboardLedgerEmbed />
-          <details className="rounded-xl border border-border-default bg-surface">
-            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-white hover:text-brand">
-              Additional dashboard tools <span className="ml-2 text-xs font-normal text-muted">Staking and Telegram verification</span>
-            </summary>
-            <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
-                <DashboardStakingCard showTelegram={false} />
-              </div>
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div><h2 className="text-sm font-black uppercase tracking-wider text-white">Alerts &amp; staking</h2><p className="mt-1 text-xs text-muted">Manage Telegram notifications and $H42 access staking from Overview.</p></div>
+              <a href="/dashboard/stake" className="text-xs font-bold text-brand hover:text-brand-bright">Open Stake workspace ↗</a>
             </div>
-          </details>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
+              <DashboardStakingCard showTelegram={false} />
+            </div>
+          </section>
         </>
       )}
 
