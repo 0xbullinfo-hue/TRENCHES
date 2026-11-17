@@ -22,8 +22,10 @@ import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { TelegramAlerts } from './TelegramAlerts';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
-import {
-} from '@/components/stake/DashboardStakingCard';
+import { DashboardStakingCard, TelegramVerificationCard } from '@/components/stake/DashboardStakingCard';
+import { ProProgressBar } from './ProProgressBar';
+import { OnboardingChecklist } from './OnboardingChecklist';
+import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import { CampaignSection } from '@/components/campaigns/CampaignSection';
@@ -747,7 +749,25 @@ export const IncubatorHub: React.FC = () => {
         tier={tier}
         formattedBalance={formattedBalance}
       />}
-      {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
+      {currentTab === 'OVERVIEW' && (
+        <>
+          <DashboardLedgerEmbed />
+          <details className="rounded-xl border border-border-default bg-surface">
+            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-white hover:text-brand">
+              Additional dashboard tools <span className="ml-2 text-xs font-normal text-muted">Onboarding, membership progress, staking and Telegram</span>
+            </summary>
+            <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
+              <OnboardingChecklist onExploreCalls={() => handleSelectTab('ALPHA')} />
+              <ProProgressBar isPro={isProOrAdmin} />
+              <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
+                <DashboardStakingCard showTelegram={false} />
+              </div>
+            </div>
+          </details>
+        </>
+      )}
 
       {/* Feature-specific content is kept out of the Overview landing page. */}
       {currentTab !== 'OVERVIEW' && (
