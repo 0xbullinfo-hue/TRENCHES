@@ -98,28 +98,41 @@ test('Navigation Audit: DashboardLedgerEmbed provides direct Link to /ledger', (
   assert.ok(src.includes('setIsOpen(true)'), 'DashboardLedgerEmbed must allow inline preview toggle');
 });
 
-test('Navigation Audit: IncubatorHub four tabs have role="tab", min-h-[44px], URL synchronization, and popstate handling', () => {
-  const src = fs.readFileSync(
+test('Navigation Audit: Sidebar six workspaces and IncubatorHub URL/popstate synchronization without duplicate tabs', () => {
+  const hubSrc = fs.readFileSync(
     path.join(process.cwd(), 'src/components/dashboard/IncubatorHub.tsx'),
     'utf-8'
   );
+  const sidebarSrc = fs.readFileSync(
+    path.join(process.cwd(), 'src/components/dashboard/DashboardSidebar.tsx'),
+    'utf-8'
+  );
+  const navCtxSrc = fs.readFileSync(
+    path.join(process.cwd(), 'src/components/dashboard/DashboardNavigationContext.tsx'),
+    'utf-8'
+  );
 
-  // Four tabs
-  assert.ok(src.includes("handleSelectTab('ALPHA')"), 'Alpha tab handler must exist');
-  assert.ok(src.includes("handleSelectTab('SOCIAL')"), 'Social tab handler must exist');
-  assert.ok(src.includes("handleSelectTab('WATCHLIST')"), 'Watchlist tab handler must exist');
-  assert.ok(src.includes("handleSelectTab('MAX_ALPHA')"), 'Max Alpha tab handler must exist');
+  // All 6 primary workspaces in sidebar
+  for (const id of ['OVERVIEW', 'ALPHA', 'MAX_ALPHA', 'WATCHLIST', 'SOCIAL', 'STAKE']) {
+    assert.ok(sidebarSrc.includes(`id: '${id}'`), `Sidebar must include ${id} workspace`);
+  }
 
-  // Accessibility and sizing
-  assert.ok(src.includes('role="tablist"'), 'Tab container must have role="tablist"');
-  assert.ok(src.includes('role="tab"'), 'Tab items must have role="tab"');
-  assert.ok(src.includes('min-h-[44px]'), 'Tabs must have min-h-[44px] touch targets');
+  // No duplicate horizontal feed-tabs bar inside IncubatorHub
+  assert.ok(!hubSrc.includes('id="feed-tabs-navigation"'), 'IncubatorHub must not render duplicate tab bar');
 
-  // History and URL state
-  assert.ok(src.includes('window.history.pushState'), 'Tab selection must update browser history via pushState');
-  assert.ok(src.includes('window.addEventListener(\'popstate\''), 'IncubatorHub must listen to popstate for back/forward sync');
+  // Accessibility and touch target sizing in sidebar
+  assert.ok(sidebarSrc.includes('aria-label="Dashboard sections"'), 'Sidebar nav must have accessible label');
+  assert.ok(sidebarSrc.includes('aria-current={isActive ? \'page\' : undefined}'), 'Active sidebar item must expose aria-current');
+  assert.ok(sidebarSrc.includes('min-h-[44px]'), 'Sidebar items must have min-h-[44px] touch targets');
 
-  // Restriction handling
-  assert.ok(src.includes('<MembershipRestrictionScreen'), 'IncubatorHub must render restriction screen for unauthorized tabs');
-  assert.ok(src.includes("currentTab === 'SOCIAL'"), 'IncubatorHub must render CampaignSection when SOCIAL is selected');
+  // History and URL state across context and fallback
+  assert.ok(navCtxSrc.includes('window.history.pushState'), 'Navigation context must update browser history via pushState');
+  assert.ok(navCtxSrc.includes('window.addEventListener(\'popstate\''), 'Navigation context must listen to popstate for back/forward sync');
+  assert.ok(hubSrc.includes('window.history.pushState'), 'IncubatorHub fallback must update browser history via pushState');
+  assert.ok(hubSrc.includes('window.addEventListener(\'popstate\''), 'IncubatorHub fallback must listen to popstate for back/forward sync');
+
+  // Workspace rendering & restriction handling
+  assert.ok(hubSrc.includes('<MembershipRestrictionScreen'), 'IncubatorHub must render restriction screen for unauthorized tabs');
+  assert.ok(hubSrc.includes("currentTab === 'SOCIAL'"), 'IncubatorHub must render CampaignSection when SOCIAL is selected');
+  assert.ok(hubSrc.includes("currentTab === 'STAKE'"), 'IncubatorHub must render Stake workspace when STAKE is selected');
 });

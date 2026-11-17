@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -20,9 +21,11 @@ import { TokenArtwork } from './TokenArtwork';
 import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { TelegramAlerts } from './TelegramAlerts';
-import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
 import {
+  DashboardStakingCard,
+  TelegramVerificationCard,
 } from '@/components/stake/DashboardStakingCard';
+import { StakeClientView, type InitialStakeData } from '@/components/stake/StakeClientView';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
 import { CampaignSection } from '@/components/campaigns/CampaignSection';
@@ -30,6 +33,10 @@ import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { AdminCampaignManager } from '@/components/admin/AdminCampaignManager';
 import { DashboardOverview } from './DashboardOverview';
 import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
+import {
+  useDashboardNavigation,
+  type DashboardWorkspace,
+} from './DashboardNavigationContext';
 import { WatchlistView } from './WatchlistView';
 import {
   AlertTriangle,
@@ -58,14 +65,35 @@ import {
   Wallet,
 } from 'lucide-react';
 
-export type DashboardTab = 'OVERVIEW' | 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA';
+export type DashboardTab = DashboardWorkspace;
 type FilterTab = 'ALL' | 'PINNED' | 'MAX_ALPHA' | 'MOVERS' | 'NEW' | 'WATCHLIST';
 type SortKey = 'PRIORITY' | 'MCAP' | 'CHANGE' | 'NEWEST';
 type ViewMode = 'GRID' | 'TABLE';
+/** Watchlist workspace source: the user's saved (starred) IDs, or Lab-curated callType WATCHLIST posts. */
+type WatchlistMode = 'SAVED' | 'PLATFORM';
 
 const ALL_CHAINS: (Chain | 'ALL')[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
 
+const DASHBOARD_TABS: DashboardTab[] = ['OVERVIEW', 'ALPHA', 'SOCIAL', 'WATCHLIST', 'MAX_ALPHA', 'STAKE'];
+
+/** Reads `?tab=` from the current URL. Missing/unknown values resolve to the Overview landing workspace. */
+const readTabFromUrl = (): DashboardTab => {
+  if (typeof window === 'undefined') return 'OVERVIEW';
+  const tabParam = new URLSearchParams(window.location.search).get('tab')?.toUpperCase();
+  return DASHBOARD_TABS.includes(tabParam as DashboardTab) ? (tabParam as DashboardTab) : 'OVERVIEW';
+};
+
+const WORKSPACE_TITLES: Record<DashboardTab, { title: string; subtitle: string }> = {
+  OVERVIEW: { title: 'Overview', subtitle: 'Account, holdings, membership and verified activity' },
+  ALPHA: { title: 'Alpha Calls', subtitle: 'Curated multi-chain trade intelligence' },
+  MAX_ALPHA: { title: 'Max Alpha', subtitle: 'Premium high-conviction calls for Pro members' },
+  WATCHLIST: { title: 'Watchlist', subtitle: 'Your saved tokens and Lab-curated research projects' },
+  SOCIAL: { title: 'Raid', subtitle: 'Community campaigns, submissions and rewards' },
+  STAKE: { title: 'Stake $H42', subtitle: 'StakePoint 90-day staking, transaction verification and Pro access' },
+};
+
 export const IncubatorHub: React.FC = () => {
+  const navCtx = useDashboardNavigation();
   const {
     connected,
     connectWallet,
@@ -104,69 +132,71 @@ export const IncubatorHub: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortKey>('PRIORITY');
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
   const [adminDeskTab, setAdminDeskTab] = useState<'CALLS' | 'CAMPAIGNS'>('CALLS');
-  const [currentTab, setCurrentTab] = useState<DashboardTab>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab')?.toUpperCase();
-      if (
-        tabParam === 'OVERVIEW' ||
-        tabParam === 'ALPHA' ||
-        tabParam === 'SOCIAL' ||
-        tabParam === 'WATCHLIST' ||
-        tabParam === 'MAX_ALPHA'
-      ) {
-        return tabParam as DashboardTab;
+  const [watchlistMode, setWatchlistMode] = useState<WatchlistMode>('SAVED');
+  const [fallbackTab, setFallbackTab] = useState<DashboardTab>('OVERVIEW');
+
+  const currentTab: DashboardTab = navCtx ? navCtx.activeWorkspace : fallbackTab;
+
+  const handleSelectTab = useCallback(
+    (tab: DashboardTab) => {
+      if (tab === 'SOCIAL') setAdminDeskTab('CAMPAIGNS');
+      else if (tab !== 'OVERVIEW' && tab !== 'STAKE') setAdminDeskTab('CALLS');
+
+      if (navCtx) {
+        navCtx.selectWorkspace(tab);
+        return;
       }
-    }
-    return 'OVERVIEW';
-  });
 
-  const handleSelectTab = (tab: DashboardTab) => {
-    setCurrentTab(tab);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      if (tab === 'OVERVIEW') url.searchParams.delete('tab');
-      else url.searchParams.set('tab', tab);
-      window.history.pushState({ tab }, '', url.toString());
-      window.dispatchEvent(new Event('trenchlabs:dashboard-tab'));
-    }
-  };
+      setFallbackTab(tab);
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (tab === 'OVERVIEW') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', tab);
+        window.history.pushState({ tab }, '', url.toString());
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [navCtx]
+  );
 
-  // Synchronize tab state on browser back/forward navigation
+  // Sync admin desk mode & fallback URL state when running standalone without DashboardLayout
   useEffect(() => {
+    if (navCtx) return;
     const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab')?.toUpperCase();
-      if (
-        tabParam === 'OVERVIEW' ||
-        tabParam === 'ALPHA' ||
-        tabParam === 'SOCIAL' ||
-        tabParam === 'WATCHLIST' ||
-        tabParam === 'MAX_ALPHA'
-      ) {
-        setCurrentTab(tabParam as DashboardTab);
-      } else {
-        setCurrentTab('OVERVIEW');
-      }
+      setFallbackTab(readTabFromUrl());
     };
+    queueMicrotask(handlePopState);
     window.addEventListener('popstate', handlePopState);
-    window.addEventListener('trenchlabs:dashboard-tab', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('trenchlabs:dashboard-tab', handlePopState);
-    };
-  }, []);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navCtx]);
+
+  useEffect(() => {
+    const nextDesk =
+      currentTab === 'SOCIAL'
+        ? 'CAMPAIGNS'
+        : currentTab === 'ALPHA' || currentTab === 'MAX_ALPHA' || currentTab === 'WATCHLIST'
+        ? 'CALLS'
+        : null;
+    if (!nextDesk) return;
+    queueMicrotask(() => setAdminDeskTab(nextDesk));
+  }, [currentTab]);
 
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
 
+  // Stake Workspace State (/api/stake/status, session-authenticated)
+  const [stakeStatusData, setStakeStatusData] = useState<InitialStakeData | null>(null);
+  const [stakeStatusLoading, setStakeStatusLoading] = useState(false);
+  const [stakeStatusError, setStakeStatusError] = useState<string | null>(null);
+  const [stakeRequiresAuth, setStakeRequiresAuth] = useState(false);
+
   const [inspectedToken, setInspectedToken] = useState<AlphaItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Admin Create/Edit Call Form State
-  const [showAdminForm, setShowAdminForm] = useState<boolean>(true);
+  // Admin Create/Edit Call Form State (collapsed to a compact desk bar until opened or editing)
+  const [showAdminForm, setShowAdminForm] = useState<boolean>(false);
   const [editingCall, setEditingCall] = useState<AlphaItem | null>(null);
   const [formCa, setFormCa] = useState('');
   const [formName, setFormName] = useState('');
@@ -481,6 +511,95 @@ export const IncubatorHub: React.FC = () => {
     }
   };
 
+  const isWalletVerified =
+    connected &&
+    !needsSignature &&
+    verificationState !== 'CONNECTED_UNVERIFIED' &&
+    verificationState !== 'VERIFICATION_FAILED';
+
+  const fetchStakeStatus = useCallback(async () => {
+    if (!connected || !publicKeyBase58 || !isWalletVerified) {
+      setStakeStatusData(null);
+      setStakeStatusError(null);
+      setStakeRequiresAuth(connected);
+      return;
+    }
+
+    setStakeStatusLoading(true);
+    setStakeStatusError(null);
+    setStakeRequiresAuth(false);
+    try {
+      const res = await fetch('/api/stake/status', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (res.status === 401) {
+        setStakeStatusData(null);
+        setStakeRequiresAuth(true);
+        return;
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message || 'Unable to load stake status.');
+      }
+      const json = (await res.json()) as InitialStakeData;
+      setStakeStatusData(json);
+    } catch (err: unknown) {
+      setStakeStatusError((err as Error)?.message || 'Failed to load staking status.');
+    } finally {
+      setStakeStatusLoading(false);
+    }
+  }, [connected, publicKeyBase58, isWalletVerified]);
+
+  useEffect(() => {
+    if (currentTab !== 'STAKE') return;
+    let active = true;
+    const run = async () => {
+      if (!connected || !publicKeyBase58 || !isWalletVerified) {
+        if (active) {
+          setStakeStatusData(null);
+          setStakeStatusError(null);
+          setStakeRequiresAuth(connected);
+        }
+        return;
+      }
+
+      if (active) {
+        setStakeStatusLoading(true);
+        setStakeStatusError(null);
+        setStakeRequiresAuth(false);
+      }
+      try {
+        const res = await fetch('/api/stake/status', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        if (!active) return;
+        if (res.status === 401) {
+          setStakeStatusData(null);
+          setStakeRequiresAuth(true);
+          return;
+        }
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.message || 'Unable to load stake status.');
+        }
+        const json = (await res.json()) as InitialStakeData;
+        if (active) setStakeStatusData(json);
+      } catch (err: unknown) {
+        if (active) {
+          setStakeStatusError((err as Error)?.message || 'Failed to load staking status.');
+        }
+      } finally {
+        if (active) setStakeStatusLoading(false);
+      }
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [currentTab, connected, publicKeyBase58, isWalletVerified]);
+
   const currentMembershipTier: UserMembershipTier = useMemo(() => {
     if (!connected) return 'FREE';
     if (isAdmin || tier.id === 'PRO') return 'PRO';
@@ -488,36 +607,64 @@ export const IncubatorHub: React.FC = () => {
     return 'FREE';
   }, [connected, isAdmin, tier.id]);
 
+  const isProOrAdmin = currentMembershipTier === 'PRO';
+
   const isCurrentTabAuthorized = useMemo(() => {
     switch (currentTab) {
+      case 'OVERVIEW':
       case 'SOCIAL':
+      case 'STAKE':
         return true;
       case 'ALPHA':
         return currentMembershipTier === 'MEMBER' || currentMembershipTier === 'PRO';
       case 'WATCHLIST':
+        if (currentMembershipTier === 'PRO') return true;
+        if (currentMembershipTier === 'MEMBER') return watchlistMode === 'SAVED';
+        return false;
       case 'MAX_ALPHA':
         return currentMembershipTier === 'PRO';
       default:
         return false;
     }
-  }, [currentTab, currentMembershipTier]);
+  }, [currentTab, currentMembershipTier, watchlistMode]);
 
   const alphaCallsCount = useMemo(() => {
     if (currentMembershipTier === 'FREE') return 0;
     return alphas.filter((a) => a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha)).length;
   }, [alphas, currentMembershipTier]);
 
+  // Platform (Lab-curated) watchlist: admin-classified research posts.
   const watchlistCallsCount = useMemo(() => {
     if (currentMembershipTier !== 'PRO') return 0;
     return alphas.filter((a) => a.callType === 'WATCHLIST').length;
   }, [alphas, currentMembershipTier]);
+
+  // Personal watchlist: the user's actual saved IDs (never inferred from callType).
+  const savedWatchlistItems = useMemo(
+    () =>
+      alphas.filter(
+        (a) =>
+          watchlist.includes(a.id) &&
+          (isProOrAdmin || (!a.isMaxAlpha && a.callType !== 'MAX_ALPHA' && a.callType !== 'WATCHLIST'))
+      ),
+    [alphas, watchlist, isProOrAdmin]
+  );
+
+  const savedWatchlistCount = savedWatchlistItems.length;
 
   const maxAlphaCallsCount = useMemo(() => {
     if (currentMembershipTier !== 'PRO') return 0;
     return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha)).length;
   }, [alphas, currentMembershipTier]);
 
-  const isProOrAdmin = currentMembershipTier === 'PRO';
+  const matchesWatchlistWorkspace = useCallback(
+    (a: AlphaItem) =>
+      watchlistMode === 'SAVED'
+        ? watchlist.includes(a.id) &&
+          (isProOrAdmin || (!a.isMaxAlpha && a.callType !== 'MAX_ALPHA' && a.callType !== 'WATCHLIST'))
+        : isProOrAdmin && a.callType === 'WATCHLIST',
+    [watchlistMode, watchlist, isProOrAdmin]
+  );
 
   const pinnedCalls = useMemo(
     () =>
@@ -527,11 +674,11 @@ export const IncubatorHub: React.FC = () => {
             if (selectedChain !== 'ALL' && a.chain !== selectedChain) return false;
             if (currentTab === 'ALPHA') return a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha);
             if (currentTab === 'MAX_ALPHA') return a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha);
-            if (currentTab === 'WATCHLIST') return a.callType === 'WATCHLIST';
+            if (currentTab === 'WATCHLIST') return matchesWatchlistWorkspace(a);
             return true;
           })
         : [],
-    [alphas, selectedChain, isCurrentTabAuthorized, currentTab]
+    [alphas, selectedChain, isCurrentTabAuthorized, currentTab, matchesWatchlistWorkspace]
   );
 
   const pinnedCampaigns = useMemo(
@@ -558,20 +705,52 @@ export const IncubatorHub: React.FC = () => {
       return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha));
     }
     if (currentTab === 'WATCHLIST') {
-      return alphas.filter((a) => a.callType === 'WATCHLIST');
+      return alphas.filter(matchesWatchlistWorkspace);
     }
     return alphas;
-  }, [alphas, currentTab, isCurrentTabAuthorized]);
+  }, [alphas, currentTab, isCurrentTabAuthorized, matchesWatchlistWorkspace]);
 
   const visibleAlphas = useMemo(
     () => currentTabBaseAlphas,
     [currentTabBaseAlphas]
   );
 
-  const newCallsCount = useMemo(
-    () => visibleAlphas.filter((a) => a.ageMinutes <= 180).length,
-    [visibleAlphas]
-  );
+  const newCallsCount = useMemo(() => {
+    if (currentMembershipTier === 'FREE') return 0;
+    return alphas.filter(
+      (a) => (a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha)) && a.ageMinutes <= 180
+    ).length;
+  }, [alphas, currentMembershipTier]);
+
+  // Publish live counts & tier locks to DashboardSidebar via DashboardNavigationContext
+  const setSidebarItemState = navCtx?.setItemState;
+  useEffect(() => {
+    if (!setSidebarItemState) return;
+    setSidebarItemState({
+      ALPHA: {
+        locked: currentMembershipTier === 'FREE',
+        count: currentMembershipTier === 'FREE' ? undefined : alphaCallsCount,
+      },
+      MAX_ALPHA: {
+        locked: currentMembershipTier !== 'PRO',
+        count: currentMembershipTier !== 'PRO' ? undefined : maxAlphaCallsCount,
+      },
+      WATCHLIST: {
+        locked: currentMembershipTier === 'FREE',
+        count: currentMembershipTier === 'FREE' ? undefined : savedWatchlistCount,
+      },
+      SOCIAL: {
+        count: campaigns.length,
+      },
+    });
+  }, [
+    setSidebarItemState,
+    currentMembershipTier,
+    alphaCallsCount,
+    maxAlphaCallsCount,
+    savedWatchlistCount,
+    campaigns.length,
+  ]);
 
   const chainCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: visibleAlphas.length };
@@ -671,7 +850,12 @@ export const IncubatorHub: React.FC = () => {
   };
 
   if (!connected) {
-    return <LockedTerminal />;
+    return (
+      <div className="space-y-8">
+        <LockedTerminal />
+        {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
+      </div>
+    );
   }
 
   return (
@@ -737,20 +921,147 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 2. DASHBOARD OVERVIEW SECTION (Section 4.2) */}
-      {currentTab === 'OVERVIEW' && <DashboardOverview
-        connected={connected}
-        shortAddress={shortAddress}
-        tier={tier}
-        formattedBalance={formattedBalance}
-      />}
-      {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
+      {/* WORKSPACE HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border-default">
+        <div>
+          <h2 className="font-sans text-xl sm:text-2xl font-black text-white tracking-tight">
+            {WORKSPACE_TITLES[currentTab].title}
+          </h2>
+          <p className="font-sans text-xs text-muted mt-0.5">
+            {WORKSPACE_TITLES[currentTab].subtitle}
+          </p>
+        </div>
 
-      {/* Feature-specific content is kept out of the Overview landing page. */}
-      {currentTab !== 'OVERVIEW' && (
-      <>
+        {searchQuery.trim() && (currentTab === 'OVERVIEW' || currentTab === 'SOCIAL' || currentTab === 'STAKE') && (
+          <div className="flex items-center gap-2 rounded-lg bg-surface border border-brand/40 px-3 py-1.5 font-sans text-xs">
+            <Search className="w-3.5 h-3.5 text-brand shrink-0" />
+            <span className="text-muted">
+              Search active: <strong className="text-white">{searchQuery}</strong>
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSelectTab('ALPHA')}
+              className="h-7 px-2.5 text-xs font-bold text-brand"
+            >
+              View in Alpha
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchQuery('')}
+              className="h-7 px-2 text-xs text-muted hover:text-white"
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* 2. OVERVIEW WORKSPACE — Account, Holdings, Membership & Verified Activity */}
+      {currentTab === 'OVERVIEW' && (
+        <DashboardOverview
+          connected={connected}
+          shortAddress={shortAddress}
+          tier={tier}
+          formattedBalance={formattedBalance}
+          alphasCount={alphaCallsCount}
+          newCallsCount={newCallsCount}
+          raidsCount={activeRaidsCount}
+          watchlistCount={watchlistCallsCount}
+          isUnlocked={isUnlocked}
+          onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$H42', e)}
+          copiedGenesisCa={copiedId === 'hero-gen-ca'}
+          onSelectFilter={(f) => {
+            if (f === 'all') setActiveFilter('ALL');
+            else if (f === 'new') setActiveFilter('NEW');
+            else if (f === 'watchlist') {
+              setWatchlistMode('PLATFORM');
+              setActiveFilter('ALL');
+            }
+          }}
+          onSelectTab={(tab) => {
+            if (tab === 'ALPHA' || tab === 'alphas') handleSelectTab('ALPHA');
+            else if (tab === 'SOCIAL' || tab === 'raids') handleSelectTab('SOCIAL');
+            else if (tab === 'WATCHLIST') handleSelectTab('WATCHLIST');
+            else if (tab === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
+          }}
+        >
+          {/* Telegram Verification & Live StakePoint Staking Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+            <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
+            <DashboardStakingCard showTelegram={false} />
+          </div>
+
+          {/* Historical Verified Multipliers Ledger */}
+          <DashboardLedgerEmbed />
+
+          {/* Multi-Chain Wallet Binding & Telegram Call Alerts Utility Bar */}
+          {isUnlocked && (
+            <div className="rounded-xl bg-surface border border-border-default p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+              <div className="lg:col-span-7 space-y-1.5">
+                <h3 className="font-sans text-base font-extrabold text-white">
+                  Multi-Chain Wallet Binding &amp; Telegram Call Alerts
+                </h3>
+                <p className="font-sans text-xs text-muted leading-relaxed">
+                  Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
+                  is verified with{' '}
+                  <strong className="text-brand">{formattedBalance} $H42</strong>.
+                  Optionally map a local EVM address for multi-chain notifications.
+                </p>
+              </div>
+
+              <div className="lg:col-span-5 flex flex-col gap-2.5">
+                {!boundEvmAddress ? (
+                  <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={evmDraft}
+                      onChange={(e) => setEvmDraft(e.target.value)}
+                      placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
+                      className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
+                    />
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      size="md"
+                      className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-brand cursor-pointer shrink-0 transition-colors"
+                    >
+                      {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-brand font-bold uppercase text-xs">MAPPED:</span>
+                      <span className="text-white truncate font-medium">{boundEvmAddress}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setBoundEvmAddress('');
+                        setEvmDraft('');
+                      }}
+                      className="h-auto p-0 text-muted hover:text-danger ml-2 text-xs underline cursor-pointer shrink-0 hover:bg-transparent"
+                      title="Change mapped address"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                )}
+                <TelegramAlerts />
+              </div>
+            </div>
+          )}
+        </DashboardOverview>
+      )}
+
       {/* 4. ADMIN COMMAND DESK (Authoritative Admin Only) */}
-      {isAdmin && (
+      {isAdmin && currentTab !== 'STAKE' && (
         <div className="rounded-xl bg-surface border-2 border-brand overflow-hidden">
           <div className="px-5 py-3.5 bg-surface-card border-b border-border-default flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -1089,8 +1400,8 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 5. PINNED PRIORITY OPPORTUNITIES (Section 4.2 D) */}
-      {pinnedCalls.length > 0 && activeFilter === 'ALL' && currentTab === 'ALPHA' && isUnlocked && (
+      {/* 5. PINNED PRIORITY OPPORTUNITIES (Alpha & Max Alpha Workspaces) */}
+      {pinnedCalls.length > 0 && activeFilter === 'ALL' && (currentTab === 'ALPHA' || currentTab === 'MAX_ALPHA') && isUnlocked && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-md bg-surface border border-border-default text-white font-mono text-xs font-black uppercase inline-flex items-center gap-1.5 shadow-none">
@@ -1108,10 +1419,9 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
-      <div id="feed-tabs" className="space-y-4 pt-2">
-        {/* role="tablist" role="tab" min-h-[44px] */}
-        {/* TAB CONTENT ROUTING */}
+      {/* 6. DEDICATED FEATURE WORKSPACES (Driven by DashboardSidebar) */}
+      {currentTab !== 'OVERVIEW' && (
+      <div id="feed-tabs" className="space-y-4">
         <div
           role="tabpanel"
           id={`tabpanel-${currentTab.toLowerCase()}`}
@@ -1119,7 +1429,112 @@ export const IncubatorHub: React.FC = () => {
           tabIndex={0}
           className="min-h-[500px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-        {currentTab === 'SOCIAL' ? (
+        {currentTab === 'STAKE' ? (
+          <div data-testid="stake-workspace" className="space-y-6 pt-1">
+            {(!isWalletVerified || stakeRequiresAuth) && (
+              <div className="rounded-xl bg-surface border border-brand/50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-brand shrink-0" />
+                    <span className="font-sans text-xs font-black uppercase text-brand tracking-wide">
+                      Verify Wallet to Load &amp; Confirm Stakes
+                    </span>
+                  </div>
+                  <p className="font-sans text-xs text-muted leading-relaxed">
+                    Sign a one-time verification message in <strong className="text-white tnum">{shortAddress}</strong> to load your on-chain stake status and confirm StakePoint transactions. No gas fee.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => requestUnlockSignature()}
+                  disabled={apiLoading || verificationState === 'VERIFYING'}
+                  loading={apiLoading || verificationState === 'VERIFYING'}
+                  className="min-h-[44px] px-5 text-xs font-black uppercase shrink-0"
+                >
+                  <KeyRound className="w-4 h-4 mr-1.5" />
+                  <span>VERIFY WALLET</span>
+                </Button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-5 space-y-4">
+                <DashboardStakingCard showTelegram={false} />
+              </div>
+
+              <div className="lg:col-span-7 space-y-4">
+                {stakeStatusLoading ? (
+                  <div className="rounded-xl bg-surface border border-border-default p-6 space-y-4">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-40 w-full" />
+                  </div>
+                ) : stakeStatusError ? (
+                  <div role="alert" className="rounded-xl bg-danger/10 border border-danger/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 text-danger text-xs font-semibold">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{stakeStatusError}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={fetchStakeStatus}
+                      className="font-mono text-xs font-bold shrink-0"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                      Retry
+                    </Button>
+                  </div>
+                ) : stakeStatusData ? (
+                  <div className="rounded-xl bg-surface/50 border border-border-default p-5 sm:p-6 space-y-4">
+                    <div className="flex items-center justify-between gap-2 pb-3 border-b border-border-default">
+                      <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-muted">
+                        Verify &amp; Confirm StakePoint Transaction
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={fetchStakeStatus}
+                          className="h-8 px-2.5 text-xs font-mono text-muted hover:text-white"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                          Refresh
+                        </Button>
+                        <Link
+                          href="/dashboard/stake"
+                          className="inline-flex items-center gap-1 text-xs font-mono font-bold text-brand hover:underline"
+                        >
+                          <span>Full view</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                    <StakeClientView
+                      key={`${stakeStatusData.wallet}-${stakeStatusData.stake.amount_raw}-${stakeStatusData.stake.status}`}
+                      initialData={stakeStatusData}
+                      embedded
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-surface border border-border-default p-6 space-y-3 text-center">
+                    <Lock className="w-6 h-6 text-brand mx-auto" />
+                    <h3 className="font-sans text-base font-extrabold text-white uppercase tracking-tight">
+                      Wallet Signature Required for Stake Confirmation
+                    </h3>
+                    <p className="font-sans text-xs text-muted max-w-md mx-auto leading-relaxed">
+                      Staking position status and StakePoint transaction verification are tied to your signed wallet session. Verify wallet ownership above to proceed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : currentTab === 'SOCIAL' ? (
           <div className="space-y-4 pt-2">
             <CampaignSection
               userWallet={publicKeyBase58}
@@ -1130,21 +1545,74 @@ export const IncubatorHub: React.FC = () => {
               onTogglePin={handleTogglePinCampaign}
             />
           </div>
-        ) : !isCurrentTabAuthorized ? (
-          <MembershipRestrictionScreen
-            category={currentTab as RestrictedCategory}
-            userTier={currentMembershipTier}
-            needsVerification={needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED'}
-            onVerifyClick={requestUnlockSignature}
-            onUpgradeClick={() => {
-              if (!connected) {
-                connectWallet();
-              } else {
-                router.push('/dashboard/stake');
-              }
-            }}
-          />
         ) : (
+          <div className="space-y-6">
+            {/* Watchlist Mode Switcher: Actual Saved Watchlist vs. Lab Curated Research */}
+            {currentTab === 'WATCHLIST' && currentMembershipTier !== 'FREE' && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface border border-border-default p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="watchlist-mode-saved"
+                    onClick={() => setWatchlistMode('SAVED')}
+                    className={`min-h-[40px] px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer ${
+                      watchlistMode === 'SAVED'
+                        ? 'bg-brand text-canvas font-black'
+                        : 'bg-surface-card text-muted hover:text-white border border-border-default'
+                    }`}
+                  >
+                    <Star className="w-3.5 h-3.5" />
+                    <span>My Saved Watchlist</span>
+                    <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] tnum ${watchlistMode === 'SAVED' ? 'bg-canvas/20 text-canvas' : 'bg-surface text-white'}`}>
+                      {savedWatchlistCount}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="watchlist-mode-platform"
+                    onClick={() => setWatchlistMode('PLATFORM')}
+                    className={`min-h-[40px] px-4 rounded-lg font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer ${
+                      watchlistMode === 'PLATFORM'
+                        ? 'bg-brand text-canvas font-black'
+                        : 'bg-surface-card text-muted hover:text-white border border-border-default'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Lab Curated Research</span>
+                    {currentMembershipTier === 'PRO' ? (
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] tnum ${watchlistMode === 'PLATFORM' ? 'bg-canvas/20 text-canvas' : 'bg-surface text-white'}`}>
+                        {watchlistCallsCount}
+                      </span>
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    )}
+                  </button>
+                </div>
+
+                <span className="px-2 font-mono text-[11px] text-muted">
+                  {watchlistMode === 'SAVED'
+                    ? 'Tokens you starred across Alpha & Max Alpha calls'
+                    : 'Long-term projects curated by the Lab (Pro)'}
+                </span>
+              </div>
+            )}
+
+            {!isCurrentTabAuthorized ? (
+              <MembershipRestrictionScreen
+                category={currentTab as RestrictedCategory}
+                userTier={currentMembershipTier}
+                needsVerification={needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED'}
+                onVerifyClick={requestUnlockSignature}
+                onUpgradeClick={() => {
+                  if (!connected) {
+                    connectWallet();
+                  } else {
+                    handleSelectTab('STAKE');
+                  }
+                }}
+              />
+            ) : (
           <div className="space-y-6">
             {/* 7. ALL CATEGORIZED ALPHA / WATCHLIST / MAX ALPHA CALLS */}
             <div className="space-y-4 pt-2">
@@ -1172,7 +1640,9 @@ export const IncubatorHub: React.FC = () => {
                     {currentTab === 'ALPHA'
                       ? 'Curated Alpha Trade Calls'
                       : currentTab === 'WATCHLIST'
-                      ? 'Curated Watchlist & Research Projects'
+                      ? watchlistMode === 'SAVED'
+                        ? 'Your Saved Watchlist Tokens'
+                        : 'Curated Watchlist & Research Projects'
                       : 'Max Alpha Premium High-Conviction Calls'}
                   </h2>
                   <p className="font-sans text-xs text-muted">
@@ -1304,7 +1774,7 @@ export const IncubatorHub: React.FC = () => {
               </div>
 
               {/* Personal Watchlist Management with Opt-In Alerts (Instruction 34) */}
-              {activeFilter === 'WATCHLIST' && (
+              {(activeFilter === 'WATCHLIST' || (currentTab === 'WATCHLIST' && watchlistMode === 'SAVED')) && (
                 <WatchlistView
                   watchlistIds={watchlist}
                   allCalls={alphas}
@@ -1330,11 +1800,25 @@ export const IncubatorHub: React.FC = () => {
                     ))}
                   </div>
                 ) : filteredTokens.length === 0 ? (
-                  <EmptyState
-                    message="No calls match these filters."
-                    actionLabel="Clear filters"
-                    onAction={resetFilters}
-                  />
+                  currentTab === 'WATCHLIST' && watchlistMode === 'SAVED' && savedWatchlistCount === 0 ? (
+                    <div className="flex justify-center pt-1">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="md"
+                        onClick={() => handleSelectTab('ALPHA')}
+                        className="font-sans text-xs font-black uppercase"
+                      >
+                        Browse Alpha Calls to Star Tokens →
+                      </Button>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      message="No calls match these filters."
+                      actionLabel="Clear filters"
+                      onAction={resetFilters}
+                    />
+                  )
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
                     {filteredTokens.map(renderAlphaCard)}
@@ -1348,11 +1832,11 @@ export const IncubatorHub: React.FC = () => {
                       <tr className="border-b border-border-default bg-surface-card font-sans text-xs text-muted uppercase">
                         <th className="py-3.5 px-4 font-bold">Token &amp; Chain</th>
                         <th className="py-3.5 px-4 font-bold">Contract Address (CA)</th>
-                        {currentTab !== 'WATCHLIST' && (
+                        {(currentTab !== 'WATCHLIST' || watchlistMode === 'SAVED') && (
                           <th className="py-3.5 px-4 text-right font-bold">Entry MC</th>
                         )}
                         <th className="py-3.5 px-4 text-right font-bold">Current MC</th>
-                        {currentTab !== 'WATCHLIST' && (
+                        {(currentTab !== 'WATCHLIST' || watchlistMode === 'SAVED') && (
                           <>
                             <th className="py-3.5 px-4 text-center font-bold">Risk Ratio</th>
                             <th className="py-3.5 px-4 font-bold">Take Profit</th>
@@ -1364,7 +1848,7 @@ export const IncubatorHub: React.FC = () => {
                     <tbody className="divide-y divide-border-default font-sans text-xs">
                       {filteredTokens.length === 0 ? (
                         <tr>
-                          <td colSpan={currentTab === 'WATCHLIST' ? 4 : 7} className="py-8 text-center text-muted font-mono text-xs">
+                          <td colSpan={currentTab === 'WATCHLIST' && watchlistMode === 'PLATFORM' ? 4 : 7} className="py-8 text-center text-muted font-mono text-xs">
                             No alpha calls match active filters.
                           </td>
                         </tr>
@@ -1456,7 +1940,7 @@ export const IncubatorHub: React.FC = () => {
                                 )}
                               </td>
 
-                              {currentTab !== 'WATCHLIST' && (
+                              {(currentTab !== 'WATCHLIST' || watchlistMode === 'SAVED') && (
                                 <td className="py-3.5 px-4 text-right font-mono tnum">
                                   <div className="font-bold text-white text-sm">
                                     {isRowWatchlist ? '—' : token.entryMarketCap || '—'}
@@ -1470,7 +1954,7 @@ export const IncubatorHub: React.FC = () => {
                                 </div>
                               </td>
 
-                              {currentTab !== 'WATCHLIST' && (
+                              {(currentTab !== 'WATCHLIST' || watchlistMode === 'SAVED') && (
                                 <>
                                   <td className="py-3.5 px-4 text-center font-mono text-xs">
                                     {isRowWatchlist ? (
@@ -1663,68 +2147,9 @@ export const IncubatorHub: React.FC = () => {
           </div>
         )}
         </div>
-      </div>
-      </>
-      )}
-
-      {/* 9. BOTTOM UTILITY BAR: EVM MAPPING & TELEGRAM ALERTS */}
-      {currentTab === 'OVERVIEW' && isUnlocked && (
-        <div className="rounded-xl bg-surface border border-border-default p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
-          <div className="lg:col-span-7 space-y-1.5">
-            <h3 className="font-sans text-base font-extrabold text-white">
-              Multi-Chain Wallet Binding &amp; Telegram Call Alerts
-            </h3>
-            <p className="font-sans text-xs text-muted leading-relaxed">
-              Your Solana wallet (<span className="font-mono text-white">{shortAddress}</span>)
-              is verified with{' '}
-              <strong className="text-brand">{formattedBalance} $H42</strong>.
-              Optionally map a local EVM address for multi-chain notifications.
-            </p>
-          </div>
-
-          <div className="lg:col-span-5 flex flex-col gap-2.5">
-            {!boundEvmAddress ? (
-              <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={evmDraft}
-                  onChange={(e) => setEvmDraft(e.target.value)}
-                  placeholder="0x... (EVM address for Base/ETH/BSC/AVAX)"
-                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
-                />
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  size="md"
-                  className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-brand cursor-pointer shrink-0 transition-colors"
-                >
-                  {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
-                </Button>
-              </form>
-            ) : (
-              <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
-                <div className="flex items-center gap-2 truncate">
-                  <span className="text-brand font-bold uppercase text-xs">MAPPED:</span>
-                  <span className="text-white truncate font-medium">{boundEvmAddress}</span>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setBoundEvmAddress('');
-                    setEvmDraft('');
-                  }}
-                  className="h-auto p-0 text-muted hover:text-danger ml-2 text-xs underline cursor-pointer shrink-0 hover:bg-transparent"
-                  title="Change mapped address"
-                >
-                  Change
-                </Button>
-              </div>
-            )}
-            <TelegramAlerts />
-          </div>
+        )}
         </div>
+      </div>
       )}
 
       {/* INSPECTOR MODAL */}

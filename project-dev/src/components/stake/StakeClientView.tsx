@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { CurrentStakeCard } from './CurrentStakeCard';
@@ -8,7 +8,7 @@ import { StakeForm } from './StakeForm';
 import { StakeSuccessToast } from './StakeSuccessToast';
 import { TelegramConnectButton } from '@/components/telegram/TelegramConnectButton';
 
-interface InitialStakeData {
+export interface InitialStakeData {
   wallet: string;
   current_tier: 'free' | 'member' | 'pro' | 'unknown';
   stake: {
@@ -33,7 +33,13 @@ interface InitialStakeData {
   gap_to_pro_usd: number;
 }
 
-export function StakeClientView({ initialData }: { initialData: InitialStakeData }) {
+export function StakeClientView({
+  initialData,
+  embedded = false,
+}: {
+  initialData: InitialStakeData;
+  embedded?: boolean;
+}) {
   const { publicKey } = useWallet();
   const { balance: genesisTokenBalance } = useGenesisBalance();
 
@@ -64,13 +70,25 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
   const initialPrefill = stakeData.gap_to_pro_usd > 0 ? stakeData.gap_to_pro_usd : 250;
 
   return (
-    <div className="w-full max-w-[560px] mx-auto px-4 py-12 sm:py-16 space-y-8">
+    <div
+      className={
+        embedded
+          ? 'w-full space-y-6'
+          : 'w-full max-w-[560px] mx-auto px-4 py-12 sm:py-16 space-y-8'
+      }
+    >
       {/* Page Header */}
-      <div className="space-y-2 text-center">
+      <div className={embedded ? 'space-y-1.5' : 'space-y-2 text-center'}>
         <h1 className="font-sans text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white">
           Stake $H42 to unlock Pro
         </h1>
-        <p className="font-sans text-sm text-muted leading-relaxed max-w-md mx-auto">
+        <p
+          className={
+            embedded
+              ? 'font-sans text-sm text-muted leading-relaxed max-w-xl'
+              : 'font-sans text-sm text-muted leading-relaxed max-w-md mx-auto'
+          }
+        >
           Real-time signals, push alerts, and full terminal access. Stake for 90 days to qualify.
         </p>
       </div>

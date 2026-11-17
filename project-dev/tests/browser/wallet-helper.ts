@@ -75,6 +75,7 @@ export async function injectPhantomWallet(page: Page, kp: Keypair): Promise<void
       };
 
       const win = window as unknown as Record<string, unknown>;
+      win.isPhantomInstalled = true;
       win.phantom = { solana: provider };
       win.solana = provider;
     },

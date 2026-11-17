@@ -19,17 +19,45 @@ export interface CommandPaletteItem {
 const STATIC_NAV_ITEMS: CommandPaletteItem[] = [
   {
     id: 'nav-dashboard',
-    label: 'Incubator Dashboard',
-    subtitle: 'View live alpha calls, overview & staking status',
+    label: 'Incubator Dashboard — Overview',
+    subtitle: 'Account, holdings, membership & verified activity',
     category: 'Navigation',
     href: '/dashboard',
+  },
+  {
+    id: 'nav-alpha',
+    label: 'Alpha Calls Workspace',
+    subtitle: 'Curated multi-chain trade calls & setup telemetry',
+    category: 'Navigation',
+    href: '/dashboard?tab=ALPHA',
+  },
+  {
+    id: 'nav-max-alpha',
+    label: 'Max Alpha Workspace',
+    subtitle: 'High-conviction Pro calls',
+    category: 'Navigation',
+    href: '/dashboard?tab=MAX_ALPHA',
+  },
+  {
+    id: 'nav-watchlist',
+    label: 'Watchlist Workspace',
+    subtitle: 'Your saved tokens & Lab-curated research',
+    category: 'Navigation',
+    href: '/dashboard?tab=WATCHLIST',
+  },
+  {
+    id: 'nav-raid',
+    label: 'Raid Campaigns Workspace',
+    subtitle: 'Community X campaigns & reward submissions',
+    category: 'Navigation',
+    href: '/dashboard?tab=SOCIAL',
   },
   {
     id: 'nav-stake',
     label: 'Stake $H42 (Pro Access)',
     subtitle: 'Verify 90-day StakePoint position for instant alerts',
     category: 'Navigation',
-    href: '/dashboard/stake',
+    href: '/dashboard?tab=STAKE',
   },
   {
     id: 'nav-ledger',
@@ -70,7 +98,7 @@ export function filterCommandPaletteItems(
       subtitle: `${a.chain} • ${a.ca ? `${a.ca.slice(0, 6)}...${a.ca.slice(-4)}` : 'Pending CA'}`,
       category: 'Alpha Call' as const,
       searchFilter: a.ticker,
-      href: '/dashboard',
+      href: '/dashboard?tab=ALPHA',
     }));
 
   const navItems = STATIC_NAV_ITEMS.filter((item) => {
@@ -89,7 +117,7 @@ export function filterCommandPaletteItems(
           subtitle: 'Apply search filter in TerminalHeader',
           category: 'Search Filter',
           searchFilter: query.trim(),
-          href: '/dashboard',
+          href: '/dashboard?tab=ALPHA',
         },
       ]
     : [];
@@ -189,7 +217,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         if (onNavigate) {
           onNavigate(item.href);
         } else if (typeof window !== 'undefined') {
-          window.location.assign(item.href);
+          const targetUrl = new URL(item.href, window.location.origin);
+          if (window.location.pathname === '/dashboard' && targetUrl.pathname === '/dashboard') {
+            window.history.pushState({}, '', targetUrl.toString());
+            window.dispatchEvent(new Event('trenchlabs:dashboard-tab'));
+          } else {
+            window.location.assign(item.href);
+          }
         }
       }
     },

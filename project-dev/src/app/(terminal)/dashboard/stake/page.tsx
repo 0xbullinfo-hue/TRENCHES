@@ -11,12 +11,12 @@ export default async function StakePage() {
   const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (!sessionToken) {
-    redirect('/dashboard');
+    redirect('/dashboard?tab=STAKE');
   }
 
   const verified = verifySessionToken(sessionToken);
   if (!verified?.wallet) {
-    redirect('/dashboard');
+    redirect('/dashboard?tab=STAKE');
   }
 
   const initialData = await getStakeStatusForWallet(verified.wallet);
