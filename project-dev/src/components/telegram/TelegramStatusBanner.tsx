@@ -9,9 +9,16 @@ const DISMISS_STORAGE_KEY = 'trench_tg_banner_dismissed';
 const DISMISS_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface VerificationStatus {
-  tier: 'free' | 'member' | 'pro';
+  tier: 'free' | 'member' | 'pro' | 'unknown';
+  entitlement?: {
+    tier: 'free' | 'member' | 'pro' | 'admin' | 'unknown';
+    verified: boolean;
+  };
   telegram: {
     connected: boolean;
+    community?: {
+      status?: string;
+    };
   };
 }
 
@@ -41,7 +48,7 @@ export function TelegramStatusBanner() {
     if (isStakeRoute || dismissed) return;
     let active = true;
 
-    fetch('/api/verification/status')
+    fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (active && json) setStatus(json);
@@ -64,15 +71,22 @@ export function TelegramStatusBanner() {
 
   if (isStakeRoute || dismissed || !status) return null;
 
-  // Hidden when connected=true OR when tier=free
-  if (status.telegram.connected || status.tier === 'free') {
+  // Hidden when confirmed joined OR when tier=free / unknown
+  if (
+    status.telegram?.connected ||
+    status.telegram?.community?.status === 'joined' ||
+    status.tier === 'free' ||
+    status.tier === 'unknown' ||
+    status.entitlement?.tier === 'unknown' ||
+    status.entitlement?.tier === 'free'
+  ) {
     return null;
   }
 
-  const bannerText =
-    status.tier === 'pro'
-      ? '📱 Connect to Telegram — your Pro signals are waiting.'
-      : '📱 Connect to Telegram — join the Member community.';
+  const isProOrAdmin = status.tier === 'pro' || status.entitlement?.tier === 'pro' || status.entitlement?.tier === 'admin';
+  const bannerText = isProOrAdmin
+    ? '📱 Connect to Telegram — your Pro signals are waiting.'
+    : '📱 Connect to Telegram — join the Member community.';
 
   return (
     <div className="w-full bg-surface-card border-b border-brand-border/60 px-4 py-3 sm:px-6">

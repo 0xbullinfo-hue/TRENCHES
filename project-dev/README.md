@@ -66,15 +66,15 @@ The TP/SL notification outbox (`src/server/notification-outbox.ts` + `src/server
 
 ## Production Telegram Setup
 
-1. Copy `.env.example` to `.env.local` and configure your credentials.
-2. Add `@Trenchlabs_bot` as an Administrator in both the Member and Pro groups with **Ban Users** permission.
-3. Deploy to production, then register the webhook once:
+1. Copy `.env.example` to `.env.local` and configure your credentials. Static invite fallback variables (`TELEGRAM_MEMBER_INVITE_URL` / `TELEGRAM_PRO_INVITE_URL`) are deprecated and unused — active verification issues single-use expiring invitations via `createChatInviteLink`.
+2. Add `@Trenchlabs_bot` as an Administrator in both the Member and Pro groups with **Invite Users via Link** and **Ban Users** permissions (required for dynamic single-use invites, `chat_member` tracking, and eviction/downgrade sweeps).
+3. Deploy to production, then register the webhook once (note `"chat_member"` must be listed explicitly in `allowed_updates`):
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
   -d "url=https://YOUR_DOMAIN/api/telegram/webhook" \
   -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>" \
-  -d 'allowed_updates=["message","my_chat_member"]'
+  -d 'allowed_updates=["message","callback_query","my_chat_member","chat_member"]'
 ```
 
 4. Verify webhook health:

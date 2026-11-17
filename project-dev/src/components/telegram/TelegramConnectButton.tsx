@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 interface VerificationStatusResponse {
   wallet: string;
-  tier: 'free' | 'member' | 'pro';
+  tier: 'free' | 'member' | 'pro' | 'unknown';
   telegram: {
     connected: boolean;
     connected_tier: 'member' | 'pro' | null;
@@ -41,7 +41,7 @@ export function TelegramConnectButton({
     setLoading(true);
     setFetchError(false);
     try {
-      const res = await fetch('/api/verification/status');
+      const res = await fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' });
       if (res.ok) {
         const data = (await res.json()) as VerificationStatusResponse;
         setStatus(data);
@@ -60,7 +60,7 @@ export function TelegramConnectButton({
 
   useEffect(() => {
     let mounted = true;
-    fetch('/api/verification/status')
+    fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error('Status failed');
         return res.json();
@@ -99,7 +99,7 @@ export function TelegramConnectButton({
       }
 
       try {
-        const res = await fetch('/api/verification/status');
+        const res = await fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' });
         if (res.ok) {
           const data = (await res.json()) as VerificationStatusResponse;
           setStatus(data);
@@ -126,6 +126,7 @@ export function TelegramConnectButton({
       const res = await fetch('/api/verification/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ target_tier: status.target_tier }),
       });
 

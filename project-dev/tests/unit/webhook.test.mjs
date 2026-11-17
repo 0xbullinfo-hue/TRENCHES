@@ -24,3 +24,10 @@ test('webhook rejects a wrong secret token (401)', async () => {
   assert.equal((await POST(mk({ 'x-telegram-bot-api-secret-token': 'wrong-secret' }))).status, 401);
 });
 
+test('webhook fails closed (503) when Redis lock/store is unreachable (never fail-open)', async () => {
+  const res = await POST(mk({ 'x-telegram-bot-api-secret-token': 'correct-secret' }));
+  assert.equal(res.status, 503);
+  const json = await res.json();
+  assert.equal(json.ok, false);
+});
+

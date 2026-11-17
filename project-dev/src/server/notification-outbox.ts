@@ -25,6 +25,7 @@ import {
   classifySendFailure,
   formatSlTriggeredMessage,
   formatTpTriggeredMessage,
+  getActiveNotificationSubscribers,
   isProOnlyCall,
   tgCall,
   unlinkWallet,
@@ -265,7 +266,7 @@ async function defaultSendTelegramMessage(
 function resolveDeps(overrides: Partial<NotificationOutboxDeps> = {}): NotificationOutboxDeps {
   return {
     isRedisConfigured: () => KV_CONFIGURED || isKvConfigured(),
-    loadSubscribers: () => kvHGetAll(SUBS_KEY),
+    loadSubscribers: getActiveNotificationSubscribers,
     resolveTier,
     unlinkWallet,
     sendTelegramMessage: defaultSendTelegramMessage,

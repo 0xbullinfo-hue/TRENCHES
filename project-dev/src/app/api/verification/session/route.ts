@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthSession } from '@/server/auth';
+import { resolveUserEntitlement } from '@/server/entitlements';
 import {
   createOrReuseVerificationSession,
   getTelegramMember,
 } from '@/server/db';
+import { getBotUsername } from '@/server/telegram';
 
 export const dynamic = 'force-dynamic';
-
-const BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME || process.env.BOT_USERNAME || 'Trenchlabs_bot').replace(/^@/, '');
 
 export async function POST(req: NextRequest) {
   const session = await getAuthSession(req);
@@ -25,22 +25,33 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Validate target_tier:
-  // - "member" requires session.tier in {"member", "pro"}
-  // - "pro" requires session.tier == "pro"
-  // Otherwise 403 { error: "not_eligible", reason }
-  const userTier = session.tier;
-  if (target_tier === 'pro' && userTier !== 'pro') {
+  // Authoritatively re-verify entitlement server-side (never trust client assertions).
+  const entitlement = await resolveUserEntitlement(session.wallet);
+  if (entitlement.tier === 'unknown') {
+    return NextResponse.json(
+      {
+        error: 'entitlement_unavailable',
+        retryable: true,
+        message: 'On-chain eligibility check is temporarily unavailable. Please retry shortly.',
+      },
+      { status: 503 }
+    );
+  }
+
+  const isProOrAdmin = entitlement.isAdmin || entitlement.baseTier === 'pro';
+  const isMemberOrHigher = isProOrAdmin || entitlement.baseTier === 'member';
+
+  if (target_tier === 'pro' && !isProOrAdmin) {
     return NextResponse.json(
       {
         error: 'not_eligible',
-        reason: 'Pro Telegram group requires an active $250 stake.',
+        reason: 'Pro Telegram group requires an active $250 90-day stake in $H42.',
       },
       { status: 403 }
     );
   }
 
-  if (target_tier === 'member' && userTier !== 'member' && userTier !== 'pro') {
+  if (target_tier === 'member' && !isMemberOrHigher) {
     return NextResponse.json(
       {
         error: 'not_eligible',
@@ -50,13 +61,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3. If wallet already in target group -> 200 { already_in_group: true }
+  // Only short-circuit as already_in_group when Telegram chat_member actually confirmed joined!
   const memberRecord = await getTelegramMember(session.wallet);
-  if (memberRecord?.in_group && memberRecord.tier === target_tier) {
+  const actuallyJoined =
+    Boolean(memberRecord) &&
+    memberRecord!.group_status === 'joined' &&
+    memberRecord!.in_group &&
+    (memberRecord!.tier === target_tier || (target_tier === 'member' && memberRecord!.tier === 'pro'));
+
+  if (actuallyJoined) {
     return NextResponse.json({ already_in_group: true }, { status: 200 });
   }
 
-  // 4 & 5. Create or reuse verification session
   const result = await createOrReuseVerificationSession(session.wallet, target_tier);
 
   if ('rateLimited' in result) {
@@ -70,7 +86,8 @@ export async function POST(req: NextRequest) {
   }
 
   const vSession = result.session;
-  const deep_link = `https://t.me/${BOT_USERNAME}?start=vs_${vSession.session_id}`;
+  const botUsername = getBotUsername() || 'Trenchlabs_bot';
+  const deep_link = `https://t.me/${botUsername}?start=vs_${vSession.session_id}`;
 
   return NextResponse.json(
     {

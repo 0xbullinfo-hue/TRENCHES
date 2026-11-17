@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminWallet, isBase58Address } from '@/lib/config';
-import { resolveTier } from '@/server/db';
+import { resolveUserEntitlement } from '@/server/entitlements';
 import { getAuthSession, verifyWalletAuth } from '@/server/auth';
-import { readGenesisBalanceCached } from '@/server/genesis';
 import { rateLimit } from '@/server/ratelimit';
 import { createLinkCode, isLinked, telegramConfigured, unlinkWallet } from '@/server/telegram';
 
@@ -70,8 +69,11 @@ export async function POST(req: NextRequest) {
 
   try {
     if (!isAdminWallet(a.wallet)) {
-      const userTier = await resolveTier(a.wallet);
-      if (userTier === 'free') {
+      const entitlement = await resolveUserEntitlement(a.wallet);
+      if (entitlement.tier === 'unknown') {
+        return fail(503, 'ENTITLEMENT_UNAVAILABLE', 'On-chain eligibility check is temporarily unavailable. Retry shortly.');
+      }
+      if (entitlement.tier === 'free') {
         return fail(403, 'ACCESS_DENIED_ZERO_BALANCE', 'Holding at least $20 worth of $H42 or staking $250 on StakePoint is required for alerts.');
       }
     }

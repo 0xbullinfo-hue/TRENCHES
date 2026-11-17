@@ -1,4 +1,5 @@
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
+import type { EntitlementResult } from '@/lib/telegram-types';
 import { getActiveStakes, loadDb, StakeRow } from '@/server/db';
 import { readGenesisBalanceCached, readGenesisRawBalanceCached } from '@/server/genesis';
 import { getGenesisPrice } from '@/server/price';
@@ -270,9 +271,18 @@ export async function resolveWalletEntitlement(
     }
   } else {
     const allStakes = await getActiveStakes(walletAddress);
-    validStakes = allStakes.filter(
-      (s) => s.status === 'active' && s.unlocks_at > nowIso
-    );
+    const minLockMs = PRO_STAKE_MIN_LOCK_DAYS * 86400 * 1000 - 60_000;
+    validStakes = allStakes.filter((s) => {
+      if (s.status !== 'active' || s.unlocks_at <= nowIso) return false;
+      if (s.staked_at) {
+        const stakedMs = new Date(s.staked_at).getTime();
+        const unlocksMs = new Date(s.unlocks_at).getTime();
+        if (Number.isFinite(stakedMs) && Number.isFinite(unlocksMs) && unlocksMs - stakedMs < minLockMs) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     totalStakedRaw = validStakes.reduce(
       (acc, s) => acc + BigInt(s.amount_raw),
@@ -416,4 +426,71 @@ export async function evaluateWalletDowngrade(
     changed,
     downgradeReason: currentEntitlement.downgradeReason,
   };
+}
+
+/**
+ * Service 1 — Authoritative Entitlement Service.
+ * Wraps resolveWalletEntitlement and preserves Admin vs Pro vs Member vs Free vs Unknown semantics.
+ * Never trusts client-provided tiers and never converts an unavailable lookup into Free or Pro.
+ */
+export async function resolveUserEntitlement(
+  walletAddress: string,
+  overrides?: {
+    mockHoldingTokens?: number;
+    mockStakedTokens?: number;
+    mockPriceUsd?: number;
+  }
+): Promise<EntitlementResult> {
+  const wallet = String(walletAddress ?? '').trim();
+  if (!wallet) {
+    return {
+      tier: 'unknown',
+      baseTier: 'unknown',
+      isAdmin: false,
+      wallet: '',
+      verifiedAt: null,
+      reason: 'Missing wallet address',
+    };
+  }
+
+  try {
+    const entitlement = await resolveWalletEntitlement(wallet, overrides);
+    if (entitlement.isAdmin) {
+      return {
+        tier: 'admin',
+        baseTier: 'pro',
+        isAdmin: true,
+        wallet,
+        verifiedAt: entitlement.resolvedAt,
+      };
+    }
+
+    return {
+      tier: entitlement.tier,
+      baseTier: entitlement.tier,
+      isAdmin: false,
+      wallet,
+      verifiedAt: entitlement.tier === 'unknown' ? null : entitlement.resolvedAt,
+      reason: entitlement.downgradeReason,
+    };
+  } catch (err) {
+    console.error('[Entitlements] resolveUserEntitlement error:', err);
+    if (isAdminWallet(wallet)) {
+      return {
+        tier: 'admin',
+        baseTier: 'pro',
+        isAdmin: true,
+        wallet,
+        verifiedAt: new Date().toISOString(),
+      };
+    }
+    return {
+      tier: 'unknown',
+      baseTier: 'unknown',
+      isAdmin: false,
+      wallet,
+      verifiedAt: null,
+      reason: err instanceof Error ? err.message : 'Entitlement check failed',
+    };
+  }
 }
