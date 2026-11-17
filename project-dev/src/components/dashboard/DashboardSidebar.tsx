@@ -80,7 +80,7 @@ export function DashboardSidebar() {
             const Icon = item.icon;
             const content = <><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-brand' : 'text-muted group-hover:text-white'}`} />{!collapsed && <><span className="min-w-0 flex-1 truncate">{item.label}</span>{item.id === 'MAX_ALPHA' && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-black text-amber-300">PRO</span>}</>}</>;
             const classes = `group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-semibold transition-colors ${active ? 'border border-brand/20 bg-brand/10 text-white shadow-[inset_2px_0_0_0_var(--color-brand)]' : 'border border-transparent text-muted hover:bg-white/[0.04] hover:text-white'} ${collapsed ? 'justify-center' : ''}`;
-            return item.href ? <a key={item.id} href={item.href} title={collapsed ? item.label : item.description} onClick={() => setMobileOpen(false)} className={classes}>{content}</a> :
+            return item.href ? <Link key={item.id} href={item.href} title={collapsed ? item.label : item.description} onClick={() => setMobileOpen(false)} className={classes}>{content}</Link> :
               <button key={item.id} type="button" title={collapsed ? item.label : item.description} onClick={() => selectTab(item.id as DashboardTab)} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
           })}
         </nav>
