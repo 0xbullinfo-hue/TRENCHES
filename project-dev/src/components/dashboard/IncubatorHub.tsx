@@ -529,11 +529,11 @@ export const IncubatorHub: React.FC = () => {
             if (selectedChain !== 'ALL' && a.chain !== selectedChain) return false;
             if (currentTab === 'ALPHA') return a.callType === 'ALPHA' || (!a.callType && !a.isMaxAlpha);
             if (currentTab === 'MAX_ALPHA') return a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha);
-            if (currentTab === 'WATCHLIST') return a.callType === 'WATCHLIST';
+            if (currentTab === 'WATCHLIST') return watchlist.includes(a.id);
             return true;
           })
         : [],
-    [alphas, selectedChain, isCurrentTabAuthorized, currentTab]
+    [alphas, selectedChain, isCurrentTabAuthorized, currentTab, watchlist]
   );
 
   const pinnedCampaigns = useMemo(
@@ -603,7 +603,7 @@ export const IncubatorHub: React.FC = () => {
           case 'PINNED':
             return item.pinned;
           case 'MAX_ALPHA':
-            return Boolean(item.isMaxAlpha || item.callType === 'MAX_ALPHA');
+            return currentTab === 'MAX_ALPHA' || Boolean(item.isMaxAlpha || item.callType === 'MAX_ALPHA');
           case 'MOVERS':
             return item.change24hPct !== null && item.change24hPct >= 200;
           case 'NEW':
@@ -625,20 +625,19 @@ export const IncubatorHub: React.FC = () => {
         if (sortBy === 'CHANGE') return compareChangeDesc(a, b);
         return a.ageMinutes - b.ageMinutes;
       });
-  }, [visibleAlphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy]);
+  }, [visibleAlphas, selectedChain, searchQuery, activeFilter, watchlist, sortBy, currentTab]);
 
   const topWinningCoins = useMemo(
     () =>
-      alphas
+      currentTabBaseAlphas
         .filter(
           (a) =>
-            a.callType !== 'WATCHLIST' &&
             (!a.isMaxAlpha || isProOrAdmin) &&
             a.change24hPct !== null
         )
         .sort(compareChangeDesc)
         .slice(0, 4),
-    [alphas, isProOrAdmin]
+    [currentTabBaseAlphas, isProOrAdmin]
   );
 
   const resetFilters = () => {
@@ -1234,7 +1233,6 @@ export const IncubatorHub: React.FC = () => {
                     {(
                       [
                         { id: 'ALL', label: 'All' },
-                        ...(isProOrAdmin ? [{ id: 'MAX_ALPHA', label: '⚡ Max Alpha' } as { id: FilterTab; label: string }] : []),
                         { id: 'PINNED', label: '📌 Pinned' },
                         { id: 'MOVERS', label: '🔥 Movers' },
                         { id: 'NEW', label: '✨ New' },
