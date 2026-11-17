@@ -1,15 +1,22 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
-import { OnboardingChecklist } from './OnboardingChecklist';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
+import { ProProgressBar } from './ProProgressBar';
+import { OnboardingChecklist } from './OnboardingChecklist';
+import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
 import {
   ArrowUpRight,
   Check,
   Copy,
   Flame,
+  Gift,
+  Sparkles,
+  Star,
+  Target,
   Wallet,
 } from 'lucide-react';
 
@@ -18,8 +25,15 @@ interface DashboardOverviewProps {
   shortAddress: string;
   tier: { id: string; label?: string; multiplier?: number };
   formattedBalance: string;
+  alphasCount: number;
+  newCallsCount: number;
+  raidsCount: number;
+  watchlistCount: number;
+  isUnlocked: boolean;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
+  onSelectFilter?: (filter: 'all' | 'new' | 'watchlist') => void;
+  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'alphas' | 'raids') => void;
   onExploreCalls?: () => void;
 }
 
@@ -28,8 +42,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   shortAddress,
   tier,
   formattedBalance,
+  alphasCount,
+  newCallsCount,
+  raidsCount,
+  watchlistCount,
+  isUnlocked,
   onCopyGenesisCa,
   copiedGenesisCa,
+  onSelectFilter,
+  onSelectTab,
   onExploreCalls,
 }) => {
   const isPro = tier.id === 'PRO';
@@ -38,10 +59,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Keep onboarding visible on the landing page, not buried in a collapsed panel. */}
       <OnboardingChecklist onExploreCalls={onExploreCalls} />
 
-      {/* 1. Welcome Panel & Membership Summary Strip */}
-      <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
+      <section className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-brand shrink-0">
@@ -49,81 +70,90 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-sans text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                  Welcome to the Lab
-                </h1>
-                <span
-                  className={`px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase ${
-                    isPro
-                      ? 'bg-alpha-strong text-white border border-alpha-border'
-                      : isMember
-                      ? 'bg-brand-bg text-brand border border-brand-border'
-                      : 'bg-surface-card text-muted border border-border-default'
-                  }`}
-                >
-                  {tierDisplayName}
-                </span>
+                <h1 className="font-sans text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Welcome to the Lab</h1>
+                <span className={`px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase ${
+                  isPro ? 'bg-alpha-strong text-white border border-alpha-border'
+                    : isMember ? 'bg-brand-bg text-brand border border-brand-border'
+                    : 'bg-surface-card text-muted border border-border-default'
+                }`}>{tierDisplayName}</span>
               </div>
-              <p className="font-sans text-xs text-muted mt-0.5">
-                Multi-chain trade intelligence terminal, risk telemetry, and community rewards.
-              </p>
+              <p className="font-sans text-xs text-muted mt-0.5">Multi-chain trade intelligence terminal, risk telemetry, and community rewards.</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={onCopyGenesisCa}
-              className="px-3.5 gap-1.5"
-              title="Copy $H42 token contract address"
-            >
-              {copiedGenesisCa ? (
-                <Check className="w-3.5 h-3.5 text-brand" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-brand" />
-              )}
+            <Button variant="secondary" size="md" onClick={onCopyGenesisCa} className="px-3.5 gap-1.5" title="Copy $H42 token contract address">
+              {copiedGenesisCa ? <Check className="w-3.5 h-3.5 text-brand" /> : <Copy className="w-3.5 h-3.5 text-brand" />}
               <span>{copiedGenesisCa ? 'Copied CA' : 'Copy $H42 CA'}</span>
             </Button>
-
             {BUY_LOCK ? (
-              <LaunchLockedButton className="h-10 px-4 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center gap-1.5">
-                <span>Buy $H42</span>
-              </LaunchLockedButton>
+              <LaunchLockedButton className="h-10 px-4 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center gap-1.5"><span>Buy $H42</span></LaunchLockedButton>
             ) : (
-              <a
-                href={BUY_LINKS.pump}
-                target="_blank"
-                rel="noreferrer"
-                className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <span>Buy $H42</span>
-                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              <a href={BUY_LINKS.pump} target="_blank" rel="noreferrer" className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                <span>Buy $H42</span><ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </a>
             )}
           </div>
         </div>
 
-        {/* Holdings-first overview: only the connected wallet and verified $H42 balance. */}
+        {/* Primary overview: welcome + holdings only. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
           <div className="p-4 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>CONNECTED WALLET</span>
-              <Wallet className="w-3.5 h-3.5 text-brand" />
-            </div>
+            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between"><span>CONNECTED WALLET</span><Wallet className="w-3.5 h-3.5 text-brand" /></div>
             <div className="text-white font-bold truncate tnum">{connected ? shortAddress : 'Disconnected'}</div>
           </div>
           <div className="p-4 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>VERIFIED $H42 HOLDING</span>
-              <span className="text-brand font-mono text-xs">SPL</span>
-            </div>
+            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between"><span>VERIFIED $H42 HOLDING</span><span className="text-brand font-mono text-xs">SPL</span></div>
             <div className="text-white font-black tnum">{formattedBalance} $H42</div>
           </div>
         </div>
-      </div>
+      </section>
 
+      {/* Previous dashboard telemetry and shortcuts are retained, but grouped to keep the landing page uncluttered. */}
+      <details className="rounded-xl bg-surface border border-border-default group">
+        <summary className="cursor-pointer list-none px-5 py-4 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-white hover:text-brand">
+          <span>Dashboard insights &amp; quick actions</span>
+          <span className="text-[11px] font-medium text-muted">Membership status, activity, progress and performance</span>
+        </summary>
+        <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+            <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">WALLET STATUS</div>
+              <div className="text-white font-bold truncate tnum">{connected ? shortAddress : 'Disconnected'}</div>
+            </div>
+            <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">VERIFIED BALANCE</div>
+              <div className="text-white font-black tnum">{formattedBalance} $H42</div>
+            </div>
+            <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
+              <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center gap-2">RESEARCH ACCESS <Target className="w-3.5 h-3.5 text-alpha-primary" /></div>
+              <div className="text-white font-bold">{isUnlocked ? 'Unlocked (Standard Calls)' : 'Locked (~$20 Required)'}</div>
+            </div>
+            <Link href="/dashboard/stake" className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group/stake">
+              <div className="text-xs text-muted group-hover/stake:text-brand uppercase font-bold tracking-wider flex items-center justify-between"><span>PRO STAKING</span><ArrowUpRight className="w-3.5 h-3.5 text-brand" /></div>
+              <div className="text-brand-bright font-black">{isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}</div>
+            </Link>
+          </div>
 
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-border-default font-mono text-xs">
+            <Button variant="ghost" size="sm" onClick={() => { onSelectTab?.('ALPHA'); onSelectFilter?.('all'); }} className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between text-left font-normal">
+              <div className="space-y-0.5"><div className="text-xs text-muted uppercase font-bold">ACTIVE CALLS</div><div className="text-base font-black text-white tnum">{alphasCount}</div></div><Target className="w-4 h-4 text-alpha-primary" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { onSelectTab?.('ALPHA'); onSelectFilter?.('new'); }} className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-brand flex items-center justify-between text-left font-normal">
+              <div className="space-y-0.5"><div className="text-xs text-muted uppercase font-bold">NEW CALLS</div><div className="text-base font-black text-brand tnum">{newCallsCount}</div></div><Sparkles className="w-4 h-4 text-brand" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onSelectTab?.('SOCIAL')} className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between text-left font-normal">
+              <div className="space-y-0.5"><div className="text-xs text-muted uppercase font-bold">ACTIVE RAIDS</div><div className="text-base font-black text-raid-primary tnum">{raidsCount}</div></div><Gift className="w-4 h-4 text-raid-primary" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { onSelectTab?.('WATCHLIST'); onSelectFilter?.('watchlist'); }} className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between text-left font-normal">
+              <div className="space-y-0.5"><div className="text-xs text-muted uppercase font-bold">PLATFORM WATCHLIST</div><div className="text-base font-black text-amber tnum">{watchlistCount}</div></div><Star className="w-4 h-4 text-amber" />
+            </Button>
+          </div>
+
+          <ProProgressBar isPro={isPro} />
+          <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+        </div>
+      </details>
     </div>
   );
 };
