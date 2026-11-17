@@ -29,6 +29,7 @@ import { CampaignSection } from '@/components/campaigns/CampaignSection';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { AdminCampaignManager } from '@/components/admin/AdminCampaignManager';
 import { DashboardOverview } from './DashboardOverview';
+import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
 import { WatchlistView } from './WatchlistView';
 import {
   AlertTriangle,
@@ -765,6 +766,7 @@ export const IncubatorHub: React.FC = () => {
           if (listEl) listEl.scrollIntoView({ behavior: 'smooth' });
         }}
       />}
+      {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
 
       {/* Feature-specific content is kept out of the Overview landing page. */}
       {currentTab !== 'OVERVIEW' && (
