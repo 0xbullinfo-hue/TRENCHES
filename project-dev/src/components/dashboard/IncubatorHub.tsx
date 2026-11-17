@@ -61,7 +61,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
-export type DashboardTab = 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA';
+export type DashboardTab = 'OVERVIEW' | 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA';
 type FilterTab = 'ALL' | 'PINNED' | 'MAX_ALPHA' | 'MOVERS' | 'NEW' | 'WATCHLIST';
 type SortKey = 'PRIORITY' | 'MCAP' | 'CHANGE' | 'NEWEST';
 type ViewMode = 'GRID' | 'TABLE';
@@ -113,6 +113,8 @@ export const IncubatorHub: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab')?.toUpperCase();
       if (
+        tabParam === 'OVERVIEW' ||
+        tabParam === 'OVERVIEW' ||
         tabParam === 'ALPHA' ||
         tabParam === 'SOCIAL' ||
         tabParam === 'WATCHLIST' ||
@@ -121,7 +123,7 @@ export const IncubatorHub: React.FC = () => {
         return tabParam as DashboardTab;
       }
     }
-    return 'ALPHA';
+    return 'OVERVIEW';
   });
 
   const handleSelectTab = (tab: DashboardTab) => {
@@ -146,7 +148,7 @@ export const IncubatorHub: React.FC = () => {
       ) {
         setCurrentTab(tabParam as DashboardTab);
       } else {
-        setCurrentTab('ALPHA');
+        setCurrentTab('OVERVIEW');
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -734,7 +736,7 @@ export const IncubatorHub: React.FC = () => {
       )}
 
       {/* 2. DASHBOARD OVERVIEW SECTION (Section 4.2) */}
-      <DashboardOverview
+      {currentTab === 'OVERVIEW' && <DashboardOverview
         connected={connected}
         shortAddress={shortAddress}
         tier={tier}
@@ -761,18 +763,10 @@ export const IncubatorHub: React.FC = () => {
           const listEl = document.getElementById('feed-tabs');
           if (listEl) listEl.scrollIntoView({ behavior: 'smooth' });
         }}
-      />
+      />}
 
-      {/* 3. STAKING & TELEGRAM SUMMARY ROW */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-stretch">
-        <div className="lg:col-span-6 flex flex-col h-full">
-          <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
-        </div>
-        <div className="lg:col-span-6 flex flex-col h-full">
-          <DashboardStakingCard showTelegram={false} />
-        </div>
-      </div>
-
+      {/* Feature-specific content is kept out of the Overview landing page. */}
+      {currentTab !== 'OVERVIEW' && (
       {/* 4. ADMIN COMMAND DESK (Authoritative Admin Only) */}
       {isAdmin && (
         <div className="rounded-xl bg-surface border-2 border-brand overflow-hidden">
@@ -1135,48 +1129,6 @@ export const IncubatorHub: React.FC = () => {
       {/* 6. MAIN FEED TABS: ALPHA CALLS (PURPLE) VS SOCIAL RAIDS (ORANGE) */}
       <div id="feed-tabs" className="space-y-4 pt-2">
         {/* role="tablist" role="tab" min-h-[44px] */}
-        <Tabs
-          id="feed-tabs-navigation"
-          aria-label="Dashboard Content Categories"
-          activeTab={currentTab}
-          onTabChange={(tabId) => {
-            if (tabId === 'ALPHA') handleSelectTab('ALPHA');
-            else if (tabId === 'SOCIAL') handleSelectTab('SOCIAL');
-            else if (tabId === 'WATCHLIST') handleSelectTab('WATCHLIST');
-            else if (tabId === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
-          }}
-          tabs={[
-            {
-              id: 'ALPHA',
-              label: 'ALPHA',
-              'data-testid': 'tab-alpha',
-              locked: currentMembershipTier === 'FREE',
-              count: currentMembershipTier === 'FREE' ? undefined : alphaCallsCount,
-            },
-            {
-              id: 'SOCIAL',
-              label: 'SOCIAL',
-              'data-testid': 'tab-social',
-              count: campaigns.length,
-            },
-            {
-              id: 'WATCHLIST',
-              label: 'WATCHLIST',
-              'data-testid': 'tab-watchlist',
-              locked: currentMembershipTier !== 'PRO',
-              count: currentMembershipTier !== 'PRO' ? undefined : watchlistCallsCount,
-            },
-            {
-              id: 'MAX_ALPHA',
-              label: 'MAX ALPHA',
-              'data-testid': 'tab-max-alpha',
-              locked: currentMembershipTier !== 'PRO',
-              count: currentMembershipTier !== 'PRO' ? undefined : maxAlphaCallsCount,
-            },
-          ]}
-          className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-border-default overflow-x-auto no-scrollbar scroll-smooth"
-        />
-
         {/* TAB CONTENT ROUTING */}
         <div
           role="tabpanel"
@@ -1730,9 +1682,10 @@ export const IncubatorHub: React.FC = () => {
         )}
         </div>
       </div>
+      )}
 
       {/* 9. BOTTOM UTILITY BAR: EVM MAPPING & TELEGRAM ALERTS */}
-      {isUnlocked && (
+      {currentTab === 'OVERVIEW' && isUnlocked && (
         <div className="rounded-xl bg-surface border border-border-default p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
           <div className="lg:col-span-7 space-y-1.5">
             <h3 className="font-sans text-base font-extrabold text-white">
