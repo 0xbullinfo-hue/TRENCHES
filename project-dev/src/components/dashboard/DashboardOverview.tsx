@@ -3,6 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
+import { OnboardingChecklist } from './OnboardingChecklist';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
 import {
   ArrowUpRight,
@@ -19,6 +20,7 @@ interface DashboardOverviewProps {
   formattedBalance: string;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
+  onExploreCalls?: () => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -28,6 +30,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   formattedBalance,
   onCopyGenesisCa,
   copiedGenesisCa,
+  onExploreCalls,
 }) => {
   const isPro = tier.id === 'PRO';
   const isMember = tier.id === 'MEMBER' || tier.id === 'LAB_MEMBER';
@@ -35,6 +38,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="space-y-5">
+      <OnboardingChecklist onExploreCalls={onExploreCalls} />
+
       {/* 1. Welcome Panel & Membership Summary Strip */}
       <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
