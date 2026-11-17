@@ -124,6 +124,7 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
           genesisPriceUsd={stakeData.thresholds?.pro?.genesis_usd_price ?? 0.0000164}
           initialAmountUsd={initialPrefill}
           onStakeSuccess={handleStakeSuccess}
+          getAuthHeaders={signRequestHeaders}
         />
       ) : (
         <div className="rounded-xl bg-surface border border-brand p-6 sm:p-8 shadow-none text-center space-y-6">
