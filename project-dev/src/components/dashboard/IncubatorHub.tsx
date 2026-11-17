@@ -767,6 +767,7 @@ export const IncubatorHub: React.FC = () => {
 
       {/* Feature-specific content is kept out of the Overview landing page. */}
       {currentTab !== 'OVERVIEW' && (
+      <>
       {/* 4. ADMIN COMMAND DESK (Authoritative Admin Only) */}
       {isAdmin && (
         <div className="rounded-xl bg-surface border-2 border-brand overflow-hidden">
@@ -1682,6 +1683,7 @@ export const IncubatorHub: React.FC = () => {
         )}
         </div>
       </div>
+      </>
       )}
 
       {/* 9. BOTTOM UTILITY BAR: EVM MAPPING & TELEGRAM ALERTS */}
