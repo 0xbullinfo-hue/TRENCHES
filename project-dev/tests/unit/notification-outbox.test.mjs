@@ -1328,3 +1328,49 @@ test('Outbox [19]: tier RPC failures never increment Telegram delivery attemptCo
   });
 });
 
+// ============================================================================
+// 20: Live /stop / Disabled Subscription Guard Inside Outbox Processing
+// ============================================================================
+test('Outbox [20]: skips and purges subscriber whose DB subscription was disabled (/stop) even after outbox seeding', async () => {
+  await withMockRedis(async (sim) => {
+    const ACTIVE_PRO = 'WalletOutboxActivePro111111111111111111111';
+    const STOPPED_PRO = 'WalletOutboxStoppedPro11111111111111111111';
+
+    sim.seedLinkedSubscribers({
+      [ACTIVE_PRO]: '8101',
+      [STOPPED_PRO]: '8102',
+    });
+
+    const { eventId } = await enqueueOutboxEvent(
+      {
+        call: makeCall({ id: 'call-outbox-stop-guard', minTier: 'PRO', isMaxAlpha: false }),
+        triggerType: 'SL',
+        targetId: buildSlTargetId('-25% SL'),
+        targetLabel: '-25% SL',
+        marketCapLabel: '$75.0K',
+      },
+      { now: sim.getNow }
+    );
+
+    const deliveredTo = [];
+    const res = await processNotificationOutbox({
+      now: sim.getNow,
+      isSubscriptionActive: async (wallet) => wallet !== STOPPED_PRO,
+      resolveTier: async () => 'pro',
+      sendTelegramMessage: async (chatId) => {
+        deliveredTo.push(String(chatId));
+        return { ok: true, status: 200 };
+      },
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.notificationsSent, 1);
+    assert.deepEqual(deliveredTo, ['8101'], 'Only active subscriber receives SL alert; /stop subscriber is excluded');
+
+    const finalState = await getOutboxEventState(eventId);
+    assert.equal(finalState.event?.status, 'completed');
+    assert.equal(finalState.subscribers[ACTIVE_PRO]?.status, 'delivered');
+    assert.equal(finalState.subscribers[STOPPED_PRO], undefined, 'Disabled/stopped subscriber purged from outbox hash');
+  });
+});
+

@@ -85,6 +85,7 @@ export interface TelegramWebhookEventRow {
   group_id?: string | null;
   next_retry_at?: number | null;
   reconciliation_reason?: string | null;
+  last_interactive_probe_at?: number | null;
 }
 
 export interface TelegramMigrationMeta {
@@ -301,7 +302,7 @@ export function getAndIncrementDurableGeneration(lockFilePath: string, minGen = 
       const parsed = JSON.parse(raw);
       currentGen = Math.max(currentGen, Number(parsed?.generation) || 0);
     }
-  } catch {}
+  } catch { }
   const nextGen = currentGen + 1;
   try {
     const tmp = `${genFilePath}.${process.pid}.${Date.now()}.${safeRandomUUID()}.tmp`;
@@ -312,9 +313,9 @@ export function getAndIncrementDurableGeneration(lockFilePath: string, minGen = 
       fs.writeFileSync(genFilePath, JSON.stringify({ generation: nextGen, updatedAt: Date.now() }), 'utf8');
       try {
         fs.unlinkSync(tmp);
-      } catch {}
+      } catch { }
     }
-  } catch {}
+  } catch { }
   return nextGen;
 }
 
@@ -340,7 +341,7 @@ export async function acquireFileLock(
   if (!fs.existsSync(dataDir)) {
     try {
       fs.mkdirSync(dataDir, { recursive: true });
-    } catch {}
+    } catch { }
   }
 
   // Clean up any abandoned reclaim staging files left by dead processes
@@ -359,11 +360,11 @@ export async function acquireFileLock(
           }
         } catch {
           // If unreadable or corrupted staging file, clean up
-          try { fs.unlinkSync(full); } catch {}
+          try { fs.unlinkSync(full); } catch { }
         }
       }
     }
-  } catch {}
+  } catch { }
 
   while (Date.now() - start < maxWaitMs) {
     try {
@@ -407,7 +408,7 @@ export async function acquireFileLock(
         // Acquisition integrity: never leave partially acquired lock on failure
         try {
           fs.closeSync(fd);
-        } catch {}
+        } catch { }
         try {
           if (fs.existsSync(lockFilePath)) {
             const raw = fs.readFileSync(lockFilePath, 'utf8');
@@ -415,13 +416,13 @@ export async function acquireFileLock(
               fs.unlinkSync(lockFilePath);
             }
           }
-        } catch {}
+        } catch { }
         throw metaErr;
       }
 
       try {
         fs.closeSync(fd);
-      } catch {}
+      } catch { }
 
       let released = false;
       const releaseFn = () => {
@@ -442,7 +443,7 @@ export async function acquireFileLock(
               }
             }
           }
-        } catch {}
+        } catch { }
       };
 
       const handle: FileLockRelease = Object.assign(releaseFn, {
@@ -491,7 +492,7 @@ export async function acquireFileLock(
             let data: Record<string, unknown> | null = null;
             try {
               data = JSON.parse(raw);
-            } catch {}
+            } catch { }
 
             const inspectedPid = typeof data?.pid === 'number' ? data.pid : -1;
             const inspectedToken = typeof data?.token === 'string' ? data.token : '';
@@ -515,7 +516,7 @@ export async function acquireFileLock(
                   let reclaimData: Record<string, unknown> | null = null;
                   try {
                     reclaimData = JSON.parse(staleRaw);
-                  } catch {}
+                  } catch { }
 
                   const reclaimToken = typeof reclaimData?.token === 'string' ? reclaimData.token : '';
                   const reclaimGen = Number(reclaimData?.fencingGeneration) || 1;
@@ -535,13 +536,13 @@ export async function acquireFileLock(
                     if (!fs.existsSync(lockFilePath)) {
                       try {
                         fs.renameSync(reclaimPath, lockFilePath);
-                      } catch {}
+                      } catch { }
                     } else {
                       try {
                         if (isPidDead(reclaimPid)) {
                           fs.unlinkSync(reclaimPath);
                         }
-                      } catch {}
+                      } catch { }
                     }
                     await sleep(20 + Math.floor(Math.random() * 30));
                     continue;
@@ -550,7 +551,7 @@ export async function acquireFileLock(
                   // Unlink verified stale reclaim staging file
                   try {
                     fs.unlinkSync(reclaimPath);
-                  } catch {}
+                  } catch { }
 
                   // Acquire exclusively with incremented fencing generation
                   const nextGen = getAndIncrementDurableGeneration(lockFilePath, inspectedGen);
@@ -581,7 +582,7 @@ export async function acquireFileLock(
                       throw new Error('Lock metadata verification failed: token mismatch on recovery');
                     }
                   } catch (recMetaErr) {
-                    try { fs.closeSync(recFd); } catch {}
+                    try { fs.closeSync(recFd); } catch { }
                     try {
                       if (fs.existsSync(lockFilePath)) {
                         const raw = fs.readFileSync(lockFilePath, 'utf8');
@@ -589,11 +590,11 @@ export async function acquireFileLock(
                           fs.unlinkSync(lockFilePath);
                         }
                       }
-                    } catch {}
+                    } catch { }
                     throw recMetaErr;
                   }
 
-                  try { fs.closeSync(recFd); } catch {}
+                  try { fs.closeSync(recFd); } catch { }
 
                   let recReleased = false;
                   const recReleaseFn = () => {
@@ -606,7 +607,7 @@ export async function acquireFileLock(
                           fs.unlinkSync(lockFilePath);
                         }
                       }
-                    } catch {}
+                    } catch { }
                   };
 
                   const recHandle: FileLockRelease = Object.assign(recReleaseFn, {
@@ -778,8 +779,8 @@ export function normalizeTelegramMemberRow(
   const wallet = String(raw.wallet || raw.wallet_address).trim();
   const rawUserId =
     raw.telegram_user_id !== undefined &&
-    raw.telegram_user_id !== null &&
-    Number.isFinite(Number(raw.telegram_user_id))
+      raw.telegram_user_id !== null &&
+      Number.isFinite(Number(raw.telegram_user_id))
       ? Number(raw.telegram_user_id)
       : null;
   const legacyInGroup = Boolean(raw.in_group);
@@ -799,8 +800,8 @@ export function normalizeTelegramMemberRow(
     raw.notification_preference === 'enabled' || raw.notification_preference === 'disabled'
       ? raw.notification_preference
       : raw.notification_status === 'enabled'
-      ? 'enabled'
-      : 'disabled';
+        ? 'enabled'
+        : 'disabled';
   const notificationEntitlementAllowed =
     typeof raw.notification_entitlement_allowed === 'boolean'
       ? raw.notification_entitlement_allowed
@@ -825,8 +826,8 @@ export function normalizeTelegramMemberRow(
       raw.actual_group_tier !== undefined
         ? raw.actual_group_tier
         : actualGroupId
-        ? inferCommunityTierFromGroupId(actualGroupId, null)
-        : null;
+          ? inferCommunityTierFromGroupId(actualGroupId, null)
+          : null;
   } else if (effectiveInGroup) {
     actualGroupId = raw.group_id ?? null;
     actualGroupTier = inferCommunityTierFromGroupId(raw.group_id, legacyTier);
@@ -835,14 +836,14 @@ export function normalizeTelegramMemberRow(
   const historicalRevocations: TelegramHistoricalRevocation[] = Array.isArray(raw.historical_revocations)
     ? raw.historical_revocations
     : raw.revoked_at
-    ? [
+      ? [
         {
           at: raw.revoked_at,
           reason: raw.revoked_reason || 'Entitlement revoked',
           group_id: raw.group_id ?? null,
         },
       ]
-    : [];
+      : [];
 
   const lastSynced = raw.last_synced_at || now;
   const createdAt = raw.created_at || lastSynced;
@@ -856,8 +857,8 @@ export function normalizeTelegramMemberRow(
       raw.telegram_chat_id !== undefined
         ? raw.telegram_chat_id
         : rawUserId !== null
-        ? String(rawUserId)
-        : null,
+          ? String(rawUserId)
+          : null,
     entitlement_tier: entitlementTier,
     tier: legacyTier,
     identity_status: identityStatus,
@@ -873,8 +874,8 @@ export function normalizeTelegramMemberRow(
       raw.verified_at !== undefined
         ? raw.verified_at
         : identityStatus === 'connected'
-        ? lastSynced
-        : null,
+          ? lastSynced
+          : null,
     invite_created_at: raw.invite_created_at ?? null,
     invite_expires_at: raw.invite_expires_at ?? null,
     invite_link_hash: raw.invite_link_hash ?? null,
@@ -883,8 +884,8 @@ export function normalizeTelegramMemberRow(
       raw.joined_at !== undefined
         ? raw.joined_at
         : effectiveInGroup
-        ? lastSynced
-        : null,
+          ? lastSynced
+          : null,
     revoked_at: raw.revoked_at ?? null,
     revoked_reason: raw.revoked_reason ?? null,
     historical_revocations: historicalRevocations,
@@ -954,7 +955,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
         try {
           fs.copyFileSync(DATA_FILE_PATH, backupPath);
           console.error(`[TrenchLabs DB] Preserved corrupted db copy at ${backupPath}`);
-        } catch {}
+        } catch { }
         throw new Error(`Database file is corrupted. Corrupted copy saved to ${backupPath}. Reseed aborted to prevent data loss.`);
       }
     }
@@ -1025,7 +1026,7 @@ export async function saveDb(db: TrenchDatabaseSchema): Promise<void> {
       fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(db, null, 2), 'utf-8');
       try {
         fs.unlinkSync(tmp);
-      } catch {}
+      } catch { }
     }
   } catch (err) {
     console.error('[TrenchLabs DB] Local save error:', err);
@@ -1969,7 +1970,7 @@ export async function upsertTelegramMember(params: {
         params.telegram_chat_id !== undefined
           ? params.telegram_chat_id
           : existing.telegram_chat_id ??
-            (existing.telegram_user_id !== null ? String(existing.telegram_user_id) : null);
+          (existing.telegram_user_id !== null ? String(existing.telegram_user_id) : null);
       existing.tier = params.tier;
       existing.entitlement_tier = params.entitlement_tier ?? params.tier;
       existing.notification_entitlement_allowed = existing.entitlement_tier !== 'free';
@@ -2028,10 +2029,10 @@ export async function upsertTelegramMember(params: {
 export type IdentityBindResult =
   | { ok: true; member: TelegramMemberRow }
   | {
-      ok: false;
-      reason: 'telegram_identity_already_linked' | 'wallet_already_linked_to_other_telegram';
-      conflictWallet?: string;
-    };
+    ok: false;
+    reason: 'telegram_identity_already_linked' | 'wallet_already_linked_to_other_telegram';
+    conflictWallet?: string;
+  };
 
 /**
  * Atomically binds a Telegram numeric user ID and private chat ID to an authenticated wallet
@@ -2396,8 +2397,8 @@ export async function enforceDbNotificationEntitlement(
       existing.identity_status === 'blocked'
         ? 'blocked'
         : pref === 'enabled' && params.allowed && existing.identity_status === 'connected'
-        ? 'enabled'
-        : 'disabled';
+          ? 'enabled'
+          : 'disabled';
 
     if (
       existing.entitlement_tier === params.entitlementTier &&
@@ -2517,8 +2518,8 @@ export async function setTelegramNotificationStatus(
           existing.identity_status === 'blocked'
             ? 'blocked'
             : pref === 'enabled' && allowed
-            ? 'enabled'
-            : 'disabled';
+              ? 'enabled'
+              : 'disabled';
       }
 
       existing.last_synced_at = now;
@@ -2644,12 +2645,18 @@ export type WebhookClaimResult =
   | { claimed: true; leaseToken: string; attemptCount: number }
   | { claimed: false; duplicate: true; status: WebhookEventStatus };
 
+/**
+ * Background retry intervals aligned with the 5-minute external scheduler
+ * (`.github/workflows/tp-sl-monitor.yml` -> `/api/telegram/dispatch-delayed`).
+ * Faster user-driven recovery (30s cooldown) happens interactively when the user
+ * polls `/api/verification/status` or runs `/status` in Telegram.
+ */
 export const DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS = [
-  30_000,
-  120_000,
   300_000,
+  600_000,
   900_000,
   1_800_000,
+  3_600_000,
 ] as const;
 
 export const MAX_WEBHOOK_ATTEMPTS = 6;
@@ -2964,6 +2971,90 @@ export async function claimRetryableMembershipEvents(options?: {
   });
 }
 
+/**
+ * Atomically claims one pending retryable membership event for a specific wallet (or Telegram user)
+ * during interactive status checks without consuming a background retry attempt up front.
+ */
+export async function claimRetryableEventForWalletInteractive(params: {
+  walletAddress: string;
+  telegramUserId?: number | null;
+  nowMs?: number;
+  minProbeIntervalMs?: number;
+  leaseMs?: number;
+  maxAttempts?: number;
+}): Promise<TelegramWebhookEventRow | null> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.telegram_webhook_events) || db.telegram_webhook_events.length === 0) {
+      return null;
+    }
+
+    const nowMs = params.nowMs ?? Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const minProbeIntervalMs = Math.max(0, params.minProbeIntervalMs ?? 30_000);
+    const leaseMs = Math.max(5_000, params.leaseMs ?? 30_000);
+    const maxAttempts = resolveRetryMaxAttempts(params.maxAttempts);
+
+    for (const ev of db.telegram_webhook_events) {
+      if (ev.status !== 'retryable_failed' || !ev.payload) continue;
+      const matchesWallet = ev.wallet_address === params.walletAddress;
+      const matchesTgUser =
+        params.telegramUserId != null && ev.telegram_user_id === params.telegramUserId;
+      if (!matchesWallet && !matchesTgUser) continue;
+
+      if (ev.attempt_count >= maxAttempts) {
+        ev.status = 'permanently_failed';
+        ev.lease_token = null;
+        ev.lease_expires_at = null;
+        ev.next_retry_at = null;
+        ev.updated_at = nowIso;
+        await saveDb(db);
+        continue;
+      }
+
+      const lastProbe = ev.last_interactive_probe_at ?? new Date(ev.updated_at).getTime();
+      if (minProbeIntervalMs > 0 && nowMs - lastProbe < minProbeIntervalMs) {
+        continue;
+      }
+
+      const leaseToken = safeRandomUUID();
+      ev.status = 'processing';
+      ev.lease_token = leaseToken;
+      ev.lease_expires_at = nowMs + leaseMs;
+      ev.last_interactive_probe_at = nowMs;
+      ev.updated_at = nowIso;
+      await saveDb(db);
+      return { ...ev };
+    }
+
+    return null;
+  });
+}
+
+/**
+ * Releases an interactive recovery lease when entitlement is still temporarily unavailable,
+ * preserving background `attempt_count` and `next_retry_at`.
+ */
+export async function releaseInteractiveWebhookProbe(
+  updateId: number,
+  leaseToken: string,
+  reason?: string,
+  nowMs = Date.now()
+): Promise<void> {
+  await withDbLock(async () => {
+    const db = await loadDb();
+    const ev = (db.telegram_webhook_events || []).find((e) => e.update_id === updateId);
+    if (!ev || ev.status === 'completed' || ev.lease_token !== leaseToken) return;
+    ev.status = 'retryable_failed';
+    ev.lease_token = null;
+    ev.lease_expires_at = null;
+    ev.last_interactive_probe_at = nowMs;
+    if (reason) ev.last_error = reason;
+    ev.updated_at = new Date(nowMs).toISOString();
+    await saveDb(db);
+  });
+}
+
 export async function listTelegramWebhookEvents(): Promise<TelegramWebhookEventRow[]> {
   const db = await loadDb();
   return [...(db.telegram_webhook_events || [])];
@@ -3006,7 +3097,7 @@ export async function migrateTelegramSchemaAndSubscribers(options?: {
         try {
           fs.mkdirSync(path.dirname(TELEGRAM_V2_BACKUP_FILE), { recursive: true });
           fs.writeFileSync(TELEGRAM_V2_BACKUP_FILE, snapshot, 'utf8');
-        } catch {}
+        } catch { }
       }
     }
 
@@ -3050,8 +3141,8 @@ export async function migrateTelegramSchemaAndSubscribers(options?: {
         const conflictingOwner =
           numericChatId !== null && numericChatId > 0
             ? db.telegram_members.find(
-                (m) => m.telegram_user_id === numericChatId && m.identity_status !== 'disconnected'
-              )
+              (m) => m.telegram_user_id === numericChatId && m.identity_status !== 'disconnected'
+            )
             : null;
         if (conflictingOwner) continue;
 
@@ -3105,8 +3196,8 @@ export async function rollbackTelegramMigration(): Promise<{ restored: boolean; 
     const raw = KV_CONFIGURED
       ? await kvGet(TELEGRAM_V2_BACKUP_KV_KEY)
       : fs.existsSync(TELEGRAM_V2_BACKUP_FILE)
-      ? fs.readFileSync(TELEGRAM_V2_BACKUP_FILE, 'utf8')
-      : null;
+        ? fs.readFileSync(TELEGRAM_V2_BACKUP_FILE, 'utf8')
+        : null;
 
     if (!raw) return { restored: false, memberCount: 0 };
     const parsed = JSON.parse(raw) as { telegram_members?: TelegramMemberRow[] };

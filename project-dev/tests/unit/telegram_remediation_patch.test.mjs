@@ -127,6 +127,8 @@ const tg = await import('../../src/server/telegram.ts');
 const webhookRoute = await import('../../src/app/api/telegram/webhook/route.ts');
 const statusRoute = await import('../../src/app/api/verification/status/route.ts');
 const dispatchDelayedRoute = await import('../../src/app/api/telegram/dispatch-delayed/route.ts');
+const sweepRoute = await import('../../src/app/api/telegram/sweep/route.ts');
+const outbox = await import('../../src/server/notification-outbox.ts');
 
 let uidSeq = 10_000;
 const nextUid = () => ++uidSeq;
@@ -204,9 +206,9 @@ test('Fix 1: Bidirectional group routing rejects Pro in Member and Member in Pro
   assert.equal(proRec?.reconciliation_required, true);
   assert.equal(proRec?.in_group, false);
 
-  // Recovery runs once bot regains ban permission -> clears mismatch & issues Pro invite!
+  // Recovery runs once bot regains ban permission & 5m scheduler window elapses -> clears mismatch & issues Pro invite!
   mockState.failBanUser = false;
-  await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 60_000 });
+  await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 310_000 });
   proRec = await db.getTelegramMember(proW);
   assert.equal(proRec?.group_status, 'invite_pending');
   assert.equal(proRec?.actual_group_tier, null);
@@ -277,10 +279,10 @@ test('Fix 1: Bidirectional group routing rejects Pro in Member and Member in Pro
     0,
     'Admin must never be kicked from Pro or Member group'
   );
-  // Recover unkW as qualified Member -> ensure Fix 1's retryable event completes cleanly
+  // Recover unkW as qualified Member -> ensure Fix 1's retryable event completes cleanly once 5m schedule elapses
   mockState.balancesRaw.set(unkW, '250000000000');
   mockState.rpcFailWallets.delete(unkW);
-  const fix1Rec = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 60_000 });
+  const fix1Rec = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 310_000 });
   assert.equal(fix1Rec.completed, 1);
   assert.equal((await db.getTelegramMember(unkW))?.group_status, 'joined');
 });
@@ -316,14 +318,64 @@ test('Fix 2: Recoverable membership events handle backoff schedule, concurrent w
   assert.equal(webhookRes.status, 200);
   assert.equal(webhookJson.status, 'retryable');
 
+  // Verify cron backoff defaults align with 5-minute scheduler: [5m, 10m, 15m, 30m, 60m]
+  assert.deepEqual([...db.DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS], [300_000, 600_000, 900_000, 1_800_000, 3_600_000]);
+
   let storedEv = (await db.listTelegramWebhookEvents()).find((e) => e.update_id === retryEventId);
   assert.equal(storedEv?.status, 'retryable_failed');
   assert.equal(storedEv?.attempt_count, 1);
   assert.ok(storedEv?.payload, 'Payload must be durably stored');
 
-  // Verify due check respects backoff (immediate retry before 30s does not claim early)
-  const earlyRec = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 10_000 });
-  assert.equal(earlyRec.processed, 0, 'Must respect 30s backoff before Attempt 2');
+  // Verify due check respects 5m cron backoff (immediate / 1m retry does not claim early)
+  const earlyRec = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 60_000 });
+  assert.equal(earlyRec.processed, 0, 'Must respect 5m cron backoff before Attempt 2');
+
+  // Verify interactive probe while still 'unknown' does NOT exhaust background cron attempts
+  const unkStatusWhileOutage = await statusRoute.GET(
+    new NextRequest(`http://localhost/api/verification/status?wallet=${wallet}`, {
+      headers: { cookie: cookieFor(wallet) },
+    })
+  );
+  assert.equal(unkStatusWhileOutage.status, 200);
+  storedEv = (await db.listTelegramWebhookEvents()).find((e) => e.update_id === retryEventId);
+  assert.equal(storedEv?.attempt_count, 1, 'Interactive outage poll must not consume cron attempt count');
+
+  // Verify expired processing lease recovery (simulated crashed worker)
+  const staleCrashId = nextUid();
+  const staleWallet = 'Fix2StaleLease11111111111111111111111111';
+  const staleTgId = 22003;
+  mockState.balancesRaw.set(staleWallet, '250000000000');
+  await db.upsertTelegramMember({
+    wallet_address: staleWallet,
+    telegram_user_id: staleTgId,
+    tier: 'member',
+    in_group: false,
+    group_status: 'invite_pending',
+    group_id: process.env.TELEGRAM_MEMBER_GROUP_ID,
+  });
+  await db.persistRetryableMembershipEvent({
+    updateId: staleCrashId,
+    eventType: 'chat_member',
+    payload: {
+      chat: { id: Number(process.env.TELEGRAM_MEMBER_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: staleTgId }, status: 'member' },
+    },
+    walletAddress: staleWallet,
+    telegramUserId: staleTgId,
+    groupId: process.env.TELEGRAM_MEMBER_GROUP_ID,
+    reason: 'transient_rpc_err',
+    nowMs: Date.now() - 400_000,
+  });
+  // Worker A claims event with 30s lease and crashes before completion
+  const leasedByA = await db.claimRetryableMembershipEvents({ nowMs: Date.now(), leaseMs: 30_000 });
+  assert.ok(leasedByA.some((e) => e.update_id === staleCrashId), 'Worker A claims due event');
+  // Concurrent Worker B before lease expiry cannot double-claim
+  const leasedEarlyByB = await db.claimRetryableMembershipEvents({ nowMs: Date.now() + 10_000, leaseMs: 30_000 });
+  assert.equal(leasedEarlyByB.some((e) => e.update_id === staleCrashId), false, 'Active lease blocks Worker B');
+  // After 30s lease expires, recovery reclaims stale lease cleanly and completes
+  const staleRecovered = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 35_000 });
+  assert.ok(staleRecovered.completed >= 1, 'Expired stale lease must be reclaimed and completed');
+  assert.equal((await db.getTelegramMember(staleWallet))?.group_status, 'joined');
 
   // Step 2: Advance beyond backoff across attempts & verify exponential delays up to 6th attempt exhaustion on separate event
   const exhaustWallet = 'Fix2ExhaustWallet11111111111111111111111';
@@ -349,8 +401,8 @@ test('Fix 2: Recoverable membership events handle backoff schedule, concurrent w
   // Now recover wallet for retryEventId cleanly BEFORE exhaustion, while keeping exhaustWallet failing!
   mockState.rpcFailWallets.delete(wallet);
 
-  // Concurrent recovery workers -> leased claim ensures processed ONCE without duplicates
-  const futureMs = Date.now() + 60_000;
+  // Concurrent recovery workers after 5m backoff -> leased claim ensures processed ONCE without duplicates
+  const futureMs = Date.now() + 305_000;
   const [r1, r2] = await Promise.all([
     tg.processRetryableMembershipEvents({ nowMs: futureMs }),
     tg.processRetryableMembershipEvents({ nowMs: futureMs }),
@@ -364,15 +416,46 @@ test('Fix 2: Recoverable membership events handle backoff schedule, concurrent w
   storedEv = (await db.listTelegramWebhookEvents()).find((e) => e.update_id === retryEventId);
   assert.equal(storedEv?.status, 'completed');
 
-  // Exhaust retries on exhaustId (up to attempt 6 -> permanently_failed)
-  let simClock = Date.now() + 120_000;
+  // Interactive fast recovery verification: user polling /api/verification/status recovers within <1m without waiting for 5m cron!
+  const fastWallet = 'Fix2FastInteractive111111111111111111111';
+  const fastTgId = 22004;
+  mockState.balancesRaw.set(fastWallet, '250000000000');
+  mockState.rpcFailWallets.add(fastWallet);
+  await db.upsertTelegramMember({
+    wallet_address: fastWallet,
+    telegram_user_id: fastTgId,
+    tier: 'member',
+    in_group: false,
+    group_status: 'invite_pending',
+    group_id: process.env.TELEGRAM_MEMBER_GROUP_ID,
+  });
+  await sendWebhook({
+    update_id: nextUid(),
+    chat_member: {
+      chat: { id: Number(process.env.TELEGRAM_MEMBER_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: fastTgId }, status: 'member' },
+    },
+  });
+  assert.equal((await db.getTelegramMember(fastWallet))?.group_status, 'invite_pending');
+  mockState.rpcFailWallets.delete(fastWallet);
+  const fastStatusRes = await statusRoute.GET(
+    new NextRequest(`http://localhost/api/verification/status?wallet=${fastWallet}`, {
+      headers: { cookie: cookieFor(fastWallet) },
+    })
+  );
+  const fastStatusJson = await fastStatusRes.json();
+  assert.equal(fastStatusJson.telegram.community.status, 'joined', 'Interactive /api/verification/status immediately recovers pending event when RPC heals');
+
+  // Exhaust retries on exhaustId (up to attempt 6 across 5m/10m/15m/30m/60m -> permanently_failed)
+  let simClock = Date.now() + 400_000;
   for (let step = 0; step < 6; step++) {
-    simClock += 60 * 60 * 1000;
+    simClock += 65 * 60 * 1000;
     await tg.processRetryableMembershipEvents({ nowMs: simClock });
   }
   const exhaustedEv = (await db.listTelegramWebhookEvents()).find((e) => e.update_id === exhaustId);
   assert.equal(exhaustedEv?.status, 'permanently_failed', 'Exhausted event must transition to permanently_failed and stop retrying');
   assert.equal(exhaustedEv?.attempt_count, 6);
+  assert.ok(exhaustedEv?.last_error, 'Permanent failure must retain last_error metadata');
 
   // Verify malformed payload during recovery marks permanently_failed instead of looping forever
   const badEvId = nextUid();
@@ -381,7 +464,7 @@ test('Fix 2: Recoverable membership events handle backoff schedule, concurrent w
     eventType: 'chat_member',
     payload: { broken: true },
     reason: 'simulated_corrupt_payload',
-    nowMs: Date.now() - 60_000,
+    nowMs: Date.now() - 400_000,
   });
   const badRecovery = await tg.processRetryableMembershipEvents({ nowMs: Date.now() + 60_000 });
   assert.ok(badRecovery.permanentlyFailed >= 1);
@@ -770,4 +853,361 @@ test('Fix 5: /status accurately separates Eligible Community, Actual Group, Mism
   const unlinkedText = await getStatusReply(55999);
   assert.ok(unlinkedText.includes('Wallet: Not Connected'));
   assert.ok(unlinkedText.includes('Telegram Identity: Not Connected'));
+});
+
+// ============================================================================
+// ITEM 2: Admin Group Policy, Non-Mismatch & /status Accuracy
+// ============================================================================
+test('Admin Policy: Admin authorized in Member and Pro without mismatch, kick, or downgrade', async () => {
+  const adminTgId = 66001;
+  await db.upsertTelegramMember({
+    wallet_address: ADMIN_WALLET,
+    telegram_user_id: adminTgId,
+    telegram_chat_id: String(adminTgId),
+    tier: 'pro',
+    entitlement_tier: 'admin',
+    in_group: false,
+    group_status: 'not_joined',
+  });
+
+  // Admin joins Member group first (moderation/support)
+  const kicksBefore = mockState.kickedUsers.length;
+  await sendWebhook({
+    update_id: nextUid(),
+    chat_member: {
+      chat: { id: Number(process.env.TELEGRAM_MEMBER_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: adminTgId }, status: 'member' },
+    },
+  });
+  assert.equal(
+    mockState.kickedUsers.slice(kicksBefore).filter((k) => k.user_id === adminTgId).length,
+    0,
+    'Admin must never be kicked when joining Member group'
+  );
+
+  // Dashboard status API must NOT report mismatch or disconnected for Admin in Member
+  const adminMemStatusRes = await statusRoute.GET(
+    new NextRequest(`http://localhost/api/verification/status?wallet=${ADMIN_WALLET}`, {
+      headers: { cookie: cookieFor(ADMIN_WALLET) },
+    })
+  );
+  const adminMemJson = await adminMemStatusRes.json();
+  assert.equal(adminMemJson.entitlement.tier, 'admin');
+  assert.equal(adminMemJson.telegram.community.status, 'joined', 'Admin in Member must report joined, NEVER mismatch');
+  assert.equal(adminMemJson.telegram.community.actualGroup, 'member');
+  assert.equal(adminMemJson.telegram.connected, true);
+
+  // Bot /status must accurately reflect Admin authorization across groups
+  await sendWebhook({
+    update_id: nextUid(),
+    message: {
+      message_id: nextUid(),
+      chat: { id: adminTgId, type: 'private' },
+      from: { id: adminTgId },
+      text: '/status',
+    },
+  });
+  const adminStatusMsg = mockState.sentMessages.at(-1)?.text || '';
+  assert.ok(adminStatusMsg.includes('Tier: <b>ADMIN</b>'), 'Admin tier label');
+  assert.ok(adminStatusMsg.includes('Eligible Community: Pro &amp; Member (Admin)') || adminStatusMsg.includes('Eligible Community: Pro & Member (Admin)'));
+  assert.ok(adminStatusMsg.includes('Actual Group: Member'));
+  assert.ok(adminStatusMsg.includes('Group Membership: <b>Joined</b>'));
+  assert.ok(!adminStatusMsg.includes('Mismatch'), 'Admin in Member must NOT show Mismatch');
+
+  // Sweep must not evict or flag Admin
+  await tg.sweepGroupMembers();
+  const afterSweep = await db.getTelegramMember(ADMIN_WALLET);
+  assert.equal(afterSweep?.group_status, 'joined');
+
+  // Admin now also enters Pro group -> Pro recorded, Member NOT kicked
+  await sendWebhook({
+    update_id: nextUid(),
+    chat_member: {
+      chat: { id: Number(process.env.TELEGRAM_PRO_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: adminTgId }, status: 'member' },
+    },
+  });
+  assert.equal(
+    mockState.kickedUsers.slice(kicksBefore).filter((k) => k.user_id === adminTgId).length,
+    0,
+    'Admin entering Pro must not kick Admin from Member group'
+  );
+  // Admin leaves secondary Member group -> Pro membership preserved
+  await sendWebhook({
+    update_id: nextUid(),
+    chat_member: {
+      chat: { id: Number(process.env.TELEGRAM_MEMBER_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: adminTgId }, status: 'left' },
+    },
+  });
+  const afterSecondaryExit = await db.getTelegramMember(ADMIN_WALLET);
+  assert.equal(afterSecondaryExit?.group_status, 'joined');
+  assert.equal(afterSecondaryExit?.actual_group_tier, 'pro');
+});
+
+// ============================================================================
+// ITEM 4 & ITEM 5: Notification Audit Across Tiers + Security Verification
+// ============================================================================
+test('Notification Audit & Security: enforces live Free/Member/Pro/Admin/OptOut rules & rejects unauthorized cron/api callers', async () => {
+  // Independent tier notification test across Free, Member, Pro, Admin
+  const nFreeW = 'NotifFree11111111111111111111111111111111';
+  const nMemW = 'NotifMemb11111111111111111111111111111111';
+  const nProW = 'NotifProW11111111111111111111111111111111';
+  const nStoppedW = 'NotifStop11111111111111111111111111111111';
+
+  mockState.balancesRaw.set(nMemW, '250000000000'); // $25 Member
+  mockState.balancesRaw.set(nProW, '250000000000');
+  mockState.balancesRaw.set(nStoppedW, '250000000000');
+  await db.createStake({
+    wallet_address: nProW,
+    amount_raw: '3000000000000',
+    lock_days: 90,
+    tx_signature: `notif_pro_${crypto.randomUUID()}`,
+  });
+  await db.createStake({
+    wallet_address: nStoppedW,
+    amount_raw: '3000000000000',
+    lock_days: 90,
+    tx_signature: `notif_stop_${crypto.randomUUID()}`,
+  });
+
+  for (const [w, tgId] of [
+    [nFreeW, 77001],
+    [nMemW, 77002],
+    [nProW, 77003],
+    [nStoppedW, 77004],
+    [ADMIN_WALLET, 77005],
+  ]) {
+    await db.upsertTelegramMember({
+      wallet_address: w,
+      telegram_user_id: tgId,
+      telegram_chat_id: String(tgId),
+      tier: 'pro',
+      in_group: true,
+      group_status: 'joined',
+    });
+    await db.setTelegramNotificationStatus(w, 'enabled', {
+      telegram_user_id: tgId,
+      telegram_chat_id: String(tgId),
+    });
+  }
+  // Free loses eligibility, Stopped opts out via /stop
+  await db.enforceDbNotificationEntitlement(nFreeW, { entitlementTier: 'free', allowed: false });
+  await sendWebhook({
+    update_id: nextUid(),
+    message: { message_id: nextUid(), chat: { id: 77004, type: 'private' }, from: { id: 77004 }, text: '/stop' },
+  });
+
+  // Verify outbox subscription active check explicitly honors opt-out / Free
+  assert.equal(await tg.isWalletNotificationSubscriptionActive(nStoppedW), false, '/stop wallet excluded from outbox');
+  assert.equal(await tg.isWalletNotificationSubscriptionActive(nProW), true);
+  assert.equal(typeof outbox.processNotificationOutbox, 'function');
+
+  // 4a. Pro-only call -> ONLY Pro (77003) & Admin (77005) receive; Free/Member/Stopped do not
+  const msgStartProOnly = mockState.sentMessages.length;
+  await tg.notifyNewCall({
+    id: 'audit-pro-only-call',
+    ticker: 'PROONLY',
+    ca: 'So11111111111111111111111111111111111111112',
+    callMc: 100000,
+    proOnly: true,
+    createdAt: new Date().toISOString(),
+    postedBy: ADMIN_WALLET,
+    status: 'active',
+    takeProfits: [],
+    stopLoss: null,
+  });
+  const proOnlyChats = new Set(mockState.sentMessages.slice(msgStartProOnly).map((m) => String(m.chat_id)));
+  assert.ok(proOnlyChats.has('77003'), 'Pro receives Pro-only call');
+  assert.ok(proOnlyChats.has('77005'), 'Admin receives Pro-only call');
+  assert.equal(proOnlyChats.has('77001'), false, 'Free never receives Pro-only call');
+  assert.equal(proOnlyChats.has('77002'), false, 'Member never receives Pro-only call');
+  assert.equal(proOnlyChats.has('77004'), false, '/stop user never receives Pro-only call');
+
+  // 4b. General call + TP/SL fan-out
+  const msgStartGeneral = mockState.sentMessages.length;
+  await tg.notifyNewCall({
+    id: 'audit-general-call',
+    ticker: 'GENCALL',
+    ca: 'So11111111111111111111111111111111111111112',
+    callMc: 100000,
+    proOnly: false,
+    createdAt: new Date().toISOString(),
+    postedBy: ADMIN_WALLET,
+    status: 'active',
+    takeProfits: [],
+    stopLoss: null,
+  });
+  const genInstantChats = new Set(mockState.sentMessages.slice(msgStartGeneral).map((m) => String(m.chat_id)));
+  assert.ok(genInstantChats.has('77003'), 'Pro receives instant general call');
+  assert.ok(genInstantChats.has('77005'), 'Admin receives instant general call');
+  assert.equal(genInstantChats.has('77001'), false, 'Free excluded from instant general call');
+  assert.equal(genInstantChats.has('77002'), false, 'Member delayed (not instant)');
+
+  const delayedMsgStart = mockState.sentMessages.length;
+  const origNow = Date.now;
+  Date.now = () => origNow() + 6 * 60 * 1000;
+  try {
+    await tg.dispatchDelayedMemberCalls();
+  } finally {
+    Date.now = origNow;
+  }
+  const delayedChats = new Set(mockState.sentMessages.slice(delayedMsgStart).map((m) => String(m.chat_id)));
+  assert.ok(delayedChats.has('77002'), 'Member receives general call after 5m delay');
+  assert.equal(delayedChats.has('77001'), false, 'Free excluded from delayed call');
+  assert.equal(delayedChats.has('77004'), false, '/stop user excluded from delayed call');
+
+  // 4c. TP / SL fanout enforcement
+  const tpslStart = mockState.sentMessages.length;
+  const sampleGeneralCall = {
+    id: 'audit-tp-sl-call',
+    ticker: 'TPSLTST',
+    ca: 'So11111111111111111111111111111111111111112',
+    callMc: 100000,
+    proOnly: false,
+    createdAt: new Date().toISOString(),
+    postedBy: ADMIN_WALLET,
+    status: 'active',
+    takeProfits: [],
+    stopLoss: null,
+  };
+  await tg.notifyTpTriggered(sampleGeneralCall, { label: '2x' }, '$200K', '2.0');
+  await tg.notifySlTriggered(sampleGeneralCall, '$50K');
+  const tpslChats = new Set(mockState.sentMessages.slice(tpslStart).map((m) => String(m.chat_id)));
+  assert.ok(tpslChats.has('77002') && tpslChats.has('77003') && tpslChats.has('77005'));
+  assert.equal(tpslChats.has('77001'), false, 'Free excluded from TP/SL alerts');
+  assert.equal(tpslChats.has('77004'), false, '/stop user excluded from TP/SL alerts');
+
+  // 5. Security verification on protected routes
+  assert.equal(
+    (await dispatchDelayedRoute.GET(new NextRequest('http://localhost/api/telegram/dispatch-delayed'))).status,
+    401
+  );
+  assert.equal(
+    (
+      await dispatchDelayedRoute.POST(
+        new NextRequest('http://localhost/api/telegram/dispatch-delayed', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer wrong-secret' },
+        })
+      )
+    ).status,
+    401
+  );
+  assert.equal(
+    (await sweepRoute.GET(new NextRequest('http://localhost/api/telegram/sweep'))).status,
+    401
+  );
+  assert.equal(
+    (
+      await sweepRoute.POST(
+        new NextRequest('http://localhost/api/telegram/sweep', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer wrong-secret' },
+        })
+      )
+    ).status,
+    401
+  );
+  assert.equal(
+    (await statusRoute.GET(new NextRequest('http://localhost/api/verification/status'))).status,
+    401
+  );
+  assert.equal(
+    (
+      await statusRoute.GET(
+        new NextRequest(`http://localhost/api/verification/status?wallet=${nFreeW}`, {
+          headers: { cookie: cookieFor(nProW) },
+        })
+      )
+    ).status,
+    403
+  );
+  assert.equal(
+    (
+      await webhookRoute.POST(
+        new NextRequest('http://localhost/api/telegram/webhook', {
+          method: 'POST',
+          headers: { 'x-telegram-bot-api-secret-token': 'invalid-secret' },
+          body: '{}',
+        })
+      )
+    ).status,
+    401
+  );
+
+  // Fail-closed when CRON_SECRET is unset
+  const prevCronSecret = process.env.CRON_SECRET;
+  delete process.env.CRON_SECRET;
+  try {
+    assert.equal(
+      (await dispatchDelayedRoute.GET(new NextRequest('http://localhost/api/telegram/dispatch-delayed'))).status,
+      500
+    );
+    assert.equal(
+      (await sweepRoute.GET(new NextRequest('http://localhost/api/telegram/sweep'))).status,
+      503
+    );
+  } finally {
+    process.env.CRON_SECRET = prevCronSecret;
+  }
+
+  // Clean up Fix notification fixtures' balances
+  mockState.balancesRaw.set(nMemW, '0');
+  mockState.balancesRaw.set(nProW, '0');
+  mockState.balancesRaw.set(nStoppedW, '0');
+});
+
+// ============================================================================
+// ITEM 6: End-to-End 13-Scenario Matrix Verification (/stop vs group, leave)
+// ============================================================================
+test('Item 6 E2E Matrix: User leaves group preserves identity/alerts and /stop never removes group membership', async () => {
+  const leaveW = 'Item6LeaveUser111111111111111111111111111';
+  const leaveTg = 88001;
+  mockState.balancesRaw.set(leaveW, '250000000000');
+  await db.upsertTelegramMember({
+    wallet_address: leaveW,
+    telegram_user_id: leaveTg,
+    telegram_chat_id: String(leaveTg),
+    tier: 'member',
+    in_group: true,
+    group_status: 'joined',
+    group_id: process.env.TELEGRAM_MEMBER_GROUP_ID,
+  });
+  await db.setTelegramNotificationStatus(leaveW, 'enabled', {
+    telegram_user_id: leaveTg,
+    telegram_chat_id: String(leaveTg),
+  });
+
+  // /stop disables notifications ONLY while keeping Member group membership intact
+  const kicksBeforeStop = mockState.kickedUsers.length;
+  await sendWebhook({
+    update_id: nextUid(),
+    message: { message_id: nextUid(), chat: { id: leaveTg, type: 'private' }, from: { id: leaveTg }, text: '/stop' },
+  });
+  const afterStop = await db.getTelegramMember(leaveW);
+  assert.equal(afterStop?.notification_status, 'disabled');
+  assert.equal(afterStop?.notification_preference, 'disabled');
+  assert.equal(afterStop?.group_status, 'joined', '/stop must preserve group membership');
+  assert.equal(afterStop?.in_group, true);
+  assert.equal(mockState.kickedUsers.length, kicksBeforeStop, '/stop must never kick from community group');
+
+  // Re-enable alerts, then user voluntarily leaves Member group -> group becomes 'left', identity & alerts stay connected
+  await db.setTelegramNotificationStatus(leaveW, 'enabled', {
+    telegram_user_id: leaveTg,
+    telegram_chat_id: String(leaveTg),
+  });
+  await sendWebhook({
+    update_id: nextUid(),
+    chat_member: {
+      chat: { id: Number(process.env.TELEGRAM_MEMBER_GROUP_ID), type: 'supergroup' },
+      new_chat_member: { user: { id: leaveTg }, status: 'left' },
+    },
+  });
+  const afterLeave = await db.getTelegramMember(leaveW);
+  assert.equal(afterLeave?.identity_status, 'connected', 'Leaving group keeps Telegram identity connected');
+  assert.equal(afterLeave?.group_status, 'left');
+  assert.equal(afterLeave?.in_group, false);
+  assert.equal(afterLeave?.actual_group_id, null);
+  assert.equal(afterLeave?.notification_status, 'enabled', 'Leaving group preserves private notifications for qualified wallet');
 });

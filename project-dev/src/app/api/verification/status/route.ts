@@ -5,7 +5,12 @@ import {
   getActivePendingVerificationSessionForWallet,
   getTelegramMember,
 } from '@/server/db';
-import { buildTelegramStatusResult, getExpectedCommunity } from '@/server/telegram';
+import {
+  buildTelegramStatusResult,
+  getExpectedCommunity,
+  isAuthorizedGroupForEntitlement,
+  recoverWalletMembershipEventsIfEligible,
+} from '@/server/telegram';
 import type {
   CommunityTier,
   GroupStatus,
@@ -33,7 +38,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const entitlement = await resolveUserEntitlement(wallet);
-    const member = await getTelegramMember(wallet);
+    let member = await getTelegramMember(wallet);
+    if (member && entitlement.tier !== 'unknown') {
+      const fastRecovered = await recoverWalletMembershipEventsIfEligible(wallet, entitlement, {
+        telegramUserId: member.telegram_user_id,
+      }).catch(() => ({ recovered: 0, deferred: false }));
+      if (fastRecovered.recovered > 0) {
+        member = await getTelegramMember(wallet);
+      }
+    }
     const pendingSession = !member ? await getActivePendingVerificationSessionForWallet(wallet) : null;
 
     const isQualified = entitlement.tier !== 'free' && entitlement.tier !== 'unknown';
@@ -85,10 +98,7 @@ export async function GET(req: NextRequest) {
     const joinedExpectedGroup =
       Boolean(member) &&
       groupStatus === 'joined' &&
-      expectedCommunityTier !== null &&
-      actualGroup !== null &&
-      (actualGroup === expectedCommunityTier ||
-        (expectedCommunityTier === 'member' && actualGroup === 'pro'));
+      isAuthorizedGroupForEntitlement(entitlement, actualGroup);
 
     const targetTier: CommunityTier | null =
       !isQualified || joinedExpectedGroup ? null : expectedCommunityTier;

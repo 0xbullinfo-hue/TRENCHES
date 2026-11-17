@@ -27,6 +27,7 @@ import {
   formatTpTriggeredMessage,
   getActiveNotificationSubscribers,
   isProOnlyCall,
+  isWalletNotificationSubscriptionActive,
   tgCall,
   unlinkWallet,
   type TgCallResult,
@@ -157,6 +158,7 @@ export interface OutboxProcessResult {
 export interface NotificationOutboxDeps {
   isRedisConfigured: () => boolean;
   loadSubscribers: () => Promise<Record<string, string>>;
+  isSubscriptionActive?: (wallet: string) => Promise<boolean>;
   resolveTier: (wallet: string) => Promise<'free' | 'member' | 'pro' | 'unknown'>;
   unlinkWallet: (wallet: string) => Promise<void>;
   sendTelegramMessage: (
@@ -267,6 +269,7 @@ function resolveDeps(overrides: Partial<NotificationOutboxDeps> = {}): Notificat
   return {
     isRedisConfigured: () => KV_CONFIGURED || isKvConfigured(),
     loadSubscribers: getActiveNotificationSubscribers,
+    isSubscriptionActive: isWalletNotificationSubscriptionActive,
     resolveTier,
     unlinkWallet,
     sendTelegramMessage: defaultSendTelegramMessage,
@@ -563,6 +566,15 @@ export async function processNotificationOutbox(
           }
 
           const claimed = JSON.parse(claimedRaw) as OutboxSubscriberDelivery;
+
+          // Respect live DB opt-out (/stop), bot-blocked, and disconnected identity states
+          if (deps.isSubscriptionActive) {
+            const subActive = await deps.isSubscriptionActive(claimed.subscriberId).catch(() => true);
+            if (!subActive) {
+              await kvHDel(subsKey, claimed.subscriberId);
+              continue;
+            }
+          }
 
           // Verify tier eligibility before sending (protects Pro-only calls and handles previously 'unknown' tiers)
           let tier: 'free' | 'member' | 'pro' | 'unknown';
