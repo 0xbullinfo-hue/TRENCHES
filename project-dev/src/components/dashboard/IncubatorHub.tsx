@@ -748,6 +748,17 @@ export const IncubatorHub: React.FC = () => {
         shortAddress={shortAddress}
         tier={tier}
         formattedBalance={formattedBalance}
+        alphasCount={alphaCallsCount}
+        newCallsCount={newCallsCount}
+        raidsCount={activeRaidsCount}
+        watchlistCount={watchlistCallsCount}
+        isUnlocked={isUnlocked}
+        onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'genesis-ca', '$H42', e)}
+        copiedGenesisCa={copiedId === 'genesis-ca'}
+        onSelectTab={(tab) => {
+          if (tab === 'ALPHA' || tab === 'SOCIAL' || tab === 'WATCHLIST') handleSelectTab(tab);
+        }}
+        onSelectFilter={(filter) => setActiveFilter(filter === 'new' ? 'NEW' : filter === 'watchlist' ? 'WATCHLIST' : 'ALL')}
         onExploreCalls={() => handleSelectTab('ALPHA')}
       />}
       {currentTab === 'OVERVIEW' && (
