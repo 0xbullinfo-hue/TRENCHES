@@ -35,7 +35,8 @@ interface InitialStakeData {
 
 export function StakeClientView({ initialData }: { initialData: InitialStakeData }) {
   const { publicKey } = useWallet();
-  const { balance: genesisTokenBalance } = useGenesisBalance();
+  const { balance: genesisTokenBalance, signRequestHeaders } = useGenesisBalance();
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const [stakeData, setStakeData] = useState<InitialStakeData>(initialData);
   const [showAdditionalForm, setShowAdditionalForm] = useState<boolean>(false);
@@ -43,15 +44,37 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/stake/status');
-      if (res.ok) {
-        const json = await res.json();
+      // First use the existing httpOnly session cookie. If the page was opened
+      // before the wallet session finished minting, request a path-bound wallet
+      // signature and retry instead of silently leaving the Stake page empty.
+      let res = await fetch('/api/stake/status', { cache: 'no-store', credentials: 'same-origin' });
+      if (res.status === 401) {
+        const headers = await signRequestHeaders('GET', '/api/stake/status');
+        if (!headers) {
+          setStatusMessage('Connect a Solana wallet that supports message signing to load your staking status.');
+          return;
+        }
+        res = await fetch('/api/stake/status', { headers, cache: 'no-store', credentials: 'same-origin' });
+      }
+
+      const json = await res.json().catch(() => null);
+      if (res.ok && json) {
         setStakeData(json);
+        setStatusMessage(null);
+      } else if (res.status === 401) {
+        setStatusMessage('Wallet verification is required to load your staking status. Please reconnect and verify your wallet.');
+      } else {
+        setStatusMessage(json?.message || 'Unable to load staking status right now. Please retry.');
       }
     } catch (e) {
       console.error('Failed to refresh stake status:', e);
+      setStatusMessage('Unable to connect to the staking service. Please retry.');
     }
-  }, []);
+  }, [signRequestHeaders]);
+
+  useEffect(() => {
+    if (publicKey) void fetchStatus();
+  }, [publicKey, fetchStatus]);
 
   const handleStakeSuccess = async () => {
     setShowSuccessToast(true);
@@ -74,6 +97,13 @@ export function StakeClientView({ initialData }: { initialData: InitialStakeData
           Real-time signals, push alerts, and full terminal access. Stake for 90 days to qualify.
         </p>
       </div>
+
+      {statusMessage && (
+        <div role="status" aria-live="polite" className="rounded-lg border border-brand/30 bg-brand/5 px-4 py-3 text-xs text-muted">
+          {statusMessage}
+          <button type="button" onClick={() => void fetchStatus()} className="ml-2 font-bold text-brand underline underline-offset-2">Retry</button>
+        </div>
+      )}
 
       {/* Secondary Card: Current Stake (Visible if user has a stake record) */}
       <CurrentStakeCard
