@@ -114,7 +114,6 @@ export const IncubatorHub: React.FC = () => {
       const tabParam = params.get('tab')?.toUpperCase();
       if (
         tabParam === 'OVERVIEW' ||
-        tabParam === 'OVERVIEW' ||
         tabParam === 'ALPHA' ||
         tabParam === 'SOCIAL' ||
         tabParam === 'WATCHLIST' ||
@@ -130,8 +129,10 @@ export const IncubatorHub: React.FC = () => {
     setCurrentTab(tab);
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
-      url.searchParams.set('tab', tab);
+      if (tab === 'OVERVIEW') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', tab);
       window.history.pushState({ tab }, '', url.toString());
+      window.dispatchEvent(new Event('trenchlabs:dashboard-tab'));
     }
   };
 
@@ -141,6 +142,7 @@ export const IncubatorHub: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab')?.toUpperCase();
       if (
+        tabParam === 'OVERVIEW' ||
         tabParam === 'ALPHA' ||
         tabParam === 'SOCIAL' ||
         tabParam === 'WATCHLIST' ||
@@ -152,7 +154,11 @@ export const IncubatorHub: React.FC = () => {
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('trenchlabs:dashboard-tab', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('trenchlabs:dashboard-tab', handlePopState);
+    };
   }, []);
 
   // Community Campaigns State
