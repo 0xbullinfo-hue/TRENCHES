@@ -109,13 +109,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </section>
 
-      {/* Previous dashboard telemetry and shortcuts are retained, but grouped to keep the landing page uncluttered. */}
-      <details className="rounded-xl bg-surface border border-border-default group">
-        <summary className="cursor-pointer list-none px-5 py-4 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-white hover:text-brand">
-          <span>Dashboard insights &amp; quick actions</span>
-          <span className="text-[11px] font-medium text-muted">Membership status, activity, progress and performance</span>
-        </summary>
-        <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
+      {/* Membership access and performance stay visible; only navigation shortcuts are collapsed. */}
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 space-y-5">
+        <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-wider text-white">Membership &amp; access</h2><span className="text-[10px] font-mono uppercase tracking-wider text-muted">Live wallet status</span></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
             <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
               <div className="text-xs text-muted uppercase font-bold tracking-wider">WALLET STATUS</div>
@@ -134,7 +130,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="text-brand-bright font-black">{isPro ? 'Pro Eligible (Active Stake)' : 'Stake on StakePoint ↗'}</div>
             </Link>
           </div>
+      </section>
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 space-y-4">
+        <div><h2 className="text-sm font-black uppercase tracking-wider text-white">Performance &amp; Pro progress</h2><p className="mt-1 text-xs text-muted">Your recent public-ledger performance and membership progress.</p></div>
+          <ProProgressBar isPro={isPro} />
+          <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+      </section>
 
+      {/* Previous dashboard telemetry and shortcuts are retained, but grouped to keep the landing page uncluttered. */}
+      <details className="rounded-xl bg-surface border border-border-default group">
+        <summary className="cursor-pointer list-none px-5 py-4 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-white hover:text-brand">
+          <span>Activity &amp; quick actions</span>
+          <span className="text-[11px] font-medium text-muted">Active calls, new calls, raids and watchlist shortcuts</span>
+        </summary>
+        <div className="space-y-5 border-t border-border-default p-4 sm:p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-border-default font-mono text-xs">
             <Button variant="ghost" size="sm" onClick={() => { onSelectTab?.('ALPHA'); onSelectFilter?.('all'); }} className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between text-left font-normal">
               <div className="space-y-0.5"><div className="text-xs text-muted uppercase font-bold">ACTIVE CALLS</div><div className="text-base font-black text-white tnum">{alphasCount}</div></div><Target className="w-4 h-4 text-alpha-primary" />
@@ -150,8 +159,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </Button>
           </div>
 
-          <ProProgressBar isPro={isPro} />
-          <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+
         </div>
       </details>
     </div>
