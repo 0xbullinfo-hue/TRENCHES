@@ -5,7 +5,7 @@ import {
   createOrReuseVerificationSession,
   getTelegramMember,
 } from '@/server/db';
-import { getBotUsername } from '@/server/telegram';
+import { getBotUsername, getCommunityTierFromGroupId } from '@/server/telegram';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,13 +61,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Only short-circuit as already_in_group when Telegram chat_member actually confirmed joined!
+  // Only short-circuit as already_in_group when actual confirmed Telegram group matches target_tier!
   const memberRecord = await getTelegramMember(session.wallet);
+  const actualGroupTier = memberRecord
+    ? memberRecord.actual_group_tier ??
+      (memberRecord.actual_group_id
+        ? getCommunityTierFromGroupId(memberRecord.actual_group_id)
+        : memberRecord.group_status === 'joined'
+        ? getCommunityTierFromGroupId(memberRecord.group_id) ?? memberRecord.tier
+        : null)
+    : null;
   const actuallyJoined =
     Boolean(memberRecord) &&
     memberRecord!.group_status === 'joined' &&
     memberRecord!.in_group &&
-    (memberRecord!.tier === target_tier || (target_tier === 'member' && memberRecord!.tier === 'pro'));
+    actualGroupTier !== null &&
+    (actualGroupTier === target_tier || (target_tier === 'member' && actualGroupTier === 'pro'));
 
   if (actuallyJoined) {
     return NextResponse.json({ already_in_group: true }, { status: 200 });

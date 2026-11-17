@@ -8,8 +8,10 @@ import { getGenesisPrice } from '@/server/price';
 import { DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
 import type { FavoritePostKind, FavoritePostRecord } from '@/lib/types';
 import type {
+  CommunityTier,
   GroupStatus,
   NotificationStatus,
+  TelegramHistoricalRevocation,
   TelegramIdentityStatus,
   TelegramMemberRecord,
   UserTier,
@@ -77,6 +79,12 @@ export interface TelegramWebhookEventRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  payload?: unknown;
+  wallet_address?: string | null;
+  telegram_user_id?: number | null;
+  group_id?: string | null;
+  next_retry_at?: number | null;
+  reconciliation_reason?: string | null;
 }
 
 export interface TelegramMigrationMeta {
@@ -747,8 +755,20 @@ function timingSafeHexEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function inferCommunityTierFromGroupId(
+  groupId: string | null | undefined,
+  fallbackTier: CommunityTier | null = null
+): CommunityTier | null {
+  const clean = groupId ? String(groupId).trim() : '';
+  const proId = process.env.TELEGRAM_PRO_GROUP_ID?.trim();
+  const memId = process.env.TELEGRAM_MEMBER_GROUP_ID?.trim();
+  if (clean && proId && clean === proId) return 'pro';
+  if (clean && memId && clean === memId) return 'member';
+  return fallbackTier;
+}
+
 /**
- * Normalizes a legacy or v2 TelegramMemberRow non-destructively into the full canonical record.
+ * Normalizes a legacy or v2/v3 TelegramMemberRow non-destructively into the full canonical record.
  * Never invents `group_status = 'joined'` unless legacy `in_group === true` on a pre-v2 row.
  */
 export function normalizeTelegramMemberRow(
@@ -756,9 +776,12 @@ export function normalizeTelegramMemberRow(
 ): TelegramMemberRow {
   const now = new Date().toISOString();
   const wallet = String(raw.wallet || raw.wallet_address).trim();
-  const rawUserId = raw.telegram_user_id !== undefined && raw.telegram_user_id !== null && Number.isFinite(Number(raw.telegram_user_id))
-    ? Number(raw.telegram_user_id)
-    : null;
+  const rawUserId =
+    raw.telegram_user_id !== undefined &&
+    raw.telegram_user_id !== null &&
+    Number.isFinite(Number(raw.telegram_user_id))
+      ? Number(raw.telegram_user_id)
+      : null;
   const legacyInGroup = Boolean(raw.in_group);
   const groupStatus: GroupStatus =
     raw.group_status ||
@@ -767,11 +790,60 @@ export function normalizeTelegramMemberRow(
   const identityStatus: TelegramMemberRow['identity_status'] =
     raw.identity_status ||
     (rawUserId !== null || raw.telegram_chat_id ? 'connected' : 'pending');
-  const legacyTier: 'member' | 'pro' = raw.tier === 'pro' ? 'pro' : 'member';
+  const legacyTier: CommunityTier = raw.tier === 'pro' ? 'pro' : 'member';
   const entitlementTier: UserTier =
     raw.entitlement_tier ||
     (rawUserId !== null || legacyInGroup ? legacyTier : 'free');
-  const notificationStatus: NotificationStatus = raw.notification_status || 'disabled';
+
+  const notificationPreference: 'enabled' | 'disabled' =
+    raw.notification_preference === 'enabled' || raw.notification_preference === 'disabled'
+      ? raw.notification_preference
+      : raw.notification_status === 'enabled'
+      ? 'enabled'
+      : 'disabled';
+  const notificationEntitlementAllowed =
+    typeof raw.notification_entitlement_allowed === 'boolean'
+      ? raw.notification_entitlement_allowed
+      : entitlementTier !== 'free';
+
+  let notificationStatus: NotificationStatus = raw.notification_status || 'disabled';
+  if (identityStatus === 'blocked') {
+    notificationStatus = 'blocked';
+  } else if (!notificationEntitlementAllowed || entitlementTier === 'free') {
+    notificationStatus = 'disabled';
+  } else if (notificationPreference === 'enabled' && identityStatus === 'connected') {
+    notificationStatus = 'enabled';
+  } else {
+    notificationStatus = 'disabled';
+  }
+
+  let actualGroupId: string | null = null;
+  let actualGroupTier: CommunityTier | null = null;
+  if (raw.actual_group_id !== undefined || raw.actual_group_tier !== undefined) {
+    actualGroupId = raw.actual_group_id ?? null;
+    actualGroupTier =
+      raw.actual_group_tier !== undefined
+        ? raw.actual_group_tier
+        : actualGroupId
+        ? inferCommunityTierFromGroupId(actualGroupId, null)
+        : null;
+  } else if (effectiveInGroup) {
+    actualGroupId = raw.group_id ?? null;
+    actualGroupTier = inferCommunityTierFromGroupId(raw.group_id, legacyTier);
+  }
+
+  const historicalRevocations: TelegramHistoricalRevocation[] = Array.isArray(raw.historical_revocations)
+    ? raw.historical_revocations
+    : raw.revoked_at
+    ? [
+        {
+          at: raw.revoked_at,
+          reason: raw.revoked_reason || 'Entitlement revoked',
+          group_id: raw.group_id ?? null,
+        },
+      ]
+    : [];
+
   const lastSynced = raw.last_synced_at || now;
   const createdAt = raw.created_at || lastSynced;
 
@@ -791,8 +863,12 @@ export function normalizeTelegramMemberRow(
     identity_status: identityStatus,
     group_status: groupStatus,
     group_id: raw.group_id ?? null,
+    actual_group_id: actualGroupId,
+    actual_group_tier: actualGroupTier,
     in_group: effectiveInGroup,
     notification_status: notificationStatus,
+    notification_preference: notificationPreference,
+    notification_entitlement_allowed: notificationEntitlementAllowed,
     verified_at:
       raw.verified_at !== undefined
         ? raw.verified_at
@@ -811,6 +887,13 @@ export function normalizeTelegramMemberRow(
         : null,
     revoked_at: raw.revoked_at ?? null,
     revoked_reason: raw.revoked_reason ?? null,
+    historical_revocations: historicalRevocations,
+    reconciliation_required: Boolean(raw.reconciliation_required),
+    reconciliation_reason: raw.reconciliation_reason ?? null,
+    reconciliation_attempt_count:
+      typeof raw.reconciliation_attempt_count === 'number' ? raw.reconciliation_attempt_count : 0,
+    next_reconciliation_at:
+      typeof raw.next_reconciliation_at === 'number' ? raw.next_reconciliation_at : null,
     entitlement_unknown_since: raw.entitlement_unknown_since ?? null,
     last_error: raw.last_error ?? null,
     last_synced_at: lastSynced,
@@ -1765,16 +1848,19 @@ export async function listGroupMembers(): Promise<TelegramMemberRow[]> {
 export async function listTrackedTelegramMembers(): Promise<TelegramMemberRow[]> {
   const db = await loadDb();
   return db.telegram_members
+    .filter((m) => m.telegram_user_id !== null && m.identity_status !== 'disconnected')
+    .map((m) => normalizeTelegramMemberRow(m));
+}
+
+export async function listMembersNeedingReconciliation(nowMs = Date.now()): Promise<TelegramMemberRow[]> {
+  const db = await loadDb();
+  return db.telegram_members
     .filter(
       (m) =>
         m.telegram_user_id !== null &&
         m.identity_status !== 'disconnected' &&
-        (m.in_group ||
-          m.group_status === 'joined' ||
-          m.group_status === 'invite_pending' ||
-          m.tier === 'pro' ||
-          m.entitlement_tier === 'pro' ||
-          m.entitlement_tier === 'member')
+        Boolean(m.reconciliation_required) &&
+        (m.next_reconciliation_at ?? 0) <= nowMs
     )
     .map((m) => normalizeTelegramMemberRow(m));
 }
@@ -1782,12 +1868,17 @@ export async function listTrackedTelegramMembers(): Promise<TelegramMemberRow[]>
 export async function listNotificationSubscribersFromDb(): Promise<Array<{ wallet: string; chatId: string }>> {
   const db = await loadDb();
   return db.telegram_members
-    .filter(
-      (m) =>
-        m.identity_status === 'connected' &&
-        m.notification_status === 'enabled' &&
-        Boolean(m.telegram_chat_id)
-    )
+    .filter((m) => {
+      const normalized = normalizeTelegramMemberRow(m);
+      return (
+        normalized.identity_status === 'connected' &&
+        normalized.notification_status === 'enabled' &&
+        normalized.notification_preference === 'enabled' &&
+        normalized.notification_entitlement_allowed !== false &&
+        normalized.entitlement_tier !== 'free' &&
+        Boolean(normalized.telegram_chat_id)
+      );
+    })
     .map((m) => ({
       wallet: m.wallet_address,
       chatId: String(m.telegram_chat_id),
@@ -1870,6 +1961,7 @@ export async function upsertTelegramMember(params: {
     const groupStatus: GroupStatus =
       params.group_status || (params.in_group ? 'joined' : 'not_joined');
     const isJoined = groupStatus === 'joined';
+    const targetGroupId = params.group_id !== undefined ? params.group_id : existing?.group_id ?? null;
 
     if (existing) {
       existing.telegram_user_id = params.telegram_user_id ?? existing.telegram_user_id;
@@ -1880,10 +1972,18 @@ export async function upsertTelegramMember(params: {
             (existing.telegram_user_id !== null ? String(existing.telegram_user_id) : null);
       existing.tier = params.tier;
       existing.entitlement_tier = params.entitlement_tier ?? params.tier;
+      existing.notification_entitlement_allowed = existing.entitlement_tier !== 'free';
       existing.group_status = groupStatus;
       existing.in_group = isJoined;
       if (params.group_id !== undefined) existing.group_id = params.group_id;
-      if (isJoined) existing.joined_at = existing.joined_at || now;
+      if (isJoined) {
+        existing.joined_at = existing.joined_at || now;
+        existing.actual_group_id = targetGroupId;
+        existing.actual_group_tier = inferCommunityTierFromGroupId(targetGroupId, params.tier);
+      } else if (groupStatus === 'left' || groupStatus === 'kicked') {
+        existing.actual_group_id = null;
+        existing.actual_group_tier = null;
+      }
       if (existing.telegram_user_id !== null && existing.identity_status !== 'blocked') {
         existing.identity_status = 'connected';
         existing.verified_at = existing.verified_at || now;
@@ -1906,8 +2006,12 @@ export async function upsertTelegramMember(params: {
       identity_status: params.telegram_user_id !== null ? 'connected' : 'pending',
       group_status: groupStatus,
       group_id: params.group_id ?? null,
+      actual_group_id: isJoined ? params.group_id ?? null : null,
+      actual_group_tier: isJoined ? inferCommunityTierFromGroupId(params.group_id, params.tier) : null,
       in_group: isJoined,
       notification_status: 'disabled',
+      notification_preference: 'disabled',
+      notification_entitlement_allowed: (params.entitlement_tier ?? params.tier) !== 'free',
       verified_at: params.telegram_user_id !== null ? now : null,
       joined_at: isJoined ? now : null,
       last_synced_at: now,
@@ -1978,18 +2082,30 @@ export async function bindTelegramIdentityAndPendingInvite(params: {
     const alreadyJoinedSameGroup =
       existing &&
       existing.group_status === 'joined' &&
-      existing.group_id === params.group_id;
+      (existing.actual_group_id ?? existing.group_id) === params.group_id;
 
     if (existing) {
+      const normalized = normalizeTelegramMemberRow(existing);
+      const preservedPref = normalized.notification_preference ?? 'disabled';
+      const entitlementAllowed = params.entitlement_tier !== 'free' && params.entitlement_tier !== 'unknown';
+
       existing.telegram_user_id = params.telegram_user_id;
       existing.telegram_chat_id = String(params.telegram_chat_id);
       existing.identity_status = 'connected';
       existing.verified_at = existing.verified_at || now;
       existing.entitlement_tier = params.entitlement_tier;
       existing.tier = params.target_tier;
+      existing.notification_preference = preservedPref;
+      existing.notification_entitlement_allowed = entitlementAllowed;
+      existing.notification_status =
+        preservedPref === 'enabled' && entitlementAllowed ? 'enabled' : 'disabled';
       existing.group_id = params.group_id;
       existing.group_status = alreadyJoinedSameGroup ? 'joined' : 'invite_pending';
       existing.in_group = Boolean(alreadyJoinedSameGroup);
+      if (alreadyJoinedSameGroup) {
+        existing.actual_group_id = params.group_id;
+        existing.actual_group_tier = params.target_tier;
+      }
       existing.invite_created_at = now;
       existing.invite_expires_at = params.invite_expires_at;
       existing.invite_link_hash = params.invite_link_hash;
@@ -1998,11 +2114,14 @@ export async function bindTelegramIdentityAndPendingInvite(params: {
       }
       existing.revoked_at = null;
       existing.revoked_reason = null;
+      existing.reconciliation_required = false;
+      existing.reconciliation_reason = null;
+      existing.reconciliation_attempt_count = 0;
+      existing.next_reconciliation_at = null;
       existing.entitlement_unknown_since = null;
       existing.last_error = null;
       existing.last_synced_at = now;
       existing.updated_at = now;
-      // Preserve existing notification_status (e.g., if user ran /stop -> keep 'disabled')
       await saveDb(db);
       return { ok: true, member: normalizeTelegramMemberRow(existing) };
     }
@@ -2017,8 +2136,12 @@ export async function bindTelegramIdentityAndPendingInvite(params: {
       identity_status: 'connected',
       group_status: 'invite_pending',
       group_id: params.group_id,
+      actual_group_id: null,
+      actual_group_tier: null,
       in_group: false,
       notification_status: 'disabled',
+      notification_preference: 'disabled',
+      notification_entitlement_allowed: true,
       verified_at: now,
       invite_created_at: now,
       invite_expires_at: params.invite_expires_at,
@@ -2027,6 +2150,11 @@ export async function bindTelegramIdentityAndPendingInvite(params: {
       joined_at: null,
       revoked_at: null,
       revoked_reason: null,
+      historical_revocations: [],
+      reconciliation_required: false,
+      reconciliation_reason: null,
+      reconciliation_attempt_count: 0,
+      next_reconciliation_at: null,
       entitlement_unknown_since: null,
       last_error: null,
       last_synced_at: now,
@@ -2040,6 +2168,19 @@ export async function bindTelegramIdentityAndPendingInvite(params: {
   });
 }
 
+function appendHistoricalRevocation(
+  existing: TelegramMemberRow,
+  entry: TelegramHistoricalRevocation
+): TelegramHistoricalRevocation[] {
+  const prev = Array.isArray(existing.historical_revocations) ? [...existing.historical_revocations] : [];
+  const last = prev[prev.length - 1];
+  if (last && last.reason === entry.reason && last.group_id === entry.group_id && Date.now() - Date.parse(last.at) < 60_000) {
+    return prev;
+  }
+  prev.push(entry);
+  return prev.slice(-20);
+}
+
 /**
  * Updates confirmed group membership status independently from identity & notifications.
  */
@@ -2048,7 +2189,9 @@ export async function updateTelegramGroupMembership(
   updates: {
     group_status: GroupStatus;
     group_id?: string | null;
-    tier?: 'member' | 'pro';
+    actual_group_id?: string | null;
+    actual_group_tier?: CommunityTier | null;
+    tier?: CommunityTier;
     entitlement_tier?: UserTier;
     invite_created_at?: string | null;
     invite_expires_at?: string | null;
@@ -2056,6 +2199,12 @@ export async function updateTelegramGroupMembership(
     pending_invite_link?: string | null;
     revoked_reason?: string | null;
     disable_notifications?: boolean;
+    notification_entitlement_allowed?: boolean;
+    reconciliation_required?: boolean;
+    reconciliation_reason?: string | null;
+    reconciliation_attempt_count?: number;
+    next_reconciliation_at?: number | null;
+    clear_actual_group?: boolean;
   }
 ): Promise<TelegramMemberRow | null> {
   return withDbLock(async () => {
@@ -2064,33 +2213,211 @@ export async function updateTelegramGroupMembership(
     if (!existing) return null;
 
     const now = new Date().toISOString();
+    const normalized = normalizeTelegramMemberRow(existing);
+    existing.notification_preference = normalized.notification_preference;
+
     existing.group_status = updates.group_status;
     existing.in_group = updates.group_status === 'joined';
     if (updates.group_id !== undefined) existing.group_id = updates.group_id;
     if (updates.tier !== undefined) existing.tier = updates.tier;
-    if (updates.entitlement_tier !== undefined) existing.entitlement_tier = updates.entitlement_tier;
+    if (updates.entitlement_tier !== undefined) {
+      existing.entitlement_tier = updates.entitlement_tier;
+      if (updates.notification_entitlement_allowed === undefined && updates.entitlement_tier !== 'unknown') {
+        existing.notification_entitlement_allowed = updates.entitlement_tier !== 'free';
+      }
+    }
+    if (updates.notification_entitlement_allowed !== undefined) {
+      existing.notification_entitlement_allowed = updates.notification_entitlement_allowed;
+    }
     if (updates.invite_created_at !== undefined) existing.invite_created_at = updates.invite_created_at;
     if (updates.invite_expires_at !== undefined) existing.invite_expires_at = updates.invite_expires_at;
     if (updates.invite_link_hash !== undefined) existing.invite_link_hash = updates.invite_link_hash;
     if (updates.pending_invite_link !== undefined) existing.pending_invite_link = updates.pending_invite_link;
+
+    if (updates.clear_actual_group) {
+      existing.actual_group_id = null;
+      existing.actual_group_tier = null;
+    } else if (updates.actual_group_id !== undefined || updates.actual_group_tier !== undefined) {
+      if (updates.actual_group_id !== undefined) existing.actual_group_id = updates.actual_group_id;
+      if (updates.actual_group_tier !== undefined) existing.actual_group_tier = updates.actual_group_tier;
+    }
 
     if (updates.group_status === 'joined') {
       existing.joined_at = existing.joined_at || now;
       existing.revoked_at = null;
       existing.revoked_reason = null;
       existing.pending_invite_link = null;
+      existing.actual_group_id =
+        updates.actual_group_id !== undefined
+          ? updates.actual_group_id
+          : updates.group_id ?? existing.group_id;
+      existing.actual_group_tier =
+        updates.actual_group_tier !== undefined
+          ? updates.actual_group_tier
+          : inferCommunityTierFromGroupId(existing.actual_group_id, updates.tier ?? existing.tier);
+      existing.reconciliation_required = false;
+      existing.reconciliation_reason = null;
+      existing.reconciliation_attempt_count = 0;
+      existing.next_reconciliation_at = null;
     } else if (updates.group_status === 'revoked') {
+      const reason = updates.revoked_reason ?? existing.revoked_reason ?? 'Entitlement revoked';
       existing.revoked_at = now;
-      existing.revoked_reason = updates.revoked_reason ?? existing.revoked_reason ?? 'Entitlement revoked';
+      existing.revoked_reason = reason;
       existing.pending_invite_link = null;
+      existing.historical_revocations = appendHistoricalRevocation(existing, {
+        at: now,
+        reason,
+        group_id: updates.group_id ?? existing.actual_group_id ?? existing.group_id ?? null,
+      });
+      if (updates.actual_group_id === undefined && !updates.reconciliation_required) {
+        existing.actual_group_id = null;
+        existing.actual_group_tier = null;
+      }
     } else if (updates.group_status === 'left' || updates.group_status === 'kicked') {
       existing.pending_invite_link = null;
+      if (updates.actual_group_id === undefined) {
+        existing.actual_group_id = null;
+        existing.actual_group_tier = null;
+      }
     }
 
-    if (updates.disable_notifications && existing.notification_status === 'enabled') {
+    if (updates.reconciliation_required !== undefined) {
+      existing.reconciliation_required = updates.reconciliation_required;
+    }
+    if (updates.reconciliation_reason !== undefined) {
+      existing.reconciliation_reason = updates.reconciliation_reason;
+    }
+    if (updates.reconciliation_attempt_count !== undefined) {
+      existing.reconciliation_attempt_count = updates.reconciliation_attempt_count;
+    }
+    if (updates.next_reconciliation_at !== undefined) {
+      existing.next_reconciliation_at = updates.next_reconciliation_at;
+    }
+
+    if (updates.disable_notifications) {
+      existing.notification_entitlement_allowed = false;
+    }
+
+    const effPref = existing.notification_preference ?? 'disabled';
+    const effAllowed = existing.notification_entitlement_allowed !== false && existing.entitlement_tier !== 'free';
+    if (existing.identity_status === 'blocked') {
+      existing.notification_status = 'blocked';
+    } else if (effPref === 'enabled' && effAllowed && existing.identity_status === 'connected') {
+      existing.notification_status = 'enabled';
+    } else {
       existing.notification_status = 'disabled';
     }
 
+    existing.entitlement_unknown_since = null;
+    existing.last_synced_at = now;
+    existing.updated_at = now;
+    await saveDb(db);
+    return normalizeTelegramMemberRow(existing);
+  });
+}
+
+/**
+ * Records a confirmed wrong-group entry or failed eviction without falsely marking the user's
+ * expected community as joined or silently converting a Pro wallet to Member.
+ */
+export async function recordMembershipMismatch(params: {
+  walletAddress: string;
+  entitlementTier: UserTier;
+  expectedCommunity: CommunityTier | null;
+  actualGroupId: string | null;
+  actualGroupTier: CommunityTier | null;
+  reason: string;
+  reconciliationRequired: boolean;
+  nextReconciliationAt?: number | null;
+  attemptCount?: number;
+}): Promise<TelegramMemberRow | null> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const existing = db.telegram_members.find((m) => m.wallet_address === params.walletAddress);
+    if (!existing) return null;
+
+    const now = new Date().toISOString();
+    const normalized = normalizeTelegramMemberRow(existing);
+    existing.notification_preference = normalized.notification_preference;
+    existing.entitlement_tier = params.entitlementTier;
+    if (params.expectedCommunity) {
+      existing.tier = params.expectedCommunity;
+    }
+    existing.notification_entitlement_allowed = params.entitlementTier !== 'free';
+    existing.actual_group_id = params.actualGroupId;
+    existing.actual_group_tier = params.actualGroupTier;
+    existing.group_status = params.actualGroupId ? 'mismatch' : existing.group_status;
+    existing.in_group = false;
+    existing.reconciliation_required = params.reconciliationRequired;
+    existing.reconciliation_reason = params.reason;
+    existing.reconciliation_attempt_count =
+      params.attemptCount ?? existing.reconciliation_attempt_count ?? 0;
+    existing.next_reconciliation_at = params.nextReconciliationAt ?? null;
+    existing.last_error = params.reason;
+
+    if (existing.identity_status === 'blocked') {
+      existing.notification_status = 'blocked';
+    } else if (
+      existing.notification_preference === 'enabled' &&
+      existing.notification_entitlement_allowed &&
+      existing.identity_status === 'connected'
+    ) {
+      existing.notification_status = 'enabled';
+    } else {
+      existing.notification_status = 'disabled';
+    }
+
+    existing.last_synced_at = now;
+    existing.updated_at = now;
+    await saveDb(db);
+    return normalizeTelegramMemberRow(existing);
+  });
+}
+
+/**
+ * Enforces notification entitlement independently of community group membership,
+ * preserving the user's explicit opt-in/opt-out preference (`notification_preference`).
+ */
+export async function enforceDbNotificationEntitlement(
+  walletAddress: string,
+  params: {
+    entitlementTier: UserTier;
+    allowed: boolean;
+  }
+): Promise<TelegramMemberRow | null> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const existing = db.telegram_members.find((m) => m.wallet_address === walletAddress);
+    if (!existing) return null;
+
+    const normalized = normalizeTelegramMemberRow(existing);
+    const pref = normalized.notification_preference ?? 'disabled';
+    const nextNotificationStatus: NotificationStatus =
+      existing.identity_status === 'blocked'
+        ? 'blocked'
+        : pref === 'enabled' && params.allowed && existing.identity_status === 'connected'
+        ? 'enabled'
+        : 'disabled';
+
+    if (
+      existing.entitlement_tier === params.entitlementTier &&
+      existing.notification_entitlement_allowed === params.allowed &&
+      existing.notification_status === nextNotificationStatus &&
+      existing.notification_preference === pref
+    ) {
+      return normalized;
+    }
+
+    const now = new Date().toISOString();
+    existing.entitlement_tier = params.entitlementTier;
+    if (params.entitlementTier === 'pro' || params.entitlementTier === 'admin') {
+      existing.tier = 'pro';
+    } else if (params.entitlementTier === 'member') {
+      existing.tier = 'member';
+    }
+    existing.notification_preference = pref;
+    existing.notification_entitlement_allowed = params.allowed;
+    existing.notification_status = nextNotificationStatus;
     existing.entitlement_unknown_since = null;
     existing.last_synced_at = now;
     existing.updated_at = now;
@@ -2155,23 +2482,45 @@ export async function setTelegramNotificationStatus(
       ) {
         return { ok: false, reason: 'wallet_already_linked_to_other_telegram' };
       }
+      const normalized = normalizeTelegramMemberRow(existing);
       if (opts?.telegram_user_id !== undefined) existing.telegram_user_id = opts.telegram_user_id;
       if (opts?.telegram_chat_id !== undefined) existing.telegram_chat_id = String(opts.telegram_chat_id);
       if (opts?.entitlement_tier !== undefined) {
         existing.entitlement_tier = opts.entitlement_tier;
         if (opts.entitlement_tier === 'pro' || opts.entitlement_tier === 'admin') existing.tier = 'pro';
         else if (opts.entitlement_tier === 'member') existing.tier = 'member';
+        if (opts.entitlement_tier !== 'unknown') {
+          existing.notification_entitlement_allowed = opts.entitlement_tier !== 'free';
+        }
+      } else if (existing.notification_entitlement_allowed === undefined) {
+        existing.notification_entitlement_allowed = normalized.notification_entitlement_allowed;
       }
+
       if (existing.telegram_chat_id && existing.identity_status !== 'blocked') {
         existing.identity_status = 'connected';
         existing.verified_at = existing.verified_at || now;
       }
+
       if (status === 'blocked') {
         existing.identity_status = 'blocked';
-      } else if (existing.identity_status === 'blocked' && status === 'enabled') {
-        existing.identity_status = 'connected';
+        existing.notification_preference = normalized.notification_preference;
+        existing.notification_status = 'blocked';
+      } else {
+        const pref: 'enabled' | 'disabled' = status === 'enabled' ? 'enabled' : 'disabled';
+        existing.notification_preference = pref;
+        if (existing.identity_status === 'blocked' && pref === 'enabled') {
+          existing.identity_status = 'connected';
+        }
+        const allowed =
+          existing.notification_entitlement_allowed !== false && existing.entitlement_tier !== 'free';
+        existing.notification_status =
+          existing.identity_status === 'blocked'
+            ? 'blocked'
+            : pref === 'enabled' && allowed
+            ? 'enabled'
+            : 'disabled';
       }
-      existing.notification_status = status;
+
       existing.last_synced_at = now;
       existing.updated_at = now;
       await saveDb(db);
@@ -2184,6 +2533,10 @@ export async function setTelegramNotificationStatus(
 
     const legacyTier: 'member' | 'pro' =
       opts?.entitlement_tier === 'pro' || opts?.entitlement_tier === 'admin' ? 'pro' : 'member';
+    const entitlementAllowed = opts?.entitlement_tier !== 'free';
+    const pref: 'enabled' | 'disabled' = status === 'enabled' ? 'enabled' : 'disabled';
+    const effectiveStatus: NotificationStatus =
+      status === 'blocked' ? 'blocked' : pref === 'enabled' && entitlementAllowed ? 'enabled' : 'disabled';
     const created = normalizeTelegramMemberRow({
       wallet: walletAddress,
       wallet_address: walletAddress,
@@ -2194,8 +2547,12 @@ export async function setTelegramNotificationStatus(
       identity_status: status === 'blocked' ? 'blocked' : 'connected',
       group_status: 'not_joined',
       group_id: null,
+      actual_group_id: null,
+      actual_group_tier: null,
       in_group: false,
-      notification_status: status,
+      notification_status: effectiveStatus,
+      notification_preference: pref,
+      notification_entitlement_allowed: entitlementAllowed,
       verified_at: now,
       last_synced_at: now,
       created_at: now,
@@ -2223,13 +2580,18 @@ export async function disableTelegramNotificationsByChatId(
     if (!existing) {
       return { disabled: false, wallet: null };
     }
-    const wasEnabled = existing.notification_status === 'enabled';
+    const normalized = normalizeTelegramMemberRow(existing);
+    const wasEnabled =
+      normalized.notification_status === 'enabled' || normalized.notification_preference === 'enabled';
     const now = new Date().toISOString();
     existing.notification_status = nextStatus;
     if (nextStatus === 'blocked') {
       existing.identity_status = 'blocked';
+      existing.notification_preference = normalized.notification_preference;
+    } else {
+      existing.notification_preference = 'disabled';
     }
-    // Preserve wallet link and group_status / in_group completely intact
+    // Preserve wallet link and group_status / in_group / actual_group_* completely intact
     existing.last_synced_at = now;
     existing.updated_at = now;
     await saveDb(db);
@@ -2282,7 +2644,38 @@ export type WebhookClaimResult =
   | { claimed: true; leaseToken: string; attemptCount: number }
   | { claimed: false; duplicate: true; status: WebhookEventStatus };
 
-const MAX_WEBHOOK_ATTEMPTS = 5;
+export const DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS = [
+  30_000,
+  120_000,
+  300_000,
+  900_000,
+  1_800_000,
+] as const;
+
+export const MAX_WEBHOOK_ATTEMPTS = 6;
+
+function resolveRetryMaxAttempts(custom?: number): number {
+  if (typeof custom === 'number' && Number.isFinite(custom) && custom >= 1) {
+    return Math.floor(custom);
+  }
+  const envVal = Number(process.env.TELEGRAM_RETRY_MAX_ATTEMPTS);
+  return Number.isFinite(envVal) && envVal >= 1 ? Math.floor(envVal) : MAX_WEBHOOK_ATTEMPTS;
+}
+
+function resolveRetryDelaysMs(custom?: readonly number[]): number[] {
+  if (Array.isArray(custom) && custom.length > 0) {
+    return custom.map((ms) => Math.max(0, Math.floor(ms)));
+  }
+  const raw = process.env.TELEGRAM_RETRY_DELAYS_MS?.trim();
+  if (raw) {
+    const parsed = raw
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n >= 0);
+    if (parsed.length > 0) return parsed;
+  }
+  return [...DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS];
+}
 
 export async function claimWebhookUpdate(
   updateId: number,
@@ -2295,8 +2688,9 @@ export async function claimWebhookUpdate(
 
     const nowMs = Date.now();
     const nowIso = new Date(nowMs).toISOString();
+    const maxAttempts = resolveRetryMaxAttempts();
 
-    // Retain recent events (48h for completed/failed, bounded list)
+    // Retain recent events (48h for completed/failed, unbounded retention for active/retryable)
     const pruneBefore = nowMs - 48 * 60 * 60 * 1000;
     db.telegram_webhook_events = db.telegram_webhook_events.filter(
       (e) =>
@@ -2341,10 +2735,11 @@ export async function claimWebhookUpdate(
       return { claimed: false, duplicate: true, status: 'processing' };
     }
 
-    if (existing.attempt_count >= MAX_WEBHOOK_ATTEMPTS) {
+    if (existing.attempt_count >= maxAttempts) {
       existing.status = 'permanently_failed';
       existing.lease_token = null;
       existing.lease_expires_at = null;
+      existing.next_retry_at = null;
       existing.updated_at = nowIso;
       await saveDb(db);
       return { claimed: false, duplicate: true, status: 'permanently_failed' };
@@ -2367,12 +2762,13 @@ export async function markWebhookUpdateCompleted(
   await withDbLock(async () => {
     const db = await loadDb();
     const ev = (db.telegram_webhook_events || []).find((e) => e.update_id === updateId);
-    if (!ev) return;
-    if (leaseToken && ev.lease_token && ev.lease_token !== leaseToken && ev.status === 'completed') return;
+    if (!ev || ev.status === 'completed') return;
+    if (leaseToken && ev.lease_token !== leaseToken) return;
     const nowIso = new Date().toISOString();
     ev.status = 'completed';
     ev.lease_token = null;
     ev.lease_expires_at = null;
+    ev.next_retry_at = null;
     ev.last_error = null;
     ev.completed_at = nowIso;
     ev.updated_at = nowIso;
@@ -2391,7 +2787,8 @@ export async function markWebhookUpdateRetryable(
     if (!ev || ev.status === 'completed') return;
     if (leaseToken && ev.lease_token && ev.lease_token !== leaseToken) return;
     const nowIso = new Date().toISOString();
-    ev.status = ev.attempt_count >= MAX_WEBHOOK_ATTEMPTS ? 'permanently_failed' : 'retryable_failed';
+    const maxAttempts = resolveRetryMaxAttempts();
+    ev.status = ev.attempt_count >= maxAttempts ? 'permanently_failed' : 'retryable_failed';
     ev.lease_token = null;
     ev.lease_expires_at = null;
     ev.last_error = errorMessage;
@@ -2402,20 +2799,174 @@ export async function markWebhookUpdateRetryable(
 
 export async function markWebhookUpdatePermanentlyFailed(
   updateId: number,
-  errorMessage: string
+  errorMessage: string,
+  leaseToken?: string
 ): Promise<void> {
   await withDbLock(async () => {
     const db = await loadDb();
     const ev = (db.telegram_webhook_events || []).find((e) => e.update_id === updateId);
     if (!ev || ev.status === 'completed') return;
+    if (leaseToken && ev.lease_token && ev.lease_token !== leaseToken) return;
     const nowIso = new Date().toISOString();
     ev.status = 'permanently_failed';
     ev.lease_token = null;
     ev.lease_expires_at = null;
+    ev.next_retry_at = null;
     ev.last_error = errorMessage;
     ev.updated_at = nowIso;
     await saveDb(db);
   });
+}
+
+/**
+ * Durably persists a Telegram membership event in `retryable_failed` (or `permanently_failed`
+ * if max retry attempts were exhausted) with bounded backoff metadata so temporary entitlement
+ * verification outages never drop or lose `chat_member` updates.
+ */
+export async function persistRetryableMembershipEvent(params: {
+  updateId: number;
+  eventType?: string;
+  payload: unknown;
+  walletAddress?: string | null;
+  telegramUserId?: number | null;
+  groupId?: string | null;
+  reason: string;
+  leaseToken?: string;
+  nowMs?: number;
+  retryDelaysMs?: readonly number[];
+  maxAttempts?: number;
+}): Promise<{ status: 'retryable_failed' | 'permanently_failed'; attemptCount: number; nextRetryAt: number | null }> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.telegram_webhook_events)) db.telegram_webhook_events = [];
+
+    const nowMs = params.nowMs ?? Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const maxAttempts = resolveRetryMaxAttempts(params.maxAttempts);
+    const delays = resolveRetryDelaysMs(params.retryDelaysMs);
+
+    let ev = db.telegram_webhook_events.find((e) => e.update_id === params.updateId);
+    if (!ev) {
+      ev = {
+        update_id: params.updateId,
+        status: 'received',
+        event_type: params.eventType || 'chat_member',
+        attempt_count: 1,
+        lease_token: null,
+        lease_expires_at: null,
+        last_error: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+        completed_at: null,
+      };
+      db.telegram_webhook_events.push(ev);
+    } else {
+      if (ev.status === 'completed') {
+        return { status: 'permanently_failed', attemptCount: ev.attempt_count, nextRetryAt: null };
+      }
+      if (params.leaseToken && ev.lease_token && ev.lease_token !== params.leaseToken) {
+        return {
+          status: ev.status === 'permanently_failed' ? 'permanently_failed' : 'retryable_failed',
+          attemptCount: ev.attempt_count,
+          nextRetryAt: ev.next_retry_at ?? null,
+        };
+      }
+    }
+
+    const exhausted = ev.attempt_count >= maxAttempts;
+    const delayIdx = Math.max(0, Math.min(delays.length - 1, ev.attempt_count - 1));
+    const nextRetryAt = exhausted ? null : nowMs + delays[delayIdx];
+
+    ev.status = exhausted ? 'permanently_failed' : 'retryable_failed';
+    ev.payload = params.payload;
+    if (params.walletAddress !== undefined) ev.wallet_address = params.walletAddress;
+    if (params.telegramUserId !== undefined) ev.telegram_user_id = params.telegramUserId;
+    if (params.groupId !== undefined) ev.group_id = params.groupId;
+    ev.reconciliation_reason = params.reason;
+    ev.last_error = params.reason;
+    ev.next_retry_at = nextRetryAt;
+    ev.lease_token = null;
+    ev.lease_expires_at = null;
+    ev.updated_at = nowIso;
+
+    await saveDb(db);
+    return {
+      status: ev.status,
+      attemptCount: ev.attempt_count,
+      nextRetryAt,
+    };
+  });
+}
+
+/**
+ * Atomically claims due retryable membership events (or expired stale processing leases) under lock
+ * so concurrent recovery workers never double-process a Telegram event.
+ */
+export async function claimRetryableMembershipEvents(options?: {
+  nowMs?: number;
+  limit?: number;
+  leaseMs?: number;
+  maxAttempts?: number;
+}): Promise<TelegramWebhookEventRow[]> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!Array.isArray(db.telegram_webhook_events) || db.telegram_webhook_events.length === 0) {
+      return [];
+    }
+
+    const nowMs = options?.nowMs ?? Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const limit = Math.max(1, Math.min(100, options?.limit ?? 25));
+    const leaseMs = Math.max(5_000, options?.leaseMs ?? 30_000);
+    const maxAttempts = resolveRetryMaxAttempts(options?.maxAttempts);
+
+    const claimed: TelegramWebhookEventRow[] = [];
+    let modified = false;
+
+    for (const ev of db.telegram_webhook_events) {
+      if (claimed.length >= limit) break;
+      if (!ev.payload) continue;
+
+      const isDueRetry =
+        ev.status === 'retryable_failed' && (ev.next_retry_at ?? 0) <= nowMs;
+      const isExpiredLease =
+        ev.status === 'processing' &&
+        ev.lease_expires_at !== null &&
+        ev.lease_expires_at <= nowMs;
+
+      if (!isDueRetry && !isExpiredLease) continue;
+
+      if (ev.attempt_count >= maxAttempts) {
+        ev.status = 'permanently_failed';
+        ev.lease_token = null;
+        ev.lease_expires_at = null;
+        ev.next_retry_at = null;
+        ev.updated_at = nowIso;
+        modified = true;
+        continue;
+      }
+
+      const leaseToken = safeRandomUUID();
+      ev.status = 'processing';
+      ev.attempt_count += 1;
+      ev.lease_token = leaseToken;
+      ev.lease_expires_at = nowMs + leaseMs;
+      ev.updated_at = nowIso;
+      modified = true;
+      claimed.push({ ...ev });
+    }
+
+    if (modified) {
+      await saveDb(db);
+    }
+
+    return claimed;
+  });
+}
+
+export async function listTelegramWebhookEvents(): Promise<TelegramWebhookEventRow[]> {
+  const db = await loadDb();
+  return [...(db.telegram_webhook_events || [])];
 }
 
 // -------------------------------------------------------------
@@ -2490,6 +3041,7 @@ export async function migrateTelegramSchemaAndSubscribers(options?: {
         }
         // Only promote disabled -> enabled during initial migration if untouched by explicit /stop after v2
         if (!db.telegram_migration && existingByWallet.notification_status === 'disabled') {
+          existingByWallet.notification_preference = 'enabled';
           existingByWallet.notification_status = 'enabled';
           legacySubsMigrated++;
         }
@@ -2516,6 +3068,8 @@ export async function migrateTelegramSchemaAndSubscribers(options?: {
             group_status: 'not_joined',
             in_group: false,
             notification_status: 'enabled',
+            notification_preference: 'enabled',
+            notification_entitlement_allowed: true,
             verified_at: now,
             last_synced_at: now,
             created_at: now,

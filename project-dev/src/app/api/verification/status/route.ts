@@ -5,7 +5,9 @@ import {
   getActivePendingVerificationSessionForWallet,
   getTelegramMember,
 } from '@/server/db';
+import { buildTelegramStatusResult, getExpectedCommunity } from '@/server/telegram';
 import type {
+  CommunityTier,
   GroupStatus,
   NotificationStatus,
   TelegramIdentityStatus,
@@ -45,36 +47,50 @@ export async function GET(req: NextRequest) {
       identityStatus = 'pending';
     }
 
-    // 2. Community access status (confirmed strictly via chat_member / authoritative tracking)
-    const groupStatus: GroupStatus = member ? member.group_status : 'not_joined';
-    let communityTier: 'member' | 'pro' | null = null;
-    if (member && (groupStatus === 'joined' || groupStatus === 'invite_pending')) {
+    // 2. Community access status (distinguishes eligible community vs actual confirmed group)
+    const statusView = buildTelegramStatusResult(member, entitlement);
+    const expectedCommunityTier: CommunityTier | null = getExpectedCommunity(entitlement);
+    const actualGroup: CommunityTier | null = statusView.community.actualGroup;
+    let groupStatus: GroupStatus = 'not_joined';
+    if (member) {
+      groupStatus =
+        statusView.community.membershipStatus === 'mismatch'
+          ? 'mismatch'
+          : statusView.community.membershipStatus === 'unknown'
+          ? member.group_status
+          : statusView.community.membershipStatus;
+    }
+
+    let communityTier: CommunityTier | null = null;
+    if (actualGroup) {
+      communityTier = actualGroup;
+    } else if (member && groupStatus === 'invite_pending') {
       communityTier = member.tier === 'pro' ? 'pro' : 'member';
-      // Never expose a Pro community tier to a Member-only or Free wallet
       if (communityTier === 'pro' && !isProOrAdmin && entitlement.tier !== 'unknown') {
         communityTier = entitlement.baseTier === 'member' ? 'member' : null;
       }
     } else if (isQualified) {
-      communityTier = isProOrAdmin ? 'pro' : 'member';
+      communityTier = expectedCommunityTier;
     }
 
-    // 3. Private notification subscription status (independent of community group membership)
-    const notificationStatus: NotificationStatus = member
-      ? member.notification_status
-      : 'disabled';
+    // 3. Private notification subscription status (distinguishes preference vs entitlement)
+    const notificationStatus: NotificationStatus =
+      member?.identity_status === 'blocked' || member?.notification_status === 'blocked'
+        ? 'blocked'
+        : member
+        ? statusView.notifications.effectiveStatus
+        : 'disabled';
 
     // 4. Target & Action eligibility
-    const expectedCommunityTier: 'member' | 'pro' | null =
-      !isQualified ? null : isProOrAdmin ? 'pro' : 'member';
-
     const joinedExpectedGroup =
       Boolean(member) &&
       groupStatus === 'joined' &&
       expectedCommunityTier !== null &&
-      (member!.tier === expectedCommunityTier ||
-        (expectedCommunityTier === 'member' && member!.tier === 'pro'));
+      actualGroup !== null &&
+      (actualGroup === expectedCommunityTier ||
+        (expectedCommunityTier === 'member' && actualGroup === 'pro'));
 
-    const targetTier: 'member' | 'pro' | null =
+    const targetTier: CommunityTier | null =
       !isQualified || joinedExpectedGroup ? null : expectedCommunityTier;
 
     const actions = {
@@ -83,8 +99,8 @@ export async function GET(req: NextRequest) {
       canEnableNotifications: isQualified && identityStatus === 'connected',
     };
 
-    const legacyConnected = identityStatus === 'connected' && groupStatus === 'joined';
-    const legacyConnectedTier = legacyConnected ? communityTier : null;
+    const legacyConnected = identityStatus === 'connected' && joinedExpectedGroup;
+    const legacyConnectedTier = legacyConnected ? actualGroup : null;
     const legacyConnectedAt = legacyConnected ? (member?.joined_at ?? member?.last_synced_at ?? null) : null;
 
     const payload: VerificationStatusResponse = {
@@ -102,10 +118,14 @@ export async function GET(req: NextRequest) {
         community: {
           tier: communityTier,
           status: groupStatus,
-          joinedAt: member?.joined_at ?? null,
+          joinedAt: joinedExpectedGroup ? member?.joined_at ?? null : null,
+          eligibleCommunity: expectedCommunityTier,
+          actualGroup,
         },
         notifications: {
           status: notificationStatus,
+          preference: statusView.notifications.preference,
+          entitlementAllowed: statusView.notifications.entitlementAllowed,
         },
         connected: legacyConnected,
         connected_tier: legacyConnectedTier,

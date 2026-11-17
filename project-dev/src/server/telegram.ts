@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { isAdminWallet } from '@/lib/config';
-import type { GroupStatus, UserTier } from '@/lib/telegram-types';
+import type { CommunityTier, GroupStatus, TelegramStatusResult, UserTier } from '@/lib/telegram-types';
 import {
   KV_CONFIGURED,
   isKvConfigured,
@@ -18,26 +18,36 @@ import {
 import type { AlphaRecord } from '@/server/alphas-data';
 import { resolveUserEntitlement } from '@/server/entitlements';
 import {
+  DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS,
+  MAX_WEBHOOK_ATTEMPTS,
   bindTelegramIdentityAndPendingInvite,
+  claimRetryableMembershipEvents,
   claimVerificationSession,
   completeVerificationSession,
   consumeLinkCodeRow,
   createLinkCodeRow,
   disableTelegramNotificationsByChatId,
+  enforceDbNotificationEntitlement,
   getTelegramMember,
   getTelegramMemberByChatId,
   getTelegramMemberByTelegramUserId,
   getVerificationSession,
   hashSecretToken,
+  listMembersNeedingReconciliation,
   listNotificationSubscribersFromDb,
   listTrackedTelegramMembers,
   markVerificationSessionFailed,
   markVerificationSessionRetryable,
+  markWebhookUpdateCompleted,
+  markWebhookUpdatePermanentlyFailed,
+  persistRetryableMembershipEvent,
   recordAuditLog,
+  recordMembershipMismatch,
   recordUnknownEntitlementState,
   resolveTier,
   setTelegramNotificationStatus,
   updateTelegramGroupMembership,
+  type TelegramMemberRow,
 } from '@/server/db';
 
 const FILE_PERSISTENCE_ALLOWED =
@@ -53,6 +63,46 @@ export const getTelegramGroups = () => ({
   member: process.env.TELEGRAM_MEMBER_GROUP_ID?.trim() || undefined,
   pro: process.env.TELEGRAM_PRO_GROUP_ID?.trim() || undefined,
 });
+
+export function getCommunityTierFromGroupId(groupId: string | null | undefined): CommunityTier | null {
+  const clean = groupId ? String(groupId).trim() : '';
+  if (!clean) return null;
+  const groups = getTelegramGroups();
+  if (groups.pro && clean === groups.pro) return 'pro';
+  if (groups.member && clean === groups.member) return 'member';
+  return null;
+}
+
+export function getExpectedCommunity(
+  entitlement:
+    | UserTier
+    | { tier: UserTier; baseTier?: 'free' | 'member' | 'pro' | 'unknown'; isAdmin?: boolean }
+): CommunityTier | null {
+  if (typeof entitlement === 'string') {
+    if (entitlement === 'admin' || entitlement === 'pro') return 'pro';
+    if (entitlement === 'member') return 'member';
+    return null;
+  }
+  if (
+    entitlement.tier === 'admin' ||
+    entitlement.isAdmin ||
+    entitlement.tier === 'pro' ||
+    entitlement.baseTier === 'pro'
+  ) {
+    return 'pro';
+  }
+  if (entitlement.tier === 'member' || entitlement.baseTier === 'member') {
+    return 'member';
+  }
+  return null;
+}
+
+export function canReceiveNotifications(
+  userPreference: 'enabled' | 'disabled',
+  entitlementAllowed: boolean
+): boolean {
+  return userPreference === 'enabled' && entitlementAllowed;
+}
 
 export const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const API_BASE = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
@@ -290,7 +340,7 @@ function formatTierLabel(tier: UserTier): string {
     case 'free':
       return 'FREE';
     default:
-      return 'TEMPORARILY UNAVAILABLE';
+      return 'Temporarily Unavailable';
   }
 }
 
@@ -301,11 +351,13 @@ function formatGroupStatusLabel(status: GroupStatus): string {
     case 'invite_pending':
       return 'Invitation Pending';
     case 'left':
-      return 'Left Group';
+      return 'Left';
     case 'kicked':
       return 'Removed from Group';
     case 'revoked':
       return 'Access Revoked';
+    case 'mismatch':
+      return 'Mismatch';
     default:
       return 'Not Joined';
   }
@@ -651,28 +703,98 @@ export interface TelegramChatMemberUpdate {
   };
 }
 
+export interface ChatMemberHandleResult {
+  handled: boolean;
+  action: string;
+  status: 'completed' | 'retryable' | 'permanently_failed';
+  reason?: string;
+}
+
+export async function enforceNotificationEntitlement(
+  wallet: string,
+  tier: UserTier
+): Promise<void> {
+  if (tier === 'unknown') {
+    await recordUnknownEntitlementState(wallet).catch(() => {});
+    return;
+  }
+  const allowed = tier !== 'free';
+  const updated = await enforceDbNotificationEntitlement(wallet, {
+    entitlementTier: tier,
+    allowed,
+  });
+  if (!allowed && kvStoreEnabled()) {
+    const chatId = updated?.telegram_chat_id;
+    await kvHDel(SUBS_KEY, wallet).catch(() => {});
+    if (chatId) await kvDel(chatKey(chatId)).catch(() => {});
+  } else if (
+    allowed &&
+    updated?.notification_status === 'enabled' &&
+    updated.telegram_chat_id &&
+    kvStoreEnabled()
+  ) {
+    await kvHSet(SUBS_KEY, wallet, String(updated.telegram_chat_id)).catch(() => {});
+    await kvSet(chatKey(updated.telegram_chat_id), wallet).catch(() => {});
+  }
+}
+
+async function createOrReuseCommunityInvitation(
+  member: TelegramMemberRow,
+  expectedCommunity: CommunityTier,
+  userId: number
+): Promise<{ invite: GeneratedInvite; reused: boolean }> {
+  const groups = getTelegramGroups();
+  const expectedGroupId = expectedCommunity === 'pro' ? groups.pro : groups.member;
+  const hasValidExisting =
+    member.group_status === 'invite_pending' &&
+    member.group_id === expectedGroupId &&
+    Boolean(member.pending_invite_link) &&
+    Boolean(member.invite_expires_at) &&
+    Date.parse(member.invite_expires_at!) > Date.now() + 60_000;
+
+  if (hasValidExisting && member.pending_invite_link && expectedGroupId) {
+    return {
+      invite: {
+        inviteLink: member.pending_invite_link,
+        inviteHash: member.invite_link_hash || hashSecretToken(member.pending_invite_link),
+        expiresAtIso: member.invite_expires_at!,
+        groupId: expectedGroupId,
+      },
+      reused: true,
+    };
+  }
+
+  const invite = await createTelegramInviteWithMeta(expectedCommunity, userId);
+  return { invite, reused: false };
+}
+
 /**
  * Service 3 — Processes Telegram `chat_member` updates for Member/Pro community groups.
- * Authoritatively tracks confirmed joins, exits, kicks, and rejects unverified / wrong-group joins.
+ * Enforces bidirectional Member/Pro group routing, persists retryable reconciliation state on
+ * temporary `'unknown'` entitlement failures, and verifies removal results without faking success.
  */
 export async function handleTelegramChatMemberUpdate(
-  chatMember: TelegramChatMemberUpdate
-): Promise<{ handled: boolean; action: string }> {
+  chatMember: TelegramChatMemberUpdate,
+  opts?: {
+    updateId?: number;
+    leaseToken?: string;
+    nowMs?: number;
+    retryDelaysMs?: readonly number[];
+    maxAttempts?: number;
+  }
+): Promise<ChatMemberHandleResult> {
   const siteUrl = getSiteUrl();
+  const dashboard = `${siteUrl}/dashboard`;
   const chatIdStr = String(chatMember?.chat?.id ?? '').trim();
-  const groups = getTelegramGroups();
+  const actualGroup = getCommunityTierFromGroupId(chatIdStr);
 
-  let eventGroupTier: 'member' | 'pro' | null = null;
-  if (groups.pro && chatIdStr === groups.pro) eventGroupTier = 'pro';
-  else if (groups.member && chatIdStr === groups.member) eventGroupTier = 'member';
-
-  if (!eventGroupTier) {
-    return { handled: false, action: 'ignored_unconfigured_group' };
+  if (!actualGroup) {
+    return { handled: false, status: 'completed', action: 'ignored_unconfigured_group' };
   }
 
   const targetUser = chatMember.new_chat_member?.user || chatMember.from;
   if (!targetUser || targetUser.is_bot || typeof targetUser.id !== 'number') {
-    return { handled: false, action: 'ignored_non_user' };
+    return { handled: false, status: 'completed', action: 'ignored_non_user' };
   }
   const userId = targetUser.id;
   const mappedStatus = mapTelegramMemberStatus(
@@ -683,22 +805,39 @@ export async function handleTelegramChatMemberUpdate(
   const member = await getTelegramMemberByTelegramUserId(userId);
   if (!member) {
     if (mappedStatus === 'joined') {
-      await removeChatMember(chatIdStr, userId);
+      const rm = await removeChatMember(chatIdStr, userId);
       await recordAuditLog('telegram_unverified_join_removed', null, {
-        group_tier: eventGroupTier,
+        group_tier: actualGroup,
+        removed: rm.ok,
+        error: rm.error ?? null,
       }).catch(() => {});
-      return { handled: true, action: 'removed_unlinked_user' };
+      return {
+        handled: true,
+        status: 'completed',
+        action: rm.ok ? 'removed_unlinked_user' : 'unlinked_user_removal_failed',
+      };
     }
-    return { handled: true, action: 'ignored_unknown_user_exit' };
+    return { handled: true, status: 'completed', action: 'ignored_unknown_user_exit' };
   }
 
   // Handle exits & kicks immediately
   if (mappedStatus === 'left' || mappedStatus === 'kicked' || mappedStatus === 'revoked') {
-    if (member.group_id && member.group_id !== chatIdStr) {
-      // Leaving an old group (e.g., Member group after upgrading to Pro) does not alter active group status.
-      return { handled: true, action: 'ignored_secondary_group_exit' };
+    // If user exited a non-active secondary group (e.g. old Member group while holding a pending Pro invite),
+    // clear actual_group_* metadata if it matches that group without clobbering their active/pending target group.
+    if (
+      (member.group_status === 'invite_pending' && member.group_id && member.group_id !== chatIdStr) ||
+      (member.group_status === 'joined' && (member.actual_group_id ?? member.group_id) !== chatIdStr)
+    ) {
+      if (member.actual_group_id === chatIdStr) {
+        await updateTelegramGroupMembership(member.wallet_address, {
+          group_status: member.group_status,
+          clear_actual_group: true,
+        });
+      }
+      return { handled: true, status: 'completed', action: 'ignored_secondary_group_exit' };
     }
-    // Preserve 'revoked' state if this 'left' event came right after our own sweep unban step
+
+    // Preserve 'revoked' state if this 'left' event came right after our own sweep/wrong-group unban step
     const recentRevoke =
       member.group_status === 'revoked' &&
       mappedStatus === 'left' &&
@@ -709,117 +848,283 @@ export async function handleTelegramChatMemberUpdate(
       await updateTelegramGroupMembership(member.wallet_address, {
         group_status: mappedStatus,
         group_id: chatIdStr,
+        clear_actual_group: true,
+        reconciliation_required: false,
+        reconciliation_reason: null,
       });
     }
-    return { handled: true, action: `recorded_${mappedStatus}` };
+    return { handled: true, status: 'completed', action: `recorded_${mappedStatus}` };
   }
 
   if (mappedStatus === 'unknown') {
     await recordAuditLog('telegram_unknown_member_status', member.wallet_address, {
-      group_tier: eventGroupTier,
+      group_tier: actualGroup,
       raw_status: chatMember.new_chat_member?.status || 'missing',
     }).catch(() => {});
-    return { handled: true, action: 'ignored_unknown_status' };
+    return { handled: true, status: 'completed', action: 'ignored_unknown_status' };
   }
 
-  // mappedStatus === 'joined' -> NEVER trust group event alone; recheck authoritative wallet entitlement
+  // mappedStatus === 'joined' -> Authoritatively recheck wallet entitlement before recording any join.
   const entitlement = await resolveUserEntitlement(member.wallet_address);
 
   if (entitlement.tier === 'unknown') {
+    const reason = entitlement.reason || 'entitlement_unavailable';
     await recordUnknownEntitlementState(
       member.wallet_address,
       'Entitlement unavailable during Telegram group join validation'
     );
-    return { handled: true, action: 'deferred_unknown_entitlement' };
-  }
 
-  const qualifiedForPro = entitlement.isAdmin || entitlement.baseTier === 'pro';
-  const qualifiedForMember = qualifiedForPro || entitlement.baseTier === 'member';
-
-  if (eventGroupTier === 'pro' && !qualifiedForPro) {
-    // Unauthorized join in Pro group -> remove immediately & reconcile
-    await removeChatMember(chatIdStr, userId);
-    await updateTelegramGroupMembership(member.wallet_address, {
-      group_status: 'revoked',
-      group_id: chatIdStr,
-      tier: entitlement.baseTier === 'member' ? 'member' : 'member',
-      entitlement_tier: entitlement.tier,
-      revoked_reason: 'Wallet does not meet Pro $250 90-day stake requirement',
-    });
-
-    if (member.telegram_chat_id) {
-      if (entitlement.baseTier === 'member') {
-        let memberLine = `Start Member verification from ${siteUrl}/dashboard.`;
-        try {
-          const mInvite = await createTelegramInviteWithMeta('member', userId);
-          await updateTelegramGroupMembership(member.wallet_address, {
-            group_status: 'invite_pending',
-            group_id: mInvite.groupId,
-            tier: 'member',
-            entitlement_tier: 'member',
-            invite_created_at: new Date().toISOString(),
-            invite_expires_at: mInvite.expiresAtIso,
-            invite_link_hash: mInvite.inviteHash,
-            pending_invite_link: mInvite.inviteLink,
-          });
-          memberLine = `Join the Member community here (single-use):\n👉 ${mInvite.inviteLink}`;
-        } catch {}
-
-        await tgSend(
-          member.telegram_chat_id,
-          `⚠️ <b>Pro Community Access Restricted</b>\n\n` +
-            `Your wallet qualifies as <b>Member</b>, not <b>Pro</b>, so access to the Pro group was removed.\n\n` +
-            `${memberLine}\n\nTo unlock Pro, stake $250 in $H42 for 90 days: ${siteUrl}/dashboard/stake`
-        );
-      } else {
-        await tgSend(
-          member.telegram_chat_id,
-          `⚠️ <b>Community Access Restricted</b>\n\n` +
-            `Your wallet no longer meets qualification requirements for the Pro group. Visit ${siteUrl}/dashboard to verify eligibility.`
-        );
+    if (opts?.updateId !== undefined) {
+      const persisted = await persistRetryableMembershipEvent({
+        updateId: opts.updateId,
+        eventType: 'chat_member',
+        payload: chatMember,
+        walletAddress: member.wallet_address,
+        telegramUserId: userId,
+        groupId: chatIdStr,
+        reason,
+        leaseToken: opts.leaseToken,
+        nowMs: opts.nowMs,
+        retryDelaysMs: opts.retryDelaysMs,
+        maxAttempts: opts.maxAttempts,
+      });
+      if (persisted.status === 'permanently_failed') {
+        return {
+          handled: true,
+          status: 'permanently_failed',
+          action: 'reconciliation_exhausted',
+          reason,
+        };
       }
+      return {
+        handled: true,
+        status: 'retryable',
+        action: 'deferred_unknown_entitlement',
+        reason,
+      };
     }
-    return { handled: true, action: 'revoked_wrong_group_pro' };
+
+    // Fallback reconciliation flag if called outside webhook update context
+    const nextAttempt = (member.reconciliation_attempt_count ?? 0) + 1;
+    const delays = opts?.retryDelaysMs || DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS;
+    const delayMs = delays[Math.max(0, Math.min(delays.length - 1, nextAttempt - 1))] ?? 30_000;
+    await recordMembershipMismatch({
+      walletAddress: member.wallet_address,
+      entitlementTier: member.entitlement_tier,
+      expectedCommunity: null,
+      actualGroupId: chatIdStr,
+      actualGroupTier: actualGroup,
+      reason: 'entitlement_unavailable',
+      reconciliationRequired: true,
+      attemptCount: nextAttempt,
+      nextReconciliationAt: (opts?.nowMs ?? Date.now()) + delayMs,
+    });
+    return {
+      handled: true,
+      status: 'retryable',
+      action: 'deferred_unknown_entitlement',
+      reason,
+    };
   }
 
-  if (eventGroupTier === 'member' && !qualifiedForMember) {
-    await removeChatMember(chatIdStr, userId);
+  await enforceNotificationEntitlement(member.wallet_address, entitlement.tier);
+
+  const expectedGroup = getExpectedCommunity(entitlement);
+
+  // Admin policy: admins are authorized for Pro and never kicked from Member group if assisting both groups.
+  if (entitlement.isAdmin || entitlement.tier === 'admin') {
+    if (actualGroup === 'pro') {
+      await updateTelegramGroupMembership(member.wallet_address, {
+        group_status: 'joined',
+        group_id: chatIdStr,
+        actual_group_id: chatIdStr,
+        actual_group_tier: 'pro',
+        tier: 'pro',
+        entitlement_tier: 'admin',
+      });
+      return { handled: true, status: 'completed', action: 'confirmed_joined_pro' };
+    }
+    // Admin entering Member group: keep Pro if already in Pro, otherwise record Member presence without downgrade.
+    if (member.group_status === 'joined' && member.actual_group_tier === 'pro') {
+      return { handled: true, status: 'completed', action: 'admin_preserved_pro_group' };
+    }
+    await updateTelegramGroupMembership(member.wallet_address, {
+      group_status: 'joined',
+      group_id: chatIdStr,
+      actual_group_id: chatIdStr,
+      actual_group_tier: 'member',
+      tier: 'pro',
+      entitlement_tier: 'admin',
+    });
+    return { handled: true, status: 'completed', action: 'admin_joined_member' };
+  }
+
+  // Free user (expectedGroup === null) -> Reject entry into EITHER Member or Pro group.
+  if (!expectedGroup) {
+    const rm = await removeChatMember(chatIdStr, userId);
+    if (!rm.ok) {
+      await recordMembershipMismatch({
+        walletAddress: member.wallet_address,
+        entitlementTier: 'free',
+        expectedCommunity: null,
+        actualGroupId: chatIdStr,
+        actualGroupTier: actualGroup,
+        reason: `wrong_community_removal_failed:${rm.error || 'unknown'}`,
+        reconciliationRequired: true,
+        nextReconciliationAt: (opts?.nowMs ?? Date.now()) + 30_000,
+      });
+      await recordAuditLog('telegram_free_removal_failed', member.wallet_address, {
+        actualGroup,
+        error: rm.error ?? 'unknown',
+      }).catch(() => {});
+      return { handled: true, status: 'completed', action: 'wrong_group_removal_failed' };
+    }
+
     await updateTelegramGroupMembership(member.wallet_address, {
       group_status: 'revoked',
       group_id: chatIdStr,
+      clear_actual_group: true,
       entitlement_tier: 'free',
-      revoked_reason: 'Wallet no longer holds $20 minimum in $H42',
+      revoked_reason:
+        actualGroup === 'pro'
+          ? 'Wallet does not meet Pro $250 90-day stake requirement'
+          : 'Wallet no longer holds $20 minimum in $H42',
+      disable_notifications: true,
     });
     if (member.telegram_chat_id) {
       await tgSend(
         member.telegram_chat_id,
-        `⚠️ <b>Member Access Restricted</b>\n\n` +
-          `Your wallet does not currently hold at least $20 in $H42. Visit ${siteUrl}/dashboard to re-verify once qualified.`
+        `⚠️ <b>Community Access Restricted</b>\n\n` +
+          `Your wallet does not currently meet the $20 $H42 (Member) or $250 90-day stake (Pro) requirement. Visit ${dashboard} to verify eligibility.`
       );
     }
-    return { handled: true, action: 'revoked_unqualified_member' };
+    return { handled: true, status: 'completed', action: `revoked_unqualified_${actualGroup}` };
   }
 
-  // Confirmed authorized join!
-  const previousGroupId = member.group_id;
+  // Wrong community in EITHER direction:
+  // - Member entering Pro group
+  // - Pro entering Member group
+  if (actualGroup !== expectedGroup) {
+    const rm = await removeChatMember(chatIdStr, userId);
+    await recordAuditLog('telegram_wrong_community_join', member.wallet_address, {
+      actualGroup,
+      expectedGroup,
+      removed: rm.ok,
+      error: rm.error ?? null,
+    }).catch(() => {});
+
+    // Always issue or reuse invitation for the user's true expected community (never silently convert Pro->Member or mark joined)
+    let expectedInvite: GeneratedInvite | null = null;
+    if (rm.ok) {
+      try {
+        const resInvite = await createOrReuseCommunityInvitation(member, expectedGroup, userId);
+        expectedInvite = resInvite.invite;
+      } catch (invErr) {
+        console.warn(`[TrenchLabs] Failed generating ${expectedGroup} invite after wrong-group removal:`, invErr);
+      }
+    }
+
+    if (!rm.ok || !expectedInvite) {
+      await recordMembershipMismatch({
+        walletAddress: member.wallet_address,
+        entitlementTier: entitlement.tier,
+        expectedCommunity: expectedGroup,
+        actualGroupId: rm.ok ? null : chatIdStr,
+        actualGroupTier: rm.ok ? null : actualGroup,
+        reason: !rm.ok ? `wrong_community_removal_failed:${rm.error || 'unknown'}` : 'wrong_community_reconcile_invite_failed',
+        reconciliationRequired: true,
+        nextReconciliationAt: (opts?.nowMs ?? Date.now()) + 30_000,
+      });
+
+      if (member.telegram_chat_id) {
+        await tgSend(
+          member.telegram_chat_id,
+          expectedGroup === 'pro'
+            ? `⚠️ <b>Wrong Community Group (PRO Wallet)</b>\n\n` +
+                `Your wallet holds <b>Pro</b> status, not Member-only. Visit ${dashboard} to get your personal Pro group invitation.`
+            : `⚠️ <b>Pro Community Access Restricted</b>\n\n` +
+                `Your wallet qualifies as <b>Member</b>, not <b>Pro</b>. Visit ${dashboard} to verify your Member group access.`
+        );
+      }
+
+      return {
+        handled: true,
+        status: 'completed',
+        action: !rm.ok
+          ? `wrong_group_${actualGroup}_removal_failed`
+          : `wrong_group_${actualGroup}_reconcile_pending`,
+      };
+    }
+
+    // Wrong group removed AND personal invite for expectedGroup issued cleanly
+    await updateTelegramGroupMembership(member.wallet_address, {
+      group_status: 'invite_pending',
+      group_id: expectedInvite.groupId,
+      clear_actual_group: true,
+      tier: expectedGroup,
+      entitlement_tier: entitlement.tier,
+      invite_created_at: new Date().toISOString(),
+      invite_expires_at: expectedInvite.expiresAtIso,
+      invite_link_hash: expectedInvite.inviteHash,
+      pending_invite_link: expectedInvite.inviteLink,
+      reconciliation_required: false,
+      reconciliation_reason: null,
+      revoked_reason:
+        expectedGroup === 'pro'
+          ? 'Pro wallet entered Member group; redirected to Pro community'
+          : 'Member wallet entered Pro group; redirected to Member community',
+    });
+
+    if (member.telegram_chat_id) {
+      if (expectedGroup === 'member') {
+        await tgSend(
+          member.telegram_chat_id,
+          `⚠️ <b>Pro Community Access Restricted</b>\n\n` +
+            `Your wallet qualifies as <b>Member</b>, not <b>Pro</b>, so access to the Pro group was removed.\n\n` +
+            `Join the Member community here (single-use):\n👉 ${expectedInvite.inviteLink}\n\n` +
+            `To unlock Pro, stake $250 in $H42 for 90 days: ${siteUrl}/dashboard/stake`
+        );
+      } else {
+        await tgSend(
+          member.telegram_chat_id,
+          `⚠️ <b>Wrong Community Group (PRO Wallet)</b>\n\n` +
+            `Your wallet holds <b>Pro</b> status and belongs in the Pro community rather than the Member group, so your Member group join was removed.\n\n` +
+            `Join the Pro community here (single-use):\n👉 ${expectedInvite.inviteLink}`
+        );
+      }
+    }
+
+    return {
+      handled: true,
+      status: 'completed',
+      action:
+        actualGroup === 'pro' ? 'revoked_wrong_group_pro' : 'revoked_wrong_group_member',
+    };
+  }
+
+  // Confirmed authorized join in exact expectedGroup!
+  const previousActualGroupId = member.actual_group_id ?? member.group_id;
   await updateTelegramGroupMembership(member.wallet_address, {
     group_status: 'joined',
     group_id: chatIdStr,
-    tier: eventGroupTier,
+    actual_group_id: chatIdStr,
+    actual_group_tier: actualGroup,
+    tier: expectedGroup,
     entitlement_tier: entitlement.tier,
   });
 
-  // If upgrading from Member to Pro and user just confirmed join in Pro, remove cleanly from Member group
+  // If upgrading from Member to Pro and user just confirmed join in Pro, remove cleanly from old Member group
+  const groups = getTelegramGroups();
   if (
-    eventGroupTier === 'pro' &&
+    actualGroup === 'pro' &&
     groups.member &&
-    previousGroupId === groups.member &&
+    previousActualGroupId === groups.member &&
     groups.member !== chatIdStr
   ) {
     await removeChatMember(groups.member, userId).catch(() => {});
   }
 
-  return { handled: true, action: `confirmed_joined_${eventGroupTier}` };
+  return { handled: true, status: 'completed', action: `confirmed_joined_${actualGroup}` };
 }
 
 /**
@@ -855,7 +1160,122 @@ export async function handleBotMembershipUpdate(
 }
 
 /**
+ * Computes authoritative, un-conflated status separating:
+ * 1. Wallet connection & verified entitlement tier
+ * 2. Telegram identity connection state
+ * 3. Eligible community tier vs. actual confirmed Telegram group membership
+ * 4. Notification preference vs. notification entitlement
+ */
+export function buildTelegramStatusResult(
+  member: TelegramMemberRow | null,
+  entitlement: {
+    tier: UserTier;
+    baseTier?: 'free' | 'member' | 'pro' | 'unknown';
+    isAdmin?: boolean;
+  } | null
+): TelegramStatusResult {
+  if (!member || !entitlement) {
+    return {
+      walletConnected: Boolean(member),
+      entitlement: {
+        tier: entitlement?.tier ?? 'unknown',
+        status:
+          entitlement?.tier === 'unknown'
+            ? 'unknown'
+            : entitlement && entitlement.tier !== 'free'
+            ? 'verified'
+            : 'unverified',
+      },
+      identity: { status: member ? member.identity_status : 'not_connected' },
+      community: {
+        eligibleCommunity: entitlement ? getExpectedCommunity(entitlement) : null,
+        actualGroup: null,
+        membershipStatus: 'not_joined',
+      },
+      notifications: {
+        preference: 'disabled',
+        entitlementAllowed: false,
+        effectiveStatus: 'disabled',
+      },
+    };
+  }
+
+  const eligibleCommunity = getExpectedCommunity(entitlement);
+
+  // Actual group must NEVER be derived from entitlement — only from actual group confirmation.
+  let actualGroup: CommunityTier | null = null;
+  if (member.actual_group_tier === 'pro' || member.actual_group_tier === 'member') {
+    actualGroup = member.actual_group_tier;
+  } else if (member.actual_group_id) {
+    actualGroup = getCommunityTierFromGroupId(member.actual_group_id);
+  } else if (member.group_status === 'joined') {
+    actualGroup = getCommunityTierFromGroupId(member.group_id) ?? member.tier;
+  }
+
+  let membershipStatus: TelegramStatusResult['community']['membershipStatus'];
+  if (entitlement.tier === 'unknown') {
+    membershipStatus = 'unknown';
+  } else if (actualGroup !== null && eligibleCommunity !== null && actualGroup !== eligibleCommunity) {
+    membershipStatus = 'mismatch';
+  } else if (actualGroup !== null && eligibleCommunity === null) {
+    membershipStatus = 'mismatch';
+  } else if (member.group_status === 'mismatch') {
+    membershipStatus = 'mismatch';
+  } else {
+    membershipStatus = member.group_status;
+  }
+
+  const preference: 'enabled' | 'disabled' =
+    member.notification_preference === 'enabled' || member.notification_preference === 'disabled'
+      ? member.notification_preference
+      : member.notification_status === 'enabled'
+      ? 'enabled'
+      : 'disabled';
+  const entitlementAllowed = entitlement.tier !== 'free' && entitlement.tier !== 'unknown';
+  const effectiveStatus: 'enabled' | 'disabled' =
+    entitlementAllowed &&
+    canReceiveNotifications(preference, entitlementAllowed) &&
+    member.identity_status !== 'blocked' &&
+    member.notification_status !== 'blocked'
+      ? 'enabled'
+      : 'disabled';
+
+  return {
+    walletConnected: true,
+    entitlement: {
+      tier: entitlement.tier,
+      status:
+        entitlement.tier === 'unknown'
+          ? 'unknown'
+          : entitlement.tier === 'free'
+          ? 'unverified'
+          : 'verified',
+    },
+    identity: {
+      status: member.identity_status,
+    },
+    community: {
+      eligibleCommunity,
+      actualGroup,
+      membershipStatus,
+    },
+    notifications: {
+      preference,
+      entitlementAllowed,
+      effectiveStatus,
+    },
+  };
+}
+
+function formatCommunityTierName(tier: CommunityTier | null): string {
+  if (tier === 'pro') return 'Pro';
+  if (tier === 'member') return 'Member';
+  return 'None';
+}
+
+/**
  * Generates an accurate database- and entitlement-backed `/status` message.
+ * Distinguishes Eligible Community from Actual Recorded Group Membership.
  */
 export async function handleStatusCommand(
   chatId: number | string,
@@ -892,7 +1312,8 @@ export async function handleStatusCommand(
         `Wallet: Not Connected\n` +
         `Tier: Unverified\n\n` +
         `Telegram Identity: Not Connected\n` +
-        `Community: None\n` +
+        `Eligible Community: None\n` +
+        `Actual Group: None\n` +
         `Group Membership: Not Joined\n\n` +
         `Private Notifications: Disabled\n\n` +
         `Action Required:\n` +
@@ -906,46 +1327,93 @@ export async function handleStatusCommand(
   }
 
   const shortWallet = `${member.wallet_address.slice(0, 6)}...${member.wallet_address.slice(-4)}`;
-  const communityName =
-    entitlement.tier === 'admin' || entitlement.baseTier === 'pro'
-      ? 'Pro'
-      : entitlement.baseTier === 'member'
-      ? 'Member'
-      : 'None';
+  const statusView = buildTelegramStatusResult(member, entitlement);
+  const identityLabel =
+    member.identity_status === 'blocked'
+      ? 'Blocked'
+      : member.identity_status === 'disconnected'
+      ? 'Disconnected'
+      : 'Connected';
 
-  const notifLabel = formatNotifStatusLabel(member.notification_status);
-  const groupLabel = formatGroupStatusLabel(member.group_status);
-  const isQualified = entitlement.tier !== 'free' && entitlement.tier !== 'unknown';
+  if (entitlement.tier === 'unknown') {
+    const text =
+      `<b>TRENCHLABS ACCOUNT STATUS</b>\n\n` +
+      `Wallet: Connected (<code>${shortWallet}</code>)\n` +
+      `Tier: <b>Temporarily Unavailable</b>\n\n` +
+      `Telegram Identity: ${identityLabel}\n` +
+      `Community: Requires Reverification\n` +
+      `Actual Group: ${formatCommunityTierName(statusView.community.actualGroup)}\n\n` +
+      `Private Notifications: <b>Current Eligibility Unavailable</b>\n\n` +
+      `Action Required:\n` +
+      `Retry verification later.\n\n` +
+      `<b>Commands:</b>\n` +
+      `/status — View your status\n` +
+      `/start — Connect or resume verification\n` +
+      `/stop — Disable private alerts\n` +
+      `/help — View help`;
+
+    return {
+      text,
+      replyMarkup: buildAlertsKeyboard(false, false, dashboard),
+    };
+  }
+
+  const eligibleName = formatCommunityTierName(statusView.community.eligibleCommunity);
+  const actualName = formatCommunityTierName(statusView.community.actualGroup);
+  const isQualified = entitlement.tier !== 'free';
+
+  let membershipLabel: string;
+  if (statusView.community.membershipStatus === 'mismatch') {
+    membershipLabel = 'Mismatch';
+  } else if (entitlement.tier === 'free') {
+    membershipLabel = member.group_status === 'revoked' ? 'Not Eligible (Revoked)' : 'Not Eligible';
+  } else {
+    membershipLabel = formatGroupStatusLabel(
+      statusView.community.membershipStatus === 'unknown'
+        ? member.group_status
+        : statusView.community.membershipStatus
+    );
+  }
+
+  const notifLabel =
+    member.identity_status === 'blocked'
+      ? 'Blocked'
+      : statusView.notifications.effectiveStatus === 'enabled'
+      ? 'Enabled'
+      : 'Disabled';
+
   const accessState =
-    entitlement.tier === 'unknown'
-      ? 'Temporarily Unavailable (Recheck Pending)'
+    statusView.community.membershipStatus === 'mismatch'
+      ? 'Synchronization Required'
       : !isQualified
       ? 'Inactive (Does Not Meet Eligibility)'
-      : member.group_status === 'joined' || member.notification_status === 'enabled'
+      : statusView.community.membershipStatus === 'joined' ||
+        statusView.notifications.effectiveStatus === 'enabled'
       ? 'Active'
-      : member.group_status === 'invite_pending'
+      : statusView.community.membershipStatus === 'invite_pending'
       ? 'Pending Group Join'
       : 'Verified (Action Available)';
 
   let actionLine = '';
-  if (entitlement.tier === 'unknown') {
-    actionLine = '\n\nAction Required:\nOn-chain verification is temporarily unavailable. Run /status again shortly.';
+  if (statusView.community.membershipStatus === 'mismatch') {
+    actionLine = `\n\nAction Required:\nYour community membership requires synchronization. Visit ${dashboard} to receive your personal ${eligibleName} invitation.`;
   } else if (entitlement.tier === 'free') {
     actionLine =
       `\n\nAction Required:\nYour wallet does not currently meet Member ($20 in $H42) or Pro ($250 staked 90d) eligibility. Check ${dashboard}.`;
-  } else if (member.group_status === 'invite_pending') {
-    actionLine = `\n\nAction Required:\nUse your personal invitation to join the ${communityName} community (or re-verify from ${dashboard} if expired).`;
-  } else if (member.group_status !== 'joined') {
-    actionLine = `\n\nAction Required:\nComplete Telegram verification on ${dashboard} to get a fresh single-use ${communityName} group invitation.`;
+  } else if (statusView.community.membershipStatus === 'invite_pending') {
+    actionLine = `\n\nAction Required:\nUse your personal ${eligibleName} invitation to join (or re-verify from ${dashboard} if expired).`;
+  } else if (statusView.community.membershipStatus !== 'joined') {
+    actionLine = `\n\nAction Required:\nComplete Telegram verification on ${dashboard} to get a fresh single-use ${eligibleName} group invitation.`;
   }
 
   const text =
     `<b>TRENCHLABS ACCOUNT STATUS</b>\n\n` +
     `Wallet: Connected (<code>${shortWallet}</code>)\n` +
     `Tier: <b>${formatTierLabel(entitlement.tier)}</b>\n\n` +
-    `Telegram Identity: ${member.identity_status === 'blocked' ? 'Blocked' : 'Connected'}\n` +
-    `Community: ${communityName}\n` +
-    `Group Membership: <b>${groupLabel}</b>\n\n` +
+    `Telegram Identity: ${identityLabel}\n` +
+    `Eligible Community: ${eligibleName}\n` +
+    `Actual Group: ${actualName}\n` +
+    `Group Membership: <b>${membershipLabel}</b>\n\n` +
     `Private Notifications: <b>${notifLabel}</b>\n\n` +
     `Access: <b>${accessState}</b>${actionLine}\n\n` +
     `<b>Commands:</b>\n` +
@@ -956,7 +1424,11 @@ export async function handleStatusCommand(
 
   return {
     text,
-    replyMarkup: buildAlertsKeyboard(member.notification_status === 'enabled', isQualified, dashboard),
+    replyMarkup: buildAlertsKeyboard(
+      statusView.notifications.effectiveStatus === 'enabled',
+      isQualified,
+      dashboard
+    ),
   };
 }
 
@@ -1116,25 +1588,440 @@ export interface SweepResult {
   upgradedToPro: number;
   demotedToMember: number;
   evicted: number;
+  reconciled: number;
+  recoveredEvents: number;
   errors: number;
   truncated: boolean;
 }
 
+export interface RetryRecoveryResult {
+  processed: number;
+  completed: number;
+  retryable: number;
+  permanentlyFailed: number;
+  reconciledMembers: number;
+}
+
+export async function reconcileUserAccess(
+  member: TelegramMemberRow,
+  resolvedEntitlement?: Awaited<ReturnType<typeof resolveUserEntitlement>>,
+  options?: {
+    sendDm?: boolean;
+    nowMs?: number;
+    retryDelaysMs?: readonly number[];
+    maxAttempts?: number;
+  }
+): Promise<{ outcome: 'unchanged' | 'upgraded_to_pro' | 'demoted_to_member' | 'revoked' | 'restored_member' | 'deferred_unknown' | 'reconcile_retryable' }> {
+  const siteUrl = getSiteUrl();
+  const dashboard = `${siteUrl}/dashboard`;
+  const groups = getTelegramGroups();
+  const userId = member.telegram_user_id as number;
+  const chatId = member.telegram_chat_id || userId;
+  const sendDm = options?.sendDm !== false;
+
+  if (!userId || !Number.isFinite(userId)) {
+    return { outcome: 'unchanged' };
+  }
+
+  const entitlement = resolvedEntitlement || (await resolveUserEntitlement(member.wallet_address));
+
+  if (entitlement.tier === 'unknown') {
+    await recordUnknownEntitlementState(
+      member.wallet_address,
+      entitlement.reason || 'Temporary entitlement check error during reconciliation'
+    );
+    return { outcome: 'deferred_unknown' };
+  }
+
+  await enforceNotificationEntitlement(member.wallet_address, entitlement.tier);
+
+  if (isAdminWallet(member.wallet_address) || entitlement.isAdmin || entitlement.tier === 'admin') {
+    return { outcome: 'unchanged' };
+  }
+
+  const expectedCommunity = getExpectedCommunity(entitlement);
+
+  // Free tier: revoke restricted notifications unconditionally (already done above) AND reconcile group access independently.
+  if (!expectedCommunity) {
+    const hasRestrictedPresence =
+      member.in_group ||
+      member.group_status === 'joined' ||
+      member.group_status === 'invite_pending' ||
+      member.group_status === 'mismatch' ||
+      Boolean(member.actual_group_id);
+
+    if (!hasRestrictedPresence) {
+      if (member.reconciliation_required) {
+        await updateTelegramGroupMembership(member.wallet_address, {
+          group_status: member.group_status,
+          entitlement_tier: 'free',
+          clear_actual_group: true,
+          disable_notifications: true,
+          reconciliation_required: false,
+          reconciliation_reason: null,
+          reconciliation_attempt_count: 0,
+          next_reconciliation_at: null,
+        });
+      }
+      return { outcome: 'unchanged' };
+    }
+
+    const removalTargets = new Set<string>();
+    if (member.actual_group_id) removalTargets.add(member.actual_group_id);
+    if (member.group_id) removalTargets.add(member.group_id);
+    if (groups.pro && (member.tier === 'pro' || member.actual_group_tier === 'pro')) removalTargets.add(groups.pro);
+    if (groups.member && (member.tier === 'member' || member.actual_group_tier === 'member')) removalTargets.add(groups.member);
+
+    let failedTarget: string | null = null;
+    for (const gid of removalTargets) {
+      const rm = await removeChatMember(gid, userId);
+      if (!rm.ok) {
+        failedTarget = gid;
+      }
+    }
+
+    if (failedTarget) {
+      const nextAttempt = (member.reconciliation_attempt_count ?? 0) + 1;
+      const maxAttempts = options?.maxAttempts ?? MAX_WEBHOOK_ATTEMPTS;
+      const delays = options?.retryDelaysMs || DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS;
+      const delayMs = delays[Math.max(0, Math.min(delays.length - 1, nextAttempt - 1))] ?? 30_000;
+      const exhausted = nextAttempt >= maxAttempts;
+      await recordMembershipMismatch({
+        walletAddress: member.wallet_address,
+        entitlementTier: 'free',
+        expectedCommunity: null,
+        actualGroupId: failedTarget,
+        actualGroupTier: getCommunityTierFromGroupId(failedTarget),
+        reason: 'free_eviction_failed',
+        reconciliationRequired: !exhausted,
+        attemptCount: nextAttempt,
+        nextReconciliationAt: exhausted ? null : (options?.nowMs ?? Date.now()) + delayMs,
+      });
+      return { outcome: 'reconcile_retryable' };
+    }
+
+    const wasPro = member.tier === 'pro' || member.actual_group_tier === 'pro';
+    await updateTelegramGroupMembership(member.wallet_address, {
+      group_status: 'revoked',
+      clear_actual_group: true,
+      entitlement_tier: 'free',
+      revoked_reason: wasPro
+        ? 'Pro stake ended and balance below $20 minimum'
+        : 'Wallet balance fell below $20 minimum',
+      disable_notifications: true,
+      reconciliation_required: false,
+      reconciliation_reason: null,
+      reconciliation_attempt_count: 0,
+      next_reconciliation_at: null,
+    });
+
+    if (sendDm && chatId) {
+      await tgSend(
+        chatId,
+        wasPro
+          ? `⚠️ <b>Access Expired</b>\n\n` +
+              `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $H42.\n\n` +
+              `Top up or re-stake on the dashboard to regain access:\n🔗 ${dashboard}`
+          : `⚠️ Your wallet no longer holds the minimum $20 in $H42 required for Member access. You have been removed from the Member group.\n\n` +
+              `Top up at ${dashboard} to get a new invite.`
+      );
+    }
+
+    return { outcome: 'revoked' };
+  }
+
+  // Qualified Member or Pro user
+  const actualGroupTier =
+    member.actual_group_tier ??
+    (member.actual_group_id
+      ? getCommunityTierFromGroupId(member.actual_group_id)
+      : member.group_status === 'joined'
+      ? getCommunityTierFromGroupId(member.group_id) ?? member.tier
+      : null);
+
+  // Already confirmed joined in the exact expected community -> idempotent no-op (sync stale fields only if needed)
+  if (member.group_status === 'joined' && actualGroupTier === expectedCommunity) {
+    if (member.reconciliation_required || member.tier !== expectedCommunity) {
+      await updateTelegramGroupMembership(member.wallet_address, {
+        group_status: 'joined',
+        tier: expectedCommunity,
+        entitlement_tier: entitlement.tier,
+        reconciliation_required: false,
+        reconciliation_reason: null,
+        reconciliation_attempt_count: 0,
+        next_reconciliation_at: null,
+      });
+    }
+    return { outcome: 'unchanged' };
+  }
+
+  // Currently in the WRONG group (e.g. Member upgraded to Pro while in Member group, Pro entered Member, or downgraded Pro still in Pro)
+  let wrongGroupRemovalFailed = false;
+  if (actualGroupTier && actualGroupTier !== expectedCommunity) {
+    const wrongGroupId =
+      member.actual_group_id || (actualGroupTier === 'pro' ? groups.pro : groups.member);
+    if (wrongGroupId) {
+      const rm = await removeChatMember(wrongGroupId, userId);
+      if (!rm.ok) {
+        wrongGroupRemovalFailed = true;
+        const nextAttempt = (member.reconciliation_attempt_count ?? 0) + 1;
+        const maxAttempts = options?.maxAttempts ?? MAX_WEBHOOK_ATTEMPTS;
+        const delays = options?.retryDelaysMs || DEFAULT_MEMBERSHIP_RETRY_DELAYS_MS;
+        const delayMs = delays[Math.max(0, Math.min(delays.length - 1, nextAttempt - 1))] ?? 30_000;
+        const exhausted = nextAttempt >= maxAttempts;
+        await recordMembershipMismatch({
+          walletAddress: member.wallet_address,
+          entitlementTier: entitlement.tier,
+          expectedCommunity,
+          actualGroupId: wrongGroupId,
+          actualGroupTier,
+          reason: 'wrong_group_removal_failed',
+          reconciliationRequired: !exhausted,
+          attemptCount: nextAttempt,
+          nextReconciliationAt: exhausted ? null : (options?.nowMs ?? Date.now()) + delayMs,
+        });
+        return { outcome: 'reconcile_retryable' };
+      }
+    }
+  }
+
+  if (wrongGroupRemovalFailed) {
+    return { outcome: 'reconcile_retryable' };
+  }
+
+  const wasPro = member.tier === 'pro';
+  const wasRevoked = member.group_status === 'revoked';
+  const wasDemoted = wasPro && expectedCommunity === 'member' && !wasRevoked;
+  const wasUpgraded =
+    expectedCommunity === 'pro' && (!wasPro || wasRevoked || member.group_status === 'mismatch' || member.group_status === 'not_joined' || member.group_status === 'left' || member.group_status === 'kicked');
+
+  // Create or reuse an active unexpired single-use invite for expectedCommunity (never duplicate active invites, never reuse expired!)
+  let inviteResult: { invite: GeneratedInvite; reused: boolean };
+  try {
+    inviteResult = await createOrReuseCommunityInvitation(member, expectedCommunity, userId);
+  } catch (invErr) {
+    console.warn(`[TrenchLabs Reconciliation] ${expectedCommunity} invite generation failed:`, invErr);
+    if (wasDemoted) {
+      await updateTelegramGroupMembership(member.wallet_address, {
+        group_status: 'not_joined',
+        group_id: groups.member || null,
+        clear_actual_group: true,
+        tier: 'member',
+        entitlement_tier: 'member',
+        invite_created_at: null,
+        invite_expires_at: null,
+        invite_link_hash: null,
+        pending_invite_link: null,
+        revoked_reason: 'Pro stake expired; downgraded to Member',
+      });
+      if (sendDm && chatId) {
+        await tgSend(
+          chatId,
+          `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
+            `Your 90-day stake has ended. Because your wallet still holds $20+ in $H42, you remain qualified as a <b>Member</b>.\n\n` +
+            `Request a personal Member invite on your dashboard: 🔗 ${dashboard}\n\n` +
+            `To regain full Pro access and priority signals, re-stake at least $250 in $H42:\n🔗 ${siteUrl}/dashboard/stake`
+        );
+      }
+      return { outcome: 'demoted_to_member' };
+    }
+    return { outcome: 'reconcile_retryable' };
+  }
+
+  // Already holds a valid active invitation for the exact same tier & group -> idempotent (do not resend spam or duplicate invite)
+  if (inviteResult.reused && !member.reconciliation_required) {
+    return { outcome: 'unchanged' };
+  }
+
+  await updateTelegramGroupMembership(member.wallet_address, {
+    group_status: 'invite_pending',
+    group_id: inviteResult.invite.groupId,
+    clear_actual_group: true,
+    tier: expectedCommunity,
+    entitlement_tier: entitlement.tier,
+    invite_created_at: new Date().toISOString(),
+    invite_expires_at: inviteResult.invite.expiresAtIso,
+    invite_link_hash: inviteResult.invite.inviteHash,
+    pending_invite_link: inviteResult.invite.inviteLink,
+    reconciliation_required: false,
+    reconciliation_reason: null,
+    reconciliation_attempt_count: 0,
+    next_reconciliation_at: null,
+    ...(wasDemoted ? { revoked_reason: 'Pro stake expired; downgraded to Member' } : {}),
+  });
+
+  await recordAuditLog('telegram_access_reconciled', member.wallet_address, {
+    expectedCommunity,
+    previousGroupStatus: member.group_status,
+    reusedInvite: inviteResult.reused,
+  }).catch(() => {});
+
+  if (sendDm && chatId && !inviteResult.reused) {
+    if (wasDemoted) {
+      await tgSend(
+        chatId,
+        `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
+          `Your 90-day stake has ended. Because your wallet still holds $20+ in $H42, you remain qualified as a <b>Member</b>.\n\n` +
+          `👉 <b>Join the Member Group (single-use invite):</b> ${inviteResult.invite.inviteLink}\n\n` +
+          `To regain full Pro access and priority signals, re-stake at least $250 in $H42:\n🔗 ${siteUrl}/dashboard/stake`
+      );
+    } else if (expectedCommunity === 'pro') {
+      await tgSend(
+        chatId,
+        `🎉 <b>${wasRevoked ? 'Pro Access Restored!' : 'Upgraded to PRO!'}</b>\n\n` +
+          `Your active StakePoint $250 90-day stake qualifies you for the Pro community.\n\n` +
+          `Join the Pro group with your single-use link (expires in 60 minutes):\n👉 ${inviteResult.invite.inviteLink}`
+      );
+    } else {
+      await tgSend(
+        chatId,
+        `✅ <b>Member Access ${wasRevoked ? 'Restored' : 'Ready'}</b>\n\n` +
+          `Your wallet meets the $20+ $H42 Member requirement.\n\n` +
+          `Join the Member community with your single-use link (expires in 60 minutes):\n👉 ${inviteResult.invite.inviteLink}`
+      );
+    }
+  }
+
+  if (wasDemoted) return { outcome: 'demoted_to_member' };
+  if (wasUpgraded && expectedCommunity === 'pro') return { outcome: 'upgraded_to_pro' };
+  return { outcome: 'restored_member' };
+}
+
+/**
+ * Processes durable retryable Telegram membership webhook events and pending member reconciliations.
+ * Uses leased atomic claiming so concurrent recovery workers never duplicate invites or alerts.
+ */
+export async function processRetryableMembershipEvents(options?: {
+  nowMs?: number;
+  budgetMs?: number;
+  limit?: number;
+  retryDelaysMs?: readonly number[];
+  maxAttempts?: number;
+}): Promise<RetryRecoveryResult> {
+  const res: RetryRecoveryResult = {
+    processed: 0,
+    completed: 0,
+    retryable: 0,
+    permanentlyFailed: 0,
+    reconciledMembers: 0,
+  };
+
+  const lockKey = 'lock:telegram_membership_recovery';
+  const lockToken = crypto.randomUUID();
+  let locked = false;
+  if (kvStoreEnabled()) {
+    locked = await kvLock(lockKey, lockToken, 60).catch(() => false);
+    if (!locked) return res;
+  }
+
+  try {
+    const nowMs = options?.nowMs ?? Date.now();
+    const budgetMs = options?.budgetMs ?? 20_000;
+    const started = Date.now();
+    const maxAttempts = options?.maxAttempts ?? MAX_WEBHOOK_ATTEMPTS;
+
+    const claimedEvents = await claimRetryableMembershipEvents({
+      nowMs,
+      limit: options?.limit ?? 25,
+      maxAttempts,
+    });
+
+    for (const ev of claimedEvents) {
+      if (Date.now() - started > budgetMs) break;
+      res.processed++;
+
+      const payload = ev.payload as TelegramChatMemberUpdate | null;
+      if (!payload || !payload.chat || payload.chat.id === undefined) {
+        await markWebhookUpdatePermanentlyFailed(
+          ev.update_id,
+          'Invalid or missing chat_member payload',
+          ev.lease_token || undefined
+        );
+        res.permanentlyFailed++;
+        continue;
+      }
+
+      try {
+        const outcome = await handleTelegramChatMemberUpdate(payload, {
+          updateId: ev.update_id,
+          leaseToken: ev.lease_token || undefined,
+          nowMs,
+          retryDelaysMs: options?.retryDelaysMs,
+          maxAttempts,
+        });
+
+        if (outcome.status === 'completed') {
+          await markWebhookUpdateCompleted(ev.update_id, ev.lease_token || undefined);
+          res.completed++;
+        } else if (outcome.status === 'permanently_failed') {
+          await markWebhookUpdatePermanentlyFailed(
+            ev.update_id,
+            outcome.reason || outcome.action,
+            ev.lease_token || undefined
+          );
+          res.permanentlyFailed++;
+        } else {
+          res.retryable++;
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'recovery_error';
+        const persisted = await persistRetryableMembershipEvent({
+          updateId: ev.update_id,
+          eventType: ev.event_type,
+          payload: ev.payload,
+          walletAddress: ev.wallet_address,
+          telegramUserId: ev.telegram_user_id,
+          groupId: ev.group_id,
+          reason: errMsg,
+          leaseToken: ev.lease_token || undefined,
+          nowMs,
+          retryDelaysMs: options?.retryDelaysMs,
+          maxAttempts,
+        });
+        if (persisted.status === 'permanently_failed') {
+          res.permanentlyFailed++;
+        } else {
+          res.retryable++;
+        }
+      }
+    }
+
+    const pendingMembers = await listMembersNeedingReconciliation(nowMs);
+    for (const m of pendingMembers) {
+      if (Date.now() - started > budgetMs) break;
+      const rec = await reconcileUserAccess(m, undefined, {
+        nowMs,
+        retryDelaysMs: options?.retryDelaysMs,
+        maxAttempts,
+      });
+      if (rec.outcome !== 'deferred_unknown' && rec.outcome !== 'reconcile_retryable') {
+        res.reconciledMembers++;
+      }
+    }
+
+    return res;
+  } finally {
+    if (locked) {
+      await kvUnlock(lockKey, lockToken).catch(() => false);
+    }
+  }
+}
+
 /**
  * Recurring background reconciliation worker:
- * 1. Upgrades qualified Members who staked $250/90d to Pro (generates personal single-use Pro invite, never marks joined until confirmed).
- * 2. Downgrades Pro members whose 90-day stake expired: revokes Pro access, issues fresh dynamic Member invite (NEVER static URL, NEVER marks joined before acceptance).
- * 3. Revokes access for users who fell to Free (removes from restricted groups, revokes restricted alerts, preserves identity record).
- * 4. Skips eviction/downgrade during 'unknown' entitlement errors within a bounded 24h grace policy.
+ * 1. Recovers any pending/retryable `chat_member` webhook events after transient RPC/oracle outages.
+ * 2. Reconciles every linked user (including previously `revoked` or `left` users) via `reconcileUserAccess`.
+ * 3. Revokes Free-tier restricted notifications independently of group membership while preserving identity/preference.
+ * 4. Restores access & issues single-use invites when previously revoked users re-qualify for Member or Pro.
  */
 export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult> {
-  const siteUrl = getSiteUrl();
-  const groups = getTelegramGroups();
   const result: SweepResult = {
     checked: 0,
     upgradedToPro: 0,
     demotedToMember: 0,
     evicted: 0,
+    reconciled: 0,
+    recoveredEvents: 0,
     errors: 0,
     truncated: false,
   };
@@ -1150,6 +2037,16 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
 
   try {
     const started = Date.now();
+
+    try {
+      const recovered = await processRetryableMembershipEvents({
+        budgetMs: Math.min(10_000, Math.floor(budgetMs / 4)),
+      });
+      result.recoveredEvents = recovered.completed + recovered.reconciledMembers;
+    } catch (recErr) {
+      console.warn('[TrenchLabs Sweep] Retryable recovery pass error:', recErr);
+    }
+
     const members = await listTrackedTelegramMembers();
     const BATCH = 10;
 
@@ -1186,133 +2083,18 @@ export async function sweepGroupMembers(budgetMs = 50_000): Promise<SweepResult>
               return;
             }
 
-            const currentTier = entitlement.baseTier;
-            const userId = m.telegram_user_id as number;
-            const chatId = m.telegram_chat_id || userId;
-
-            // Case A: Member upgraded to PRO
-            if (m.tier === 'member' && currentTier === 'pro' && m.group_status !== 'revoked') {
-              try {
-                const proInvite = await createTelegramInviteWithMeta('pro', userId);
-                if (groups.member && m.group_status === 'joined') {
-                  await removeChatMember(groups.member, userId).catch(() => {});
-                }
-                await updateTelegramGroupMembership(m.wallet_address, {
-                  group_status: 'invite_pending',
-                  group_id: proInvite.groupId,
-                  tier: 'pro',
-                  entitlement_tier: entitlement.tier,
-                  invite_created_at: new Date().toISOString(),
-                  invite_expires_at: proInvite.expiresAtIso,
-                  invite_link_hash: proInvite.inviteHash,
-                  pending_invite_link: proInvite.inviteLink,
-                });
-                result.upgradedToPro++;
-
-                await tgSend(
-                  chatId,
-                  `🎉 <b>Upgraded to PRO!</b>\n\n` +
-                    `Your active StakePoint $250 90-day stake qualifies you for the Pro community.\n\n` +
-                    `Join the Pro group with your single-use link (expires in 60 minutes):\n` +
-                    `👉 ${proInvite.inviteLink}`
-                );
-              } catch (upErr) {
-                console.warn('[TrenchLabs Sweep] Pro upgrade invite generation failed:', upErr);
-              }
-              return;
-            }
-
-            // Case B: Was PRO (joined or invite_pending), now downgraded to MEMBER or FREE
-            if (m.tier === 'pro' && currentTier !== 'pro') {
-              if (groups.pro) {
-                await removeChatMember(groups.pro, userId).catch(() => {});
-              }
-
-              if (currentTier === 'member') {
-                // Generate fresh single-use dynamic Member invite (NEVER fallback to static URL, NEVER mark in_group=true before join)
-                let memberInvite: GeneratedInvite | null = null;
-                try {
-                  memberInvite = await createTelegramInviteWithMeta('member', userId);
-                } catch (invErr) {
-                  console.warn('[TrenchLabs Sweep] Member downgrade invite generation failed:', invErr);
-                }
-
-                await updateTelegramGroupMembership(m.wallet_address, {
-                  group_status: memberInvite ? 'invite_pending' : 'not_joined',
-                  group_id: memberInvite ? memberInvite.groupId : groups.member || null,
-                  tier: 'member',
-                  entitlement_tier: 'member',
-                  invite_created_at: memberInvite ? new Date().toISOString() : null,
-                  invite_expires_at: memberInvite ? memberInvite.expiresAtIso : null,
-                  invite_link_hash: memberInvite ? memberInvite.inviteHash : null,
-                  pending_invite_link: memberInvite ? memberInvite.inviteLink : null,
-                  revoked_reason: 'Pro stake expired; downgraded to Member',
-                });
-                result.demotedToMember++;
-
-                const memberInviteLine = memberInvite
-                  ? `👉 <b>Join the Member Group (single-use invite):</b> ${memberInvite.inviteLink}\n\n`
-                  : `Request a personal Member invite on your dashboard: 🔗 ${siteUrl}/dashboard\n\n`;
-
-                await tgSend(
-                  chatId,
-                  `⚠️ <b>Your Pro Access Has Ended</b>\n\n` +
-                    `Your 90-day stake has ended. Because your wallet still holds $20+ in $H42, you remain qualified as a <b>Member</b>.\n\n` +
-                    memberInviteLine +
-                    `To regain full Pro access and priority signals, re-stake at least $250 in $H42:\n` +
-                    `🔗 ${siteUrl}/dashboard/stake`
-                );
-              } else {
-                // Dropped below Member threshold -> full revocation (preserving identity link record)
-                if (groups.member) {
-                  await removeChatMember(groups.member, userId).catch(() => {});
-                }
-                await updateTelegramGroupMembership(m.wallet_address, {
-                  group_status: 'revoked',
-                  entitlement_tier: 'free',
-                  revoked_reason: 'Pro stake ended and balance below $20 minimum',
-                  disable_notifications: true,
-                });
-                if (kvStoreEnabled()) {
-                  await kvHDel(SUBS_KEY, m.wallet_address).catch(() => {});
-                }
-                result.evicted++;
-
-                await tgSend(
-                  chatId,
-                  `⚠️ <b>Access Expired</b>\n\n` +
-                    `Your Pro stake has ended and your wallet no longer holds the minimum $20 in $H42.\n\n` +
-                    `Top up or re-stake on the dashboard to regain access:\n` +
-                    `🔗 ${siteUrl}/dashboard`
-                );
-              }
-            }
-
-            // Case C: Was MEMBER, now FREE
-            else if (
-              m.tier === 'member' &&
-              currentTier === 'free' &&
-              (m.in_group || m.group_status === 'joined' || m.group_status === 'invite_pending')
-            ) {
-              if (groups.member) {
-                await removeChatMember(groups.member, userId).catch(() => {});
-              }
-              await updateTelegramGroupMembership(m.wallet_address, {
-                group_status: 'revoked',
-                entitlement_tier: 'free',
-                revoked_reason: 'Wallet balance fell below $20 minimum',
-                disable_notifications: true,
-              });
-              if (kvStoreEnabled()) {
-                await kvHDel(SUBS_KEY, m.wallet_address).catch(() => {});
-              }
+            const rec = await reconcileUserAccess(m, entitlement, { sendDm: true });
+            if (rec.outcome === 'upgraded_to_pro') {
+              result.upgradedToPro++;
+              result.reconciled++;
+            } else if (rec.outcome === 'demoted_to_member') {
+              result.demotedToMember++;
+              result.reconciled++;
+            } else if (rec.outcome === 'revoked') {
               result.evicted++;
-
-              await tgSend(
-                chatId,
-                `⚠️ Your wallet no longer holds the minimum $20 in $H42 required for Member access. You have been removed from the Member group.\n\n` +
-                  `Top up at ${siteUrl}/dashboard to get a new invite.`
-              );
+              result.reconciled++;
+            } else if (rec.outcome === 'restored_member') {
+              result.reconciled++;
             }
           } catch (err) {
             result.errors++;
@@ -1511,15 +2293,17 @@ export async function getActiveNotificationSubscribers(): Promise<Record<string,
     for (const sub of dbSubscribers) {
       merged[sub.wallet] = sub.chatId;
     }
-    // Check explicit opt-outs/blocks so legacy Redis entries never override /stop
-    const { loadDb } = await import('@/server/db');
+    // Check explicit opt-outs, blocks, and revoked Free entitlements so stale Redis entries never bypass enforcement
+    const { loadDb, normalizeTelegramMemberRow } = await import('@/server/db');
     const db = await loadDb();
-    for (const m of db.telegram_members || []) {
+    for (const rawMember of db.telegram_members || []) {
+      const m = normalizeTelegramMemberRow(rawMember);
       if (
-        m.notification_status === 'disabled' ||
-        m.notification_status === 'blocked' ||
-        m.identity_status === 'blocked' ||
-        m.identity_status === 'disconnected'
+        m.notification_status !== 'enabled' ||
+        m.notification_preference === 'disabled' ||
+        m.notification_entitlement_allowed === false ||
+        m.entitlement_tier === 'free' ||
+        m.identity_status !== 'connected'
       ) {
         blockedOrDisabledWallets.add(m.wallet_address);
       }
@@ -1544,6 +2328,34 @@ export async function getActiveNotificationSubscribers(): Promise<Record<string,
   }
 
   return merged;
+}
+
+/**
+ * Resolves live fan-out eligibility for a wallet, never trusting stale subscriber maps or Redis caches.
+ */
+async function resolveFanoutEligibility(
+  wallet: string
+): Promise<{ tier: 'free' | 'member' | 'pro' | 'unknown'; preferenceAllowed: boolean }> {
+  try {
+    const member = await getTelegramMember(wallet);
+    if (member) {
+      if (
+        member.identity_status !== 'connected' ||
+        member.notification_preference === 'disabled' ||
+        member.notification_status !== 'enabled'
+      ) {
+        return { tier: 'free', preferenceAllowed: false };
+      }
+    }
+  } catch {
+    // Allow KV-only unit simulators when DB unavailable
+  }
+
+  const tier = isAdminWallet(wallet) ? 'pro' : await resolveTier(wallet);
+  if (tier === 'free') {
+    await enforceNotificationEntitlement(wallet, 'free').catch(() => {});
+  }
+  return { tier, preferenceAllowed: tier === 'pro' || tier === 'member' };
 }
 
 // ---------- fan-out ----------
@@ -1708,9 +2520,9 @@ export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ d
                 // Admin already received instant alert
                 return;
               }
-              const tier = await resolveTier(wallet);
-              // Only deliver to verified Member tier holders ($20+ held); never unknown/free
-              if (tier !== 'member') return;
+              const { tier, preferenceAllowed } = await resolveFanoutEligibility(wallet);
+              // Only deliver to verified, opted-in Member tier holders ($20+ held); never unknown/free
+              if (!preferenceAllowed || tier !== 'member') return;
 
               const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
               if (res.ok) {
@@ -1769,10 +2581,9 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          const isAdmin = isAdminWallet(wallet);
-          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
+          const { tier, preferenceAllowed } = await resolveFanoutEligibility(wallet);
 
-          if (tier === 'free' || tier === 'unknown') {
+          if (!preferenceAllowed || tier === 'free' || tier === 'unknown') {
             result.skipped++;
             return;
           }
@@ -1880,9 +2691,8 @@ export async function notifyTpTriggered(
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          const isAdmin = isAdminWallet(wallet);
-          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
-          if (tier === 'free' || tier === 'unknown') {
+          const { tier, preferenceAllowed } = await resolveFanoutEligibility(wallet);
+          if (!preferenceAllowed || tier === 'free' || tier === 'unknown') {
             result.skipped++;
             return;
           }
@@ -1937,9 +2747,8 @@ export async function notifySlTriggered(
     await Promise.all(
       subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
         try {
-          const isAdmin = isAdminWallet(wallet);
-          const tier = isAdmin ? 'pro' : await resolveTier(wallet);
-          if (tier === 'free' || tier === 'unknown') {
+          const { tier, preferenceAllowed } = await resolveFanoutEligibility(wallet);
+          if (!preferenceAllowed || tier === 'free' || tier === 'unknown') {
             result.skipped++;
             return;
           }

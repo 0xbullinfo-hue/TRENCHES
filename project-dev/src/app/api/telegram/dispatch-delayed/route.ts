@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dispatchDelayedMemberCalls, timingSafeEqualStr } from '@/server/telegram';
+import {
+  dispatchDelayedMemberCalls,
+  processRetryableMembershipEvents,
+  timingSafeEqualStr,
+} from '@/server/telegram';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -23,8 +27,21 @@ async function handle(req: NextRequest) {
   }
 
   try {
-    const result = await dispatchDelayedMemberCalls();
-    return NextResponse.json({ ok: true, ...result });
+    const [result, recovery] = await Promise.all([
+      dispatchDelayedMemberCalls(),
+      processRetryableMembershipEvents({ budgetMs: 15_000 }).catch((recErr) => {
+        console.error(
+          '[Delayed Dispatch] Membership recovery pass failed:',
+          recErr instanceof Error ? recErr.message : 'Unknown error'
+        );
+        return null;
+      }),
+    ]);
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      ...(recovery ? { membershipRecovery: recovery } : {}),
+    });
   } catch (err) {
     console.error('[Delayed Dispatch] Execution failed:', err instanceof Error ? err.message : 'Unknown error');
     return NextResponse.json({ ok: false, error: 'Delayed dispatch execution failed' }, { status: 500 });

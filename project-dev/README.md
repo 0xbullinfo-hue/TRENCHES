@@ -82,3 +82,10 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 ```bash
 curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 ```
+
+### Membership Reconciliation & Retry Recovery
+
+Temporary Solana RPC / oracle outages (`unknown` entitlement) or failed group evictions during `chat_member` webhook events are durably persisted in `telegram_webhook_events` (`retryable_failed`) with bounded exponential backoff (`30s`, `2m`, `5m`, `15m`, `30m`, up to 6 attempts) rather than dropped or falsely completed. Recovery (`processRetryableMembershipEvents`) is triggered automatically by:
+
+* **5-minute external scheduler:** `.github/workflows/tp-sl-monitor.yml` triggers `GET /api/telegram/dispatch-delayed`, which drains due retryable membership events and pending reconciliations alongside delayed Member calls.
+* **Daily reconciliation sweep:** `GET /api/telegram/sweep` runs `processRetryableMembershipEvents` before full member entitlement reconciliation (`reconcileUserAccess`).

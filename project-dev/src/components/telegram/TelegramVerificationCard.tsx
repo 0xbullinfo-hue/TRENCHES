@@ -184,6 +184,8 @@ function communityDisplayLabel(
       return { text: 'Removed from Group', toneClass: 'text-danger' };
     case 'revoked':
       return { text: 'Access Revoked', toneClass: 'text-danger' };
+    case 'mismatch':
+      return { text: 'Sync Required (Wrong Group)', toneClass: 'text-amber' };
     default:
       return { text: 'Not Joined', toneClass: 'text-muted' };
   }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   claimWebhookUpdate,
   markWebhookUpdateCompleted,
+  markWebhookUpdatePermanentlyFailed,
   markWebhookUpdateRetryable,
 } from '@/server/db';
 import {
@@ -71,11 +72,30 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. Group member updates (joins, exits, kicks, restrictions)
+    // 1. Group member updates (joins, exits, kicks, restrictions, retryable reconciliation)
     if (update.chat_member) {
-      await handleTelegramChatMemberUpdate(update.chat_member as TelegramChatMemberUpdate);
+      const outcome = await handleTelegramChatMemberUpdate(
+        update.chat_member as TelegramChatMemberUpdate,
+        { updateId, leaseToken: claim.leaseToken }
+      );
+      if (outcome.status === 'retryable') {
+        // Retryable event payload and backoff metadata are durably persisted; ack receipt without marking completed.
+        return NextResponse.json({ ok: true, status: 'retryable', action: outcome.action });
+      }
+      if (outcome.status === 'permanently_failed') {
+        await markWebhookUpdatePermanentlyFailed(
+          updateId,
+          outcome.reason || outcome.action,
+          claim.leaseToken
+        );
+        return NextResponse.json({
+          ok: true,
+          status: 'permanently_failed',
+          action: outcome.action,
+        });
+      }
       await markWebhookUpdateCompleted(updateId, claim.leaseToken);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, action: outcome.action });
     }
 
     // 2. Bot membership updates (user blocks/unblocks private bot, or bot promoted/removed in groups)
