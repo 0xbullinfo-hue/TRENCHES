@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { AlphaItem, Chain, Campaign, CallType } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -66,6 +67,7 @@ type ViewMode = 'GRID' | 'TABLE';
 const ALL_CHAINS: (Chain | 'ALL')[] = ['ALL', 'SOL', 'BSC', 'ETH', 'BASE', 'ROBIN', 'AVAX'];
 
 export const IncubatorHub: React.FC = () => {
+  const router = useRouter();
   const {
     connected,
     connectWallet,
@@ -509,8 +511,8 @@ export const IncubatorHub: React.FC = () => {
 
   const watchlistCallsCount = useMemo(() => {
     if (currentMembershipTier !== 'PRO') return 0;
-    return alphas.filter((a) => a.callType === 'WATCHLIST').length;
-  }, [alphas, currentMembershipTier]);
+    return watchlist.length;
+  }, [watchlist, currentMembershipTier]);
 
   const maxAlphaCallsCount = useMemo(() => {
     if (currentMembershipTier !== 'PRO') return 0;
@@ -558,10 +560,12 @@ export const IncubatorHub: React.FC = () => {
       return alphas.filter((a) => a.callType === 'MAX_ALPHA' || Boolean(a.isMaxAlpha));
     }
     if (currentTab === 'WATCHLIST') {
-      return alphas.filter((a) => a.callType === 'WATCHLIST');
+      // The Watchlist workspace is driven by each user's starred post IDs,
+      // not by a separate callType value that publishers do not assign.
+      return alphas.filter((a) => watchlist.includes(a.id));
     }
     return alphas;
-  }, [alphas, currentTab, isCurrentTabAuthorized]);
+  }, [alphas, currentTab, isCurrentTabAuthorized, watchlist]);
 
   const visibleAlphas = useMemo(
     () => currentTabBaseAlphas,
