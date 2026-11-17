@@ -16,6 +16,7 @@ interface StakeFormProps {
   genesisPriceUsd: number;
   initialAmountUsd?: number;
   onStakeSuccess: () => void;
+  getAuthHeaders: (method: string, path: string) => Promise<Record<string, string> | null>;
 }
 
 type ButtonState = 'idle' | 'verifying' | 'error' | 'success';
@@ -26,6 +27,7 @@ export function StakeForm({
   genesisPriceUsd,
   initialAmountUsd = 250,
   onStakeSuccess,
+  getAuthHeaders,
 }: StakeFormProps) {
   const [amountStr, setAmountStr] = useState<string>(initialAmountUsd.toFixed(2));
   const [txSignature, setTxSignature] = useState<string>('');
@@ -85,9 +87,11 @@ export function StakeForm({
     try {
       const rawTokens = BigInt(Math.floor(equivalentTokens * 1e9)).toString();
       setTimelineStep('confirming');
+      const authHeaders = await getAuthHeaders('POST', '/api/stake/confirm');
+      if (!authHeaders) throw new Error('Connect and verify a wallet that supports message signing before verifying your stake.');
       const res = await fetch('/api/stake/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tx_signature: txSignature.trim(),
           amount_raw: rawTokens,
@@ -104,7 +108,8 @@ export function StakeForm({
 
       // Poll existing /api/stake/status to transition verified -> active
       try {
-        const statusRes = await fetch('/api/stake/status', { credentials: 'same-origin' });
+        const statusHeaders = await getAuthHeaders('GET', '/api/stake/status');
+        const statusRes = await fetch('/api/stake/status', { headers: statusHeaders || undefined, credentials: 'same-origin', cache: 'no-store' });
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           if (statusData?.stake?.status === 'active' || statusData?.current_tier === 'pro') {
@@ -223,6 +228,7 @@ export function StakeForm({
           </label>
           <p className="font-sans text-2xs text-muted leading-relaxed">
             Paste your Solana transaction signature from StakePoint to immediately activate Pro status.
+            {!isWalletConnected && <span className="block mt-1 text-brand">Connect and verify your Solana wallet to continue.</span>}
           </p>
         </div>
 
@@ -240,7 +246,8 @@ export function StakeForm({
             disabled={
               isVerifyingSignature ||
               isTimelineStepInProgress(timelineStep) ||
-              !txSignature.trim()
+              !txSignature.trim() ||
+              !isWalletConnected
             }
             className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
           >
