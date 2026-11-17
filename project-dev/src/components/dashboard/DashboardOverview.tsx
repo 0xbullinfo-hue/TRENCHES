@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
@@ -10,10 +9,6 @@ import {
   Check,
   Copy,
   Flame,
-  Gift,
-  Sparkles,
-  Star,
-  Target,
   Wallet,
 } from 'lucide-react';
 
@@ -22,15 +17,8 @@ interface DashboardOverviewProps {
   shortAddress: string;
   tier: { id: string; label?: string; multiplier?: number };
   formattedBalance: string;
-  alphasCount: number;
-  newCallsCount: number;
-  raidsCount: number;
-  watchlistCount: number;
-  isUnlocked: boolean;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
-  onSelectFilter?: (filter: 'all' | 'new' | 'watchlist') => void;
-  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'alphas' | 'raids') => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -38,15 +26,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   shortAddress,
   tier,
   formattedBalance,
-  alphasCount,
-  newCallsCount,
-  raidsCount,
-  watchlistCount,
-  isUnlocked,
   onCopyGenesisCa,
   copiedGenesisCa,
-  onSelectFilter,
-  onSelectTab,
 }) => {
   const isPro = tier.id === 'PRO';
   const isMember = tier.id === 'MEMBER' || tier.id === 'LAB_MEMBER';
