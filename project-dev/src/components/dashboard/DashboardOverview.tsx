@@ -137,7 +137,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
       </section>
 
-      {/* Previous dashboard telemetry and shortcuts are retained, but grouped to keep the landing page uncluttered. */}
+      {/* Secondary navigation shortcuts remain grouped so the primary account information stays visible. */}
       <details className="rounded-xl bg-surface border border-border-default group">
         <summary className="cursor-pointer list-none px-5 py-4 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-white hover:text-brand">
           <span>Activity &amp; quick actions</span>
