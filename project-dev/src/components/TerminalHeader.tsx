@@ -70,6 +70,7 @@ export const TerminalHeader: React.FC = () => {
 
           <Link
             href="/dashboard"
+            title="Open Lab Analysis terminal"
             className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
               pathname === '/dashboard'
                 ? 'bg-surface-card border-brand text-brand font-black'

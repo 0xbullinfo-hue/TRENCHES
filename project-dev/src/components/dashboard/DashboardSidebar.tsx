@@ -239,7 +239,7 @@ export function DashboardSidebar({
             <ActiveIcon className="h-4 w-4 text-brand shrink-0" />
             <div className="min-w-0">
               <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim leading-none">
-                Workspace
+                Lab Analysis
               </div>
               <div className="font-sans text-sm font-extrabold text-white truncate mt-0.5">
                 {activeItem.label}
@@ -271,8 +271,8 @@ export function DashboardSidebar({
       >
         <div className="flex h-14 items-center justify-between gap-2 px-4 border-b border-border-default">
           <div className={`min-w-0 ${blockClass}`}>
-            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-dim">Workspace</div>
-            <div className="font-sans text-sm font-black text-white tracking-tight">Lab Terminal</div>
+            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-dim">TrenchLabs</div>
+            <div className="font-sans text-sm font-black text-white tracking-tight">Lab Analysis</div>
           </div>
           <Shield className={`h-5 w-5 text-brand shrink-0 hidden ${collapsed ? 'md:block md:mx-auto' : ''}`} aria-hidden="true" />
           <button

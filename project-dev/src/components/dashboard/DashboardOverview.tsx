@@ -22,7 +22,6 @@ import {
   Flame,
   Gift,
   KeyRound,
-  Send,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -35,9 +34,11 @@ import { OnboardingChecklist } from './OnboardingChecklist';
 import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
 import { MyPinnedPosts } from './MyPinnedPosts';
 import { UserCallHistoryPanel } from './UserCallHistoryPanel';
+import { TelegramVerificationCard } from '@/components/telegram/TelegramVerificationCard';
 
 export interface DashboardOverviewProps {
   connected: boolean;
+  walletAddress?: string | null;
   shortAddress: string;
   tier: { id: string; label?: string; multiplier?: number };
   formattedBalance: string;
@@ -55,13 +56,15 @@ export interface DashboardOverviewProps {
   portfolio?: Portfolio | null;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
+  onConnectWallet?: () => void;
   onVerifyWallet?: () => void;
+  onTelegramStatusChange?: (connected: boolean) => void;
   onOpenAlpha?: (coin: AlphaItem, destination: 'ALPHA' | 'MAX_ALPHA') => void;
   onOpenRaid?: (campaignId: string) => void;
   onUnpinPost?: (kind: FavoritePostKind, id: string) => void;
   onSelectFilter?: (filter: 'all' | 'new') => void;
   onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'MAX_ALPHA' | 'STAKE') => void;
-  /** Secondary configuration panels (e.g. Telegram verification, Multi-Chain EVM Binding) rendered inside the collapsed disclosure panel. */
+  /** Additional Connected Services panel (e.g. Multi-Chain EVM Binding) displayed beside Telegram Verification. */
   children?: React.ReactNode;
 }
 
@@ -76,6 +79,7 @@ interface OverviewAlertItem {
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   connected,
+  walletAddress,
   shortAddress,
   tier,
   formattedBalance,
@@ -86,14 +90,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   isAdmin = false,
   isVerified = false,
   needsVerification = false,
-  telegramConnected = null,
   favorites = [],
   alphas = [],
   campaigns = [],
   portfolio = null,
   onCopyGenesisCa,
   copiedGenesisCa,
+  onConnectWallet,
   onVerifyWallet,
+  onTelegramStatusChange,
   onOpenAlpha,
   onOpenRaid,
   onUnpinPost,
@@ -166,24 +171,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    if (!needsVerification && isUnlocked && telegramConnected === false) {
-      list.push({
-        id: 'link-telegram',
-        title: 'Telegram Alerts Pending',
-        description: 'Link your Telegram account to receive real-time private call alerts matching your membership tier.',
-        actionLabel: 'Connect Telegram',
-        tone: 'amber',
-        onAction: () => {
-          setSecondaryExpanded(true);
-          setTimeout(() => {
-            document.getElementById('overview-telegram')?.scrollIntoView({ behavior: 'smooth' });
-          }, 80);
-        },
-      });
-    }
-
     return list;
-  }, [connected, needsVerification, onVerifyWallet, shortAddress, membershipTier, isPro, isUnlocked, telegramConnected, onSelectTab]);
+  }, [connected, needsVerification, onVerifyWallet, shortAddress, membershipTier, isPro, onSelectTab]);
 
   return (
     <div className="space-y-4">
@@ -439,8 +428,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 >
                   {alert.id === 'verify-wallet' ? (
                     <KeyRound className="w-4 h-4" />
-                  ) : alert.id === 'link-telegram' ? (
-                    <Send className="w-4 h-4" />
                   ) : (
                     <AlertTriangle className="w-4 h-4" />
                   )}
@@ -469,7 +456,42 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </section>
       )}
 
-      {/* 3. Primary Overview Panels: Unified My Pinned Posts + Personal Account Call History (Sections 12.2 D & E) */}
+      {/* 3. Account Verification & Connected Services — Visible by default (Section 21.3) */}
+      <section
+        id="overview-verification"
+        data-testid="overview-connected-services"
+        aria-label="Account verification and connected services"
+        className="space-y-2.5"
+      >
+        <div className="flex items-center justify-between px-0.5">
+          <div>
+            <h2 className="font-sans text-sm font-extrabold uppercase tracking-wider text-white">
+              Account Verification &amp; Connected Services
+            </h2>
+            <p className="font-sans text-xs text-muted">
+              Verify Telegram group alerts and optional multi-chain EVM notifications
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+          <div id="overview-telegram" className="flex flex-col">
+            <TelegramVerificationCard
+              connected={connected}
+              isPro={isPro}
+              isVerified={isVerified}
+              needsVerification={needsVerification}
+              walletAddress={walletAddress}
+              onVerifyWallet={onVerifyWallet}
+              onConnectWallet={onConnectWallet}
+              onStatusChange={onTelegramStatusChange}
+            />
+          </div>
+          {children}
+        </div>
+      </section>
+
+      {/* 4. Primary Overview Panels: Unified My Pinned Posts + Personal Account Call History (Sections 12.2 D & E) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         <div className="xl:col-span-7 flex flex-col">
           <MyPinnedPosts
@@ -494,7 +516,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* 4. Secondary Account Tools & Analytics — Collapsed by Default (Section 12.2 F) */}
+      {/* 5. Secondary Analytics & Onboarding — Collapsed by Default (Section 12.2 F) */}
       <section
         data-testid="overview-secondary-tools"
         className="rounded-xl bg-surface border border-border-default overflow-hidden"
@@ -510,11 +532,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="flex items-center gap-2">
               <Settings2 className="w-4 h-4 text-brand shrink-0" />
               <span className="font-sans text-sm font-extrabold text-white">
-                Account Tools, Verification &amp; Weekly Analytics
+                Account Tools &amp; Weekly Analytics
               </span>
             </div>
             <p className="font-sans text-xs text-muted">
-              Pro progress tracker, 7-day performance digest, Telegram linking, and EVM alert binding
+              Pro unlock progress tracker, 7-day performance digest, and onboarding checklist
             </p>
           </div>
 
@@ -539,8 +561,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <ProProgressBar isPro={isPro} />
               <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
             </div>
-
-            <div id="overview-telegram">{children}</div>
           </div>
         )}
       </section>

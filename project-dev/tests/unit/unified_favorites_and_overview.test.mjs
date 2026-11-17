@@ -339,7 +339,9 @@ test('DashboardOverview shows conditional action alerts only when unresolved and
 
   try {
     assert.ok(memberAlertView.container.querySelector('[data-testid="overview-alert-upgrade-pro"]'));
-    assert.ok(memberAlertView.container.querySelector('[data-testid="overview-alert-link-telegram"]'));
+    assert.ok(memberAlertView.container.querySelector('[data-testid="overview-connected-services"]'));
+    assert.ok(memberAlertView.container.querySelector('[data-testid="telegram-verification-card"]'));
+    assert.equal(memberAlertView.container.querySelector('[data-testid="overview-alert-link-telegram"]'), null);
   } finally {
     await memberAlertView.cleanup();
     globalThis.fetch = origFetch;

@@ -16,10 +16,7 @@ import { GENESIS_MINT } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
 import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
-import {
-  DashboardStakingCard,
-  TelegramVerificationCard,
-} from '@/components/stake/DashboardStakingCard';
+import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
 import { StakeClientView, type InitialStakeData } from '@/components/stake/StakeClientView';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
@@ -180,7 +177,6 @@ export const IncubatorHub: React.FC = () => {
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
-  const [telegramConnected, setTelegramConnected] = useState<boolean | null>(null);
 
   // Stake Workspace State (/api/stake/status, session-authenticated)
   const [stakeStatusData, setStakeStatusData] = useState<InitialStakeData | null>(null);
@@ -306,27 +302,6 @@ export const IncubatorHub: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [currentTab]);
-
-  // Check Telegram link status for Overview actionable alerts (only when verified & eligible)
-  useEffect(() => {
-    if (!connected || !publicKeyBase58 || !isWalletVerified || !isUnlocked) {
-      queueMicrotask(() => setTelegramConnected(null));
-      return;
-    }
-    let active = true;
-    fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (!active || !json?.telegram) return;
-        setTelegramConnected(Boolean(json.telegram.connected));
-      })
-      .catch(() => {
-        if (active) setTelegramConnected(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [connected, publicKeyBase58, isWalletVerified, isUnlocked]);
 
   const fetchStakeStatus = useCallback(async () => {
     if (!connected || !publicKeyBase58 || !isWalletVerified) {
@@ -703,9 +678,12 @@ export const IncubatorHub: React.FC = () => {
           </div>
         )}
 
-      {/* CONSISTENT WORKSPACE HEADER */}
+      {/* CONSISTENT LAB ANALYSIS DESTINATION HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border-default">
         <div>
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-dim mb-1">
+            Lab Analysis / {WORKSPACE_TITLES[currentTab].title}
+          </div>
           <h2 className="font-sans text-xl sm:text-2xl font-black text-white tracking-tight">
             {WORKSPACE_TITLES[currentTab].title}
           </h2>
@@ -737,10 +715,11 @@ export const IncubatorHub: React.FC = () => {
         </div>
       </div>
 
-      {/* OVERVIEW WORKSPACE */}
+      {/* OVERVIEW */}
       {currentTab === 'OVERVIEW' && (
         <DashboardOverview
           connected={connected}
+          walletAddress={publicKeyBase58}
           shortAddress={shortAddress}
           tier={tier}
           formattedBalance={formattedBalance}
@@ -755,13 +734,13 @@ export const IncubatorHub: React.FC = () => {
             verificationState === 'CONNECTED_UNVERIFIED' ||
             verificationState === 'VERIFICATION_FAILED'
           }
-          telegramConnected={telegramConnected}
           favorites={favorites}
           alphas={alphas}
           campaigns={campaigns}
           portfolio={portfolio}
           onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$H42', e)}
           copiedGenesisCa={copiedId === 'hero-gen-ca'}
+          onConnectWallet={connectWallet}
           onVerifyWallet={() => requestUnlockSignature()}
           onOpenAlpha={(coin, destination) => {
             handleSelectTab(destination);
@@ -790,71 +769,68 @@ export const IncubatorHub: React.FC = () => {
             else if (tab === 'STAKE') handleSelectTab('STAKE');
           }}
         >
-          {/* Single Authoritative Telegram Verification + Multi-Chain EVM Wallet Binding Row inside collapsed Secondary Tools */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-            <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
+          {/* Multi-Chain EVM Wallet Binding sits directly beside Telegram Verification inside Overview Connected Services */}
+          <div className="rounded-xl bg-surface border border-border-default hover:border-brand/50 transition-colors p-4 sm:p-5 flex flex-col justify-between h-full">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-surface-card border border-border-default font-mono text-[11px] font-bold uppercase text-muted">
+                  CROSS-CHAIN ALERTS
+                </span>
+                <span className="font-mono text-[11px] text-dim uppercase tnum">
+                  {boundEvmAddress ? 'EVM MAPPED' : 'OPTIONAL'}
+                </span>
+              </div>
 
-            <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 flex flex-col justify-between h-full">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-surface-card border border-border-default font-mono text-[11px] font-bold uppercase text-muted">
-                    CROSS-CHAIN ALERTS
-                  </span>
-                  <span className="font-mono text-[11px] text-dim uppercase tnum">
-                    {boundEvmAddress ? 'EVM MAPPED' : 'OPTIONAL'}
-                  </span>
-                </div>
-
-                <h3 className="font-sans text-base sm:text-lg font-extrabold text-white uppercase tracking-tight">
+              <div>
+                <h3 className="font-sans text-base font-extrabold text-white tracking-tight">
                   Multi-Chain EVM Binding
                 </h3>
-
-                <p className="font-sans text-xs sm:text-sm text-muted leading-relaxed">
+                <p className="font-sans text-xs text-muted leading-relaxed mt-1">
                   Verified Solana wallet <span className="font-mono text-white tnum">{shortAddress}</span> holds{' '}
                   <strong className="text-brand tnum">{formattedBalance} $H42</strong>. Optionally bind a local 0x address for ETH, Base, BSC, and AVAX call notifications.
                 </p>
               </div>
+            </div>
 
-              <div className="pt-5 mt-auto">
-                {!boundEvmAddress ? (
-                  <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={evmDraft}
-                      onChange={(e) => setEvmDraft(e.target.value)}
-                      placeholder="0x... (EVM address)"
-                      className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
-                    />
-                    <Button
-                      type="submit"
-                      variant="secondary"
-                      size="md"
-                      className="h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-brand shrink-0"
-                    >
-                      {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-brand font-bold uppercase text-xs">MAPPED:</span>
-                      <span className="text-white truncate font-medium tnum">{boundEvmAddress}</span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setBoundEvmAddress('');
-                        setEvmDraft('');
-                      }}
-                      className="h-auto p-0 text-muted hover:text-danger ml-2 text-xs underline shrink-0 hover:bg-transparent"
-                    >
-                      Change
-                    </Button>
+            <div className="pt-4 mt-4 border-t border-border-default/60">
+              {!boundEvmAddress ? (
+                <form onSubmit={handleSaveEvm} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={evmDraft}
+                    onChange={(e) => setEvmDraft(e.target.value)}
+                    placeholder="0x... (EVM address)"
+                    className="flex-1 h-9 px-3 rounded-lg bg-surface-card border border-border-default font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
+                  />
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    size="sm"
+                    className="h-9 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default font-sans text-xs font-bold text-brand shrink-0"
+                  >
+                    {evmSaved ? 'MAPPED ✓' : 'MAP 0x'}
+                  </Button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between w-full px-3.5 py-2 rounded-lg bg-brand-bg border border-brand-border font-mono text-xs">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-brand font-bold uppercase text-xs">MAPPED:</span>
+                    <span className="text-white truncate font-medium tnum">{boundEvmAddress}</span>
                   </div>
-                )}
-              </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setBoundEvmAddress('');
+                      setEvmDraft('');
+                    }}
+                    className="h-auto p-0 text-muted hover:text-danger ml-2 text-xs underline shrink-0 hover:bg-transparent"
+                  >
+                    Change
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </DashboardOverview>

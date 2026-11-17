@@ -205,11 +205,15 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     }
     await adminPresetBtn.click();
 
-    // 1. Overview shows compact account summary, My Pinned Posts, User Call History & collapsed Secondary Tools — NO Ledger embed or Admin Desk
+    // 1. Overview shows compact account summary, Lab Analysis branding, visible Telegram Verification + EVM Connected Services, My Pinned Posts & User Call History
+    await expect(page.locator('body')).toContainText(/Lab Analysis/i);
+    await expect(page.locator('body')).not.toContainText(/Lab Terminal/i);
     await expect(page.locator('body')).toContainText(/Welcome to the Lab/i, { timeout: 15000 });
     await expect(page.locator('body')).toContainText(/Verified Holdings/i);
     await expect(page.locator('body')).toContainText(/Research Access/i);
     await expect(page.locator('body')).toContainText(/Pro Staking/i);
+    await expect(page.getByTestId('overview-connected-services')).toBeVisible();
+    await expect(page.getByTestId('telegram-verification-card')).toBeVisible();
     await expect(page.getByTestId('my-pinned-posts')).toBeVisible();
     await expect(page.getByTestId('user-call-history')).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/Recent Call Performance Ledger/i);
@@ -223,7 +227,6 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page.getByTestId('overview-secondary-content')).toBeVisible();
     await expect(page.getByTestId('pro-progress-bar')).toBeVisible();
     await expect(page.getByTestId('weekly-performance-digest')).toBeVisible();
-    await expect(page.locator('body')).toContainText(/GET CALL NOTIFICATIONS/i);
     await page.getByTestId('toggle-secondary-tools').click();
 
     // 2. Alpha Calls workspace + apply workspace-local filters (chain=SOL, search=NONEXISTENT, view=TABLE)
