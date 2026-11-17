@@ -57,7 +57,7 @@ test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle
   assert.equal(readWorkspaceFromSearch('?tab=unknown'), 'OVERVIEW');
   assert.equal(readWorkspaceFromSearch('?tab=alpha'), 'ALPHA');
   assert.equal(readWorkspaceFromSearch('?tab=MAX_ALPHA'), 'MAX_ALPHA');
-  assert.equal(readWorkspaceFromSearch('?tab=WATCHLIST'), 'WATCHLIST');
+  assert.equal(readWorkspaceFromSearch('?tab=WATCHLIST'), 'OVERVIEW');
   assert.equal(readWorkspaceFromSearch('?tab=SOCIAL'), 'SOCIAL');
   assert.equal(readWorkspaceFromSearch('?tab=stake'), 'STAKE');
   assert.equal(readWorkspaceFromSearch('?tab=admin'), 'ADMIN');
@@ -65,13 +65,12 @@ test('DashboardNavigationContext: readWorkspaceFromSearch & workspaceHref handle
   assert.equal(workspaceHref('OVERVIEW'), '/dashboard');
   assert.equal(workspaceHref('ALPHA'), '/dashboard?tab=ALPHA');
   assert.equal(workspaceHref('MAX_ALPHA'), '/dashboard?tab=MAX_ALPHA');
-  assert.equal(workspaceHref('WATCHLIST'), '/dashboard?tab=WATCHLIST');
   assert.equal(workspaceHref('SOCIAL'), '/dashboard?tab=SOCIAL');
   assert.equal(workspaceHref('STAKE'), '/dashboard?tab=STAKE');
   assert.equal(workspaceHref('ADMIN'), '/dashboard?tab=ADMIN');
 });
 
-test('DashboardSidebar renders all 6 workspaces, active state, counts, and collapse toggle', async () => {
+test('DashboardSidebar renders all 5 primary workspaces (+ Admin), active state, counts, and no Watchlist workspace', async () => {
   const selected = [];
   const view = await renderComponent(
     React.createElement(DashboardSidebar, {
@@ -80,17 +79,17 @@ test('DashboardSidebar renders all 6 workspaces, active state, counts, and colla
       itemState: {
         ALPHA: { count: 7, locked: false },
         MAX_ALPHA: { locked: true },
-        WATCHLIST: { count: 2, locked: false },
         SOCIAL: { count: 4 },
       },
     })
   );
 
   try {
-    const expectedIds = ['tab-overview', 'tab-alpha', 'tab-max-alpha', 'tab-watchlist', 'tab-social', 'tab-stake'];
+    const expectedIds = ['tab-overview', 'tab-alpha', 'tab-max-alpha', 'tab-social', 'tab-stake'];
     for (const id of expectedIds) {
       assert.ok(view.container.querySelector(`[data-testid="${id}"]`), `Missing sidebar item ${id}`);
     }
+    assert.equal(view.container.querySelector('[data-testid="tab-watchlist"]'), null, 'Watchlist workspace must be removed');
     assert.equal(view.container.querySelector('[data-testid="tab-admin"]'), null, 'Non-admin must not see Admin sidebar item');
 
     const adminView = await renderComponent(
@@ -164,8 +163,10 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
       alphasCount: 12,
       newCallsCount: 3,
       raidsCount: 2,
-      watchlistCount: 4,
       isUnlocked: true,
+      isVerified: true,
+      needsVerification: false,
+      telegramConnected: true,
       onCopyGenesisCa: () => {
         copied = true;
       },
@@ -181,13 +182,21 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
     assert.ok(text.includes('MEMBER TIER'));
     assert.ok(text.includes('FzFu...7p3e'));
     assert.ok(text.includes('1,250,000 $H42'));
-    assert.ok(text.includes('Unlocked (Standard Calls)'));
+    assert.ok(text.includes('Unlocked (Live Feeds)'));
     assert.ok(text.includes('Copy $H42 CA'));
     assert.ok(text.includes('Buy $H42'));
-    assert.ok(text.includes('ACTIVE CALLS'));
-    assert.ok(text.includes('NEW CALLS'));
-    assert.ok(text.includes('ACTIVE RAIDS'));
-    assert.ok(text.includes('SAVED WATCHLIST'));
+    assert.ok(text.includes('Active Calls'));
+    assert.ok(text.includes('New Calls'));
+    assert.ok(text.includes('Active Raids'));
+    assert.ok(text.includes('My Pinned Posts'));
+    assert.ok(view.container.querySelector('[data-testid="my-pinned-posts"]'));
+    assert.ok(view.container.querySelector('[data-testid="user-call-history"]'));
+    assert.equal(view.container.querySelector('[data-testid="overview-secondary-content"]'), null);
+
+    const toolsToggle = view.container.querySelector('[data-testid="toggle-secondary-tools"]');
+    await act(async () => {
+      toolsToggle.dispatchEvent(new dom.Event('click', { bubbles: true }));
+    });
     assert.ok(view.container.querySelector('[data-testid="pro-progress-bar"]'));
     assert.ok(view.container.querySelector('[data-testid="weekly-performance-digest"]'));
 
@@ -198,7 +207,7 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
     });
     assert.equal(copied, true);
 
-    const activeCallsShortcut = buttons.find((b) => b.textContent.includes('ACTIVE CALLS'));
+    const activeCallsShortcut = buttons.find((b) => b.textContent.includes('Active Calls'));
     await act(async () => {
       activeCallsShortcut.dispatchEvent(new dom.Event('click', { bubbles: true }));
     });
@@ -210,14 +219,18 @@ test('DashboardOverview preserves account telemetry, token actions, Pro progress
   }
 });
 
-test('Architecture constraints: Watchlist saved-IDs only, dedicated Admin workspace, isolated filters, no duplicate Staking card', () => {
+test('Architecture constraints: Unified favorites/Watchlist migration, no Ledger embed on Overview, dedicated Admin workspace, isolated filters, no duplicate Staking card', () => {
   const hubSrc = fs.readFileSync(
     path.join(process.cwd(), 'src/components/dashboard/IncubatorHub.tsx'),
     'utf-8'
   );
   assert.ok(
+    !hubSrc.includes('<DashboardLedgerEmbed'),
+    'Overview / IncubatorHub must NOT embed Public Activity Ledger'
+  );
+  assert.ok(
     hubSrc.includes('watchlist.includes(a.id)') && !hubSrc.includes('watchlistMode'),
-    'Watchlist workspace must resolve strictly from personal watchlist.includes(a.id), not a fake platform feed mode'
+    'Pinned calls check must exclude fake WATCHLIST feed mode'
   );
   assert.ok(
     /a\.callType === 'MAX_ALPHA'\s*\|\|\s*Boolean\(a\.isMaxAlpha\)/.test(hubSrc),

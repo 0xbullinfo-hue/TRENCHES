@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { AlphaItem, Campaign, Chain } from '@/lib/types';
+import type { AlphaItem, Campaign, Chain, FavoritePostKind } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -26,12 +26,10 @@ import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal'
 import { CampaignSection } from '@/components/campaigns/CampaignSection';
 import { AdminWorkspace } from '@/components/admin/AdminWorkspace';
 import { DashboardOverview } from './DashboardOverview';
-import { DashboardLedgerEmbed } from '@/components/ledger/DashboardLedgerEmbed';
 import {
   useDashboardNavigation,
   type DashboardWorkspace,
 } from './DashboardNavigationContext';
-import { WatchlistView } from './WatchlistView';
 import {
   FILTER_CHAINS,
   WorkspaceFilterBar,
@@ -53,30 +51,29 @@ import {
 } from 'lucide-react';
 
 export type DashboardTab = DashboardWorkspace;
-type FilterableWorkspace = 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST';
+type FilterableWorkspace = 'ALPHA' | 'MAX_ALPHA';
 
 const DASHBOARD_TABS: DashboardTab[] = [
   'OVERVIEW',
   'ALPHA',
   'SOCIAL',
-  'WATCHLIST',
   'MAX_ALPHA',
   'STAKE',
   'ADMIN',
 ];
 
-/** Reads `?tab=` from the current URL. Missing/unknown values resolve to the Overview landing workspace. */
+/** Reads `?tab=` from the current URL. Missing/unknown/legacy Watchlist values resolve to Overview. */
 const readTabFromUrl = (): DashboardTab => {
   if (typeof window === 'undefined') return 'OVERVIEW';
   const tabParam = new URLSearchParams(window.location.search).get('tab')?.toUpperCase();
+  if (tabParam === 'WATCHLIST') return 'OVERVIEW';
   return DASHBOARD_TABS.includes(tabParam as DashboardTab) ? (tabParam as DashboardTab) : 'OVERVIEW';
 };
 
 const WORKSPACE_TITLES: Record<DashboardTab, { title: string; subtitle: string }> = {
-  OVERVIEW: { title: 'Overview', subtitle: 'Account telemetry, holdings, membership and verified activity' },
+  OVERVIEW: { title: 'Overview', subtitle: 'Account summary, pinned posts, membership and call history' },
   ALPHA: { title: 'Alpha Calls', subtitle: 'Curated multi-chain trade setups with entry, TP and SL telemetry' },
   MAX_ALPHA: { title: 'Max Alpha', subtitle: 'High-conviction Pro setups restricted to StakePoint & Pro members' },
-  WATCHLIST: { title: 'Watchlist', subtitle: 'Your personal saved calls and per-token opt-in Telegram alerts' },
   SOCIAL: { title: 'Raid', subtitle: 'Community X reward campaigns and proof submissions' },
   STAKE: { title: 'Stake $H42', subtitle: 'StakePoint 90-day staking, transaction verification and Pro access' },
   ADMIN: { title: 'Admin Desk', subtitle: 'Centralized content publishing, drafts, archive and Raid management' },
@@ -85,7 +82,6 @@ const WORKSPACE_TITLES: Record<DashboardTab, { title: string; subtitle: string }
 const FILTER_PLACEHOLDERS: Record<FilterableWorkspace, string> = {
   ALPHA: 'Search Alpha Calls (token, ticker, CA, caller)...',
   MAX_ALPHA: 'Search Max Alpha calls (token, ticker, CA, caller)...',
-  WATCHLIST: 'Search your saved Watchlist tokens...',
 };
 
 export const IncubatorHub: React.FC = () => {
@@ -104,6 +100,9 @@ export const IncubatorHub: React.FC = () => {
     adminActionError,
     watchlist,
     toggleWatchlist,
+    favorites = [],
+    toggleFavorite,
+    portfolio,
     boundEvmAddress,
     setBoundEvmAddress,
     createAlphaCall,
@@ -123,13 +122,12 @@ export const IncubatorHub: React.FC = () => {
   const [fallbackTab, setFallbackTab] = useState<DashboardTab>('OVERVIEW');
   const currentTab: DashboardTab = navCtx ? navCtx.activeWorkspace : fallbackTab;
 
-  // Strictly isolated per-workspace filter states (Section 18.4)
+  // Strictly isolated per-workspace filter states (Section 10)
   const [filtersByWorkspace, setFiltersByWorkspace] = useState<
     Record<FilterableWorkspace, WorkspaceFilterState>
   >(() => ({
     ALPHA: createDefaultFilterState(),
     MAX_ALPHA: createDefaultFilterState(),
-    WATCHLIST: createDefaultFilterState(),
   }));
 
   const updateWorkspaceFilter = useCallback(
@@ -182,6 +180,7 @@ export const IncubatorHub: React.FC = () => {
   // Community Campaigns State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [telegramConnected, setTelegramConnected] = useState<boolean | null>(null);
 
   // Stake Workspace State (/api/stake/status, session-authenticated)
   const [stakeStatusData, setStakeStatusData] = useState<InitialStakeData | null>(null);
@@ -296,6 +295,39 @@ export const IncubatorHub: React.FC = () => {
     verificationState !== 'CONNECTED_UNVERIFIED' &&
     verificationState !== 'VERIFICATION_FAILED';
 
+  // Legacy ?tab=WATCHLIST links redirect cleanly onto Overview and focus My Pinned Posts
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const rawTab = new URLSearchParams(window.location.search).get('tab')?.toUpperCase();
+    if (rawTab === 'WATCHLIST' && currentTab === 'OVERVIEW') {
+      const timer = setTimeout(() => {
+        document.getElementById('pinned-posts')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentTab]);
+
+  // Check Telegram link status for Overview actionable alerts (only when verified & eligible)
+  useEffect(() => {
+    if (!connected || !publicKeyBase58 || !isWalletVerified || !isUnlocked) {
+      queueMicrotask(() => setTelegramConnected(null));
+      return;
+    }
+    let active = true;
+    fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!active || !json?.telegram) return;
+        setTelegramConnected(Boolean(json.telegram.connected));
+      })
+      .catch(() => {
+        if (active) setTelegramConnected(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [connected, publicKeyBase58, isWalletVerified, isUnlocked]);
+
   const fetchStakeStatus = useCallback(async () => {
     if (!connected || !publicKeyBase58 || !isWalletVerified) {
       setStakeStatusData(null);
@@ -395,7 +427,6 @@ export const IncubatorHub: React.FC = () => {
       case 'STAKE':
         return true;
       case 'ALPHA':
-      case 'WATCHLIST':
         return currentMembershipTier === 'MEMBER' || currentMembershipTier === 'PRO';
       case 'MAX_ALPHA':
         return currentMembershipTier === 'PRO';
@@ -431,19 +462,24 @@ export const IncubatorHub: React.FC = () => {
     );
   }, [alphas, currentMembershipTier]);
 
-  // Personal Watchlist ONLY uses user saved IDs (never fake WATCHLIST callType)
-  const savedWatchlistItems = useMemo(() => {
-    if (currentMembershipTier === 'FREE') return [];
-    return alphas.filter(
-      (a) =>
-        watchlist.includes(a.id) &&
-        (isProOrAdmin || (!a.isMaxAlpha && a.callType !== 'MAX_ALPHA' && a.callType !== 'WATCHLIST'))
-    );
-  }, [alphas, watchlist, currentMembershipTier, isProOrAdmin]);
+  const totalPinnedCount = useMemo(() => {
+    const savedCallCount =
+      currentMembershipTier === 'FREE'
+        ? 0
+        : alphas.filter(
+            (a) =>
+              watchlist.includes(a.id) &&
+              a.callType !== 'WATCHLIST' &&
+              (isProOrAdmin || (!a.isMaxAlpha && a.callType !== 'MAX_ALPHA'))
+          ).length;
+    const savedRaidCount = favorites.filter(
+      (f) => f.kind === 'RAID' && campaigns.some((c) => c.id === f.id)
+    ).length;
+    return savedCallCount + savedRaidCount;
+  }, [currentMembershipTier, alphas, watchlist, isProOrAdmin, favorites, campaigns]);
 
   const alphaCallsCount = alphaCallsList.length;
   const maxAlphaCallsCount = maxAlphaCallsList.length;
-  const savedWatchlistCount = savedWatchlistItems.length;
 
   const activeRaidsCount = useMemo(() => {
     // eslint-disable-next-line react-hooks/purity
@@ -457,11 +493,14 @@ export const IncubatorHub: React.FC = () => {
     return alphaCallsList.filter((a) => a.ageMinutes <= 180).length;
   }, [alphaCallsList]);
 
-  // Publish live counts & locks to DashboardSidebar
+  // Publish live counts & locks to DashboardSidebar (Overview, Alpha Calls, Max Alpha, Raid, Stake + Admin)
   const setSidebarItemState = navCtx?.setItemState;
   useEffect(() => {
     if (!setSidebarItemState) return;
     setSidebarItemState({
+      OVERVIEW: {
+        count: totalPinnedCount > 0 ? totalPinnedCount : undefined,
+      },
       ALPHA: {
         locked: currentMembershipTier === 'FREE',
         count: currentMembershipTier === 'FREE' ? undefined : alphaCallsCount,
@@ -470,28 +509,24 @@ export const IncubatorHub: React.FC = () => {
         locked: currentMembershipTier !== 'PRO',
         count: currentMembershipTier !== 'PRO' ? undefined : maxAlphaCallsCount,
       },
-      WATCHLIST: {
-        locked: currentMembershipTier === 'FREE',
-        count: currentMembershipTier === 'FREE' ? undefined : savedWatchlistCount,
-      },
       SOCIAL: {
         count: campaigns.length,
       },
       ...(isAdmin
         ? {
-            ADMIN: {
-              locked: false,
-              count: adminAlphas?.length ?? alphas.length,
-            },
-          }
+          ADMIN: {
+            locked: false,
+            count: adminAlphas?.length ?? alphas.length,
+          },
+        }
         : {}),
     });
   }, [
     setSidebarItemState,
+    totalPinnedCount,
     currentMembershipTier,
     alphaCallsCount,
     maxAlphaCallsCount,
-    savedWatchlistCount,
     campaigns.length,
     isAdmin,
     adminAlphas?.length,
@@ -499,9 +534,7 @@ export const IncubatorHub: React.FC = () => {
   ]);
 
   const activeFilterableWorkspace: FilterableWorkspace | null =
-    currentTab === 'ALPHA' || currentTab === 'MAX_ALPHA' || currentTab === 'WATCHLIST'
-      ? currentTab
-      : null;
+    currentTab === 'ALPHA' || currentTab === 'MAX_ALPHA' ? currentTab : null;
 
   const activeFilterState = useMemo(
     () =>
@@ -515,9 +548,8 @@ export const IncubatorHub: React.FC = () => {
     if (!isCurrentTabAuthorized) return [];
     if (currentTab === 'ALPHA') return alphaCallsList;
     if (currentTab === 'MAX_ALPHA') return maxAlphaCallsList;
-    if (currentTab === 'WATCHLIST') return savedWatchlistItems;
     return [];
-  }, [isCurrentTabAuthorized, currentTab, alphaCallsList, maxAlphaCallsList, savedWatchlistItems]);
+  }, [isCurrentTabAuthorized, currentTab, alphaCallsList, maxAlphaCallsList]);
 
   const chainCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: currentTabBaseAlphas.length };
@@ -606,7 +638,6 @@ export const IncubatorHub: React.FC = () => {
     return (
       <div className="space-y-8">
         <LockedTerminal />
-        {currentTab === 'OVERVIEW' && <DashboardLedgerEmbed />}
       </div>
     );
   }
@@ -617,9 +648,8 @@ export const IncubatorHub: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none ${
-            toastType === 'error' ? 'border-danger text-danger' : 'border-brand text-white'
-          }`}
+          className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg bg-surface border font-sans text-xs font-semibold flex items-center gap-2.5 shadow-none ${toastType === 'error' ? 'border-danger text-danger' : 'border-brand text-white'
+            }`}
         >
           {toastType === 'error' ? (
             <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
@@ -630,44 +660,48 @@ export const IncubatorHub: React.FC = () => {
         </div>
       )}
 
-      {/* WALLET SIGNATURE / VERIFICATION BANNER */}
-      {connected && (needsSignature || verificationState === 'CONNECTED_UNVERIFIED' || verificationState === 'VERIFICATION_FAILED') && (
-        <div className="rounded-xl bg-surface border-2 border-brand p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-card border border-brand flex items-center justify-center text-brand shrink-0">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-sans text-xs font-black uppercase text-brand tracking-wide">
-                  CRYPTOGRAPHIC VERIFICATION REQUIRED
-                </span>
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 font-bold">
-                  {verificationState === 'VERIFICATION_FAILED' ? 'SIGNATURE FAILED' : 'ACTION REQUIRED'}
-                </span>
+      {/* WALLET SIGNATURE / VERIFICATION BANNER (Rendered inside Overview Alerts when on Overview) */}
+      {currentTab !== 'OVERVIEW' &&
+        connected &&
+        (needsSignature ||
+          verificationState === 'CONNECTED_UNVERIFIED' ||
+          verificationState === 'VERIFICATION_FAILED') && (
+          <div className="rounded-xl bg-surface border-2 border-brand p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-surface-card border border-brand flex items-center justify-center text-brand shrink-0">
+                <KeyRound className="w-5 h-5" />
               </div>
-              <p className="font-sans text-xs text-muted leading-relaxed">
-                Sign a one-time message in your wallet to verify ownership of <strong className="text-white tnum">{shortAddress}</strong> and unlock your membership access &amp; trade calls. No transaction fee.
-              </p>
-              {apiError && verificationState === 'VERIFICATION_FAILED' && (
-                <p role="alert" className="font-mono text-xs text-danger font-semibold">{apiError}</p>
-              )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-sans text-xs font-black uppercase text-brand tracking-wide">
+                    CRYPTOGRAPHIC VERIFICATION REQUIRED
+                  </span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 font-bold">
+                    {verificationState === 'VERIFICATION_FAILED' ? 'SIGNATURE FAILED' : 'ACTION REQUIRED'}
+                  </span>
+                </div>
+                <p className="font-sans text-xs text-muted leading-relaxed">
+                  Sign a one-time message in your wallet to verify ownership of <strong className="text-white tnum">{shortAddress}</strong> and unlock your membership access &amp; trade calls. No transaction fee.
+                </p>
+                {apiError && verificationState === 'VERIFICATION_FAILED' && (
+                  <p role="alert" className="font-mono text-xs text-danger font-semibold">{apiError}</p>
+                )}
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={() => requestUnlockSignature()}
+              disabled={apiLoading || verificationState === 'VERIFYING'}
+              loading={apiLoading || verificationState === 'VERIFYING'}
+              className="min-h-[44px] px-6 text-xs font-black uppercase shrink-0"
+            >
+              <KeyRound className="w-4 h-4 mr-2" />
+              <span>VERIFY WALLET</span>
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="primary"
-            size="lg"
-            onClick={() => requestUnlockSignature()}
-            disabled={apiLoading || verificationState === 'VERIFYING'}
-            loading={apiLoading || verificationState === 'VERIFYING'}
-            className="min-h-[44px] px-6 text-xs font-black uppercase shrink-0"
-          >
-            <KeyRound className="w-4 h-4 mr-2" />
-            <span>VERIFY WALLET</span>
-          </Button>
-        </div>
-      )}
+        )}
 
       {/* CONSISTENT WORKSPACE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border-default">
@@ -713,23 +747,50 @@ export const IncubatorHub: React.FC = () => {
           alphasCount={alphaCallsCount}
           newCallsCount={newCallsCount}
           raidsCount={activeRaidsCount}
-          watchlistCount={savedWatchlistCount}
           isUnlocked={isUnlocked}
+          isAdmin={isAdmin}
+          isVerified={isWalletVerified}
+          needsVerification={
+            needsSignature ||
+            verificationState === 'CONNECTED_UNVERIFIED' ||
+            verificationState === 'VERIFICATION_FAILED'
+          }
+          telegramConnected={telegramConnected}
+          favorites={favorites}
+          alphas={alphas}
+          campaigns={campaigns}
+          portfolio={portfolio}
           onCopyGenesisCa={(e) => handleCopyText(GENESIS_MINT, 'hero-gen-ca', '$H42', e)}
           copiedGenesisCa={copiedId === 'hero-gen-ca'}
+          onVerifyWallet={() => requestUnlockSignature()}
+          onOpenAlpha={(coin, destination) => {
+            handleSelectTab(destination);
+            setInspectedToken(coin);
+          }}
+          onOpenRaid={(campaignId) => {
+            handleSelectTab('SOCIAL');
+            setTimeout(() => {
+              document
+                .querySelector(`[data-testid="favorite-raid-${campaignId}"]`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 90);
+          }}
+          onUnpinPost={(kind: FavoritePostKind, id: string) => {
+            toggleFavorite?.(kind, id);
+            showToast('Removed post from My Pinned Posts.');
+          }}
           onSelectFilter={(f) => {
             if (f === 'all') updateWorkspaceFilter('ALPHA', { activeFilter: 'ALL' });
             else if (f === 'new') updateWorkspaceFilter('ALPHA', { activeFilter: 'NEW' });
           }}
           onSelectTab={(tab) => {
-            if (tab === 'ALPHA' || tab === 'alphas') handleSelectTab('ALPHA');
-            else if (tab === 'SOCIAL' || tab === 'raids') handleSelectTab('SOCIAL');
-            else if (tab === 'WATCHLIST') handleSelectTab('WATCHLIST');
+            if (tab === 'ALPHA') handleSelectTab('ALPHA');
+            else if (tab === 'SOCIAL') handleSelectTab('SOCIAL');
             else if (tab === 'MAX_ALPHA') handleSelectTab('MAX_ALPHA');
             else if (tab === 'STAKE') handleSelectTab('STAKE');
           }}
         >
-          {/* Single Authoritative Telegram Verification + Multi-Chain EVM Wallet Binding Row (no duplicate staking card) */}
+          {/* Single Authoritative Telegram Verification + Multi-Chain EVM Wallet Binding Row inside collapsed Secondary Tools */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
             <TelegramVerificationCard connected={connected} isPro={isUnlocked} />
 
@@ -796,9 +857,6 @@ export const IncubatorHub: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Historical Verified Multipliers Ledger */}
-          <DashboardLedgerEmbed />
         </DashboardOverview>
       )}
 
@@ -977,6 +1035,8 @@ export const IncubatorHub: React.FC = () => {
                   isAdmin={false}
                   campaigns={campaigns}
                   loading={campaignsLoading}
+                  favoritedIds={favorites.filter((f) => f.kind === 'RAID').map((f) => f.id)}
+                  onToggleFavorite={connected && toggleFavorite ? (campaignId) => toggleFavorite('RAID', campaignId) : undefined}
                   onRefresh={fetchCampaigns}
                 />
               </div>
@@ -1033,15 +1093,6 @@ export const IncubatorHub: React.FC = () => {
                   </div>
                 )}
 
-                {/* Personal Watchlist Alert Panel (WATCHLIST only) */}
-                {currentTab === 'WATCHLIST' && (
-                  <WatchlistView
-                    watchlistIds={watchlist}
-                    allCalls={savedWatchlistItems}
-                    onToggleWatchlist={toggleWatchlist}
-                  />
-                )}
-
                 {/* Page-Specific Isolated Filter Bar */}
                 {activeFilterableWorkspace && (
                   <WorkspaceFilterBar
@@ -1069,27 +1120,13 @@ export const IncubatorHub: React.FC = () => {
                       ))}
                     </div>
                   ) : filteredTokens.length === 0 ? (
-                    currentTab === 'WATCHLIST' && savedWatchlistCount === 0 ? (
-                      <div className="flex justify-center pt-1">
-                        <Button
-                          type="button"
-                          variant="primary"
-                          size="md"
-                          onClick={() => handleSelectTab('ALPHA')}
-                          className="font-sans text-xs font-black uppercase"
-                        >
-                          Browse Alpha Calls to Star Tokens →
-                        </Button>
-                      </div>
-                    ) : (
-                      <EmptyState
-                        message="No calls match active filters in this workspace."
-                        actionLabel="Clear filters"
-                        onAction={() =>
-                          activeFilterableWorkspace && resetWorkspaceFilters(activeFilterableWorkspace)
-                        }
-                      />
-                    )
+                    <EmptyState
+                      message="No calls match active filters in this workspace."
+                      actionLabel="Clear filters"
+                      onAction={() =>
+                        activeFilterableWorkspace && resetWorkspaceFilters(activeFilterableWorkspace)
+                      }
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
                       {filteredTokens.map(renderUserAlphaCard)}
@@ -1223,11 +1260,10 @@ export const IncubatorHub: React.FC = () => {
                                     {token.takeProfits.map((tp) => (
                                       <span
                                         key={tp.label}
-                                        className={`px-1.5 py-0.5 rounded text-[11px] font-extrabold border ${
-                                          tp.hit
-                                            ? 'bg-brand text-canvas border-brand'
-                                            : 'bg-surface-card text-white border-border-default'
-                                        }`}
+                                        className={`px-1.5 py-0.5 rounded text-[11px] font-extrabold border ${tp.hit
+                                          ? 'bg-brand text-canvas border-brand'
+                                          : 'bg-surface-card text-white border-border-default'
+                                          }`}
                                       >
                                         {tp.label}
                                         {tp.hit ? ' ✓' : ''}
@@ -1249,9 +1285,8 @@ export const IncubatorHub: React.FC = () => {
                                       title="Toggle Watchlist"
                                     >
                                       <Star
-                                        className={`w-3.5 h-3.5 ${
-                                          starred ? 'text-amber fill-amber' : 'text-muted'
-                                        }`}
+                                        className={`w-3.5 h-3.5 ${starred ? 'text-amber fill-amber' : 'text-muted'
+                                          }`}
                                       />
                                     </button>
                                     <a
@@ -1342,9 +1377,8 @@ export const IncubatorHub: React.FC = () => {
 
                             <div className="text-right font-mono tnum shrink-0">
                               <div
-                                className={`text-sm font-bold ${
-                                  coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
-                                }`}
+                                className={`text-sm font-bold ${coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
+                                  }`}
                               >
                                 {formatChangePct(coin.change24hPct)}
                               </div>

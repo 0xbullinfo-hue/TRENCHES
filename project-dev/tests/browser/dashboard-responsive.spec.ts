@@ -25,7 +25,6 @@ const SIDEBAR_TEST_IDS = [
   'tab-overview',
   'tab-alpha',
   'tab-max-alpha',
-  'tab-watchlist',
   'tab-social',
   'tab-stake',
 ];
@@ -144,11 +143,12 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page).toHaveURL(/tab=ALPHA/i);
     await expect(page.locator('body')).toContainText(/GENESIS|MEMBER|UNLOCK|Access/i);
 
-    // Switch to WATCHLIST -> restriction screen shown + Admin item hidden for non-admin
+    // Watchlist workspace removed; Admin item hidden for non-admin; Max Alpha shows restriction
     await page.getByTestId('mobile-nav-trigger').click();
+    await expect(page.getByTestId('tab-watchlist')).toHaveCount(0);
     await expect(page.getByTestId('tab-admin')).toHaveCount(0);
-    await page.getByTestId('tab-watchlist').click();
-    await expect(page).toHaveURL(/tab=WATCHLIST/i);
+    await page.getByTestId('tab-max-alpha').click();
+    await expect(page).toHaveURL(/tab=MAX_ALPHA/i);
     await expect(page.locator('body')).toContainText(/PRO|StakePoint|UNLOCK|Access/i);
 
     // Direct navigation to ?tab=ADMIN fails closed both before and after non-admin wallet connect
@@ -186,7 +186,13 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page.getByTestId('sidebar-collapse-toggle')).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('all 7 workspaces, admin isolation, independent filters, personal watchlist, and stake view work cleanly on desktop and tablet', async ({ page }) => {
+  test('all 6 workspaces, admin isolation, independent filters, unified My Pinned Posts, and stake view work cleanly on desktop and tablet', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'trenchlabs_social_initiation_v1',
+        JSON.stringify({ completed: true, sharedAt: new Date().toISOString() })
+      );
+    });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
 
@@ -199,17 +205,26 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     }
     await adminPresetBtn.click();
 
-    // 1. Overview shows consolidated account sections, Telegram + EVM binding, ledger embed — NO repeated Admin Desk or full Staking card
+    // 1. Overview shows compact account summary, My Pinned Posts, User Call History & collapsed Secondary Tools — NO Ledger embed or Admin Desk
     await expect(page.locator('body')).toContainText(/Welcome to the Lab/i, { timeout: 15000 });
-    await expect(page.locator('body')).toContainText(/VERIFIED BALANCE/i);
-    await expect(page.locator('body')).toContainText(/RESEARCH ACCESS/i);
-    await expect(page.locator('body')).toContainText(/PRO STAKING STATUS/i);
-    await expect(page.getByTestId('pro-progress-bar')).toBeVisible();
-    await expect(page.getByTestId('weekly-performance-digest')).toBeVisible();
-    await expect(page.locator('body')).toContainText(/Recent Call Performance Ledger/i);
-    await expect(page.locator('body')).toContainText(/GET CALL NOTIFICATIONS/i);
+    await expect(page.locator('body')).toContainText(/Verified Holdings/i);
+    await expect(page.locator('body')).toContainText(/Research Access/i);
+    await expect(page.locator('body')).toContainText(/Pro Staking/i);
+    await expect(page.getByTestId('my-pinned-posts')).toBeVisible();
+    await expect(page.getByTestId('user-call-history')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/Recent Call Performance Ledger/i);
+    await expect(page.locator('body')).not.toContainText(/View full ledger/i);
     await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
     await expect(page.locator('body')).not.toContainText(/Staking — \$H42/i);
+
+    // Secondary tools collapsed by default and expand cleanly
+    await expect(page.getByTestId('overview-secondary-content')).toHaveCount(0);
+    await page.getByTestId('toggle-secondary-tools').click();
+    await expect(page.getByTestId('overview-secondary-content')).toBeVisible();
+    await expect(page.getByTestId('pro-progress-bar')).toBeVisible();
+    await expect(page.getByTestId('weekly-performance-digest')).toBeVisible();
+    await expect(page.locator('body')).toContainText(/GET CALL NOTIFICATIONS/i);
+    await page.getByTestId('toggle-secondary-tools').click();
 
     // 2. Alpha Calls workspace + apply workspace-local filters (chain=SOL, search=NONEXISTENT, view=TABLE)
     await page.getByTestId('tab-alpha').click();
@@ -236,17 +251,25 @@ test.describe('TRENCHLABS responsive dashboard release verification', () => {
     await expect(page.getByTestId('view-table-alpha')).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('reset-filters-alpha').click();
 
-    // 4. Watchlist workspace displays ONLY personal saved tokens (no Lab Curated fake feed toggle)
-    await page.getByTestId('tab-watchlist').click();
-    await expect(page).toHaveURL(/tab=WATCHLIST/i);
-    await expect(page.getByTestId('filter-bar-watchlist')).toBeVisible();
-    await expect(page.getByTestId('watchlist-mode-platform')).toHaveCount(0);
+    // 4. Legacy ?tab=WATCHLIST resolves gracefully to Overview & My Pinned Posts
+    await page.goto(`${BASE_URL}/dashboard?tab=WATCHLIST`, { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('my-pinned-posts')).toBeVisible();
 
-    // 5. Raid workspace
+    // 5. Raid workspace + pinning a Raid card into unified My Pinned Posts
     await page.getByTestId('tab-social').click();
     await expect(page).toHaveURL(/tab=SOCIAL/i);
     await expect(page.locator('body')).toContainText(/COMMUNITY REWARD RAIDS/i);
     await expect(page.locator('body')).not.toContainText(/MASTER ADMIN DESK/i);
+
+    const favRaidBtn = page.locator('[data-testid^="favorite-raid-"]').first();
+    if ((await favRaidBtn.count()) > 0 && (await favRaidBtn.isVisible())) {
+      const cardLocked = await page.getByTestId('locked-social-card-gate').count();
+      if (cardLocked === 0) {
+        await favRaidBtn.click();
+        await page.getByTestId('tab-overview').click();
+        await expect(page.getByTestId('my-pinned-posts')).toContainText(/RAID/i);
+      }
+    }
 
     // 6. Stake workspace (exclusive home for DashboardStakingCard + StakeClientView)
     await page.getByTestId('tab-stake').click();

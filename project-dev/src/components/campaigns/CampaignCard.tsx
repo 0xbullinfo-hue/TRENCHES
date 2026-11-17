@@ -23,6 +23,7 @@ import {
   Check,
   Twitter,
   Pin,
+  Star,
   Wallet,
   ShieldCheck,
   RefreshCw,
@@ -40,6 +41,8 @@ export interface CampaignCardProps {
   campaign: Campaign;
   userWallet?: string | null;
   isAdmin?: boolean;
+  isFavorited?: boolean;
+  onToggleFavorite?: (campaignId: string) => void;
   onSubmissionSuccess?: (submission: CampaignSubmission) => void;
   onTogglePin?: (campaignId: string, pinned: boolean) => void;
 }
@@ -59,6 +62,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   campaign,
   userWallet,
   isAdmin = false,
+  isFavorited = false,
+  onToggleFavorite,
   onSubmissionSuccess,
   onTogglePin,
 }) => {
@@ -150,8 +155,36 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
             )}
           </div>
 
-          {isAdmin && (
-            <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
+          <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
+            {onToggleFavorite && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                data-testid={`favorite-raid-${campaign.id}`}
+                aria-label={
+                  isFavorited
+                    ? `Remove ${campaign.title} from pinned posts`
+                    : `Pin ${campaign.title} to My Pinned Posts`
+                }
+                aria-pressed={isFavorited}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(campaign.id);
+                }}
+                className={`h-7 px-2 py-0.5 rounded-md border text-xs font-mono transition-colors inline-flex items-center gap-1 ${
+                  isFavorited
+                    ? 'bg-amber/15 border-amber text-amber font-bold hover:bg-amber/20'
+                    : 'bg-surface-card hover:bg-surface-3 border-border-default text-muted hover:text-amber'
+                }`}
+                title={isFavorited ? 'Unpin from My Pinned Posts' : 'Pin to My Pinned Posts'}
+              >
+                <Star className={`w-3 h-3 ${isFavorited ? 'fill-amber text-amber' : ''}`} />
+                <span className="hidden sm:inline">{isFavorited ? 'SAVED' : 'SAVE'}</span>
+              </Button>
+            )}
+
+            {isAdmin && (
               <Button
                 type="button"
                 variant={campaign.pinned ? 'primary' : 'secondary'}
@@ -169,8 +202,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               >
                 {campaign.pinned ? 'PINNED' : 'PIN'}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Campaign Title & Configured Duration Row (Section 6.2) */}

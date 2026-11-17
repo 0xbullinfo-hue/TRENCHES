@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Campaign, CampaignSubmission } from '@/lib/types';
+import { GenesisContext } from '@/context/GenesisContext';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CampaignCard } from './CampaignCard';
 import {
@@ -18,6 +19,8 @@ interface CampaignSectionProps {
   loading?: boolean;
   onRefresh?: () => void;
   onTogglePin?: (campaignId: string, pinned: boolean) => void;
+  onToggleFavorite?: (campaignId: string) => void;
+  favoritedIds?: string[];
   onSubmissionSuccess?: (submission: CampaignSubmission) => void;
 }
 
@@ -28,8 +31,11 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
   loading: externalLoading,
   onRefresh,
   onTogglePin,
+  onToggleFavorite,
+  favoritedIds,
   onSubmissionSuccess,
 }) => {
+  const genesis = React.useContext(GenesisContext);
   const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
   const [initiationRecord, setInitiationRecord] = useState<InitiationRecord | null>(() => {
@@ -118,10 +124,10 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
         prev.map((c) =>
           c.id === submission.campaignId
             ? {
-                ...c,
-                userSubmission: submission,
-                submissionsCount: (c.submissionsCount || 0) + 1,
-              }
+              ...c,
+              userSubmission: submission,
+              submissionsCount: (c.submissionsCount || 0) + 1,
+            }
             : c
         )
       );
@@ -192,13 +198,24 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-          {campaigns.map((c) =>
-            isInitiationCompleted ? (
+          {campaigns.map((c) => {
+            const isFav = favoritedIds
+              ? favoritedIds.includes(c.id)
+              : Boolean(genesis?.isFavorited?.('RAID', c.id));
+            const handleFav = onToggleFavorite
+              ? onToggleFavorite
+              : genesis?.connected && genesis?.toggleFavorite
+                ? (id: string) => genesis.toggleFavorite?.('RAID', id)
+                : undefined;
+
+            return isInitiationCompleted ? (
               <CampaignCard
                 key={c.id}
                 campaign={c}
                 userWallet={userWallet}
                 isAdmin={isAdmin}
+                isFavorited={isFav}
+                onToggleFavorite={handleFav}
                 onTogglePin={onTogglePin}
                 onSubmissionSuccess={handleInternalSubmissionSuccess}
               />
@@ -232,8 +249,8 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
                   </p>
                 </div>
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       )}
     </div>

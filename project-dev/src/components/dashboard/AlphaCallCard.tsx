@@ -172,8 +172,8 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
                   onToggleWatchlist(coin.id);
                 }}
                 className="w-7 h-7 p-0 border border-border-default hover:bg-surface-3"
-                title="Toggle Watchlist"
-                aria-label={isStarred ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                title={isStarred ? 'Unpin from My Pinned Posts (Watchlist)' : 'Pin to My Pinned Posts (Watchlist)'}
+                aria-label={isStarred ? 'Remove from My Pinned Posts (Watchlist)' : 'Add to My Pinned Posts (Watchlist)'}
               >
                 <Star
                   className={`w-3.5 h-3.5 ${isStarred ? 'text-amber fill-amber' : 'text-muted'

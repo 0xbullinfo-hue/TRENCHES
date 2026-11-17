@@ -6,6 +6,7 @@ import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
 import { getGenesisPrice } from '@/server/price';
 import { DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
+import type { FavoritePostKind, FavoritePostRecord } from '@/lib/types';
 
 export { TOKEN_DECIMALS, TOKEN_SYMBOL };
 
@@ -108,6 +109,7 @@ interface TrenchDatabaseSchema {
   ledger_entries: LedgerEntryRow[];
   audit_logs: AuditLogRow[];
   raid_challenges?: RaidChallengeRow[];
+  user_favorites?: Record<string, FavoritePostRecord[]>;
 }
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
@@ -192,6 +194,7 @@ function buildInitialSeed(): TrenchDatabaseSchema {
     ledger_entries: [],
     audit_logs: [],
     raid_challenges: [],
+    user_favorites: {},
   };
 }
 
@@ -708,6 +711,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
       if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
       if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
       if (!Array.isArray(parsed.raid_challenges)) parsed.raid_challenges = [];
+      if (!parsed.user_favorites || typeof parsed.user_favorites !== 'object') parsed.user_favorites = {};
       return parsed;
     } catch (err) {
       console.error('[TrenchLabs DB] Stored database is unreadable:', err);
@@ -728,6 +732,7 @@ export async function loadDb(): Promise<TrenchDatabaseSchema> {
           if (!Array.isArray(parsed.telegram_members)) parsed.telegram_members = [];
           if (!Array.isArray(parsed.audit_logs)) parsed.audit_logs = [];
           if (!Array.isArray(parsed.raid_challenges)) parsed.raid_challenges = [];
+          if (!parsed.user_favorites || typeof parsed.user_favorites !== 'object') parsed.user_favorites = {};
           inMemoryDb = parsed;
           return inMemoryDb;
         }
@@ -1709,6 +1714,83 @@ export async function recordAuditLog(
       db.audit_logs = db.audit_logs.slice(0, 1000);
     }
     await saveDb(db);
+  });
+}
+
+// -------------------------------------------------------------
+// Database Operations: User Favorites / Pinned Posts
+// -------------------------------------------------------------
+
+function favoriteIdentityKey(item: Pick<FavoritePostRecord, 'id' | 'kind'>): string {
+  return `${item.kind === 'RAID' ? 'RAID' : 'CALL'}:${item.id}`;
+}
+
+export async function getUserFavorites(walletAddress: string): Promise<FavoritePostRecord[]> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const list = db.user_favorites?.[walletAddress];
+    return Array.isArray(list) ? [...list] : [];
+  });
+}
+
+export async function setUserFavorite(
+  walletAddress: string,
+  item: { id: string; kind: FavoritePostKind },
+  active: boolean
+): Promise<FavoritePostRecord[]> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!db.user_favorites || typeof db.user_favorites !== 'object') {
+      db.user_favorites = {};
+    }
+    const existing = Array.isArray(db.user_favorites[walletAddress])
+      ? db.user_favorites[walletAddress]
+      : [];
+    const targetKey = favoriteIdentityKey(item);
+    const filtered = existing.filter((entry) => favoriteIdentityKey(entry) !== targetKey);
+
+    const next = active
+      ? [{ id: item.id, kind: item.kind, createdAt: new Date().toISOString() }, ...filtered].slice(0, 200)
+      : filtered;
+
+    db.user_favorites[walletAddress] = next;
+    await saveDb(db);
+    return [...next];
+  });
+}
+
+export async function mergeUserFavorites(
+  walletAddress: string,
+  items: Array<{ id: string; kind: FavoritePostKind; createdAt?: string }>
+): Promise<FavoritePostRecord[]> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    if (!db.user_favorites || typeof db.user_favorites !== 'object') {
+      db.user_favorites = {};
+    }
+    const existing = Array.isArray(db.user_favorites[walletAddress])
+      ? db.user_favorites[walletAddress]
+      : [];
+
+    const mergedMap = new Map<string, FavoritePostRecord>();
+    for (const entry of existing) {
+      mergedMap.set(favoriteIdentityKey(entry), entry);
+    }
+    for (const incoming of items) {
+      const key = favoriteIdentityKey(incoming);
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, {
+          id: incoming.id,
+          kind: incoming.kind,
+          createdAt: incoming.createdAt || new Date().toISOString(),
+        });
+      }
+    }
+
+    const next = Array.from(mergedMap.values()).slice(0, 200);
+    db.user_favorites[walletAddress] = next;
+    await saveDb(db);
+    return [...next];
   });
 }
 

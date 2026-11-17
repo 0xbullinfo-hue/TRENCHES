@@ -157,6 +157,14 @@ export interface AllocationRecord {
   sig: string;
 }
 
+export type FavoritePostKind = 'ALPHA' | 'MAX_ALPHA' | 'RAID';
+
+export interface FavoritePostRecord {
+  id: string;
+  kind: FavoritePostKind;
+  createdAt: string;
+}
+
 export interface Portfolio {
   claimedCount: number;
   totalRealizedPnl: string;

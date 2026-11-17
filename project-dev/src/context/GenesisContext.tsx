@@ -11,6 +11,8 @@ import type {
   AlphaItem,
   CallType,
   Chain,
+  FavoritePostKind,
+  FavoritePostRecord,
   Portfolio,
   SyndicateCaller,
 } from '@/lib/types';
@@ -78,6 +80,9 @@ export interface GenesisContextValue {
 
   watchlist: string[];
   toggleWatchlist: (tokenId: string) => void;
+  favorites?: FavoritePostRecord[];
+  toggleFavorite?: (kind: FavoritePostKind, id: string) => void;
+  isFavorited?: (kind: FavoritePostKind, id: string) => boolean;
   recordAllocation: (ticker: string, chain: Chain, amountSol: string) => void;
 
   searchQuery: string;

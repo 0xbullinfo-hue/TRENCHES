@@ -1,11 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
+import type {
+  AlphaItem,
+  Campaign,
+  FavoritePostKind,
+  FavoritePostRecord,
+  Portfolio,
+} from '@/lib/types';
 import {
+  AlertTriangle,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -13,6 +21,10 @@ import {
   Copy,
   Flame,
   Gift,
+  KeyRound,
+  Send,
+  Settings2,
+  ShieldCheck,
   Sparkles,
   Star,
   Target,
@@ -21,8 +33,10 @@ import {
 import { ProProgressBar } from './ProProgressBar';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import { WeeklyPerformanceDigest } from './WeeklyPerformanceDigest';
+import { MyPinnedPosts } from './MyPinnedPosts';
+import { UserCallHistoryPanel } from './UserCallHistoryPanel';
 
-interface DashboardOverviewProps {
+export interface DashboardOverviewProps {
   connected: boolean;
   shortAddress: string;
   tier: { id: string; label?: string; multiplier?: number };
@@ -30,14 +44,34 @@ interface DashboardOverviewProps {
   alphasCount: number;
   newCallsCount: number;
   raidsCount: number;
-  watchlistCount: number;
   isUnlocked: boolean;
+  isAdmin?: boolean;
+  isVerified?: boolean;
+  needsVerification?: boolean;
+  telegramConnected?: boolean | null;
+  favorites?: FavoritePostRecord[];
+  alphas?: AlphaItem[];
+  campaigns?: Campaign[];
+  portfolio?: Portfolio | null;
   onCopyGenesisCa: (e: React.MouseEvent) => void;
   copiedGenesisCa: boolean;
+  onVerifyWallet?: () => void;
+  onOpenAlpha?: (coin: AlphaItem, destination: 'ALPHA' | 'MAX_ALPHA') => void;
+  onOpenRaid?: (campaignId: string) => void;
+  onUnpinPost?: (kind: FavoritePostKind, id: string) => void;
   onSelectFilter?: (filter: 'all' | 'new') => void;
-  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'WATCHLIST' | 'MAX_ALPHA' | 'STAKE' | 'alphas' | 'raids') => void;
-  /** Extra account sections rendered below the performance digest (e.g. Telegram, Staking, Verified Ledger). */
+  onSelectTab?: (tab: 'ALPHA' | 'SOCIAL' | 'MAX_ALPHA' | 'STAKE') => void;
+  /** Secondary configuration panels (e.g. Telegram verification, Multi-Chain EVM Binding) rendered inside the collapsed disclosure panel. */
   children?: React.ReactNode;
+}
+
+interface OverviewAlertItem {
+  id: string;
+  title: string;
+  description: string;
+  actionLabel: string;
+  tone: 'brand' | 'amber' | 'danger';
+  onAction: () => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -48,38 +82,129 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   alphasCount,
   newCallsCount,
   raidsCount,
-  watchlistCount,
   isUnlocked,
+  isAdmin = false,
+  isVerified = false,
+  needsVerification = false,
+  telegramConnected = null,
+  favorites = [],
+  alphas = [],
+  campaigns = [],
+  portfolio = null,
   onCopyGenesisCa,
   copiedGenesisCa,
+  onVerifyWallet,
+  onOpenAlpha,
+  onOpenRaid,
+  onUnpinPost,
   onSelectFilter,
   onSelectTab,
   children,
 }) => {
-  const [shortcutsOpen, setShortcutsOpen] = useState(true);
-  const isPro = tier.id === 'PRO';
-  const isMember = tier.id === 'MEMBER' || tier.id === 'LAB_MEMBER';
+  // Secondary analytics, setup checklist & Telegram/EVM forms are collapsed by default to keep Overview compact (Section 12.2 F)
+  const [secondaryExpanded, setSecondaryExpanded] = useState(false);
+
+  const isPro = isAdmin || tier.id === 'PRO';
+  const isMember = !isPro && (tier.id === 'MEMBER' || tier.id === 'LAB_MEMBER');
+  const membershipTier: 'FREE' | 'MEMBER' | 'PRO' = isPro ? 'PRO' : isMember ? 'MEMBER' : 'FREE';
   const tierDisplayName = isPro ? 'PRO TIER' : isMember ? 'MEMBER TIER' : 'FREE TIER';
 
-  return (
-    <div className="space-y-5">
-      {/* 0. Onboarding Checklist (Instruction 36) */}
-      <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
+  // Compute accessible pinned count consistently with MyPinnedPosts rules
+  const accessiblePinnedCount = useMemo(() => {
+    const alphaIds = new Map(alphas.map((a) => [a.id, a]));
+    const campaignIds = new Set(campaigns.map((c) => c.id));
+    const seen = new Set<string>();
+    for (const fav of favorites) {
+      if (fav.kind === 'RAID') {
+        if (campaignIds.has(fav.id)) seen.add(`RAID:${fav.id}`);
+        continue;
+      }
+      const alpha = alphaIds.get(fav.id);
+      if (!alpha || alpha.callType === 'WATCHLIST') continue;
+      if (membershipTier === 'FREE' && !isAdmin) continue;
+      const isMax =
+        alpha.callType === 'MAX_ALPHA' ||
+        Boolean(alpha.isMaxAlpha) ||
+        (Boolean(alpha.destinations?.includes('MAX_ALPHA')) && !alpha.destinations?.includes('ALPHA'));
+      if (isMax && !isPro) continue;
+      seen.add(`CALL:${fav.id}`);
+    }
+    return seen.size;
+  }, [favorites, alphas, campaigns, membershipTier, isAdmin, isPro]);
 
-      {/* 1. Welcome Panel & Membership Summary Strip */}
-      <div className="rounded-xl bg-surface border border-border-default p-5 sm:p-6 space-y-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border-default">
-          <div className="flex items-center gap-3">
+  // Actionable alerts — only shown when action is actually required (Section 12.2 C & 12.3)
+  const alerts = useMemo<OverviewAlertItem[]>(() => {
+    const list: OverviewAlertItem[] = [];
+    if (!connected) return list;
+
+    if (needsVerification && onVerifyWallet) {
+      list.push({
+        id: 'verify-wallet',
+        title: 'Wallet Signature Required',
+        description: `Sign a one-time verification message in ${shortAddress} to load gated Alpha calls and confirm stakes.`,
+        actionLabel: 'Verify Wallet',
+        tone: 'brand',
+        onAction: onVerifyWallet,
+      });
+    } else if (membershipTier === 'FREE') {
+      list.push({
+        id: 'upgrade-member',
+        title: 'Insufficient Membership Balance',
+        description: 'Hold ~$20 in $H42 for Alpha Calls or stake $250 on StakePoint for full Pro access.',
+        actionLabel: 'Stake for Access',
+        tone: 'amber',
+        onAction: () => onSelectTab?.('STAKE'),
+      });
+    } else if (membershipTier === 'MEMBER' && !isPro) {
+      list.push({
+        id: 'upgrade-pro',
+        title: 'Unlock Max Alpha & Pro Alerts',
+        description: 'Stake $250 in $H42 via StakePoint (90d lock) to access Max Alpha setups and private Pro Telegram channels.',
+        actionLabel: 'Upgrade to Pro',
+        tone: 'brand',
+        onAction: () => onSelectTab?.('STAKE'),
+      });
+    }
+
+    if (!needsVerification && isUnlocked && telegramConnected === false) {
+      list.push({
+        id: 'link-telegram',
+        title: 'Telegram Alerts Pending',
+        description: 'Link your Telegram account to receive real-time private call alerts matching your membership tier.',
+        actionLabel: 'Connect Telegram',
+        tone: 'amber',
+        onAction: () => {
+          setSecondaryExpanded(true);
+          setTimeout(() => {
+            document.getElementById('overview-telegram')?.scrollIntoView({ behavior: 'smooth' });
+          }, 80);
+        },
+      });
+    }
+
+    return list;
+  }, [connected, needsVerification, onVerifyWallet, shortAddress, membershipTier, isPro, isUnlocked, telegramConnected, onSelectTab]);
+
+  return (
+    <div className="space-y-4">
+      {/* 1. Compact Welcome Header + Unified Account Summary (Sections 12.2 A & B) */}
+      <section
+        data-testid="overview-account-summary"
+        className="rounded-xl bg-surface border border-border-default p-4 sm:p-5 space-y-4"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 pb-4 border-b border-border-default">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-lg bg-surface-card border border-border-default flex items-center justify-center text-brand shrink-0">
               <Flame className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-sans text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                <h1 className="font-sans text-lg sm:text-xl font-black text-white uppercase tracking-tight">
                   Welcome to the Lab
                 </h1>
                 <span
-                  className={`px-2 py-0.5 rounded-md font-mono text-xs font-black uppercase ${
+                  data-testid="overview-tier-badge"
+                  className={`px-2 py-0.5 rounded-md font-mono text-[11px] font-black uppercase ${
                     isPro
                       ? 'bg-alpha-strong text-white border border-alpha-border'
                       : isMember
@@ -89,19 +214,53 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 >
                   {tierDisplayName}
                 </span>
+                {connected && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-card border border-border-default font-mono text-[11px] text-white tnum">
+                    <Wallet className="w-3 h-3 text-brand" />
+                    <span>{shortAddress}</span>
+                  </span>
+                )}
+                {connected && (
+                  <span
+                    data-testid="overview-verification-badge"
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[11px] font-bold uppercase ${
+                      needsVerification
+                        ? 'bg-amber/10 border-amber/40 text-amber'
+                        : isVerified
+                        ? 'bg-brand-bg border-brand-border text-brand'
+                        : 'bg-surface-card border-border-default text-muted'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{needsVerification ? 'Signature Pending' : isVerified ? 'Verified' : 'Connected'}</span>
+                  </span>
+                )}
               </div>
-              <p className="font-sans text-xs text-muted mt-0.5">
-                Multi-chain trade intelligence terminal, risk telemetry, and community rewards.
+              <p className="font-sans text-xs text-muted">
+                Holdings, membership status, pinned calls, and personal account activity at a glance.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <Button
+              type="button"
               variant="secondary"
-              size="md"
+              size="sm"
+              onClick={() => setSecondaryExpanded((v) => !v)}
+              className="h-9 px-3 gap-1.5 font-mono text-xs"
+              title="Toggle Telegram alerts, EVM binding & weekly analytics"
+            >
+              <Settings2 className="w-3.5 h-3.5 text-brand" />
+              <span>Account Tools</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
               onClick={onCopyGenesisCa}
-              className="px-3.5 gap-1.5"
+              className="h-9 px-3 gap-1.5 font-mono text-xs"
               title="Copy $H42 token contract address"
             >
               {copiedGenesisCa ? (
@@ -113,7 +272,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </Button>
 
             {BUY_LOCK ? (
-              <LaunchLockedButton className="h-10 px-4 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center gap-1.5">
+              <LaunchLockedButton className="h-9 px-3.5 rounded-lg font-sans text-xs font-black uppercase inline-flex items-center gap-1.5">
                 <span>Buy $H42</span>
               </LaunchLockedButton>
             ) : (
@@ -121,7 +280,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 href={BUY_LINKS.pump}
                 target="_blank"
                 rel="noreferrer"
-                className="h-10 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <span>Buy $H42</span>
                 <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -130,35 +289,35 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* 2. Membership Telemetry Grid (Section 4.2 B) */}
+        {/* Unified 4-Tile Account Telemetry */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>WALLET STATUS</span>
-              <Wallet className="w-3.5 h-3.5 text-brand" />
+          <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
+            <div className="text-[11px] text-muted uppercase font-bold tracking-wider flex items-center justify-between">
+              <span>Verified Holdings</span>
+              <span className="text-brand font-mono text-[11px]">$H42</span>
             </div>
-            <div className="text-white font-bold truncate tnum">
-              {connected ? shortAddress : 'Disconnected'}
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>VERIFIED BALANCE</span>
-              <span className="text-brand font-mono text-xs">SPL</span>
-            </div>
-            <div className="text-white font-black tnum">
+            <div className="text-white font-black text-sm tnum">
               {formattedBalance} $H42
             </div>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-surface-card border border-border-default space-y-1">
-            <div className="text-xs text-muted uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>RESEARCH ACCESS</span>
+          <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
+            <div className="text-[11px] text-muted uppercase font-bold tracking-wider flex items-center justify-between">
+              <span>Membership Tier</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-brand" />
+            </div>
+            <div className="text-white font-bold text-sm">
+              {isPro ? 'Pro (Max Alpha)' : isMember ? 'Member (Standard)' : 'Free (Raids Only)'}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-surface-card border border-border-default space-y-1">
+            <div className="text-[11px] text-muted uppercase font-bold tracking-wider flex items-center justify-between">
+              <span>Research Access</span>
               <Target className="w-3.5 h-3.5 text-alpha-primary" />
             </div>
-            <div className="text-white font-bold">
-              {isUnlocked ? 'Unlocked (Standard Calls)' : 'Locked (~$20 Required)'}
+            <div className="text-white font-bold text-sm">
+              {isUnlocked ? 'Unlocked (Live Feeds)' : 'Locked (~$20 Required)'}
             </div>
           </div>
 
@@ -170,117 +329,221 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 onSelectTab('STAKE');
               }
             }}
-            className="p-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
-            title="Open Stake $H42 workspace for 90-day Pro staking"
+            className="p-3 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand space-y-1 transition-colors cursor-pointer block group focus:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+            title="Open Stake $H42 workspace"
           >
-            <div className="text-xs text-muted group-hover:text-brand uppercase font-bold tracking-wider flex items-center justify-between">
-              <span>PRO STAKING STATUS</span>
+            <div className="text-[11px] text-muted group-hover:text-brand uppercase font-bold tracking-wider flex items-center justify-between">
+              <span>Pro Staking</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-brand" />
             </div>
-            <div className="text-brand-bright font-black">
-              {isPro ? 'Pro Eligible (Manage Stake)' : 'Stake on StakePoint ↗'}
+            <div className="text-brand-bright font-black text-sm">
+              {isPro ? 'Pro Eligible · Manage' : 'Stake $250 on StakePoint'}
             </div>
           </Link>
         </div>
 
-        {/* 3. Interactive Activity Summary (Section 7.2) — expandable workspace shortcuts */}
-        <div className="pt-2 border-t border-border-default space-y-2">
-          <div className="flex items-center justify-between pt-1">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-dim">
-              Activity Shortcuts
-            </span>
-            <button
-              type="button"
-              onClick={() => setShortcutsOpen((v) => !v)}
-              aria-expanded={shortcutsOpen}
-              className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-muted hover:text-white transition-colors cursor-pointer"
-            >
-              <span>{shortcutsOpen ? 'Hide' : 'Show'}</span>
-              {shortcutsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-
-          {shortcutsOpen && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+        {/* Compact Workspace Shortcuts Strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 font-mono text-xs">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
               onSelectTab?.('ALPHA');
               onSelectFilter?.('all');
             }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-alpha-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="View all active Alpha Calls"
+            className="p-2.5 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-border-default/60 hover:border-alpha-border flex items-center justify-between text-left font-normal"
           >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">ACTIVE CALLS</div>
-              <div className="text-base font-black text-white tnum">{alphasCount}</div>
+            <div>
+              <div className="text-[10px] text-muted uppercase font-bold">Active Calls</div>
+              <div className="text-sm font-black text-white tnum">{alphasCount}</div>
             </div>
-            <Target className="w-4 h-4 text-alpha-primary" />
+            <Target className="w-4 h-4 text-alpha-primary shrink-0" />
           </Button>
 
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
               onSelectTab?.('ALPHA');
               onSelectFilter?.('new');
             }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-brand flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="Filter by new Alpha Calls"
+            className="p-2.5 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-border-default/60 hover:border-brand flex items-center justify-between text-left font-normal"
           >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">NEW CALLS</div>
-              <div className="text-base font-black text-brand tnum">{newCallsCount}</div>
+            <div>
+              <div className="text-[10px] text-muted uppercase font-bold">New Calls</div>
+              <div className="text-sm font-black text-brand tnum">{newCallsCount}</div>
             </div>
-            <Sparkles className="w-4 h-4 text-brand" />
+            <Sparkles className="w-4 h-4 text-brand shrink-0" />
           </Button>
 
           <Button
+            type="button"
             variant="ghost"
             size="sm"
-            onClick={() => {
-              onSelectTab?.('SOCIAL');
-              const raidsEl = document.getElementById('raids-section');
-              if (raidsEl) raidsEl.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-raid-border flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="Jump to Social Raids section"
+            onClick={() => onSelectTab?.('SOCIAL')}
+            className="p-2.5 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-border-default/60 hover:border-raid-border flex items-center justify-between text-left font-normal"
           >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">ACTIVE RAIDS</div>
-              <div className="text-base font-black text-raid-primary tnum">{raidsCount}</div>
+            <div>
+              <div className="text-[10px] text-muted uppercase font-bold">Active Raids</div>
+              <div className="text-sm font-black text-raid-primary tnum">{raidsCount}</div>
             </div>
-            <Gift className="w-4 h-4 text-raid-primary" />
+            <Gift className="w-4 h-4 text-raid-primary shrink-0" />
           </Button>
 
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
-              onSelectTab?.('WATCHLIST');
+              document.getElementById('pinned-posts')?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="p-3 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-transparent hover:border-amber flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand font-normal"
-            title="Open your saved Watchlist"
+            className="p-2.5 h-auto w-full bg-surface-card/60 hover:bg-surface-card border border-border-default/60 hover:border-amber flex items-center justify-between text-left font-normal"
           >
-            <div className="space-y-0.5">
-              <div className="text-xs text-muted uppercase font-bold">SAVED WATCHLIST</div>
-              <div className="text-base font-black text-amber tnum">{watchlistCount}</div>
+            <div>
+              <div className="text-[10px] text-muted uppercase font-bold">My Pinned Posts</div>
+              <div className="text-sm font-black text-amber tnum">{accessiblePinnedCount}</div>
             </div>
-            <Star className="w-4 h-4 text-amber" />
+            <Star className="w-4 h-4 text-amber shrink-0" />
           </Button>
-          </div>
-          )}
+        </div>
+      </section>
+
+      {/* 2. Important Account Alerts — Only shown when action is required (Section 12.2 C) */}
+      {alerts.length > 0 && (
+        <section
+          data-testid="overview-account-alerts"
+          aria-label="Important account alerts"
+          className="space-y-2.5"
+        >
+          {alerts.map((alert) => (
+            <div
+              key={alert.id}
+              data-testid={`overview-alert-${alert.id}`}
+              className={`rounded-xl bg-surface border p-3.5 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                alert.tone === 'brand'
+                  ? 'border-brand/60'
+                  : alert.tone === 'danger'
+                  ? 'border-danger/60'
+                  : 'border-amber/50'
+              }`}
+            >
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                <div
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${
+                    alert.tone === 'brand'
+                      ? 'bg-brand-bg border-brand-border text-brand'
+                      : 'bg-amber/10 border-amber/40 text-amber'
+                  }`}
+                >
+                  {alert.id === 'verify-wallet' ? (
+                    <KeyRound className="w-4 h-4" />
+                  ) : alert.id === 'link-telegram' ? (
+                    <Send className="w-4 h-4" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <div className="font-sans text-xs font-black uppercase tracking-wide text-white">
+                    {alert.title}
+                  </div>
+                  <p className="font-sans text-xs text-muted leading-snug">
+                    {alert.description}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant={alert.tone === 'brand' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={alert.onAction}
+                className="h-9 px-4 text-xs font-black uppercase shrink-0"
+              >
+                {alert.actionLabel}
+              </Button>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* 3. Primary Overview Panels: Unified My Pinned Posts + Personal Account Call History (Sections 12.2 D & E) */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+        <div className="xl:col-span-7 flex flex-col">
+          <MyPinnedPosts
+            favorites={favorites}
+            alphas={alphas}
+            campaigns={campaigns}
+            membershipTier={membershipTier}
+            isAdmin={isAdmin}
+            onOpenAlpha={(coin, dest) => onOpenAlpha?.(coin, dest)}
+            onOpenRaid={(id) => onOpenRaid?.(id)}
+            onUnpin={(kind, id) => onUnpinPost?.(kind, id)}
+            onBrowseWorkspace={(ws) => onSelectTab?.(ws)}
+          />
+        </div>
+
+        <div className="xl:col-span-5 flex flex-col">
+          <UserCallHistoryPanel
+            portfolio={portfolio}
+            connected={connected}
+            onExploreAlpha={isUnlocked ? () => onSelectTab?.('ALPHA') : undefined}
+          />
         </div>
       </div>
 
-      {/* 4. PRO Unlock Progress Bar (Instruction 33) */}
-      <ProProgressBar isPro={isPro} />
+      {/* 4. Secondary Account Tools & Analytics — Collapsed by Default (Section 12.2 F) */}
+      <section
+        data-testid="overview-secondary-tools"
+        className="rounded-xl bg-surface border border-border-default overflow-hidden"
+      >
+        <button
+          type="button"
+          data-testid="toggle-secondary-tools"
+          aria-expanded={secondaryExpanded}
+          onClick={() => setSecondaryExpanded((v) => !v)}
+          className="w-full px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-surface-card/60 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-brand shrink-0" />
+              <span className="font-sans text-sm font-extrabold text-white">
+                Account Tools, Verification &amp; Weekly Analytics
+              </span>
+            </div>
+            <p className="font-sans text-xs text-muted">
+              Pro progress tracker, 7-day performance digest, Telegram linking, and EVM alert binding
+            </p>
+          </div>
 
-      {/* 5. Weekly Tier Performance Digest (Instruction 37) */}
-      <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+          <div className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-brand shrink-0">
+            <span>{secondaryExpanded ? 'Collapse' : 'Expand tools'}</span>
+            {secondaryExpanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </div>
+        </button>
 
-      {children}
+        {secondaryExpanded && (
+          <div
+            data-testid="overview-secondary-content"
+            className="p-4 sm:p-5 border-t border-border-default space-y-5 bg-surface/50"
+          >
+            <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              <ProProgressBar isPro={isPro} />
+              <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+            </div>
+
+            <div id="overview-telegram">{children}</div>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

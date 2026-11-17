@@ -31,6 +31,7 @@ export const TerminalHeader: React.FC = () => {
   };
 
   const communityUrl = process.env.NEXT_PUBLIC_COMMUNITY_TG_URL?.trim() || SOCIAL_LINKS.telegram;
+  const isDashboardRoute = pathname?.startsWith('/dashboard');
 
   return (
     <header className="sticky top-0 z-40 w-full bg-canvas border-b border-brand-border">
@@ -78,16 +79,18 @@ export const TerminalHeader: React.FC = () => {
             <span>Dashboard</span>
           </Link>
 
-          <Link
-            href="/ledger"
-            className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
-              pathname === '/ledger'
-                ? 'bg-surface-card border-brand text-brand font-black'
-                : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
-            }`}
-          >
-            <span>Ledger</span>
-          </Link>
+          {!isDashboardRoute && (
+            <Link
+              href="/ledger"
+              className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+                pathname === '/ledger'
+                  ? 'bg-surface-card border-brand text-brand font-black'
+                  : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
+              }`}
+            >
+              <span>Ledger</span>
+            </Link>
+          )}
 
           <a
             href={communityUrl}
@@ -174,16 +177,18 @@ export const TerminalHeader: React.FC = () => {
         >
           Dashboard
         </Link>
-        <Link
-          href="/ledger"
-          className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
-            pathname === '/ledger'
-              ? 'bg-surface-card border-brand text-brand'
-              : 'bg-surface-card border-border-default text-white'
-          }`}
-        >
-          Ledger
-        </Link>
+        {!isDashboardRoute && (
+          <Link
+            href="/ledger"
+            className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
+              pathname === '/ledger'
+                ? 'bg-surface-card border-brand text-brand'
+                : 'bg-surface-card border-border-default text-white'
+            }`}
+          >
+            Ledger
+          </Link>
+        )}
       </div>
     </header>
   );

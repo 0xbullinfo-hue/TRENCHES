@@ -41,13 +41,12 @@ test('E2E Performance Ledger: /ledger page contains active navigation and back l
   assert.ok(html.includes('href="/#choose-your-access"'), 'Must have root-relative link to Membership');
 });
 
-test('E2E Terminal Header: /dashboard contains working Ledger and Dashboard links without dead anchors', async () => {
+test('E2E Terminal Header: /dashboard omits dashboard Ledger buttons and dead anchors while preserving /ledger access', async () => {
   const res = await fetch(`${BASE_URL}/dashboard`);
   const html = await res.text();
 
   assert.ok(!html.includes('href="#ledger-embed"'), 'Must not contain dead #ledger-embed link in header');
-  assert.ok(html.includes('href="/ledger"'), 'Terminal navigation must link to /ledger');
-  assert.ok(html.includes('View full ledger'), 'Dashboard embed must have View full ledger link');
+  assert.ok(!html.includes('View full ledger'), 'Dashboard Overview must NOT render embedded full ledger banner');
 });
 
 test('E2E Dashboard Tabs & State Sync: /dashboard with query params', async () => {

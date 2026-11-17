@@ -218,7 +218,7 @@ test('AC 9, 10, 11, 12, 13, 16, 18: Public GET /api/ledger, cache headers, filte
   const dashboardRes = await fetch(`${BASE_URL}/dashboard`);
   assert.equal(dashboardRes.status, 200);
   const dashboardHtml = await dashboardRes.text();
-  assert.ok(dashboardHtml.includes('View full ledger'), 'Dashboard embed must have View full ledger link');
+  assert.ok(!dashboardHtml.includes('View full ledger'), 'Dashboard Overview must NOT embed the public Performance Ledger');
 });
 
 test('AC 28: Dashboard staking card carries "Powered by StakePoint."', () => {

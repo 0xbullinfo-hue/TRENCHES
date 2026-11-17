@@ -39,11 +39,11 @@ const STATIC_NAV_ITEMS: CommandPaletteItem[] = [
     href: '/dashboard?tab=MAX_ALPHA',
   },
   {
-    id: 'nav-watchlist',
-    label: 'Watchlist Workspace',
-    subtitle: 'Your saved tokens & opt-in Telegram alerts',
+    id: 'nav-pinned-posts',
+    label: 'My Pinned Posts (Overview)',
+    subtitle: 'Your unified favourites from Alpha Calls, Max Alpha & Raid',
     category: 'Navigation',
-    href: '/dashboard?tab=WATCHLIST',
+    href: '/dashboard#pinned-posts',
   },
   {
     id: 'nav-raid',

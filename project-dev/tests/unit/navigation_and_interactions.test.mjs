@@ -112,10 +112,11 @@ test('Navigation Audit: Sidebar six workspaces and IncubatorHub URL/popstate syn
     'utf-8'
   );
 
-  // All 6 primary workspaces in sidebar
-  for (const id of ['OVERVIEW', 'ALPHA', 'MAX_ALPHA', 'WATCHLIST', 'SOCIAL', 'STAKE']) {
+  // All 5 primary user workspaces in sidebar (Watchlist workspace removed in favor of Overview My Pinned Posts)
+  for (const id of ['OVERVIEW', 'ALPHA', 'MAX_ALPHA', 'SOCIAL', 'STAKE']) {
     assert.ok(sidebarSrc.includes(`id: '${id}'`), `Sidebar must include ${id} workspace`);
   }
+  assert.ok(!sidebarSrc.includes("id: 'WATCHLIST'"), 'Sidebar must NOT include removed WATCHLIST workspace');
 
   // No duplicate horizontal feed-tabs bar inside IncubatorHub
   assert.ok(!hubSrc.includes('id="feed-tabs-navigation"'), 'IncubatorHub must not render duplicate tab bar');

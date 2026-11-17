@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
  * Note: 'SOCIAL' maps to the Raid workspace so existing `?tab=SOCIAL` links keep working.
  * 'ADMIN' is restricted exclusively to authorized administrator wallets.
  */
-export type DashboardWorkspace = 'OVERVIEW' | 'ALPHA' | 'MAX_ALPHA' | 'WATCHLIST' | 'SOCIAL' | 'STAKE' | 'ADMIN';
+export type DashboardWorkspace = 'OVERVIEW' | 'ALPHA' | 'MAX_ALPHA' | 'SOCIAL' | 'STAKE' | 'ADMIN';
 
 export interface SidebarItemState {
   count?: number;
@@ -21,7 +21,6 @@ export const DASHBOARD_WORKSPACES: DashboardWorkspace[] = [
   'OVERVIEW',
   'ALPHA',
   'MAX_ALPHA',
-  'WATCHLIST',
   'SOCIAL',
   'STAKE',
   'ADMIN',
@@ -29,6 +28,8 @@ export const DASHBOARD_WORKSPACES: DashboardWorkspace[] = [
 
 export const readWorkspaceFromSearch = (search: string): DashboardWorkspace => {
   const tabParam = new URLSearchParams(search).get('tab')?.toUpperCase();
+  // Legacy ?tab=WATCHLIST gracefully resolves to Overview where My Pinned Posts lives
+  if (tabParam === 'WATCHLIST') return 'OVERVIEW';
   return DASHBOARD_WORKSPACES.includes(tabParam as DashboardWorkspace)
     ? (tabParam as DashboardWorkspace)
     : 'OVERVIEW';

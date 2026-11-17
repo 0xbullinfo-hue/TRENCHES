@@ -19,6 +19,8 @@ import type {
   AlphasResponse,
   CallType,
   Chain,
+  FavoritePostKind,
+  FavoritePostRecord,
   Portfolio,
   PublicationStatus,
   PublishingDestination,
@@ -92,6 +94,9 @@ export interface AuthContextValue {
 
   watchlist: string[];
   toggleWatchlist: (tokenId: string) => void;
+  favorites: FavoritePostRecord[];
+  toggleFavorite: (kind: FavoritePostKind, id: string) => void;
+  isFavorited: (kind: FavoritePostKind, id: string) => boolean;
   recordAllocation: (ticker: string, chain: Chain, amountSol: string) => void;
 
   searchQuery: string;
@@ -104,7 +109,93 @@ export const AuthContext = createContext<AuthContextValue | undefined>(undefined
 const WATCHLIST_STORAGE_KEY = 'trenchlabs_watchlist_v3';
 const getWatchlistStorageKey = (addr: string | null) =>
   addr ? `trenchlabs_watchlist_v4:${addr}` : 'trenchlabs_watchlist_anon_v4';
+const getFavoritesStorageKey = (addr: string | null) =>
+  addr ? `trenchlabs_favorites_v1:${addr}` : 'trenchlabs_favorites_anon_v1';
+const getFavoritesMigratedKey = (addr: string) =>
+  `trenchlabs_favorites_server_migrated_v1:${addr}`;
 const ACCESS_STORAGE_KEY = 'trenchlabs_access_v1';
+
+function favoriteIdentityKey(kind: FavoritePostKind, id: string): string {
+  return `${kind === 'RAID' ? 'RAID' : 'CALL'}:${id}`;
+}
+
+function readLocalFavoritesSnapshot(addr: string | null): FavoritePostRecord[] {
+  if (typeof window === 'undefined') return [];
+  const merged = new Map<string, FavoritePostRecord>();
+
+  try {
+    const favRaw = window.localStorage.getItem(getFavoritesStorageKey(addr));
+    if (favRaw) {
+      const parsed = JSON.parse(favRaw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (!item || typeof item !== 'object') continue;
+          const id = typeof item.id === 'string' ? item.id.trim() : '';
+          const kind = String(item.kind || '').toUpperCase() as FavoritePostKind;
+          if (!id || (kind !== 'ALPHA' && kind !== 'MAX_ALPHA' && kind !== 'RAID')) continue;
+          const key = favoriteIdentityKey(kind, id);
+          if (!merged.has(key)) {
+            merged.set(key, {
+              id,
+              kind,
+              createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    const v4Key = getWatchlistStorageKey(addr);
+    const v4Raw = window.localStorage.getItem(v4Key);
+    const v3Raw = addr ? window.localStorage.getItem(WATCHLIST_STORAGE_KEY) : null;
+    const legacySources = [v4Raw, v3Raw];
+
+    for (const raw of legacySources) {
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) continue;
+      for (const tokenId of parsed) {
+        if (typeof tokenId !== 'string' || !tokenId.trim()) continue;
+        const cleanId = tokenId.trim();
+        const key = favoriteIdentityKey('ALPHA', cleanId);
+        if (!merged.has(key)) {
+          merged.set(key, {
+            id: cleanId,
+            kind: 'ALPHA',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    if (v3Raw && addr) {
+      const parsedV3 = JSON.parse(v3Raw);
+      if (Array.isArray(parsedV3) && parsedV3.length > 0 && !v4Raw) {
+        window.localStorage.setItem(v4Key, JSON.stringify(parsedV3));
+      }
+      window.localStorage.removeItem(WATCHLIST_STORAGE_KEY);
+    }
+
+    const result = Array.from(merged.values());
+    if (result.length > 0) {
+      window.localStorage.setItem(getFavoritesStorageKey(addr), JSON.stringify(result));
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalFavoritesSnapshot(addr: string | null, items: FavoritePostRecord[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(getFavoritesStorageKey(addr), JSON.stringify(items));
+    const callIds = items.filter((f) => f.kind !== 'RAID').map((f) => f.id);
+    window.localStorage.setItem(getWatchlistStorageKey(addr), JSON.stringify(callIds));
+  } catch {
+    // ignore
+  }
+}
 
 async function sha256Hex(str: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -139,7 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [verificationState, setVerificationState] = useState<VerificationState>('DISCONNECTED');
 
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<FavoritePostRecord[]>([]);
+  const watchlist = useMemo(
+    () => favorites.filter((f) => f.kind !== 'RAID').map((f) => f.id),
+    [favorites]
+  );
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
@@ -195,7 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAdminActionError(null);
           setCallers([]);
           setPortfolio(null);
-          setWatchlist([]);
+          setFavorites([]);
           setApiError(null);
           setNeedsSignature(connected);
           setVerificationState(connected ? 'CONNECTED_UNVERIFIED' : 'DISCONNECTED');
@@ -204,51 +299,128 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [publicKeyBase58, connected]);
 
-  // Load and isolate personal watchlist per connected wallet, migrating legacy once
+  // Load and isolate unified favourites per connected wallet, migrating legacy Watchlist IDs once
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      const key = getWatchlistStorageKey(publicKeyBase58);
-      const saved = window.localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          queueMicrotask(() => setWatchlist(parsed));
-          return;
-        }
-      }
+    const localSnapshot = readLocalFavoritesSnapshot(publicKeyBase58);
+    queueMicrotask(() => setFavorites(localSnapshot));
 
-      // Legacy Watchlist migration occurs only once:
-      const legacy = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      if (legacy && publicKeyBase58) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          window.localStorage.setItem(key, JSON.stringify(parsed));
-          window.localStorage.removeItem(WATCHLIST_STORAGE_KEY);
-          queueMicrotask(() => setWatchlist(parsed));
-          return;
-        }
-      }
+    const isLiveAuthed =
+      (!DEMO_ENABLED || demoPreset === 'live') &&
+      connected &&
+      Boolean(publicKeyBase58) &&
+      !needsSignature &&
+      verificationState === 'VERIFIED';
 
-      queueMicrotask(() => setWatchlist([]));
-    } catch {
-      queueMicrotask(() => setWatchlist([]));
-    }
-  }, [publicKeyBase58]);
+    if (!isLiveAuthed || !publicKeyBase58) return;
 
-  const toggleWatchlist = useCallback((tokenId: string) => {
-    setWatchlist((prev) => {
-      const exists = prev.includes(tokenId);
-      const next = exists ? prev.filter((id) => id !== tokenId) : [...prev, tokenId];
+    let active = true;
+    const syncWithServer = async () => {
       try {
-        const key = getWatchlistStorageKey(publicKeyBase58);
-        window.localStorage.setItem(key, JSON.stringify(next));
+        const migratedFlag = window.localStorage.getItem(getFavoritesMigratedKey(publicKeyBase58));
+        if (!migratedFlag && localSnapshot.length > 0) {
+          const migrateRes = await fetch('/api/favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ migrate: localSnapshot }),
+          });
+          if (migrateRes.ok) {
+            const json = await migrateRes.json();
+            if (active && json?.ok && Array.isArray(json.favorites)) {
+              window.localStorage.setItem(getFavoritesMigratedKey(publicKeyBase58), '1');
+              setFavorites(json.favorites);
+              writeLocalFavoritesSnapshot(publicKeyBase58, json.favorites);
+              return;
+            }
+          }
+        } else {
+          const getRes = await fetch('/api/favorites', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+          if (getRes.ok) {
+            const json = await getRes.json();
+            if (active && json?.ok && Array.isArray(json.favorites)) {
+              setFavorites(json.favorites);
+              writeLocalFavoritesSnapshot(publicKeyBase58, json.favorites);
+            }
+          }
+        }
       } catch {
-        // ignore
+        // Keep local snapshot if offline / network hiccup
       }
-      return next;
-    });
-  }, [publicKeyBase58]);
+    };
+
+    syncWithServer();
+    return () => {
+      active = false;
+    };
+  }, [publicKeyBase58, demoPreset, connected, needsSignature, verificationState]);
+
+  const isFavorited = useCallback(
+    (kind: FavoritePostKind, id: string) => {
+      const targetKey = favoriteIdentityKey(kind, id);
+      return favorites.some((f) => favoriteIdentityKey(f.kind, f.id) === targetKey);
+    },
+    [favorites]
+  );
+
+  const toggleFavorite = useCallback(
+    (kind: FavoritePostKind, id: string) => {
+      const cleanId = id.trim();
+      if (!cleanId) return;
+      const targetKey = favoriteIdentityKey(kind, cleanId);
+      let nextActive = true;
+
+      setFavorites((prev) => {
+        const exists = prev.some((f) => favoriteIdentityKey(f.kind, f.id) === targetKey);
+        nextActive = !exists;
+        const next = exists
+          ? prev.filter((f) => favoriteIdentityKey(f.kind, f.id) !== targetKey)
+          : [{ id: cleanId, kind, createdAt: new Date().toISOString() }, ...prev];
+        writeLocalFavoritesSnapshot(publicKeyBase58, next);
+        return next;
+      });
+
+      const isLiveAuthed =
+        (!DEMO_ENABLED || demoPreset === 'live') &&
+        connected &&
+        Boolean(publicKeyBase58) &&
+        !needsSignature &&
+        verificationState === 'VERIFIED';
+
+      if (isLiveAuthed && publicKeyBase58) {
+        fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ id: cleanId, kind, active: nextActive }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((json) => {
+            if (json?.ok && Array.isArray(json.favorites)) {
+              setFavorites(json.favorites);
+              writeLocalFavoritesSnapshot(publicKeyBase58, json.favorites);
+            }
+          })
+          .catch(() => {
+            // Keep optimistic local state if offline
+          });
+      }
+    },
+    [publicKeyBase58, demoPreset, connected, needsSignature, verificationState]
+  );
+
+  const toggleWatchlist = useCallback(
+    (tokenId: string) => {
+      const found = alphas.find((a) => a.id === tokenId);
+      const kind: FavoritePostKind =
+        found && (found.isMaxAlpha || found.callType === 'MAX_ALPHA') ? 'MAX_ALPHA' : 'ALPHA';
+      toggleFavorite(kind, tokenId);
+    },
+    [alphas, toggleFavorite]
+  );
 
   const isUnlocked = connected && !needsSignature && (isAdmin || serverTier === 'PRO' || serverTier === 'LAB_MEMBER' || balance >= DEFAULT_MEMBER_TOKENS);
 
@@ -874,6 +1046,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSearchQuery,
     watchlist,
     toggleWatchlist,
+    favorites,
+    toggleFavorite,
+    isFavorited,
     recordAllocation,
     resetAuthState,
   };

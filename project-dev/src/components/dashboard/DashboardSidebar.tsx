@@ -12,7 +12,6 @@ import {
   RadioTower,
   Shield,
   ShieldCheck,
-  Star,
   Target,
   X,
   Zap,
@@ -36,10 +35,9 @@ interface NavItem {
 }
 
 export const DASHBOARD_NAV_ITEMS: NavItem[] = [
-  { id: 'OVERVIEW', label: 'Overview', description: 'Account, holdings and membership', icon: LayoutDashboard, testId: 'tab-overview' },
+  { id: 'OVERVIEW', label: 'Overview', description: 'Account, pinned posts and activity', icon: LayoutDashboard, testId: 'tab-overview' },
   { id: 'ALPHA', label: 'Alpha Calls', description: 'Curated trade intelligence', icon: Target, testId: 'tab-alpha' },
   { id: 'MAX_ALPHA', label: 'Max Alpha', description: 'Premium high-conviction calls', icon: Zap, testId: 'tab-max-alpha' },
-  { id: 'WATCHLIST', label: 'Watchlist', description: 'Your saved tokens and opt-in alerts', icon: Star, testId: 'tab-watchlist' },
   { id: 'SOCIAL', label: 'Raid', description: 'Community campaigns and raids', icon: RadioTower, testId: 'tab-social' },
   { id: 'STAKE', label: 'Stake', description: 'StakePoint staking and Pro access', icon: Coins, testId: 'tab-stake' },
 ];
@@ -84,7 +82,6 @@ export function DashboardSidebar({
     return {
       ALPHA: { locked: !isMember },
       MAX_ALPHA: { locked: !isPro },
-      WATCHLIST: { locked: !isMember },
     };
   }, [genesis?.connected, genesis?.isAdmin, genesis?.tier?.id]);
 
