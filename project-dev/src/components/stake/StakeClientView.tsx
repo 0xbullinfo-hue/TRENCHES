@@ -31,6 +31,11 @@ export interface InitialStakeData {
   };
   eligible_for_pro: boolean;
   gap_to_pro_usd: number;
+  stakepoint?: {
+    configured: boolean;
+    program_configured: boolean;
+    pool_configured: boolean;
+  };
 }
 
 export function StakeClientView({
@@ -68,6 +73,12 @@ export function StakeClientView({
   const isActivePro = stakeData.current_tier === 'pro' && stakeData.stake.status === 'active';
   const showForm = !isActivePro || showAdditionalForm;
   const initialPrefill = stakeData.gap_to_pro_usd > 0 ? stakeData.gap_to_pro_usd : 250;
+  const stakePointConfigured =
+    stakeData.stakepoint?.configured ??
+    Boolean(
+      process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() &&
+        process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim()
+    );
 
   return (
     <div
@@ -111,6 +122,7 @@ export function StakeClientView({
           walletBalanceTokens={genesisTokenBalance}
           genesisPriceUsd={stakeData.thresholds?.pro?.genesis_usd_price ?? 0.0000164}
           initialAmountUsd={initialPrefill}
+          stakePointConfigured={stakePointConfigured}
           onStakeSuccess={handleStakeSuccess}
         />
       ) : (

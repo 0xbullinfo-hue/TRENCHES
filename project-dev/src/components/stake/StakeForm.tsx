@@ -15,6 +15,7 @@ interface StakeFormProps {
   walletBalanceTokens: number;
   genesisPriceUsd: number;
   initialAmountUsd?: number;
+  stakePointConfigured?: boolean;
   onStakeSuccess: () => void;
 }
 
@@ -25,6 +26,7 @@ export function StakeForm({
   walletBalanceTokens,
   genesisPriceUsd,
   initialAmountUsd = 250,
+  stakePointConfigured,
   onStakeSuccess,
 }: StakeFormProps) {
   const [amountStr, setAmountStr] = useState<string>(initialAmountUsd.toFixed(2));
@@ -52,6 +54,12 @@ export function StakeForm({
     process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID
       ? `https://stakepoint.app/pool/${process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID}`
       : 'https://stakepoint.app/pools';
+  const isStakePointConfigured =
+    stakePointConfigured ??
+    Boolean(
+      process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() &&
+        process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim()
+    );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = cleanNumericInput(e.target.value);
@@ -68,6 +76,10 @@ export function StakeForm({
 
   const handleVerifyTx = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isStakePointConfigured) {
+      setErrorMessage('StakePoint pool and on-chain verification program will be configured after token launch.');
+      return;
+    }
     // Duplicate-submission guard: block while any step is in progress
     if (isVerifyingSignature || isTimelineStepInProgress(timelineStep)) {
       return;
@@ -195,24 +207,51 @@ export function StakeForm({
 
       {/* Primary CTA: Stake on StakePoint */}
       <div className="space-y-3">
-        <a
-          href={stakepointUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
-        >
-          <span>Stake $H42 on StakePoint →</span>
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5] shrink-0" />
-        </a>
-        <p className="text-center font-sans text-2xs text-muted leading-relaxed">
-          Opens the official $H42 pool on StakePoint. Lock for 90 days to qualify for Pro.
-        </p>
-        <div
-          data-testid="mobile-deeplink-guidance"
-          className="rounded-lg bg-surface-card border border-border-default p-3 font-sans text-xs text-muted leading-relaxed"
-        >
-          <strong className="text-white font-semibold">Mobile wallet tip:</strong> After confirming your 90-day stake on StakePoint, copy your Solana transaction signature and return to this tab to verify below.
-        </div>
+        {isStakePointConfigured ? (
+          <>
+            <a
+              href={stakepointUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+            >
+              <span>Stake $H42 on StakePoint →</span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5] shrink-0" />
+            </a>
+            <p className="text-center font-sans text-2xs text-muted leading-relaxed">
+              Opens the official $H42 pool on StakePoint. Lock for 90 days to qualify for Pro.
+            </p>
+            <div
+              data-testid="mobile-deeplink-guidance"
+              className="rounded-lg bg-surface-card border border-border-default p-3 font-sans text-xs text-muted leading-relaxed"
+            >
+              <strong className="text-white font-semibold">Mobile wallet tip:</strong> After confirming your 90-day stake on StakePoint, copy your Solana transaction signature and return to this tab to verify below.
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none"
+            >
+              <Lock className="w-4 h-4 shrink-0" />
+              <span>Stake $H42 on StakePoint →</span>
+            </button>
+            <div
+              data-testid="stakepoint-not-configured"
+              className="rounded-lg bg-surface-card border border-border-default p-3.5 space-y-1 text-left"
+            >
+              <p className="font-sans text-xs font-semibold text-white">
+                StakePoint staking is not yet configured.
+              </p>
+              <p className="font-sans text-2xs text-muted leading-relaxed">
+                The official $H42 StakePoint pool and on-chain verification program will be enabled after token launch and pool creation.
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Manual Signature Verification Form */}
@@ -222,7 +261,9 @@ export function StakeForm({
             Already Staked? Verify Transaction
           </label>
           <p className="font-sans text-2xs text-muted leading-relaxed">
-            Paste your Solana transaction signature from StakePoint to immediately activate Pro status.
+            {isStakePointConfigured
+              ? 'Paste your Solana transaction signature from StakePoint to immediately activate Pro status.'
+              : 'Transaction verification activates once the official StakePoint pool and program ID are configured.'}
           </p>
         </div>
 
@@ -231,18 +272,24 @@ export function StakeForm({
             id="tx-sig"
             type="text"
             value={txSignature}
+            disabled={!isStakePointConfigured}
             onChange={(e) => setTxSignature(e.target.value)}
-            placeholder="Paste transaction signature..."
-            className="flex-1 min-h-[44px] h-11 px-3.5 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none"
+            placeholder={
+              isStakePointConfigured
+                ? 'Paste transaction signature...'
+                : 'Staking verification pending pool configuration...'
+            }
+            className="flex-1 min-h-[44px] h-11 px-3.5 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
             disabled={
+              !isStakePointConfigured ||
               isVerifyingSignature ||
               isTimelineStepInProgress(timelineStep) ||
               !txSignature.trim()
             }
-            className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 cursor-pointer transition-colors shrink-0"
+            className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0"
           >
             {isVerifyingSignature || isTimelineStepInProgress(timelineStep)
               ? 'Verifying...'

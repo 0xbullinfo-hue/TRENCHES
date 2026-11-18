@@ -1,4 +1,13 @@
-name: TP/SL Automated Monitor (5m External Scheduler)
+name: TrenchLabs Scheduled Workers (5m External Scheduler)
+
+# Single external 5-minute scheduler covering all sub-daily background endpoints:
+#   - GET /api/telegram/monitor
+#   - GET /api/telegram/dispatch-delayed
+#   - GET /api/admin/campaign-recovery
+#
+# Daily /api/telegram/sweep (0 3 * * *) stays in project-dev/vercel.json for Vercel Hobby compatibility.
+# Single-scheduler rule: keep ONLY one active 5-minute scheduler per job. If you enable a different
+# external scheduler (e.g. Cloudflare Cron or Upstash QStash), remove the `schedule:` block here first.
 
 on:
   schedule:
@@ -111,4 +120,60 @@ jobs:
               process.exit(1);
             }
             console.log("Delayed dispatch run completed:", JSON.stringify(summary));
+          '
+
+  trigger-campaign-recovery:
+    # Separate job so notification monitoring and campaign recovery never block each other.
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger GET /api/admin/campaign-recovery
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.trenchlabshq.xyz' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not configured."
+            exit 1
+          fi
+          TARGET_URL="${SITE_URL%/}/api/admin/campaign-recovery"
+          HTTP_STATUS=$(curl -sS -o /tmp/recovery_response.json -w "%{http_code}" \
+            --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "$TARGET_URL")
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            rm -f /tmp/recovery_response.json
+            echo "::error::Campaign recovery endpoint returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            let body;
+            try {
+              body = JSON.parse(fs.readFileSync("/tmp/recovery_response.json", "utf8"));
+            } catch {
+              try { fs.unlinkSync("/tmp/recovery_response.json"); } catch {}
+              console.error("::error::Campaign recovery endpoint did not return valid JSON.");
+              process.exit(1);
+            }
+            try { fs.unlinkSync("/tmp/recovery_response.json"); } catch {}
+            const summary = {
+              ok: Boolean(body?.ok),
+              status: typeof body?.status === "string" ? body.status : "UNKNOWN",
+              durationMs: Number(body?.durationMs ?? 0),
+              recordsDiscovered: Number(body?.recordsDiscovered ?? 0),
+              recordsProcessed: Number(body?.recordsProcessed ?? 0),
+              recordsRecovered: Number(body?.recordsRecovered ?? 0),
+              recordsStillPending: Number(body?.recordsStillPending ?? 0),
+              failedOperations: Number(body?.failedOperations ?? 0),
+              reconciledCounters: Number(body?.reconciledCounters ?? 0),
+              recoveredReservations: Number(body?.recoveredReservations ?? 0),
+              dispatchedNotifications: Number(body?.dispatchedNotifications ?? 0),
+            };
+            if (!body || body.ok !== true || summary.status === "FAILED") {
+              console.error("::error::Campaign recovery worker reported failure:", JSON.stringify(summary));
+              process.exit(1);
+            }
+            console.log("Campaign recovery run completed:", JSON.stringify(summary));
           '

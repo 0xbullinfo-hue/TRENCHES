@@ -1067,11 +1067,23 @@ export async function getStakeStatusForWallet(walletAddress: string) {
   const current_tier = await resolveTier(walletAddress);
   const eligible_for_pro = current_tier === 'pro' || stakeData.amount_usd >= 250;
   const gap_to_pro_usd = Math.max(0, +(250 - stakeData.amount_usd).toFixed(2));
+  const stakePointProgramConfigured = Boolean(
+    process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() ||
+      process.env.STAKEPOINT_PROGRAM_ID?.trim()
+  );
+  const stakePointPoolConfigured = Boolean(
+    process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim()
+  );
 
   return {
     wallet: walletAddress,
     current_tier,
     stake: stakeData,
+    stakepoint: {
+      configured: stakePointProgramConfigured && stakePointPoolConfigured,
+      program_configured: stakePointProgramConfigured,
+      pool_configured: stakePointPoolConfigured,
+    },
     thresholds: {
       member: {
         usd_target: member.usd_target,
