@@ -1,4 +1,5 @@
 export type StakePointPool = {
+  id?: string;
   poolId: string;
   apr: number | null;
   lockPeriod: string | number | null;
@@ -6,6 +7,9 @@ export type StakePointPool = {
   poolUrl: string;
   rewardToken: string;
   status: string;
+  poolAddress?: string | null;
+  vaultAddress?: string | null;
+  tokenMint?: string | null;
 };
 
 export type RawStakePointPool = {
@@ -27,6 +31,8 @@ export type RawStakePointPool = {
   rewardTokenSymbol?: string | null;
   rewardToken?: string | null;
   poolAddress?: string | null;
+  vaultAddress?: string | null;
+  tokenVault?: string | null;
   poolUrl?: string | null;
   isPaused?: boolean;
   isInitialized?: boolean;

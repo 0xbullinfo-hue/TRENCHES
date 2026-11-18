@@ -1,22 +1,46 @@
 import { NextResponse } from 'next/server';
-import { fetchGenesisPools } from '@/lib/stakepoint/fetchPools';
+import { fetchGenesisPools, findConfiguredPool } from '@/lib/stakepoint/fetchPools';
 import { GENESIS_MINT } from '@/lib/config';
+import { getStakePointIntegrationStatus } from '@/server/stakepoint';
 
 export const revalidate = 300;
 
 export async function GET() {
   const mint = GENESIS_MINT;
-  const programConfigured = Boolean(
-    process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() ||
-      process.env.STAKEPOINT_PROGRAM_ID?.trim()
-  );
-  const poolConfigured = Boolean(process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim());
-  const configured = programConfigured && poolConfigured;
+  const integration = getStakePointIntegrationStatus();
+
+  if (integration.status === 'BLOCKED' || !integration.configured || !integration.poolId) {
+    return NextResponse.json(
+      {
+        pools: [],
+        status: 'BLOCKED',
+        configured: false,
+        programConfigured: integration.programConfigured,
+        poolConfigured: integration.poolConfigured,
+        message: integration.message,
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
+        },
+      }
+    );
+  }
 
   try {
-    const pools = await fetchGenesisPools();
+    const allPools = await fetchGenesisPools();
+    const configuredPool = findConfiguredPool(allPools, integration.poolId, mint);
+    const pools = configuredPool ? [configuredPool] : [];
+
     return NextResponse.json(
-      { pools, configured, programConfigured, poolConfigured },
+      {
+        pools,
+        status: 'ACTIVE',
+        configured: true,
+        programConfigured: true,
+        poolConfigured: true,
+      },
       {
         status: 200,
         headers: {
@@ -28,7 +52,14 @@ export async function GET() {
     const message = err instanceof Error ? err.message : 'Failed to fetch StakePoint pools';
     console.error(`[StakePoint API] Failed to fetch pools for mint ${mint}:`, err);
     return NextResponse.json(
-      { error: message, pools: [], configured, programConfigured, poolConfigured },
+      {
+        error: message,
+        pools: [],
+        status: integration.status,
+        configured: integration.configured,
+        programConfigured: integration.programConfigured,
+        poolConfigured: integration.poolConfigured,
+      },
       {
         status: 502,
         headers: {
@@ -38,4 +69,3 @@ export async function GET() {
     );
   }
 }
-

@@ -56,8 +56,19 @@ export function normalizePools(raw: unknown): StakePointPool[] {
       (directId ? `https://stakepoint.app/pool/${directId}` : 'https://stakepoint.app/pools');
 
     const rewardToken = p.rewardToken ?? p.rewardTokenSymbol ?? p.rewards ?? 'GENESIS';
+    const rawId = typeof p.id === 'string' && p.id.trim().length > 0 ? p.id.trim() : undefined;
+    const poolAddress =
+      typeof p.poolAddress === 'string' && p.poolAddress.trim().length > 0
+        ? p.poolAddress.trim()
+        : null;
+    const vaultRaw = p.vaultAddress ?? p.tokenVault;
+    const vaultAddress =
+      typeof vaultRaw === 'string' && vaultRaw.trim().length > 0 ? vaultRaw.trim() : null;
+    const tokenMint =
+      typeof p.tokenMint === 'string' && p.tokenMint.trim().length > 0 ? p.tokenMint.trim() : null;
 
     return {
+      ...(rawId ? { id: rawId } : {}),
       poolId,
       apr,
       lockPeriod,
@@ -65,8 +76,31 @@ export function normalizePools(raw: unknown): StakePointPool[] {
       poolUrl,
       rewardToken,
       status,
+      ...(poolAddress ? { poolAddress } : {}),
+      ...(vaultAddress ? { vaultAddress } : {}),
+      ...(tokenMint ? { tokenMint } : {}),
     };
   }).sort((a, b) => (b.apr ?? -1) - (a.apr ?? -1));
+}
+
+export function findConfiguredPool(
+  pools: StakePointPool[],
+  configuredPoolId: string,
+  expectedMint: string
+): StakePointPool | null {
+  const target = configuredPoolId.trim();
+  if (!target) return null;
+  for (const pool of pools) {
+    if (pool.tokenMint && pool.tokenMint !== expectedMint) continue;
+    if (
+      pool.poolId === target ||
+      pool.id === target ||
+      pool.poolAddress === target
+    ) {
+      return pool;
+    }
+  }
+  return null;
 }
 
 export async function fetchGenesisPools(): Promise<StakePointPool[]> {

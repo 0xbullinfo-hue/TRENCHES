@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { KV_CONFIGURED, kvGet, kvSet, kvLock, kvUnlock, kvRenewLock, kvSetLocked } from '@/server/kv';
 import { readGenesisBalanceCached } from '@/server/genesis';
 import { ADMIN_WALLET, isAdminWallet, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/lib/config';
+import { resolveStakePointConfig } from '@/lib/stakepoint/config';
 import { getGenesisPrice } from '@/server/price';
 import { DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
 import type { FavoritePostKind, FavoritePostRecord } from '@/lib/types';
@@ -1067,22 +1068,16 @@ export async function getStakeStatusForWallet(walletAddress: string) {
   const current_tier = await resolveTier(walletAddress);
   const eligible_for_pro = current_tier === 'pro' || stakeData.amount_usd >= 250;
   const gap_to_pro_usd = Math.max(0, +(250 - stakeData.amount_usd).toFixed(2));
-  const stakePointProgramConfigured = Boolean(
-    process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() ||
-      process.env.STAKEPOINT_PROGRAM_ID?.trim()
-  );
-  const stakePointPoolConfigured = Boolean(
-    process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim()
-  );
+  const stakePointStatus = resolveStakePointConfig();
 
   return {
     wallet: walletAddress,
     current_tier,
     stake: stakeData,
     stakepoint: {
-      configured: stakePointProgramConfigured && stakePointPoolConfigured,
-      program_configured: stakePointProgramConfigured,
-      pool_configured: stakePointPoolConfigured,
+      configured: stakePointStatus.configured,
+      program_configured: stakePointStatus.programConfigured,
+      pool_configured: stakePointStatus.poolConfigured,
     },
     thresholds: {
       member: {
@@ -1137,6 +1132,40 @@ export async function createStake(params: {
     db.stakes.push(newStake);
     await saveDb(db);
     return newStake;
+  });
+}
+
+export async function createStakeIfAbsent(params: {
+  wallet_address: string;
+  amount_raw: string;
+  lock_days: number;
+  tx_signature: string;
+  staking_provider?: string;
+}): Promise<{ created: boolean; stake: StakeRow }> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const existing = (db.stakes || []).find((s) => s.tx_signature === params.tx_signature);
+    if (existing) {
+      return { created: false, stake: existing };
+    }
+
+    const now = new Date();
+    const unlock = new Date(now.getTime() + params.lock_days * 24 * 60 * 60 * 1000);
+
+    const newStake: StakeRow = {
+      id: safeRandomUUID(),
+      wallet_address: params.wallet_address,
+      amount_raw: params.amount_raw,
+      staked_at: now.toISOString(),
+      unlocks_at: unlock.toISOString(),
+      status: 'active',
+      tx_signature: params.tx_signature,
+      staking_provider: params.staking_provider || 'stakepoint',
+    };
+
+    db.stakes.push(newStake);
+    await saveDb(db);
+    return { created: true, stake: newStake };
   });
 }
 
