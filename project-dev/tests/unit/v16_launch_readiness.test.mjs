@@ -953,11 +953,15 @@ test('Branding [1/18]: The hero contains the exact approved paragraph', () => {
   const heroPath = path.join(ROOT_DIR, 'src/components/HeroTerminal.tsx');
   const content = fs.readFileSync(heroPath, 'utf8');
   assert.ok(
+    content.includes('Building the strongest community in the Trenches.'),
+    'Hero paragraph must contain updated approved intro'
+  );
+  assert.ok(
     content.includes('TrenchLabs HQ is the lab — the platform. The GENESIS (<span className="text-brand-bright font-bold">$H42</span>) is your access key.'),
     'Hero paragraph must contain exact approved copy'
   );
   assert.ok(
-    content.includes('TrenchLabs is a research and trading-intelligence platform. Holding GENESIS ($H42) unlocks membership tiers and tools.'),
+    content.includes('TrenchLabs is a research and analytical Lab. Holding GENESIS ($H42) unlocks membership tiers and tools.'),
     'Hero paragraph must contain updated approved copy'
   );
 });
