@@ -1,4 +1,4 @@
-import { Connection } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { GENESIS_MINT, SOLANA_RPC, TOKEN_DECIMALS, isBase58Address } from '@/lib/config';
 import { resolveStakePointConfig, type StakePointIntegrationState } from '@/lib/stakepoint/config';
 import { createStakeIfAbsent, getActiveStakes, loadDb, StakeRow } from '@/server/db';
@@ -89,6 +89,7 @@ export interface MinimalParsedTransaction {
 
 export interface StakePointVerificationDeps {
   fetchTransaction?: (signature: string) => Promise<MinimalParsedTransaction | null>;
+  fetchPoolAccountOwner?: (poolAddress: string) => Promise<string | null>;
   getPrice?: typeof getGenesisPrice;
   loadDb?: typeof loadDb;
   createStakeIfAbsent?: typeof createStakeIfAbsent;
@@ -232,16 +233,25 @@ export async function verifyAndRecordStakePointPosition(
   const lockKey = `stakepoint:tx:${txSignature}`;
   let lockHeld = false;
 
+  const rpcUrl = env.SOLANA_RPC || SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
   const fetchTx: (sig: string) => Promise<MinimalParsedTransaction | null> =
     deps.fetchTransaction ??
     (async (sig: string) => {
-      const rpcUrl = env.SOLANA_RPC || SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
       const connection = new Connection(rpcUrl, 'confirmed');
       return (await connection.getParsedTransaction(sig, {
         maxSupportedTransactionVersion: 0,
         commitment: 'confirmed',
       })) as unknown as MinimalParsedTransaction | null;
     });
+  const fetchPoolOwner: ((poolAddress: string) => Promise<string | null>) | null =
+    deps.fetchPoolAccountOwner ??
+    (deps.fetchTransaction
+      ? null
+      : async (poolAddress: string) => {
+          const connection = new Connection(rpcUrl, 'confirmed');
+          const info = await connection.getAccountInfo(new PublicKey(poolAddress), 'confirmed');
+          return info ? info.owner.toBase58() : null;
+        });
 
   try {
     if (useKvLock) {
@@ -251,6 +261,17 @@ export async function verifyAndRecordStakePointPosition(
           success: false,
           status: 'REJECTED',
           error: 'This transaction is currently being processed by another request.',
+        };
+      }
+    }
+
+    if (fetchPoolOwner) {
+      const poolAccountOwner = await fetchPoolOwner(configuredPoolId);
+      if (!poolAccountOwner || poolAccountOwner !== configuredProgramId) {
+        return {
+          success: false,
+          status: 'REJECTED',
+          error: `Configured StakePoint pool (${configuredPoolId}) is not owned on-chain by program (${configuredProgramId}).`,
         };
       }
     }
@@ -404,7 +425,8 @@ export async function verifyAndRecordStakePointPosition(
     }
 
     // Authoritative on-chain pool-to-vault linkage: receiving token account must be owned on-chain
-    // by the configured pool address (or explicitly pinned by server STAKEPOINT_VAULT_ADDRESS).
+    // by the configured pool address (`post.owner === configuredPoolId`). If optional
+    // STAKEPOINT_VAULT_ADDRESS is set, it only further narrows eligible vaults and never bypasses pool ownership.
     let poolVaultReceivedRaw = BigInt(0);
     const candidateVaultDeltas = new Map<string, bigint>();
 
@@ -414,14 +436,11 @@ export async function verifyAndRecordStakePointPosition(
       const vaultTokenAccount = accountKeys[post.accountIndex] || '';
       if (!vaultTokenAccount || vaultTokenAccount === walletAddress) continue;
 
-      const isPoolOwnedVault = post.owner === configuredPoolId;
-      const isServerPinnedVault =
-        configuredVaultAddress !== null &&
-        vaultTokenAccount === configuredVaultAddress &&
-        Boolean(post.owner) &&
-        post.owner !== walletAddress;
+      if (configuredVaultAddress !== null && vaultTokenAccount !== configuredVaultAddress) {
+        continue;
+      }
 
-      if (!isPoolOwnedVault && !isServerPinnedVault) continue;
+      if (post.owner !== configuredPoolId) continue;
 
       const preMatch = preByIndex.get(post.accountIndex);
       const preRaw = preMatch?.uiTokenAmount?.amount ? BigInt(preMatch.uiTokenAmount.amount) : BigInt(0);

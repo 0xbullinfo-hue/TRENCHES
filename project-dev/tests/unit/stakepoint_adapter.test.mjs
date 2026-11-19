@@ -19,9 +19,9 @@ const WRONG_PROGRAM_ID = 'WrongProg1111111111111111111111111111111111';
 const CONFIGURED_POOL_ID = 'Poo1Cfg111111111111111111111111111111111111';
 const WRONG_POOL_ID = 'Poo1Other1111111111111111111111111111111111';
 const POOL_VAULT_ATA = 'Poo1Vau1t1111111111111111111111111111111111';
-const OTHER_VAULT_ATA = 'OtherVau1t111111111111111111111111111111111';
+const OTHER_VAULT_ATA = 'SecondVau1t11111111111111111111111111111111';
 const USER_WALLET = 'UserWa11et111111111111111111111111111111111';
-const SECOND_WALLET = 'OtherWa11et11111111111111111111111111111111';
+const SECOND_WALLET = 'SecondWa11et1111111111111111111111111111111';
 const USER_ATA = 'UserAta111111111111111111111111111111111111';
 const SPL_TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
@@ -635,37 +635,104 @@ test(
       assert.equal(filteredPool?.poolUrl, 'https://stakepoint.app/pool/verified');
       assert.equal(findConfiguredPool([normalized[0]], CONFIGURED_POOL_ID, GENESIS_MINT), null);
 
-      // Server-pinned STAKEPOINT_VAULT_ADDRESS validates PDA-authority pools without upstream trust
-      const pinnedStore = makeMemoryStore();
+      // Unlinked STAKEPOINT_VAULT_ADDRESS (vault post.owner !== CONFIGURED_POOL_ID) MUST fail closed
+      const unlinkedStore = makeMemoryStore();
       const pinnedEnv = {
         NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID: CONFIGURED_PROGRAM_ID,
         NEXT_PUBLIC_STAKEPOINT_POOL_ID: CONFIGURED_POOL_ID,
         STAKEPOINT_VAULT_ADDRESS: POOL_VAULT_ATA,
       };
-      const pdaAuthority = 'PdaAuth111111111111111111111111111111111111';
+      const unlinkedAuthority = 'PdaAuth111111111111111111111111111111111111';
+      for (const badOwner of [unlinkedAuthority, WRONG_POOL_ID, SECOND_WALLET]) {
+        const unlinkedRes = await verifyAndRecordStakePointPosition(
+          {
+            walletAddress: USER_WALLET,
+            txSignature: makeSignature(`unlinked_vault_${badOwner}`),
+            lockDays: 90,
+          },
+          {
+            env: pinnedEnv,
+            loadDb: unlinkedStore.loadDb,
+            createStakeIfAbsent: unlinkedStore.createStakeIfAbsent,
+            fetchPoolAccountOwner: async () => CONFIGURED_PROGRAM_ID,
+            fetchTransaction: async () =>
+              buildParsedStakeTx({
+                vaultOwner: badOwner,
+                vaultAccount: POOL_VAULT_ATA,
+                instructionAccounts: [USER_WALLET, CONFIGURED_POOL_ID, POOL_VAULT_ATA],
+                extraAccountKeys: [CONFIGURED_POOL_ID],
+              }),
+            getPrice: async () => VALID_PRICE,
+          }
+        );
+        assert.equal(unlinkedRes.success, false);
+        assert.equal(unlinkedRes.status, 'REJECTED');
+      }
+
+      // Mismatched STAKEPOINT_VAULT_ADDRESS rejects valid pool-owned deposit to a different ATA
+      const mismatchPinnedRes = await verifyAndRecordStakePointPosition(
+        {
+          walletAddress: USER_WALLET,
+          txSignature: makeSignature('mismatched_pinned_vault'),
+          lockDays: 90,
+        },
+        {
+          env: {
+            ...pinnedEnv,
+            STAKEPOINT_VAULT_ADDRESS: OTHER_VAULT_ATA,
+          },
+          loadDb: unlinkedStore.loadDb,
+          createStakeIfAbsent: unlinkedStore.createStakeIfAbsent,
+          fetchPoolAccountOwner: async () => CONFIGURED_PROGRAM_ID,
+          fetchTransaction: async () => buildParsedStakeTx(),
+          getPrice: async () => VALID_PRICE,
+        }
+      );
+      assert.equal(mismatchPinnedRes.success, false);
+      assert.equal(mismatchPinnedRes.status, 'REJECTED');
+
+      // On-chain pool account not owned by CONFIGURED_PROGRAM_ID (or missing) must be REJECTED
+      for (const badPoolOwner of [WRONG_PROGRAM_ID, null]) {
+        const badOwnerRes = await verifyAndRecordStakePointPosition(
+          {
+            walletAddress: USER_WALLET,
+            txSignature: makeSignature(`bad_pool_owner_${String(badPoolOwner)}`),
+            lockDays: 90,
+          },
+          {
+            env: pinnedEnv,
+            loadDb: unlinkedStore.loadDb,
+            createStakeIfAbsent: unlinkedStore.createStakeIfAbsent,
+            fetchPoolAccountOwner: async () => badPoolOwner,
+            fetchTransaction: async () => buildParsedStakeTx(),
+            getPrice: async () => VALID_PRICE,
+          }
+        );
+        assert.equal(badOwnerRes.success, false);
+        assert.equal(badOwnerRes.status, 'REJECTED');
+      }
+      assert.equal(unlinkedStore.stakes.length, 0);
+
+      // Valid STAKEPOINT_VAULT_ADDRESS succeeds ONLY when vault is owned on-chain by CONFIGURED_POOL_ID
+      // and pool account is owned on-chain by CONFIGURED_PROGRAM_ID
       const pinnedRes = await verifyAndRecordStakePointPosition(
         {
           walletAddress: USER_WALLET,
-          txSignature: makeSignature('pinned_vault_ok'),
+          txSignature: makeSignature('pinned_vault_linked_ok'),
           lockDays: 90,
         },
         {
           env: pinnedEnv,
-          loadDb: pinnedStore.loadDb,
-          createStakeIfAbsent: pinnedStore.createStakeIfAbsent,
-          fetchTransaction: async () =>
-            buildParsedStakeTx({
-              vaultOwner: pdaAuthority,
-              vaultAccount: POOL_VAULT_ATA,
-              instructionAccounts: [USER_WALLET, CONFIGURED_POOL_ID, POOL_VAULT_ATA],
-              extraAccountKeys: [CONFIGURED_POOL_ID],
-            }),
+          loadDb: unlinkedStore.loadDb,
+          createStakeIfAbsent: unlinkedStore.createStakeIfAbsent,
+          fetchPoolAccountOwner: async () => CONFIGURED_PROGRAM_ID,
+          fetchTransaction: async () => buildParsedStakeTx(),
           getPrice: async () => VALID_PRICE,
         }
       );
       assert.equal(pinnedRes.success, true);
       assert.equal(pinnedRes.status, 'VERIFIED');
-      assert.equal(pinnedStore.stakes.length, 1);
+      assert.equal(unlinkedStore.stakes.length, 1);
     }
   )
 );
