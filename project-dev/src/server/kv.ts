@@ -522,6 +522,12 @@ export async function kvSMembers(key: string): Promise<string[]> {
   return ((await cmd(['SMEMBERS', key])) as string[] | null) ?? [];
 }
 
+export async function kvExpire(key: string, ttlSec: number): Promise<void> {
+  const safeTtl = Math.max(1, Math.ceil(ttlSec));
+  if (!Number.isFinite(safeTtl)) return;
+  await cmd(['EXPIRE', key, safeTtl]);
+}
+
 // ---------------------------------------------------------------------------
 // Atomic Lua primitives for the Durable TP/SL Notification Outbox
 // ---------------------------------------------------------------------------

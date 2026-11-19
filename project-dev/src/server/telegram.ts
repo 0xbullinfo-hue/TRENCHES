@@ -5,11 +5,14 @@ import {
   KV_CONFIGURED,
   isKvConfigured,
   kvDel,
+  kvExpire,
   kvGet,
   kvGetDel,
   kvHDel,
   kvHGetAll,
   kvHSet,
+  kvSAdd,
+  kvSMembers,
   kvSet,
   kvSetEx,
   kvLock,
@@ -1607,6 +1610,8 @@ export interface FanoutResult {
 }
 
 export const DELAYED_MEMBER_CALLS_KEY = 'telegram:delayed_member_calls_v1';
+export const DELAYED_MEMBER_RECEIPTS_KEY_PREFIX = 'telegram:delayed_receipts_v1:';
+export const DELAYED_RECEIPT_TTL_SEC = 7 * 86_400;
 export const MEMBER_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface DelayedMemberCall {
@@ -1616,7 +1621,26 @@ export interface DelayedMemberCall {
   createdAt: number;
 }
 
+export interface DispatchDelayedMemberDeps {
+  nowMs?: () => number;
+  kvEnabled?: boolean;
+  kvLock?: typeof kvLock;
+  kvUnlock?: typeof kvUnlock;
+  kvHGetAll?: typeof kvHGetAll;
+  kvHDel?: typeof kvHDel;
+  kvSMembers?: typeof kvSMembers;
+  kvSAdd?: typeof kvSAdd;
+  kvExpire?: typeof kvExpire;
+  getSubscribers?: typeof getActiveNotificationSubscribers;
+  resolveTier?: typeof resolveTier;
+  sendFn?: typeof tgSend;
+  telegramConfigured?: () => boolean;
+  sleepMs?: (ms: number) => Promise<void>;
+}
+
 const localDelayedQueue = new Map<string, DelayedMemberCall>();
+const localDelayedReceipts = new Map<string, Set<string>>();
+let localDelayedDispatchLock = false;
 
 export async function enqueueDelayedMemberCall(r: AlphaRecord): Promise<void> {
   const deliverAt = Date.now() + MEMBER_DELAY_MS;
@@ -1649,25 +1673,51 @@ export async function enqueueDelayedMemberCall(r: AlphaRecord): Promise<void> {
   }
 }
 
-export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ dispatched: number; pending: number }> {
-  if (!telegramConfigured()) return { dispatched: 0, pending: 0 };
+export async function dispatchDelayedMemberCalls(
+  budgetMs = 50_000,
+  deps: DispatchDelayedMemberDeps = {}
+): Promise<{ dispatched: number; pending: number }> {
+  const isTgReady = deps.telegramConfigured ?? telegramConfigured;
+  if (!isTgReady()) return { dispatched: 0, pending: 0 };
   const siteUrl = getSiteUrl();
+
+  const useKv = deps.kvEnabled ?? kvStoreEnabled();
+  const nowFn = deps.nowMs ?? Date.now;
+  const lockFn = deps.kvLock ?? kvLock;
+  const unlockFn = deps.kvUnlock ?? kvUnlock;
+  const hGetAllFn = deps.kvHGetAll ?? kvHGetAll;
+  const hDelFn = deps.kvHDel ?? kvHDel;
+  const sMembersFn = deps.kvSMembers ?? kvSMembers;
+  const sAddFn = deps.kvSAdd ?? kvSAdd;
+  const expireFn = deps.kvExpire ?? kvExpire;
+  const getSubsFn = deps.getSubscribers ?? getActiveNotificationSubscribers;
+  const resolveTierFn = deps.resolveTier ?? resolveTier;
+  const sendFn = deps.sendFn ?? tgSend;
+  const sleepFn = deps.sleepMs ?? sleep;
 
   const lockKey = 'lock:dispatch_delayed_member_calls';
   const lockToken = crypto.randomUUID();
   let locked = false;
-  if (kvStoreEnabled()) {
-    locked = await kvLock(lockKey, lockToken, 65);
+  let localLocked = false;
+  if (useKv) {
+    locked = await lockFn(lockKey, lockToken, 65);
     if (!locked) {
       return { dispatched: 0, pending: 0 };
     }
+  } else {
+    if (localDelayedDispatchLock) {
+      return { dispatched: 0, pending: 0 };
+    }
+    localDelayedDispatchLock = true;
+    localLocked = true;
   }
 
   try {
-    const now = Date.now();
+    const startedAt = nowFn();
+    const now = startedAt;
     let items: DelayedMemberCall[] = [];
-    if (kvStoreEnabled()) {
-      const rawMap = await kvHGetAll(DELAYED_MEMBER_CALLS_KEY);
+    if (useKv) {
+      const rawMap = await hGetAllFn(DELAYED_MEMBER_CALLS_KEY);
       items = Object.entries(rawMap || {})
         .map(([, rawStr]) => {
           try {
@@ -1686,56 +1736,116 @@ export async function dispatchDelayedMemberCalls(budgetMs = 50_000): Promise<{ d
       return { dispatched: 0, pending: items.length };
     }
 
-    const subs = Object.entries(await getActiveNotificationSubscribers());
+    const subs = Object.entries(await getSubsFn());
     const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${siteUrl}/dashboard` }]] };
     const BATCH = 20;
     let dispatchedCount = 0;
+    let completedDueCount = 0;
+    let budgetExhausted = false;
 
     for (const item of due) {
+      if (budgetExhausted || nowFn() - startedAt > budgetMs) {
+        budgetExhausted = true;
+        break;
+      }
+
       // Pro-only calls must never be dispatched to $20 Member tier subscribers
       if (isProOnlyCall(item.call)) {
-        if (kvStoreEnabled()) await kvHDel(DELAYED_MEMBER_CALLS_KEY, item.callId).catch(() => {});
+        if (useKv) await hDelFn(DELAYED_MEMBER_CALLS_KEY, item.callId).catch(() => {});
         localDelayedQueue.delete(item.callId);
+        localDelayedReceipts.delete(item.callId);
+        completedDueCount++;
         continue;
       }
 
+      const receiptKey = `${DELAYED_MEMBER_RECEIPTS_KEY_PREFIX}${item.callId}`;
+      const delivered = new Set<string>(
+        useKv
+          ? await sMembersFn(receiptKey)
+          : Array.from(localDelayedReceipts.get(item.callId) ?? [])
+      );
+      if (!useKv && !localDelayedReceipts.has(item.callId)) {
+        localDelayedReceipts.set(item.callId, new Set<string>());
+      }
+
+      const recordDurableReceipt = async (wallet: string): Promise<void> => {
+        if (useKv) {
+          const added = await sAddFn(receiptKey, wallet);
+          if (added === 1) {
+            await expireFn(receiptKey, DELAYED_RECEIPT_TTL_SEC).catch(() => {});
+          }
+          delivered.add(wallet);
+        } else {
+          let localSet = localDelayedReceipts.get(item.callId);
+          if (!localSet) {
+            localSet = new Set<string>();
+            localDelayedReceipts.set(item.callId, localSet);
+          }
+          localSet.add(wallet);
+          delivered.add(wallet);
+        }
+      };
+
       const text = formatCallMessage(item.call);
+      let itemIncomplete = false;
+
       for (let i = 0; i < subs.length; i += BATCH) {
+        if (nowFn() - startedAt > budgetMs) {
+          itemIncomplete = true;
+          budgetExhausted = true;
+          break;
+        }
+
         await Promise.all(
           subs.slice(i, i + BATCH).map(async ([wallet, chatId]) => {
             try {
-              if (isAdminWallet(wallet)) {
-                // Admin already received instant alert
+              if (isAdminWallet(wallet) || delivered.has(wallet)) {
+                // Admin received instant alert, or this subscriber already has a durable delivery receipt
                 return;
               }
-              const tier = await resolveTier(wallet);
+              const tier = await resolveTierFn(wallet);
               // Only deliver to verified Member tier holders ($20+ held); never unknown/free
               if (tier !== 'member') return;
 
-              const res = await tgSend(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+              const res = await sendFn(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
               if (res.ok) {
+                await recordDurableReceipt(wallet);
                 dispatchedCount++;
               } else if (classifySendFailure(res.status, res.description) === 'blocked') {
                 await disableTelegramNotificationsByChatId(chatId, 'blocked').catch(() => {});
-                if (kvStoreEnabled()) await kvHDel(SUBS_KEY, wallet).catch(() => {});
+                if (useKv) await hDelFn(SUBS_KEY, wallet).catch(() => {});
+                await recordDurableReceipt(wallet);
+              } else {
+                // Transient send failure: retain item in delayed queue without marking receipt so next run retries
+                itemIncomplete = true;
               }
             } catch (err) {
               console.error('[TrenchLabs] Delayed member send error:', err);
+              itemIncomplete = true;
             }
           })
         );
-        if (i + BATCH < subs.length) await sleep(1_100);
+        if (!itemIncomplete && nowFn() - startedAt <= budgetMs && i + BATCH < subs.length) {
+          await sleepFn(1_100);
+        }
       }
 
-      // Remove dispatched call from delayed queue
-      if (kvStoreEnabled()) await kvHDel(DELAYED_MEMBER_CALLS_KEY, item.callId).catch(() => {});
-      localDelayedQueue.delete(item.callId);
+      // Only delete delayed call hash entry after all eligible subscribers completed without transient failures
+      if (!itemIncomplete) {
+        if (useKv) await hDelFn(DELAYED_MEMBER_CALLS_KEY, item.callId).catch(() => {});
+        localDelayedQueue.delete(item.callId);
+        localDelayedReceipts.delete(item.callId);
+        completedDueCount++;
+      }
     }
 
-    return { dispatched: dispatchedCount, pending: items.length - due.length };
+    return { dispatched: dispatchedCount, pending: Math.max(0, items.length - completedDueCount) };
   } finally {
     if (locked) {
-      await kvUnlock(lockKey, lockToken).catch(() => {});
+      await unlockFn(lockKey, lockToken).catch(() => {});
+    }
+    if (localLocked) {
+      localDelayedDispatchLock = false;
     }
   }
 }

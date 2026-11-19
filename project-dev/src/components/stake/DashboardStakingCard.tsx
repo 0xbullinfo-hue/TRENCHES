@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useGenesisBalance } from '@/context/GenesisContext';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
-import { ArrowUpRight, ChevronDown, ChevronUp, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronUp, Lock, RefreshCw, Sparkles } from 'lucide-react';
 import { StakePointPool } from '@/lib/stakepoint/types';
 import { formatTvlDisplay, formatLockPeriodDisplay } from '@/components/staking/StakePointCard';
 import { TelegramVerificationCard } from '@/components/telegram/TelegramVerificationCard';
@@ -40,6 +40,50 @@ interface StakeStatusResponse {
   };
   eligible_for_pro: boolean;
   gap_to_pro_usd: number;
+  stakepoint?: {
+    configured: boolean;
+    program_configured: boolean;
+    pool_configured: boolean;
+  };
+}
+
+function StakePointActionButton({
+  ready,
+  href,
+  label,
+  className,
+}: {
+  ready: boolean;
+  href: string;
+  label: string;
+  className: string;
+}) {
+  if (ready) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none ${className}`}
+      >
+        <span>{label}</span>
+        <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled
+      aria-disabled="true"
+      title="StakePoint pool and program will be configured after token launch"
+      className={`h-10 sm:h-11 px-6 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none ${className}`}
+    >
+      <Lock className="w-3.5 h-3.5" />
+      <span>{label}</span>
+    </button>
+  );
 }
 
 function StakePointLiveSection({
@@ -161,14 +205,23 @@ export function DashboardStakingCard({
   const [pools, setPools] = useState<StakePointPool[] | null>(null);
   const [poolsLoading, setPoolsLoading] = useState(true);
   const [poolsError, setPoolsError] = useState(false);
+  const [poolsConfigured, setPoolsConfigured] = useState<boolean>(
+    Boolean(
+      process.env.NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID?.trim() &&
+        process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim()
+    )
+  );
 
   const loadPools = useCallback(async () => {
     try {
       setPoolsLoading(true);
       setPoolsError(false);
       const res = await fetch('/api/stakepoint/pools');
-      if (res.ok) {
-        const json = await res.json();
+      const json = await res.json().catch(() => null);
+      if (json && typeof json.configured === 'boolean') {
+        setPoolsConfigured(json.configured);
+      }
+      if (res.ok && json) {
         setPools(json.pools || []);
       } else {
         setPoolsError(true);
@@ -232,7 +285,12 @@ export function DashboardStakingCard({
   const currentStakedUsd = statusData?.stake?.amount_usd ?? 0;
   const isPartialStake = currentStakedUsd > 0 && gapToPro > 0;
 
-  // StakePoint pool link
+  // StakePoint pool link & readiness
+  const stakePointConfigured = statusData?.stakepoint?.configured ?? poolsConfigured;
+  const hasPoolTarget = Boolean(
+    process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID?.trim() || (pools && pools.length > 0)
+  );
+  const stakePointReady = Boolean(stakePointConfigured && hasPoolTarget);
   const stakePointPoolUrl =
     process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID
       ? `https://stakepoint.app/pool/${process.env.NEXT_PUBLIC_STAKEPOINT_POOL_ID}`
@@ -258,15 +316,17 @@ export function DashboardStakingCard({
               <span className="text-2xs font-mono text-muted uppercase">
                 $20 $H42
               </span>
-              <a
-                href={stakePointPoolUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted hover:text-brand transition-colors"
-                title="Open Pool on StakePoint"
-              >
-                <ArrowUpRight className="w-4 h-4" />
-              </a>
+              {stakePointReady && (
+                <a
+                  href={stakePointPoolUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted hover:text-brand transition-colors"
+                  title="Open Pool on StakePoint"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -302,15 +362,12 @@ export function DashboardStakingCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <a
+            <StakePointActionButton
+              ready={stakePointReady}
               href={stakePointPoolUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
-            >
-              <span>STAKE ON STAKEPOINT</span>
-              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-            </a>
+              label="STAKE ON STAKEPOINT"
+              className="w-full sm:w-auto"
+            />
             <Link
               href="/#choose-your-access"
               className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center transition-colors cursor-pointer"
@@ -318,6 +375,12 @@ export function DashboardStakingCard({
               <span>VIEW TIERS</span>
             </Link>
           </div>
+
+          {!stakePointReady && (
+            <p className="font-sans text-2xs text-muted leading-relaxed">
+              Official $H42 StakePoint pool and verification program will be configured after token launch and pool creation.
+            </p>
+          )}
 
           {/* Powered by StakePoint. */}
           <p className="font-sans text-2xs text-dim pt-2.5 border-t border-border-default/40">
@@ -354,15 +417,17 @@ export function DashboardStakingCard({
               <span className="text-muted text-xs font-mono">
                 ({daysLeft} days remaining)
               </span>
-              <a
-                href={stakePointPoolUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted hover:text-brand transition-colors"
-                title="Open Pool on StakePoint"
-              >
-                <ArrowUpRight className="w-4 h-4" />
-              </a>
+              {stakePointReady && (
+                <a
+                  href={stakePointPoolUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted hover:text-brand transition-colors"
+                  title="Open Pool on StakePoint"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -391,15 +456,12 @@ export function DashboardStakingCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <a
+            <StakePointActionButton
+              ready={stakePointReady}
               href={stakePointPoolUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
-            >
-              <span>STAKE ADDITIONAL</span>
-              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-            </a>
+              label="STAKE ADDITIONAL"
+              className=""
+            />
 
             <Button
               variant="secondary"
@@ -467,15 +529,17 @@ export function DashboardStakingCard({
             <span className="text-2xs font-mono text-muted uppercase">
               90-DAY LOCK
             </span>
-            <a
-              href={stakePointPoolUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted hover:text-brand transition-colors"
-              title="Open Pool on StakePoint"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-            </a>
+            {stakePointReady && (
+              <a
+                href={stakePointPoolUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted hover:text-brand transition-colors"
+                title="Open Pool on StakePoint"
+              >
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            )}
           </div>
         </div>
 
@@ -504,16 +568,19 @@ export function DashboardStakingCard({
         </div>
 
         <div>
-          <a
+          <StakePointActionButton
+            ready={stakePointReady}
             href={stakePointPoolUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
-          >
-            <span>STAKE $H42</span>
-            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-          </a>
+            label="STAKE $H42"
+            className="w-full sm:w-auto"
+          />
         </div>
+
+        {!stakePointReady && (
+          <p className="font-sans text-2xs text-muted leading-relaxed">
+            Official $H42 StakePoint pool and verification program will be configured after token launch and pool creation.
+          </p>
+        )}
 
         {pools && pools.length > 1 && (
           <div className="pt-1.5 border-t border-border-default/40">

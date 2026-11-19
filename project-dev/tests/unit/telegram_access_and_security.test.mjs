@@ -660,3 +660,159 @@ test('Section 18.E/F: Webhook deduplication, retryable error recovery, Status AP
   assert.equal(delayedBeforeNow.dispatched, 0, 'Must NOT dispatch general call before 5m delay elapses');
   assert.ok(delayedBeforeNow.pending >= 1);
 });
+
+test('Delayed fan-out durable per-subscriber receipts prevent duplicate delivery across partial failures and budget retries', async () => {
+  const hashStore = new Map();
+  const receiptStore = new Map();
+  const sentToChats = [];
+  let failSub2 = true;
+  let nowClock = 1_700_000_000_000;
+
+  const callId = 'delayed-partial-fail-call-1';
+  const callKey = tg.DELAYED_MEMBER_CALLS_KEY;
+  const dueHash = new Map([
+    [
+      callId,
+      JSON.stringify({
+        callId,
+        deliverAt: nowClock - 5_000,
+        createdAt: nowClock - 305_000,
+        call: {
+          id: callId,
+          name: 'RetryToken',
+          ticker: 'RETRY',
+          chain: 'SOL',
+          ca: 'So11111111111111111111111111111111111111112',
+          entryMarketCap: '$50K',
+          risk: 1,
+          stopLoss: '-15% SL',
+          takeProfits: [{ label: '2x', multiple: 2, hit: false }],
+          minTier: 'LAB_MEMBER',
+          isMaxAlpha: false,
+        },
+      }),
+    ],
+  ]);
+  hashStore.set(callKey, dueHash);
+
+  const sub1 = 'MemberSub1111111111111111111111111111111111';
+  const sub2 = 'MemberSub2222222222222222222222222222222222';
+
+  const makeDeps = () => ({
+    nowMs: () => nowClock,
+    kvEnabled: true,
+    telegramConfigured: () => true,
+    kvLock: async () => true,
+    kvUnlock: async () => true,
+    kvHGetAll: async (key) => Object.fromEntries(hashStore.get(key) || []),
+    kvHDel: async (key, field) => {
+      hashStore.get(key)?.delete(field);
+    },
+    kvSMembers: async (key) => Array.from(receiptStore.get(key) || []),
+    kvSAdd: async (key, member) => {
+      let set = receiptStore.get(key);
+      if (!set) {
+        set = new Set();
+        receiptStore.set(key, set);
+      }
+      const had = set.has(member);
+      set.add(member);
+      return had ? 0 : 1;
+    },
+    kvExpire: async () => {},
+    getSubscribers: async () => ({
+      [sub1]: '1001',
+      [sub2]: '1002',
+    }),
+    resolveTier: async () => 'member',
+    sendFn: async (chatId) => {
+      if (chatId === '1002' && failSub2) {
+        return { ok: false, status: 502, description: 'Bad Gateway' };
+      }
+      sentToChats.push(chatId);
+      return { ok: true, status: 200 };
+    },
+    sleepMs: async () => {},
+  });
+
+  // First run: sub1 succeeds (receipt saved), sub2 fails transiently -> item remains queued
+  const firstRun = await tg.dispatchDelayedMemberCalls(50_000, makeDeps());
+  assert.equal(firstRun.dispatched, 1);
+  assert.equal(firstRun.pending, 1);
+  assert.deepEqual(sentToChats, ['1001']);
+  assert.equal(hashStore.get(callKey)?.has(callId), true, 'Incomplete delayed call must remain in queue for retry');
+
+  // Second run (sub2 recovers): sub1 MUST NOT receive duplicate, sub2 receives message, hash entry cleaned up
+  failSub2 = false;
+  const secondRun = await tg.dispatchDelayedMemberCalls(50_000, makeDeps());
+  assert.equal(secondRun.dispatched, 1);
+  assert.equal(secondRun.pending, 0);
+  assert.deepEqual(sentToChats, ['1001', '1002']);
+  assert.equal(hashStore.get(callKey)?.has(callId), false, 'Completed delayed call must be removed after all subscribers succeed');
+
+  // Budget exhaustion mid-fanout preserves queue & durable receipts without duplicating batch 1
+  const budgetCallId = 'delayed-budget-cut-call-2';
+  const batchSubs = {};
+  for (let idx = 0; idx < 22; idx++) {
+    batchSubs[`BudgetSub${String(idx).padStart(2, '0')}1111111111111111111111111111111`] = String(2000 + idx);
+  }
+  hashStore.set(
+    callKey,
+    new Map([
+      [
+        budgetCallId,
+        JSON.stringify({
+          callId: budgetCallId,
+          deliverAt: nowClock - 1_000,
+          createdAt: nowClock - 301_000,
+          call: {
+            id: budgetCallId,
+            name: 'BudgetToken',
+            ticker: 'BDGT',
+            chain: 'SOL',
+            ca: 'So11111111111111111111111111111111111111112',
+            entryMarketCap: '$50K',
+            risk: 1,
+            stopLoss: '-15% SL',
+            takeProfits: [{ label: '2x', multiple: 2, hit: false }],
+            minTier: 'LAB_MEMBER',
+            isMaxAlpha: false,
+          },
+        }),
+      ],
+    ])
+  );
+  const budgetSent = [];
+  let sleepTicks = 0;
+  let clockOffset = 0;
+  const budgetDeps = {
+    ...makeDeps(),
+    nowMs: () => nowClock + clockOffset,
+    getSubscribers: async () => batchSubs,
+    sendFn: async (chatId) => {
+      budgetSent.push(chatId);
+      return { ok: true, status: 200 };
+    },
+    sleepMs: async () => {
+      sleepTicks++;
+      clockOffset = 60_000; // exceed 50s budget before batch 2
+    },
+  };
+
+  const budgetRun1 = await tg.dispatchDelayedMemberCalls(50_000, budgetDeps);
+  assert.equal(budgetRun1.dispatched, 20);
+  assert.equal(budgetRun1.pending, 1);
+  assert.equal(sleepTicks, 1);
+  assert.equal(hashStore.get(callKey)?.has(budgetCallId), true);
+
+  clockOffset = 0;
+  const budgetRun2 = await tg.dispatchDelayedMemberCalls(50_000, {
+    ...budgetDeps,
+    nowMs: () => nowClock,
+    sleepMs: async () => {},
+  });
+  assert.equal(budgetRun2.dispatched, 2);
+  assert.equal(budgetRun2.pending, 0);
+  assert.equal(budgetSent.length, 22);
+  assert.equal(new Set(budgetSent).size, 22, 'Every subscriber must receive exactly one delayed message across budget retry');
+});
