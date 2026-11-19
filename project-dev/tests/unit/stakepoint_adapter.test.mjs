@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { GENESIS_MINT } from '../../src/lib/config.ts';
+import { resolveStakePointConfig } from '../../src/lib/stakepoint/config.ts';
+import { findConfiguredPool, normalizePools } from '../../src/lib/stakepoint/fetchPools.ts';
 import { signSession, SESSION_COOKIE_NAME } from '../../src/server/auth.ts';
 import {
   getStakePointIntegrationStatus,
@@ -15,7 +18,7 @@ const CONFIGURED_PROGRAM_ID = 'StakePnt11111111111111111111111111111111111';
 const WRONG_PROGRAM_ID = 'WrongProg1111111111111111111111111111111111';
 const CONFIGURED_POOL_ID = 'Poo1Cfg111111111111111111111111111111111111';
 const WRONG_POOL_ID = 'Poo1Other1111111111111111111111111111111111';
-const POOL_VAULT_ATA = 'Poo1Vault1111111111111111111111111111111111';
+const POOL_VAULT_ATA = 'Poo1Vau1t1111111111111111111111111111111111';
 const OTHER_VAULT_ATA = 'OtherVau1t111111111111111111111111111111111';
 const USER_WALLET = 'UserWa11et111111111111111111111111111111111';
 const SECOND_WALLET = 'OtherWa11et11111111111111111111111111111111';
@@ -29,8 +32,15 @@ const VALID_PRICE = {
   isFresh: true,
 };
 
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
 function makeSignature(seed) {
-  return `${seed}_${'A'.repeat(Math.max(1, 88 - seed.length - 1))}`;
+  const digest = crypto.createHash('sha256').update(String(seed)).digest();
+  let out = '';
+  for (let i = 0; i < 88; i++) {
+    out += BASE58_ALPHABET[digest[i % digest.length] % BASE58_ALPHABET.length];
+  }
+  return out;
 }
 
 function makeMemoryStore() {
@@ -151,6 +161,8 @@ function withEnv(vars, fn) {
       'NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID',
       'STAKEPOINT_PROGRAM_ID',
       'NEXT_PUBLIC_STAKEPOINT_POOL_ID',
+      'STAKEPOINT_VAULT_ADDRESS',
+      'NEXT_PUBLIC_STAKEPOINT_VAULT_ADDRESS',
       'SESSION_SECRET',
     ]) {
       prev[key] = process.env[key];
@@ -475,6 +487,39 @@ test(
       );
       assert.equal(wrongMintRes.success, false);
       assert.equal(wrongMintRes.status, 'REJECTED');
+
+      // Split-instruction attack: StakePoint instruction omits receiving POOL_VAULT_ATA
+      const splitIxRes = await verifyAndRecordStakePointPosition(
+        { walletAddress: USER_WALLET, txSignature: makeSignature('split_ix'), lockDays: 90 },
+        {
+          env,
+          loadDb: store.loadDb,
+          createStakeIfAbsent: store.createStakeIfAbsent,
+          fetchTransaction: async () =>
+            buildParsedStakeTx({
+              instructionAccounts: [USER_WALLET, CONFIGURED_POOL_ID, OTHER_VAULT_ATA],
+            }),
+          getPrice: async () => VALID_PRICE,
+        }
+      );
+      assert.equal(splitIxRes.success, false);
+      assert.equal(splitIxRes.status, 'REJECTED');
+
+      // Missing/spoofed SPL transfer source (transferChecked omitted from innerInstructions)
+      const noSplTx = buildParsedStakeTx();
+      noSplTx.meta.innerInstructions = [];
+      const noSplRes = await verifyAndRecordStakePointPosition(
+        { walletAddress: USER_WALLET, txSignature: makeSignature('missing_spl'), lockDays: 90 },
+        {
+          env,
+          loadDb: store.loadDb,
+          createStakeIfAbsent: store.createStakeIfAbsent,
+          fetchTransaction: async () => noSplTx,
+          getPrice: async () => VALID_PRICE,
+        }
+      );
+      assert.equal(noSplRes.success, false);
+      assert.equal(noSplRes.status, 'REJECTED');
       assert.equal(store.stakes.length, 0);
     }
   )
@@ -544,46 +589,83 @@ test(
       assert.equal(res.details?.poolId, CONFIGURED_POOL_ID);
       assert.equal(store.stakes.length, 1);
 
-      const offchainStore = makeMemoryStore();
-      const offchainEnv = {
+      // Non-base58 pool slug must fail closed as BLOCKED (no unverified upstream metadata lookup)
+      const slugEnv = {
         NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID: CONFIGURED_PROGRAM_ID,
         NEXT_PUBLIC_STAKEPOINT_POOL_ID: 'official-h42-pool',
       };
-      const offchainSig = makeSignature('valid_offchain_pool_id');
-      const offchainRes = await verifyAndRecordStakePointPosition(
+      assert.equal(resolveStakePointConfig(slugEnv).status, 'BLOCKED');
+      const slugRes = await verifyAndRecordStakePointPosition(
         {
           walletAddress: USER_WALLET,
-          txSignature: offchainSig,
+          txSignature: makeSignature('slug_blocked'),
           lockDays: 90,
         },
         {
-          env: offchainEnv,
-          loadDb: offchainStore.loadDb,
-          createStakeIfAbsent: offchainStore.createStakeIfAbsent,
-          fetchPools: async () => [
-            {
-              id: 'official-h42-pool',
-              poolId: 'official-h42-pool',
-              apr: 25,
-              lockPeriod: '90 days',
-              tvl: 10000,
-              poolUrl: 'https://stakepoint.app/pool/official-h42-pool',
-              rewardToken: '$H42',
-              status: 'Active',
-              poolAddress: CONFIGURED_POOL_ID,
-              vaultAddress: POOL_VAULT_ATA,
-              tokenMint: GENESIS_MINT,
-            },
-          ],
+          env: slugEnv,
+          loadDb: store.loadDb,
+          createStakeIfAbsent: store.createStakeIfAbsent,
           fetchTransaction: async () => buildParsedStakeTx(),
           getPrice: async () => VALID_PRICE,
         }
       );
-      assert.equal(offchainRes.success, true);
-      assert.equal(offchainRes.status, 'VERIFIED');
-      assert.equal(offchainRes.details?.poolId, 'official-h42-pool');
-      assert.equal(offchainRes.details?.poolAddress, CONFIGURED_POOL_ID);
-      assert.equal(offchainStore.stakes.length, 1);
+      assert.equal(slugRes.success, false);
+      assert.equal(slugRes.status, 'BLOCKED');
+
+      // findConfiguredPool strictly verifies expected mint, address match, and safe HTTPS origin
+      const normalized = normalizePools([
+        {
+          id: 'missing-mint',
+          poolId: CONFIGURED_POOL_ID,
+          poolAddress: CONFIGURED_POOL_ID,
+          poolUrl: 'https://evil.example/phish',
+          apr: 99,
+        },
+        {
+          id: CONFIGURED_POOL_ID,
+          poolId: CONFIGURED_POOL_ID,
+          poolAddress: CONFIGURED_POOL_ID,
+          tokenMint: GENESIS_MINT,
+          poolUrl: 'https://stakepoint.app/pool/verified',
+          apr: 25,
+        },
+      ]);
+      assert.equal(normalized[0].poolUrl, 'https://stakepoint.app/pool/missing-mint');
+      const filteredPool = findConfiguredPool(normalized, CONFIGURED_POOL_ID, GENESIS_MINT);
+      assert.equal(filteredPool?.poolUrl, 'https://stakepoint.app/pool/verified');
+      assert.equal(findConfiguredPool([normalized[0]], CONFIGURED_POOL_ID, GENESIS_MINT), null);
+
+      // Server-pinned STAKEPOINT_VAULT_ADDRESS validates PDA-authority pools without upstream trust
+      const pinnedStore = makeMemoryStore();
+      const pinnedEnv = {
+        NEXT_PUBLIC_STAKEPOINT_PROGRAM_ID: CONFIGURED_PROGRAM_ID,
+        NEXT_PUBLIC_STAKEPOINT_POOL_ID: CONFIGURED_POOL_ID,
+        STAKEPOINT_VAULT_ADDRESS: POOL_VAULT_ATA,
+      };
+      const pdaAuthority = 'PdaAuth111111111111111111111111111111111111';
+      const pinnedRes = await verifyAndRecordStakePointPosition(
+        {
+          walletAddress: USER_WALLET,
+          txSignature: makeSignature('pinned_vault_ok'),
+          lockDays: 90,
+        },
+        {
+          env: pinnedEnv,
+          loadDb: pinnedStore.loadDb,
+          createStakeIfAbsent: pinnedStore.createStakeIfAbsent,
+          fetchTransaction: async () =>
+            buildParsedStakeTx({
+              vaultOwner: pdaAuthority,
+              vaultAccount: POOL_VAULT_ATA,
+              instructionAccounts: [USER_WALLET, CONFIGURED_POOL_ID, POOL_VAULT_ATA],
+              extraAccountKeys: [CONFIGURED_POOL_ID],
+            }),
+          getPrice: async () => VALID_PRICE,
+        }
+      );
+      assert.equal(pinnedRes.success, true);
+      assert.equal(pinnedRes.status, 'VERIFIED');
+      assert.equal(pinnedStore.stakes.length, 1);
     }
   )
 );
@@ -657,5 +739,35 @@ test('Security [8/8]: Failed Solana transaction and missing RPC tx are REJECTED 
   );
   assert.equal(nullRes.success, false);
   assert.equal(nullRes.status, 'REJECTED');
+
+  // Lock must always be released even when RPC fetch throws unexpectedly
+  const lockCalls = [];
+  const unlockCalls = [];
+  const throwRes = await verifyAndRecordStakePointPosition(
+    { walletAddress: USER_WALLET, txSignature: makeSignature('rpc_throw_lock_release'), lockDays: 90 },
+    {
+      env,
+      loadDb: store.loadDb,
+      createStakeIfAbsent: store.createStakeIfAbsent,
+      kvConfigured: true,
+      kvLock: async (k, w) => {
+        lockCalls.push([k, w]);
+        return true;
+      },
+      kvUnlock: async (k, w) => {
+        unlockCalls.push([k, w]);
+        return true;
+      },
+      fetchTransaction: async () => {
+        throw new Error('Simulated Solana RPC timeout');
+      },
+      getPrice: async () => VALID_PRICE,
+    }
+  );
+  assert.equal(throwRes.success, false);
+  assert.equal(throwRes.status, 'REJECTED');
+  assert.equal(lockCalls.length, 1);
+  assert.equal(unlockCalls.length, 1);
+  assert.deepEqual(unlockCalls[0], lockCalls[0]);
   assert.equal(store.stakes.length, 0);
 });

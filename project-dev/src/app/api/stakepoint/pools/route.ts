@@ -3,7 +3,7 @@ import { fetchGenesisPools, findConfiguredPool } from '@/lib/stakepoint/fetchPoo
 import { GENESIS_MINT } from '@/lib/config';
 import { getStakePointIntegrationStatus } from '@/server/stakepoint';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const mint = GENESIS_MINT;

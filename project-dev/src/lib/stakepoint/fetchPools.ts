@@ -1,5 +1,24 @@
-import { GENESIS_MINT } from '@/lib/config';
+import { GENESIS_MINT, isBase58Address } from '@/lib/config';
 import { StakePointPool, RawStakePointPool } from './types';
+
+function sanitizeStakePointUrl(rawUrl: unknown, fallbackId: string): string {
+  const safeFallback = fallbackId
+    ? `https://stakepoint.app/pool/${encodeURIComponent(fallbackId)}`
+    : 'https://stakepoint.app/pools';
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return safeFallback;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (
+      parsed.protocol === 'https:' &&
+      (parsed.hostname === 'stakepoint.app' || parsed.hostname.endsWith('.stakepoint.app'))
+    ) {
+      return parsed.toString();
+    }
+  } catch {
+    // Fall through to canonical StakePoint URL
+  }
+  return safeFallback;
+}
 
 export function normalizePools(raw: unknown): StakePointPool[] {
   const items: RawStakePointPool[] = Array.isArray(raw) ? raw : [];
@@ -51,9 +70,7 @@ export function normalizePools(raw: unknown): StakePointPool[] {
     // Pool identifier & URL
     const poolId = String(p.poolId ?? p.id ?? 'unknown');
     const directId = p.id ?? (p.poolId !== undefined && p.poolId !== null ? String(p.poolId) : '');
-    const poolUrl =
-      p.poolUrl ??
-      (directId ? `https://stakepoint.app/pool/${directId}` : 'https://stakepoint.app/pools');
+    const poolUrl = sanitizeStakePointUrl(p.poolUrl, directId);
 
     const rewardToken = p.rewardToken ?? p.rewardTokenSymbol ?? p.rewards ?? 'GENESIS';
     const rawId = typeof p.id === 'string' && p.id.trim().length > 0 ? p.id.trim() : undefined;
@@ -64,8 +81,9 @@ export function normalizePools(raw: unknown): StakePointPool[] {
     const vaultRaw = p.vaultAddress ?? p.tokenVault;
     const vaultAddress =
       typeof vaultRaw === 'string' && vaultRaw.trim().length > 0 ? vaultRaw.trim() : null;
+    const mintRaw = p.tokenMint ?? p.mint ?? p.stakingMint;
     const tokenMint =
-      typeof p.tokenMint === 'string' && p.tokenMint.trim().length > 0 ? p.tokenMint.trim() : null;
+      typeof mintRaw === 'string' && mintRaw.trim().length > 0 ? mintRaw.trim() : null;
 
     return {
       ...(rawId ? { id: rawId } : {}),
@@ -89,14 +107,24 @@ export function findConfiguredPool(
   expectedMint: string
 ): StakePointPool | null {
   const target = configuredPoolId.trim();
-  if (!target) return null;
+  const mint = expectedMint.trim();
+  if (!target || !isBase58Address(target) || !mint || !isBase58Address(mint)) {
+    return null;
+  }
+
   for (const pool of pools) {
-    if (pool.tokenMint && pool.tokenMint !== expectedMint) continue;
-    if (
-      pool.poolId === target ||
-      pool.id === target ||
-      pool.poolAddress === target
-    ) {
+    // Upstream metadata must explicitly match the $H42 mint; never match missing or different mints.
+    if (pool.tokenMint !== mint) continue;
+    if (pool.vaultAddress && (!isBase58Address(pool.vaultAddress) || pool.vaultAddress === target)) {
+      continue;
+    }
+    if (pool.poolAddress) {
+      if (pool.poolAddress === target) {
+        return pool;
+      }
+      continue;
+    }
+    if (pool.poolId === target || pool.id === target) {
       return pool;
     }
   }

@@ -1,14 +1,14 @@
 import { Connection } from '@solana/web3.js';
 import { GENESIS_MINT, SOLANA_RPC, TOKEN_DECIMALS, isBase58Address } from '@/lib/config';
 import { resolveStakePointConfig, type StakePointIntegrationState } from '@/lib/stakepoint/config';
-import { fetchGenesisPools, findConfiguredPool } from '@/lib/stakepoint/fetchPools';
-import type { StakePointPool } from '@/lib/stakepoint/types';
 import { createStakeIfAbsent, getActiveStakes, loadDb, StakeRow } from '@/server/db';
 import { getGenesisPrice } from '@/server/price';
 import { PRO_STAKE_MIN_LOCK_DAYS, PRO_STAKE_USD_THRESHOLD } from '@/server/entitlements';
 import { KV_CONFIGURED, kvLock, kvUnlock } from '@/server/kv';
 
 export type StakePointIntegrationStatus = StakePointIntegrationState;
+
+const SOLANA_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{64,96}$/;
 
 const SPL_TOKEN_PROGRAM_IDS = new Set([
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
@@ -89,7 +89,6 @@ export interface MinimalParsedTransaction {
 
 export interface StakePointVerificationDeps {
   fetchTransaction?: (signature: string) => Promise<MinimalParsedTransaction | null>;
-  fetchPools?: () => Promise<StakePointPool[]>;
   getPrice?: typeof getGenesisPrice;
   loadDb?: typeof loadDb;
   createStakeIfAbsent?: typeof createStakeIfAbsent;
@@ -106,6 +105,7 @@ export function getStakePointIntegrationStatus(
   configured: boolean;
   programId: string | null;
   poolId: string | null;
+  vaultAddress: string | null;
   programConfigured: boolean;
   poolConfigured: boolean;
   message: string;
@@ -165,7 +165,7 @@ export async function verifyAndRecordStakePointPosition(
   const env = deps.env ?? process.env;
 
   // 1. Basic input and format validation
-  if (!txSignature || txSignature.length < 64) {
+  if (!txSignature || !SOLANA_SIGNATURE_REGEX.test(txSignature)) {
     return {
       success: false,
       status: 'REJECTED',
@@ -192,7 +192,7 @@ export async function verifyAndRecordStakePointPosition(
     };
   }
 
-  // 3. Enforce BOTH server-side StakePoint configurations (program ID + pool ID)
+  // 3. Enforce BOTH server-side StakePoint configurations (program ID + on-chain pool ID)
   const integration = getStakePointIntegrationStatus(env);
   if (integration.status !== 'ACTIVE' || !integration.programId || !integration.poolId) {
     return {
@@ -202,7 +202,12 @@ export async function verifyAndRecordStakePointPosition(
     };
   }
 
-  if (!walletAddress || !isBase58Address(walletAddress)) {
+  if (
+    !walletAddress ||
+    !isBase58Address(walletAddress) ||
+    walletAddress === integration.poolId ||
+    walletAddress === integration.programId
+  ) {
     return {
       success: false,
       status: 'REJECTED',
@@ -219,53 +224,13 @@ export async function verifyAndRecordStakePointPosition(
     };
   }
 
-  // 4. Resolve authoritative on-chain pool & vault addresses for configured poolId
-  const expectedPoolAddresses = new Set<string>();
-  const verifiedVaultAddresses = new Set<string>();
-  if (isBase58Address(integration.poolId)) {
-    expectedPoolAddresses.add(integration.poolId);
-  }
+  const configuredProgramId = integration.programId;
+  const configuredPoolId = integration.poolId;
+  const configuredVaultAddress = integration.vaultAddress;
 
-  const getPools = deps.fetchPools ?? fetchGenesisPools;
-  if (expectedPoolAddresses.size === 0 || deps.fetchPools) {
-    try {
-      const pools = await getPools();
-      const matched = findConfiguredPool(pools, integration.poolId, GENESIS_MINT);
-      if (matched) {
-        if (matched.poolAddress && isBase58Address(matched.poolAddress)) {
-          expectedPoolAddresses.add(matched.poolAddress);
-        }
-        if (matched.vaultAddress && isBase58Address(matched.vaultAddress)) {
-          verifiedVaultAddresses.add(matched.vaultAddress);
-        }
-      }
-    } catch {
-      // Handled below by fail-closed size check if configured poolId wasn't already a base58 pubkey
-    }
-  }
-
-  if (expectedPoolAddresses.size === 0 && verifiedVaultAddresses.size === 0) {
-    return {
-      success: false,
-      status: 'BLOCKED',
-      error:
-        'StakePoint on-chain verification is BLOCKED: Unable to resolve an authoritative on-chain pool address for the configured NEXT_PUBLIC_STAKEPOINT_POOL_ID.',
-    };
-  }
-
-  // 5. Distributed Lock to prevent concurrent double-submission race conditions
+  // 4. Distributed Lock + On-chain Verification (guaranteed lock release on any failure)
   const lockKey = `stakepoint:tx:${txSignature}`;
   let lockHeld = false;
-  if (useKvLock) {
-    lockHeld = await acquireLock(lockKey, walletAddress, 120);
-    if (!lockHeld) {
-      return {
-        success: false,
-        status: 'REJECTED',
-        error: 'This transaction is currently being processed by another request.',
-      };
-    }
-  }
 
   const fetchTx: (sig: string) => Promise<MinimalParsedTransaction | null> =
     deps.fetchTransaction ??
@@ -279,6 +244,17 @@ export async function verifyAndRecordStakePointPosition(
     });
 
   try {
+    if (useKvLock) {
+      lockHeld = await acquireLock(lockKey, walletAddress, 120);
+      if (!lockHeld) {
+        return {
+          success: false,
+          status: 'REJECTED',
+          error: 'This transaction is currently being processed by another request.',
+        };
+      }
+    }
+
     const tx = await fetchTx(txSignature);
 
     if (!tx || !tx.meta || tx.meta.err) {
@@ -289,7 +265,7 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    // 6. Verify primary signer matches authenticated wallet
+    // 5. Verify primary signer matches authenticated wallet
     const rawAccountKeys = tx.transaction?.message?.accountKeys || [];
     const staticKeys = rawAccountKeys.map((k) =>
       typeof k === 'string' ? k : keyToBase58(k.pubkey)
@@ -319,56 +295,50 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    // 7. Verify BOTH StakePoint program interaction AND configured pool account participation at instruction level
-    if (!accountKeys.includes(integration.programId)) {
+    // 6. Verify BOTH StakePoint program invocation AND configured pool account participation
+    if (!accountKeys.includes(configuredProgramId)) {
       return {
         success: false,
         status: 'REJECTED',
-        error: `Transaction did not interact with the designated StakePoint program (${integration.programId})`,
+        error: `Transaction did not interact with the designated StakePoint program (${configuredProgramId})`,
       };
     }
 
-    const txPoolPresentInAccounts = [...expectedPoolAddresses].some((addr) =>
-      accountKeys.includes(addr)
-    );
-    if (!txPoolPresentInAccounts && ![...verifiedVaultAddresses].some((v) => accountKeys.includes(v))) {
+    if (!accountKeys.includes(configuredPoolId)) {
       return {
         success: false,
         status: 'REJECTED',
-        error: `Transaction did not reference the configured StakePoint pool (${integration.poolId}).`,
+        error: `Transaction did not reference the configured StakePoint pool (${configuredPoolId}).`,
       };
     }
 
     const allInstructions = collectAllInstructions(tx);
     const programInstructions = allInstructions.filter(
-      (ix) => keyToBase58(ix.programId) === integration.programId
+      (ix) => keyToBase58(ix.programId) === configuredProgramId
     );
     if (programInstructions.length === 0) {
       return {
         success: false,
         status: 'REJECTED',
-        error: `Transaction did not invoke the designated StakePoint program (${integration.programId}).`,
+        error: `Transaction did not invoke the designated StakePoint program (${configuredProgramId}).`,
       };
     }
 
-    const programTargetsConfiguredPool = programInstructions.some((ix) => {
+    const poolInstructions = programInstructions.filter((ix) => {
       if (!Array.isArray(ix.accounts) || ix.accounts.length === 0) return false;
       const ixAccounts = ix.accounts.map(keyToBase58);
-      return (
-        ixAccounts.some((a) => expectedPoolAddresses.has(a)) ||
-        ixAccounts.some((a) => verifiedVaultAddresses.has(a))
-      );
+      return ixAccounts.includes(configuredPoolId);
     });
 
-    if (!programTargetsConfiguredPool) {
+    if (poolInstructions.length === 0) {
       return {
         success: false,
         status: 'REJECTED',
-        error: `StakePoint program instruction did not target the configured StakePoint pool (${integration.poolId}).`,
+        error: `StakePoint program instruction did not target the configured StakePoint pool (${configuredPoolId}).`,
       };
     }
 
-    // 8. Verify $H42 (GENESIS_MINT) outgoing delta from authenticated wallet AND incoming deposit into configured pool vault
+    // 7. Verify $H42 (GENESIS_MINT) outgoing delta from authenticated wallet AND pool-owned vault deposit
     const preBalances = tx.meta.preTokenBalances || [];
     const postBalances = tx.meta.postTokenBalances || [];
 
@@ -425,7 +395,7 @@ export async function verifyAndRecordStakePointPosition(
       }
     }
 
-    if (senderSentRaw <= BigInt(0)) {
+    if (senderSentRaw <= BigInt(0) || walletTokenAccounts.size === 0) {
       return {
         success: false,
         status: 'REJECTED',
@@ -433,73 +403,108 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    // Verify incoming $H42 tokens landed specifically in a vault belonging to the configured pool
+    // Authoritative on-chain pool-to-vault linkage: receiving token account must be owned on-chain
+    // by the configured pool address (or explicitly pinned by server STAKEPOINT_VAULT_ADDRESS).
     let poolVaultReceivedRaw = BigInt(0);
-    const verifiedVaultTokenAccounts = new Set<string>();
-    let matchedPoolAddress: string | undefined;
+    const candidateVaultDeltas = new Map<string, bigint>();
 
     for (const post of postBalances) {
       if (post.mint !== GENESIS_MINT) continue;
       if (post.owner === walletAddress) continue;
       const vaultTokenAccount = accountKeys[post.accountIndex] || '';
-      if (vaultTokenAccount === walletAddress) continue;
+      if (!vaultTokenAccount || vaultTokenAccount === walletAddress) continue;
 
-      const belongsToConfiguredPool =
-        (post.owner ? expectedPoolAddresses.has(post.owner) : false) ||
-        (vaultTokenAccount ? expectedPoolAddresses.has(vaultTokenAccount) : false) ||
-        (vaultTokenAccount ? verifiedVaultAddresses.has(vaultTokenAccount) : false);
+      const isPoolOwnedVault = post.owner === configuredPoolId;
+      const isServerPinnedVault =
+        configuredVaultAddress !== null &&
+        vaultTokenAccount === configuredVaultAddress &&
+        Boolean(post.owner) &&
+        post.owner !== walletAddress;
 
-      if (!belongsToConfiguredPool) continue;
+      if (!isPoolOwnedVault && !isServerPinnedVault) continue;
 
       const preMatch = preByIndex.get(post.accountIndex);
       const preRaw = preMatch?.uiTokenAmount?.amount ? BigInt(preMatch.uiTokenAmount.amount) : BigInt(0);
       const postRaw = post.uiTokenAmount?.amount ? BigInt(post.uiTokenAmount.amount) : BigInt(0);
 
       if (postRaw > preRaw) {
-        poolVaultReceivedRaw += postRaw - preRaw;
-        if (vaultTokenAccount) verifiedVaultTokenAccounts.add(vaultTokenAccount);
-        if (!matchedPoolAddress && post.owner && expectedPoolAddresses.has(post.owner)) {
-          matchedPoolAddress = post.owner;
+        const delta = postRaw - preRaw;
+        poolVaultReceivedRaw += delta;
+        candidateVaultDeltas.set(
+          vaultTokenAccount,
+          (candidateVaultDeltas.get(vaultTokenAccount) ?? BigInt(0)) + delta
+        );
+      }
+    }
+
+    if (poolVaultReceivedRaw <= BigInt(0) || candidateVaultDeltas.size === 0) {
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: `No $H42 token deposit into the configured StakePoint pool vault (${configuredPoolId}) was detected in this transaction.`,
+      };
+    }
+
+    // Enforce single-instruction linkage: the SAME StakePoint program instruction that targets
+    // configuredPoolId must also reference the receiving pool-owned vault token account.
+    const instructionLinkedVaults = new Set<string>();
+    for (const ix of poolInstructions) {
+      const ixAccounts = (ix.accounts || []).map(keyToBase58);
+      for (const acct of ixAccounts) {
+        if (candidateVaultDeltas.has(acct)) {
+          instructionLinkedVaults.add(acct);
         }
       }
     }
 
-    if (poolVaultReceivedRaw <= BigInt(0)) {
+    if (instructionLinkedVaults.size === 0) {
       return {
         success: false,
         status: 'REJECTED',
-        error: `No $H42 token deposit into the configured StakePoint pool vault (${integration.poolId}) was detected in this transaction.`,
+        error: `StakePoint program instruction did not link the configured pool (${configuredPoolId}) to the receiving $H42 vault.`,
       };
     }
 
-    // If parsed SPL token transfer instructions are present in the tx, verify at least one directs tokens into a verified pool vault
+    let linkedVaultReceivedRaw = BigInt(0);
+    for (const vault of instructionLinkedVaults) {
+      linkedVaultReceivedRaw += candidateVaultDeltas.get(vault) ?? BigInt(0);
+    }
+
+    // 8. Verify actual SPL token transfer instruction(s) from wallet ATA into linked pool vault
     const splTransfers = allInstructions.filter(
       (ix) =>
         (ix.program === 'spl-token' || SPL_TOKEN_PROGRAM_IDS.has(keyToBase58(ix.programId))) &&
         parseSplTransferAmount(ix) !== null
     );
-    if (splTransfers.length > 0) {
-      let verifiedSplTransferRaw = BigInt(0);
-      for (const ix of splTransfers) {
-        const info = ix.parsed?.info;
-        const dest = typeof info?.destination === 'string' ? info.destination : '';
-        const mint = typeof info?.mint === 'string' ? info.mint : null;
-        if (mint && mint !== GENESIS_MINT) continue;
-        if (verifiedVaultTokenAccounts.has(dest)) {
-          const amt = parseSplTransferAmount(ix);
-          if (amt) verifiedSplTransferRaw += BigInt(amt);
-        }
-      }
-      if (verifiedSplTransferRaw <= BigInt(0)) {
-        return {
-          success: false,
-          status: 'REJECTED',
-          error: `SPL token transfer destination did not match the configured StakePoint pool vault (${integration.poolId}).`,
-        };
-      }
+
+    let verifiedSplTransferRaw = BigInt(0);
+    for (const ix of splTransfers) {
+      const info = ix.parsed?.info;
+      const source = typeof info?.source === 'string' ? info.source : '';
+      const dest = typeof info?.destination === 'string' ? info.destination : '';
+      const authority = typeof info?.authority === 'string' ? info.authority : '';
+      const mint = typeof info?.mint === 'string' ? info.mint : null;
+
+      if (mint && mint !== GENESIS_MINT) continue;
+      if (!source || !walletTokenAccounts.has(source)) continue;
+      if (!instructionLinkedVaults.has(dest)) continue;
+      if (authority && authority !== walletAddress && authority !== configuredPoolId) continue;
+
+      const amt = parseSplTransferAmount(ix);
+      if (amt) verifiedSplTransferRaw += BigInt(amt);
     }
 
-    const amountRaw = poolVaultReceivedRaw < senderSentRaw ? poolVaultReceivedRaw : senderSentRaw;
+    if (verifiedSplTransferRaw <= BigInt(0)) {
+      return {
+        success: false,
+        status: 'REJECTED',
+        error: `No verified $H42 SPL token transfer from authenticated wallet into the configured StakePoint pool vault (${configuredPoolId}) was found.`,
+      };
+    }
+
+    let amountRaw = senderSentRaw;
+    if (linkedVaultReceivedRaw < amountRaw) amountRaw = linkedVaultReceivedRaw;
+    if (verifiedSplTransferRaw < amountRaw) amountRaw = verifiedSplTransferRaw;
 
     // 9. Server-side USD valuation check using live price oracle
     const priceResult = await getPrice();
@@ -554,9 +559,9 @@ export async function verifyAndRecordStakePointPosition(
         amountUsd,
         lockDays,
         unlocksAt: unlockDate,
-        programId: integration.programId,
-        poolId: integration.poolId,
-        ...(matchedPoolAddress ? { poolAddress: matchedPoolAddress } : {}),
+        programId: configuredProgramId,
+        poolId: configuredPoolId,
+        poolAddress: configuredPoolId,
       },
     };
   } catch (err) {
