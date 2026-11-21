@@ -5,7 +5,6 @@ import Link from 'next/link';
 import type { AlphaItem, Campaign, Chain, FavoritePostKind } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { TabularValue } from '@/components/primitives/TabularValue';
 import { TradeWorkspaceSkeleton } from '@/components/skeletons/TradeWorkspaceSkeleton';
@@ -23,6 +22,8 @@ import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
 import { NextStepCard } from '@/components/dashboard/NextStepCard';
+import { SignalsGridSkeleton } from '@/components/dashboard/skeletons/SignalsGridSkeleton';
+import { StakeFormSkeleton } from '@/components/dashboard/skeletons/StakeFormSkeleton';
 import { resolveUserState, stateMeta } from '@/lib/state/resolveUserState';
 import { StakeClientView, type InitialStakeData } from '@/components/stake/StakeClientView';
 import { LockedTerminal } from '@/components/LockedTerminal';
@@ -998,11 +999,7 @@ export const IncubatorHub: React.FC = () => {
 
                   <div className="lg:col-span-7">
                     {stakeStatusLoading ? (
-                      <div className="rounded-xl bg-surface border border-border-default p-6 space-y-4">
-                        <Skeleton className="h-6 w-48" />
-                        <Skeleton className="h-24 w-full" />
-                        <Skeleton className="h-40 w-full" />
-                      </div>
+                      <StakeFormSkeleton />
                     ) : stakeStatusError ? (
                       <div role="alert" className="rounded-xl bg-danger/10 border border-danger/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 text-danger text-xs font-semibold">
@@ -1154,16 +1151,7 @@ export const IncubatorHub: React.FC = () => {
                 {/* Grid vs Table View */}
                 {activeFilterState.viewMode === 'GRID' ? (
                   apiLoading && alphas.length === 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="rounded-xl bg-surface border border-border-default p-4 space-y-3">
-                          <Skeleton className="w-full h-12 rounded-md" />
-                          <Skeleton className="h-4 w-3/4" />
-                          <Skeleton className="h-3 w-1/2" />
-                          <Skeleton className="h-10 w-full" />
-                        </div>
-                      ))}
-                    </div>
+                    <SignalsGridSkeleton cols={3} rows={1} />
                   ) : filteredTokens.length === 0 ? (
                     <EmptyState
                       message="No calls match active filters in this workspace."

@@ -195,7 +195,7 @@ export function LedgerGrid({
         ) : (
           <Link
             href="/ledger"
-            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors self-start md:self-auto"
+            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors self-start md:self-auto rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <span>View full ledger</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -229,8 +229,26 @@ export function LedgerGrid({
           <p className="font-sans text-sm text-muted">
             {currentChain !== 'all'
               ? `No ${currentChain.toUpperCase()} ledger entries recorded yet.`
-              : 'Ledger entries will appear here as calls close.'}
+              : 'The ledger shows every closed call with proof. Closed outcomes will appear here once recorded.'}
           </p>
+          {currentChain !== 'all' ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => handleFilterChain('all')}
+            >
+              Show all chains
+            </Button>
+          ) : (
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:text-brand-bright underline underline-offset-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <span>Open Lab Analysis</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
       ) : (
         <div className="w-full overflow-x-auto rounded-xl border border-border-default bg-surface-card shadow-none">
@@ -278,7 +296,7 @@ export function LedgerGrid({
         <div className="pt-2 flex justify-end">
           <Link
             href="/ledger"
-            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors"
+            className="font-mono text-xs text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <span>View full ledger ({total} calls)</span>
             <ArrowUpRight className="w-3.5 h-3.5" />

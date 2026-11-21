@@ -245,6 +245,88 @@ test('Unverified or demo sessions do not poll protected /api/stake/status or /ap
     ),
     false
   );
+
+  // Positive check (B.5): verified live session MUST trigger /api/stake/status and /api/verification/status
+  const liveUrls = [];
+  const origFetch2 = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    liveUrls.push(u);
+    if (u.includes('/api/stakepoint/pools')) {
+      return { ok: true, status: 200, json: async () => ({ configured: false, pools: [] }) };
+    }
+    if (u.includes('/api/stake/status')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          wallet: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+          current_tier: 'member',
+          gap_to_pro_usd: 150,
+          eligible_for_pro: false,
+          stake: { amount_raw: '0', amount_genesis: 0, amount_usd: 100, staked_at: null, unlocks_at: null, days_remaining: 0, status: 'none' },
+          thresholds: { pro: { usd_target: 250, genesis_usd_price: 0.0000164, token_amount: '15243902' } },
+        }),
+      };
+    }
+    if (u.includes('/api/verification/status')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          wallet: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+          tier: 'member',
+          entitlement: { tier: 'member', verified: true },
+          telegram: { connected: false, identity_status: 'not_connected', community: { status: 'not_joined', required_tier: 'member' }, notifications: { status: 'disabled', can_enable: false } },
+          can_connect: true,
+          target_tier: 'member',
+        }),
+      };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+
+  const liveVerifiedCtx = makeMockGenesisContext({
+    connected: true,
+    publicKeyBase58: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+    needsSignature: false,
+    verificationState: 'VERIFIED',
+    demoEnabled: false,
+    demoPreset: 'live',
+  });
+
+  const liveView = await renderComponent(
+    React.createElement(
+      GenesisContext.Provider,
+      { value: liveVerifiedCtx },
+      React.createElement(ProProgressBar, { isPro: false }),
+      React.createElement(TelegramStatusBanner),
+      React.createElement(TelegramConnectButton),
+      React.createElement(DashboardStakingCard, { showTelegram: false }),
+      React.createElement(TelegramVerificationCard, {
+        connected: true,
+        needsVerification: false,
+        walletAddress: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+      })
+    )
+  );
+
+  try {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 40));
+    });
+    assert.ok(
+      liveUrls.some((u) => u.includes('/api/stake/status')),
+      'Authenticated live session MUST fetch /api/stake/status'
+    );
+    assert.ok(
+      liveUrls.some((u) => u.includes('/api/verification/status')),
+      'Authenticated live session MUST fetch /api/verification/status'
+    );
+  } finally {
+    await liveView.cleanup();
+    globalThis.fetch = origFetch2;
+  }
 });
 
 test('StakeForm $250 smoke check displays 15.2M $H42 and sends 6-decimal amount_raw', async () => {

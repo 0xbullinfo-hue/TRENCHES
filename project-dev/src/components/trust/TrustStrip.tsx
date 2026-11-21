@@ -7,10 +7,10 @@ import { roles } from '@/lib/theme/roles';
 export type TrustMetrics = {
   signalCount: number;
   winRate: number;
-  expectancy: number;
-  profitFactor: number;
-  maxDrawdown: number;
-  startDate: string;
+  expectancy?: number;
+  profitFactor?: number;
+  maxDrawdown?: number;
+  startDate?: string;
 };
 
 type Props = {
@@ -27,20 +27,23 @@ export function TrustStrip({ metrics, loading }: Props) {
 
   if (!metrics) return null;
 
-  const compact = (
-    <>
-      {metrics.signalCount} signals · {metrics.winRate}% win ·{' '}
-      {metrics.expectancy.toFixed(2)}R avg
-    </>
-  );
+  const compactParts = [`${metrics.signalCount} signals`, `${metrics.winRate}% win`];
+  if (typeof metrics.expectancy === 'number') {
+    compactParts.push(`${metrics.expectancy.toFixed(2)}R avg`);
+  }
+  const fullParts = [...compactParts];
+  if (typeof metrics.profitFactor === 'number') {
+    fullParts.push(`${metrics.profitFactor.toFixed(1)} PF`);
+  }
+  if (typeof metrics.maxDrawdown === 'number') {
+    fullParts.push(`${metrics.maxDrawdown.toFixed(0)}% max DD`);
+  }
+  if (metrics.startDate) {
+    fullParts.push(`since ${metrics.startDate}`);
+  }
 
-  const full = (
-    <>
-      {metrics.signalCount} signals · {metrics.winRate}% win ·{' '}
-      {metrics.expectancy.toFixed(2)}R avg · {metrics.profitFactor.toFixed(1)} PF ·{' '}
-      {metrics.maxDrawdown.toFixed(0)}% max DD · since {metrics.startDate}
-    </>
-  );
+  const compact = compactParts.join(' · ');
+  const full = fullParts.join(' · ');
 
   return (
     <div className="rounded-md border border-line bg-surface-card px-3 py-2 text-xs text-muted">

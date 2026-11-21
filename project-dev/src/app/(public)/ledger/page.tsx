@@ -1,9 +1,11 @@
 import React, { Suspense } from 'react';
 import { getLedgerEntries } from '@/server/db';
+import { computePerformanceStats } from '@/lib/ledger/performance-stats';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LedgerGrid } from '@/components/ledger/LedgerGrid';
 import { LedgerCardSkeleton } from '@/components/ledger/LedgerCardSkeleton';
 import { LedgerMethodologyExplainer } from '@/components/ledger/LedgerMethodologyExplainer';
+import { TrustStrip } from '@/components/trust/TrustStrip';
 import { ShieldCheck } from 'lucide-react';
 
 export const revalidate = 60;
@@ -15,12 +17,28 @@ export default async function PublicLedgerPage(props: {
   const chain = params?.chain || 'all';
   const sort = params?.sort || 'newest';
 
-  const { entries, total, has_more } = await getLedgerEntries({
-    chain,
-    sort,
-    limit: 12,
-    offset: 0,
-  });
+  const [{ entries, total, has_more }, statsPool] = await Promise.all([
+    getLedgerEntries({
+      chain,
+      sort,
+      limit: 12,
+      offset: 0,
+    }),
+    getLedgerEntries({
+      chain: 'all',
+      sort: 'newest',
+      limit: 500,
+      offset: 0,
+    }),
+  ]);
+  const stats = computePerformanceStats(statsPool.entries);
+  const trustMetrics =
+    stats.totalRecordedCalls > 0 && stats.winRate !== null
+      ? {
+          signalCount: stats.totalRecordedCalls,
+          winRate: Math.round(stats.winRate),
+        }
+      : null;
 
   return (
     <div className="py-12 sm:py-16 bg-canvas min-h-[calc(100vh-140px)]">
@@ -46,7 +64,8 @@ export default async function PublicLedgerPage(props: {
           </p>
         </div>
 
-        {/* Dismissible Methodology Explainer (Instruction 35) */}
+        {/* Trust summary + Dismissible Methodology Explainer (Instruction 35) */}
+        <TrustStrip metrics={trustMetrics} />
         <LedgerMethodologyExplainer />
 
         {/* Ledger Table wrapped in Suspense for useSearchParams */}

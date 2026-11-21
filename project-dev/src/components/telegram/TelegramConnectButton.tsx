@@ -221,8 +221,9 @@ export function TelegramConnectButton({
       <div className="flex items-center gap-2 text-xs font-sans text-danger">
         <span>Couldn&apos;t check Telegram status.</span>
         <button
+          type="button"
           onClick={() => refetchStatus()}
-          className="text-brand underline underline-offset-2 hover:text-brand-bright font-bold"
+          className="text-brand underline underline-offset-2 hover:text-brand-bright font-bold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           [Retry]
         </button>
@@ -244,7 +245,7 @@ export function TelegramConnectButton({
         href={process.env.NEXT_PUBLIC_BOT_URL || 'https://t.me/Trenchlabs_bot'}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-bg border border-brand/40 text-brand hover:border-brand transition-colors select-none"
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-bg border border-brand/40 text-brand hover:border-brand transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <span>✅ Telegram connected{tierName ? ` (${tierName})` : ''}</span>
       </a>

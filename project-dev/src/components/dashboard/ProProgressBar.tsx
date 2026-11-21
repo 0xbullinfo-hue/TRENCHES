@@ -7,6 +7,7 @@ import { cn } from '@/components/ui/cn';
 import { GenesisContext } from '@/context/GenesisContext';
 import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import { TabularValue } from '@/components/primitives/TabularValue';
+import { UsdAmount } from '@/components/primitives/formats';
 import { MarketDataBadge } from './MarketDataBadge';
 import {
   toGenesisProvenanceItem,
@@ -146,7 +147,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
           ) : (
             <span>
               <strong className="text-white font-bold">
-                <TabularValue value={effectiveGap} decimals={2} prefix="$" />
+                <UsdAmount value={effectiveGap} />
               </strong>{' '}
               remaining of ${targetUsd} target
             </span>

@@ -202,7 +202,7 @@ export const MyPinnedPosts: React.FC<MyPinnedPostsProps> = ({
                       type="button"
                       data-testid={`pinned-filter-${opt.id.toLowerCase()}`}
                       onClick={() => setCategoryFilter(opt.id)}
-                      className={`h-7 px-2.5 rounded-md font-mono text-[11px] font-bold border transition-colors cursor-pointer ${
+                      className={`h-7 px-2.5 rounded-md font-mono text-[11px] font-bold border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                         active
                           ? 'bg-brand-bg border-brand text-brand'
                           : 'bg-surface-card border-border-default text-muted hover:text-white'

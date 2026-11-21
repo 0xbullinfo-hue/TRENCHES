@@ -56,13 +56,13 @@ export function DashboardLedgerEmbed() {
               <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <span>Preview Inline</span>
               </button>
               <Link
                 href="/ledger"
-                className="w-full sm:w-auto h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                className="w-full sm:w-auto h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card"
               >
                 <span>View full ledger</span>
                 <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
