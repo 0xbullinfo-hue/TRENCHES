@@ -80,8 +80,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="min-h-screen flex flex-col bg-canvas text-ink font-sans antialiased">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
+    >
+      <body
+        suppressHydrationWarning
+        className="min-h-screen flex flex-col bg-canvas text-ink font-sans antialiased"
+      >
         <Providers>{children}</Providers>
         <Toaster theme="dark" position="bottom-right" richColors />
       </body>
