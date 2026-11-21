@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GenesisContext } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import type {
   GroupStatus,
   NotificationStatus,
@@ -227,6 +228,9 @@ export function TelegramVerificationCard({
     needsVerification !== undefined
       ? needsVerification
       : Boolean(connected && (genesis?.needsSignature ?? false));
+  const canFetchVerificationStatus =
+    canFetchSessionEndpoints(genesis, true) &&
+    Boolean(connected && effectiveWallet && !effectiveNeedsSig);
   const handleConnect = onConnectWallet ?? genesis?.connectWallet;
   const handleVerify = onVerifyWallet ?? genesis?.requestUnlockSignature;
 
@@ -262,7 +266,7 @@ export function TelegramVerificationCard({
 
   const fetchVerificationStatus = useCallback(
     async (silent = false): Promise<Partial<VerificationStatusResponse> | null> => {
-      if (!connected || !effectiveWallet || effectiveNeedsSig) {
+      if (!canFetchVerificationStatus) {
         return null;
       }
 
@@ -322,7 +326,7 @@ export function TelegramVerificationCard({
         }
       }
     },
-    [connected, effectiveWallet, effectiveNeedsSig, isPro, onStatusChange, stopPolling]
+    [canFetchVerificationStatus, isPro, onStatusChange, stopPolling]
   );
 
   // Sync status whenever wallet connection / signature verification changes
@@ -352,6 +356,15 @@ export function TelegramVerificationCard({
       return;
     }
 
+    if (!canFetchVerificationStatus) {
+      queueMicrotask(() => {
+        setStatusData(null);
+        setAuthRequiredError(false);
+        setLoading(false);
+      });
+      return;
+    }
+
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -362,7 +375,15 @@ export function TelegramVerificationCard({
     return () => {
       cancelled = true;
     };
-  }, [connected, effectiveWallet, effectiveNeedsSig, isVerified, fetchVerificationStatus, stopPolling]);
+  }, [
+    connected,
+    effectiveWallet,
+    effectiveNeedsSig,
+    canFetchVerificationStatus,
+    isVerified,
+    fetchVerificationStatus,
+    stopPolling,
+  ]);
 
   const startPolling = useCallback(() => {
     stopPolling();

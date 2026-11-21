@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthSession, verifyWalletAuth } from '@/server/auth';
+import { clientIp, rateLimit } from '@/server/ratelimit';
 import { getStakeStatusForWallet } from '@/server/db';
 import { isBase58Address } from '@/lib/config';
 
@@ -8,6 +9,14 @@ export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 export async function GET(req: NextRequest) {
+  const rl = await rateLimit(`stake-status:ip:${clientIp(req)}`, 60, 60);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'rate_limited', message: 'Too many requests', retryAfter: rl.retryAfter },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rl.retryAfter) } }
+    );
+  }
+
   // 1. Authenticate caller (session cookie or signed ed25519 headers)
   const session = await getAuthSession(req);
   let authWallet = session?.wallet;

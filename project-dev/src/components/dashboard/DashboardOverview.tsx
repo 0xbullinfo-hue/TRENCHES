@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { TabularValue } from '@/components/primitives/TabularValue';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
 import type {
@@ -286,7 +288,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span className="text-brand font-mono text-[11px]">$H42</span>
             </div>
             <div className="text-white font-black text-sm tnum">
-              {formattedBalance} $H42
+              <TabularValue value={formattedBalance} suffix=" $H42" />
             </div>
           </div>
 
@@ -345,7 +347,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">Active Calls</div>
-              <div className="text-sm font-black text-white tnum">{alphasCount}</div>
+              <div className="text-sm font-black text-white tnum">
+                <TabularValue value={alphasCount} decimals={0} />
+              </div>
             </div>
             <Target className="w-4 h-4 text-alpha-primary shrink-0" />
           </Button>
@@ -362,7 +366,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">New Calls</div>
-              <div className="text-sm font-black text-brand tnum">{newCallsCount}</div>
+              <div className="text-sm font-black text-brand tnum">
+                <TabularValue value={newCallsCount} decimals={0} />
+              </div>
             </div>
             <Sparkles className="w-4 h-4 text-brand shrink-0" />
           </Button>
@@ -376,7 +382,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">Active Raids</div>
-              <div className="text-sm font-black text-raid-primary tnum">{raidsCount}</div>
+              <div className="text-sm font-black text-raid-primary tnum">
+                <TabularValue value={raidsCount} decimals={0} />
+              </div>
             </div>
             <Gift className="w-4 h-4 text-raid-primary shrink-0" />
           </Button>
@@ -392,7 +400,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">My Pinned Posts</div>
-              <div className="text-sm font-black text-amber tnum">{accessiblePinnedCount}</div>
+              <div className="text-sm font-black text-amber tnum">
+                <TabularValue value={accessiblePinnedCount} decimals={0} />
+              </div>
             </div>
             <Star className="w-4 h-4 text-amber shrink-0" />
           </Button>
@@ -476,43 +486,53 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
           <div id="overview-telegram" className="flex flex-col">
-            <TelegramVerificationCard
-              connected={connected}
-              isPro={isPro}
-              isVerified={isVerified}
-              needsVerification={needsVerification}
-              walletAddress={walletAddress}
-              onVerifyWallet={onVerifyWallet}
-              onConnectWallet={onConnectWallet}
-              onStatusChange={onTelegramStatusChange}
-            />
+            <ErrorBoundary panelName="Telegram Verification">
+              <TelegramVerificationCard
+                connected={connected}
+                isPro={isPro}
+                isVerified={isVerified}
+                needsVerification={needsVerification}
+                walletAddress={walletAddress}
+                onVerifyWallet={onVerifyWallet}
+                onConnectWallet={onConnectWallet}
+                onStatusChange={onTelegramStatusChange}
+              />
+            </ErrorBoundary>
           </div>
-          {children}
+          {children && (
+            <ErrorBoundary panelName="Connected Services">
+              {children}
+            </ErrorBoundary>
+          )}
         </div>
       </section>
 
       {/* 4. Primary Overview Panels: Unified My Pinned Posts + Personal Account Call History (Sections 12.2 D & E) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         <div className="xl:col-span-7 flex flex-col">
-          <MyPinnedPosts
-            favorites={favorites}
-            alphas={alphas}
-            campaigns={campaigns}
-            membershipTier={membershipTier}
-            isAdmin={isAdmin}
-            onOpenAlpha={(coin, dest) => onOpenAlpha?.(coin, dest)}
-            onOpenRaid={(id) => onOpenRaid?.(id)}
-            onUnpin={(kind, id) => onUnpinPost?.(kind, id)}
-            onBrowseWorkspace={(ws) => onSelectTab?.(ws)}
-          />
+          <ErrorBoundary panelName="Pinned Posts">
+            <MyPinnedPosts
+              favorites={favorites}
+              alphas={alphas}
+              campaigns={campaigns}
+              membershipTier={membershipTier}
+              isAdmin={isAdmin}
+              onOpenAlpha={(coin, dest) => onOpenAlpha?.(coin, dest)}
+              onOpenRaid={(id) => onOpenRaid?.(id)}
+              onUnpin={(kind, id) => onUnpinPost?.(kind, id)}
+              onBrowseWorkspace={(ws) => onSelectTab?.(ws)}
+            />
+          </ErrorBoundary>
         </div>
 
         <div className="xl:col-span-5 flex flex-col">
-          <UserCallHistoryPanel
-            portfolio={portfolio}
-            connected={connected}
-            onExploreAlpha={isUnlocked ? () => onSelectTab?.('ALPHA') : undefined}
-          />
+          <ErrorBoundary panelName="Call History">
+            <UserCallHistoryPanel
+              portfolio={portfolio}
+              connected={connected}
+              onExploreAlpha={isUnlocked ? () => onSelectTab?.('ALPHA') : undefined}
+            />
+          </ErrorBoundary>
         </div>
       </div>
 
@@ -555,11 +575,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             data-testid="overview-secondary-content"
             className="p-4 sm:p-5 border-t border-border-default space-y-5 bg-surface/50"
           >
-            <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
+            <ErrorBoundary panelName="Onboarding Checklist">
+              <OnboardingChecklist onExploreCalls={() => onSelectTab?.('ALPHA')} />
+            </ErrorBoundary>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-              <ProProgressBar isPro={isPro} />
-              <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+              <ErrorBoundary panelName="Pro Progress">
+                <ProProgressBar isPro={isPro} />
+              </ErrorBoundary>
+              <ErrorBoundary panelName="Weekly Performance Digest">
+                <WeeklyPerformanceDigest tierId={tier.id} isUnlocked={isUnlocked} />
+              </ErrorBoundary>
             </div>
           </div>
         )}

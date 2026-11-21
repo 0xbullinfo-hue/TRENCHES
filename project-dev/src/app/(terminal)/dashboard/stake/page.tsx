@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/server/auth';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { StakeClientView } from '@/components/stake/StakeClientView';
 import { getStakeStatusForWallet } from '@/server/db';
 
@@ -20,5 +21,9 @@ export default async function StakePage() {
   }
 
   const initialData = await getStakeStatusForWallet(verified.wallet);
-  return <StakeClientView initialData={initialData} />;
+  return (
+    <ErrorBoundary panelName="Stake Management">
+      <StakeClientView initialData={initialData} />
+    </ErrorBoundary>
+  );
 }

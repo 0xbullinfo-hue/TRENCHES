@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import { GenesisContext } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Loader2 } from 'lucide-react';
 
@@ -25,8 +27,11 @@ export function TelegramConnectButton({
   compact = false,
   onConnected,
 }: TelegramConnectButtonProps) {
+  const genesis = useContext(GenesisContext);
+  const canFetchStatus = canFetchSessionEndpoints(genesis, true);
+
   const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(canFetchStatus);
   const [fetchError, setFetchError] = useState<boolean>(false);
 
   const [opening, setOpening] = useState<boolean>(false);
@@ -38,6 +43,9 @@ export function TelegramConnectButton({
   const pollDeadlineRef = useRef<number>(0);
 
   const refetchStatus = useCallback(async () => {
+    if (!canFetchStatus) {
+      return null;
+    }
     setLoading(true);
     setFetchError(false);
     try {
@@ -56,9 +64,12 @@ export function TelegramConnectButton({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canFetchStatus]);
 
   useEffect(() => {
+    if (!canFetchStatus) {
+      return;
+    }
     let mounted = true;
     fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
       .then((res) => {
@@ -68,6 +79,7 @@ export function TelegramConnectButton({
       .then((data: VerificationStatusResponse) => {
         if (mounted) {
           setStatus(data);
+          setFetchError(false);
           setLoading(false);
         }
       })
@@ -82,7 +94,7 @@ export function TelegramConnectButton({
       mounted = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, []);
+  }, [canFetchStatus]);
 
   const startPolling = useCallback(() => {
     setPolling(true);
@@ -170,6 +182,28 @@ export function TelegramConnectButton({
     }
   };
 
+  const renderVerifyFirst = () => (
+    <div className="relative group inline-block">
+      <button
+        type="button"
+        disabled
+        className={`rounded-md border border-brand-border/30 bg-surface-card text-muted disabled:opacity-50 cursor-not-allowed font-sans text-xs font-semibold select-none ${
+          compact ? 'px-3 py-1.5' : 'h-11 px-5'
+        }`}
+        title="Verify your wallet to unlock Telegram access."
+      >
+        Connect Telegram — verify wallet first
+      </button>
+      <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-xs text-white bg-surface-card border border-border-default rounded-md shadow-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        Verify your wallet to unlock Telegram access.
+      </span>
+    </div>
+  );
+
+  if (!canFetchStatus) {
+    return renderVerifyFirst();
+  }
+
   // State 4: Loading Skeleton
   if (loading && !status) {
     return (
@@ -219,23 +253,7 @@ export function TelegramConnectButton({
 
   // State 1: can_connect = false (Free Tier)
   if (!status.can_connect) {
-    return (
-      <div className="relative group inline-block">
-        <button
-          type="button"
-          disabled
-          className={`rounded-md border border-brand-border/30 bg-surface-card text-muted disabled:opacity-50 cursor-not-allowed font-sans text-xs font-semibold select-none ${
-            compact ? 'px-3 py-1.5' : 'h-11 px-5'
-          }`}
-          title="Verify your wallet to unlock Telegram access."
-        >
-          Connect Telegram — verify wallet first
-        </button>
-        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-xs text-white bg-surface-card border border-border-default rounded-md shadow-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
-          Verify your wallet to unlock Telegram access.
-        </span>
-      </div>
-    );
+    return renderVerifyFirst();
   }
 
   // State 3: can_connect = true, connected = false (Primary CTA / Polling)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthSession } from '@/server/auth';
+import { clientIp, rateLimit } from '@/server/ratelimit';
 import { resolveUserEntitlement } from '@/server/entitlements';
 import {
   getActivePendingVerificationSessionForWallet,
@@ -15,6 +16,14 @@ import type {
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const rl = await rateLimit(`verif-status:ip:${clientIp(req)}`, 60, 60);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', message: 'Too many requests', retryAfter: rl.retryAfter },
+      { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': String(rl.retryAfter) } }
+    );
+  }
+
   const session = await getAuthSession(req);
   if (!session) {
     return NextResponse.json({ error: 'unauthorized', message: 'Session required' }, { status: 401 });

@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, CheckCircle2, Lock, Sparkles } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { GenesisContext } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
+import { TabularValue } from '@/components/primitives/TabularValue';
 import { MarketDataBadge } from './MarketDataBadge';
 import {
   toGenesisProvenanceItem,
@@ -31,6 +34,9 @@ interface ProProgressBarProps {
 }
 
 export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro = false }) => {
+  const genesis = useContext(GenesisContext);
+  const canFetchStatus = canFetchSessionEndpoints(genesis, true);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [gapToPro, setGapToPro] = useState<number | null>(null);
   const [targetUsd, setTargetUsd] = useState<number>(250);
@@ -38,6 +44,11 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
   const [provenance, setProvenance] = useState<GenesisThresholdProvenanceInput | null>(null);
 
   useEffect(() => {
+    if (isPro || !canFetchStatus) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     const controller = new AbortController();
 
@@ -86,7 +97,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
       mounted = false;
       controller.abort();
     };
-  }, [isPro]);
+  }, [isPro, canFetchStatus]);
 
   // If loading and we don't have isPro, render subtle skeleton placeholder
   if (loading && gapToPro === null && !isPro) {
@@ -122,7 +133,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
             {unlocked || isPro ? 'PRO TIER UNLOCKED' : 'PRO TIER UNLOCK PROGRESS'}
           </span>
           <span className="font-mono text-xs px-2 py-0.5 rounded bg-surface border border-border-default text-brand font-bold">
-            {percent}%
+            <TabularValue value={percent} decimals={0} suffix="%" />
           </span>
         </div>
 
@@ -134,7 +145,10 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
             </span>
           ) : (
             <span>
-              <strong className="text-white font-bold">${effectiveGap.toFixed(2)}</strong> remaining of ${targetUsd} target
+              <strong className="text-white font-bold">
+                <TabularValue value={effectiveGap} decimals={2} prefix="$" />
+              </strong>{' '}
+              remaining of ${targetUsd} target
             </span>
           )}
           <MarketDataBadge item={toGenesisProvenanceItem(provenance)} />

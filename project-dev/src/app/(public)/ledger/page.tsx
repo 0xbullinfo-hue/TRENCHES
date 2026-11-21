@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { getLedgerEntries } from '@/server/db';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LedgerGrid } from '@/components/ledger/LedgerGrid';
 import { LedgerCardSkeleton } from '@/components/ledger/LedgerCardSkeleton';
 import { LedgerMethodologyExplainer } from '@/components/ledger/LedgerMethodologyExplainer';
@@ -49,16 +50,18 @@ export default async function PublicLedgerPage(props: {
         <LedgerMethodologyExplainer />
 
         {/* Ledger Table wrapped in Suspense for useSearchParams */}
-        <Suspense fallback={<LedgerCardSkeleton />}>
-          <LedgerGrid
-            initialEntries={entries}
-            initialTotal={total}
-            initialHasMore={has_more}
-            initialChain={chain}
-            initialSort={sort}
-            isDashboardEmbed={false}
-          />
-        </Suspense>
+        <ErrorBoundary panelName="Performance Ledger">
+          <Suspense fallback={<LedgerCardSkeleton />}>
+            <LedgerGrid
+              initialEntries={entries}
+              initialTotal={total}
+              initialHasMore={has_more}
+              initialChain={chain}
+              initialSort={sort}
+              isDashboardEmbed={false}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </div>
   );

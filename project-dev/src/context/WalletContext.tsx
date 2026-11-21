@@ -470,7 +470,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const disconnectDemoOrWallet = useCallback(async () => {
     try {
-      fetch('/api/auth/session', { method: 'DELETE' }).catch(() => { });
+      fetch('/api/auth/session', { method: 'DELETE', credentials: 'same-origin' }).catch(() => { });
       if (wallet.connected || wallet.wallet) {
         await wallet.disconnect();
       }
@@ -501,6 +501,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [wallet]);
 
+  const effectiveDemoPreset: DemoPreset =
+    wallet.connected && wallet.publicKey ? 'live' : demoPreset;
+
   const value: WalletContextValue = {
     connected,
     publicKeyBase58,
@@ -515,7 +518,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     points,
     isZeroBalance,
     isAdmin,
-    demoPreset,
+    demoPreset: effectiveDemoPreset,
     setDemoPreset,
     connectWallet,
     switchWallet,

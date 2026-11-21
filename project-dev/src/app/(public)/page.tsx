@@ -1,4 +1,5 @@
 import React from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { HeroTerminal } from '@/components/HeroTerminal';
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection';
 import { PipelineGrid } from '@/components/PipelineGrid';
@@ -23,10 +24,14 @@ export default function LandingPage() {
       <AlphaIntelligencePreview />
 
       {/* 5. Access Tiers & Feature Matrix */}
-      <TierSection />
+      <ErrorBoundary panelName="Membership Tiers">
+        <TierSection />
+      </ErrorBoundary>
 
       {/* 6. Performance & Trust (Verified Ledger Statistics & Disclosures) */}
-      <PerformanceTrustSection />
+      <ErrorBoundary panelName="Performance & Trust">
+        <PerformanceTrustSection />
+      </ErrorBoundary>
 
       {/* 7. Community Conversion (Build with the Lab) */}
       <CommunitySection />

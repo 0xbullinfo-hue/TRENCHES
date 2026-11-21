@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
+import { GenesisContext } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import { TelegramConnectButton } from './TelegramConnectButton';
 
 const DISMISS_STORAGE_KEY = 'trench_tg_banner_dismissed';
@@ -24,6 +26,7 @@ interface VerificationStatus {
 
 export function TelegramStatusBanner() {
   const pathname = usePathname();
+  const genesis = useContext(GenesisContext);
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [dismissed, setDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -43,9 +46,12 @@ export function TelegramStatusBanner() {
 
   // Do not render on /dashboard/stake per §7.2
   const isStakeRoute = pathname === '/dashboard/stake';
+  const canFetchStatus = canFetchSessionEndpoints(genesis, true);
 
   useEffect(() => {
-    if (isStakeRoute || dismissed) return;
+    if (isStakeRoute || dismissed || !canFetchStatus) {
+      return;
+    }
     let active = true;
 
     fetch('/api/verification/status', { credentials: 'same-origin', cache: 'no-store' })
@@ -58,7 +64,7 @@ export function TelegramStatusBanner() {
     return () => {
       active = false;
     };
-  }, [isStakeRoute, dismissed]);
+  }, [isStakeRoute, dismissed, canFetchStatus]);
 
   const handleDismiss = () => {
     setDismissed(true);
@@ -69,7 +75,7 @@ export function TelegramStatusBanner() {
     }
   };
 
-  if (isStakeRoute || dismissed || !status) return null;
+  if (isStakeRoute || dismissed || !canFetchStatus || !status) return null;
 
   // Hidden when confirmed joined OR when tier=free / unknown
   if (

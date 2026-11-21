@@ -3,7 +3,15 @@
 import React, { useState, useMemo } from 'react';
 import { Lock, ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { PublicKey } from '@solana/web3.js';
+import { TOKEN_DECIMALS } from '@/lib/config';
+import { parseUnits } from '@/lib/math/tokenMath';
 import { cleanNumericInput, formatTokenDisplay, getUnlockDate } from '@/lib/stake/format';
+
+function tokensToRawUnits(tokens: number, decimals = TOKEN_DECIMALS): bigint {
+  if (!Number.isFinite(tokens) || tokens <= 0) return 0n;
+  const safeDecimals = Number.isInteger(decimals) && decimals >= 0 ? decimals : TOKEN_DECIMALS;
+  return parseUnits(tokens.toFixed(safeDecimals), safeDecimals);
+}
 import {
   StakeStatusTimeline,
   isTimelineStepInProgress,
@@ -37,15 +45,16 @@ export function StakeForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const numericAmount = parseFloat(amountStr) || 0;
-  const tokenPrice = genesisPriceUsd > 0 ? genesisPriceUsd : 0.0000164;
+  const hasValidPrice = Number.isFinite(genesisPriceUsd) && genesisPriceUsd > 0;
+  const tokenPrice = hasValidPrice ? genesisPriceUsd : null;
 
-  // Compute equivalent GENESIS tokens
-  const equivalentTokens = numericAmount / tokenPrice;
-  const walletBalanceUsd = walletBalanceTokens * tokenPrice;
+  // Compute equivalent $H42 tokens when live oracle price is available
+  const equivalentTokens = tokenPrice ? numericAmount / tokenPrice : null;
+  const walletBalanceUsd = tokenPrice ? walletBalanceTokens * tokenPrice : 0;
 
   // Validation
   const isBelowMinimum = numericAmount < 250;
-  const isAboveBalance = walletBalanceTokens > 0 && numericAmount > walletBalanceUsd;
+  const isAboveBalance = hasValidPrice && walletBalanceTokens > 0 && numericAmount > walletBalanceUsd;
   const isWalletConnected = Boolean(walletPublicKey);
 
   const unlockDateFormatted = useMemo(() => getUnlockDate(90), []);
@@ -68,7 +77,7 @@ export function StakeForm({
   };
 
   const handleMaxClick = () => {
-    if (walletBalanceUsd > 0) {
+    if (hasValidPrice && walletBalanceUsd > 0) {
       setAmountStr(walletBalanceUsd.toFixed(2));
       setErrorMessage(null);
     }
@@ -95,14 +104,17 @@ export function StakeForm({
     setTimelineStep('submitted');
 
     try {
-      const rawTokens = BigInt(Math.floor(equivalentTokens * 1e9)).toString();
+      const rawTokens =
+        equivalentTokens !== null
+          ? tokensToRawUnits(equivalentTokens, TOKEN_DECIMALS).toString()
+          : undefined;
       setTimelineStep('confirming');
       const res = await fetch('/api/stake/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tx_signature: txSignature.trim(),
-          amount_raw: rawTokens,
+          ...(rawTokens ? { amount_raw: rawTokens } : {}),
           lock_days: 90,
         }),
       });
@@ -182,7 +194,11 @@ export function StakeForm({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-2xs font-mono pt-1 text-muted">
-          <span>≈ {formatTokenDisplay(equivalentTokens)} $H42</span>
+          <span>
+            {equivalentTokens !== null
+              ? `≈ ${formatTokenDisplay(equivalentTokens)} $H42`
+              : '$H42 price unavailable'}
+          </span>
           {walletBalanceTokens > 0 && (
             <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $H42</span>
           )}

@@ -78,6 +78,7 @@
 
 @layer utilities {
   .tnum,
+  .tabular,
   [data-num],
   .font-mono {
     font-variant-numeric: tabular-nums;

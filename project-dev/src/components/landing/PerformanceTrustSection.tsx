@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TabularValue } from '@/components/primitives/TabularValue';
 import { ArrowUpRight, CheckCircle2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import type { PerformanceCalculationResult } from '@/lib/ledger/performance-stats';
 
@@ -152,7 +153,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 TOTAL RECORDED CALLS
               </div>
               <div className="font-sans text-3xl font-black text-white tnum">
-                {stats.totalRecordedCalls}
+                <TabularValue value={stats.totalRecordedCalls} decimals={0} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Documented incubator entries on public ledger
@@ -165,7 +166,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 <CheckCircle2 className="w-4 h-4 text-brand" />
               </div>
               <div className="font-sans text-3xl font-black text-brand tnum">
-                {stats.profitableCalls}
+                <TabularValue value={stats.profitableCalls} decimals={0} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Authoritative TP milestone or profitable close
@@ -177,7 +178,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 RECORDED LOSSES / SL
               </div>
               <div className="font-sans text-3xl font-black text-white tnum">
-                {stats.losses}
+                <TabularValue value={stats.losses} decimals={0} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Authoritative SL invalidation or loss close
@@ -192,7 +193,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 )}
               </div>
               <div className="font-sans text-3xl font-black text-amber tnum">
-                {stats.openCalls > 0 ? stats.openCalls : '0'}
+                <TabularValue value={stats.openCalls > 0 ? stats.openCalls : 0} decimals={0} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Excluded from resolved win-rate denominator

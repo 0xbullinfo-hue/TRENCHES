@@ -54,7 +54,10 @@ export function StakeClientView({
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/stake/status');
+      const res = await fetch('/api/stake/status', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
       if (res.ok) {
         const json = await res.json();
         setStakeData(json);
@@ -120,7 +123,7 @@ export function StakeClientView({
         <StakeForm
           walletPublicKey={publicKey}
           walletBalanceTokens={genesisTokenBalance}
-          genesisPriceUsd={stakeData.thresholds?.pro?.genesis_usd_price ?? 0.0000164}
+          genesisPriceUsd={stakeData.thresholds?.pro?.genesis_usd_price ?? 0}
           initialAmountUsd={initialPrefill}
           stakePointConfigured={stakePointConfigured}
           onStakeSuccess={handleStakeSuccess}

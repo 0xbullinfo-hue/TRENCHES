@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/server/auth';
+import { clientIp, rateLimit } from '@/server/ratelimit';
 import { verifyAndRecordStakePointPosition } from '@/server/stakepoint';
 import { resolveWalletEntitlement } from '@/server/entitlements';
 
@@ -8,6 +9,14 @@ export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 export async function POST(req: Request) {
+  const rl = await rateLimit(`stake-confirm:ip:${clientIp(req)}`, 20, 60);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', message: 'Too many requests', retryAfter: rl.retryAfter },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rl.retryAfter) } }
+    );
+  }
+
   const session = await getAuthSession(req);
   if (!session) {
     return NextResponse.json(

@@ -83,6 +83,8 @@ export interface GenesisContextValue {
   favorites?: FavoritePostRecord[];
   toggleFavorite?: (kind: FavoritePostKind, id: string) => void;
   isFavorited?: (kind: FavoritePostKind, id: string) => boolean;
+  favoriteError?: string | null;
+  clearFavoriteError?: () => void;
   recordAllocation: (ticker: string, chain: Chain, amountSol: string) => void;
 
   searchQuery: string;

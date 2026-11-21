@@ -6,12 +6,17 @@ import type { AlphaItem, Campaign, Chain, FavoritePostKind } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { TabularValue } from '@/components/primitives/TabularValue';
+import { TradeWorkspaceSkeleton } from '@/components/skeletons/TradeWorkspaceSkeleton';
+import { toast } from '@/lib/ui/toast';
 import {
   MembershipRestrictionScreen,
   type UserMembershipTier,
   type RestrictedCategory,
 } from './MembershipRestrictionScreen';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import { GENESIS_MINT } from '@/lib/config';
 import { TokenArtwork } from './TokenArtwork';
 import { AlphaCallCard } from './AlphaCallCard';
@@ -99,6 +104,8 @@ export const IncubatorHub: React.FC = () => {
     toggleWatchlist,
     favorites = [],
     toggleFavorite,
+    favoriteError,
+    clearFavoriteError,
     portfolio,
     boundEvmAddress,
     setBoundEvmAddress,
@@ -112,6 +119,8 @@ export const IncubatorHub: React.FC = () => {
     apiError,
     needsSignature,
     verificationState,
+    demoEnabled,
+    demoPreset,
     refreshAll,
     requestUnlockSignature,
   } = useGenesisBalance();
@@ -207,9 +216,21 @@ export const IncubatorHub: React.FC = () => {
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
     setToastType(type);
+    if (type === 'error') {
+      toast.error(msg);
+    } else {
+      toast.success(msg);
+    }
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 3000);
   }, []);
+
+  useEffect(() => {
+    if (!favoriteError) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    showToast(favoriteError, 'error');
+    clearFavoriteError?.();
+  }, [favoriteError, clearFavoriteError, showToast]);
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -285,11 +306,17 @@ export const IncubatorHub: React.FC = () => {
     }
   };
 
-  const isWalletVerified =
-    connected &&
-    !needsSignature &&
-    verificationState !== 'CONNECTED_UNVERIFIED' &&
-    verificationState !== 'VERIFICATION_FAILED';
+  const isWalletVerified = canFetchSessionEndpoints(
+    {
+      connected,
+      publicKeyBase58,
+      needsSignature,
+      verificationState,
+      demoEnabled,
+      demoPreset,
+    },
+    false
+  );
 
   // Legacy ?tab=WATCHLIST links redirect cleanly onto Overview and focus My Pinned Posts
   useEffect(() => {
@@ -304,7 +331,7 @@ export const IncubatorHub: React.FC = () => {
   }, [currentTab]);
 
   const fetchStakeStatus = useCallback(async () => {
-    if (!connected || !publicKeyBase58 || !isWalletVerified) {
+    if (!isWalletVerified) {
       setStakeStatusData(null);
       setStakeStatusError(null);
       setStakeRequiresAuth(connected);
@@ -335,13 +362,13 @@ export const IncubatorHub: React.FC = () => {
     } finally {
       setStakeStatusLoading(false);
     }
-  }, [connected, publicKeyBase58, isWalletVerified]);
+  }, [connected, isWalletVerified]);
 
   useEffect(() => {
     if (currentTab !== 'STAKE') return;
     let active = true;
     const run = async () => {
-      if (!connected || !publicKeyBase58 || !isWalletVerified) {
+      if (!isWalletVerified) {
         if (active) {
           setStakeStatusData(null);
           setStakeStatusError(null);
@@ -872,19 +899,21 @@ export const IncubatorHub: React.FC = () => {
               </Button>
             </div>
           ) : (
-            <AdminWorkspace
-              items={adminAlphas && adminAlphas.length > 0 ? adminAlphas : alphas}
-              campaigns={campaigns}
-              adminActionError={adminActionError}
-              onCreateCall={createAlphaCall}
-              onUpdateCall={updateAlphaCall}
-              onDeleteCall={deleteAlphaCall}
-              onTogglePin={togglePinCall}
-              onSetOutcome={setCallOutcome}
-              onInspect={setInspectedToken}
-              onToast={showToast}
-              getAdminHeaders={getAdminHeaders}
-            />
+            <ErrorBoundary panelName="Admin Desk">
+              <AdminWorkspace
+                items={adminAlphas && adminAlphas.length > 0 ? adminAlphas : alphas}
+                campaigns={campaigns}
+                adminActionError={adminActionError}
+                onCreateCall={createAlphaCall}
+                onUpdateCall={updateAlphaCall}
+                onDeleteCall={deleteAlphaCall}
+                onTogglePin={togglePinCall}
+                onSetOutcome={setCallOutcome}
+                onInspect={setInspectedToken}
+                onToast={showToast}
+                getAdminHeaders={getAdminHeaders}
+              />
+            </ErrorBoundary>
           )}
         </div>
       )}
@@ -931,7 +960,9 @@ export const IncubatorHub: React.FC = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   <div className="lg:col-span-5">
-                    <DashboardStakingCard showTelegram={false} />
+                    <ErrorBoundary panelName="StakePoint Pool Card">
+                      <DashboardStakingCard showTelegram={false} />
+                    </ErrorBoundary>
                   </div>
 
                   <div className="lg:col-span-7">
@@ -984,11 +1015,13 @@ export const IncubatorHub: React.FC = () => {
                             </Link>
                           </div>
                         </div>
-                        <StakeClientView
-                          key={`${stakeStatusData.wallet}-${stakeStatusData.stake.amount_raw}-${stakeStatusData.stake.status}`}
-                          initialData={stakeStatusData}
-                          embedded
-                        />
+                        <ErrorBoundary panelName="Stake Verification">
+                          <StakeClientView
+                            key={`${stakeStatusData.wallet}-${stakeStatusData.stake.amount_raw}-${stakeStatusData.stake.status}`}
+                            initialData={stakeStatusData}
+                            embedded
+                          />
+                        </ErrorBoundary>
                       </div>
                     ) : (
                       <div className="rounded-xl bg-surface border border-border-default p-6 space-y-3 text-center">
@@ -1006,15 +1039,17 @@ export const IncubatorHub: React.FC = () => {
               </div>
             ) : currentTab === 'SOCIAL' ? (
               <div className="space-y-4">
-                <CampaignSection
-                  userWallet={publicKeyBase58}
-                  isAdmin={false}
-                  campaigns={campaigns}
-                  loading={campaignsLoading}
-                  favoritedIds={favorites.filter((f) => f.kind === 'RAID').map((f) => f.id)}
-                  onToggleFavorite={connected && toggleFavorite ? (campaignId) => toggleFavorite('RAID', campaignId) : undefined}
-                  onRefresh={fetchCampaigns}
-                />
+                <ErrorBoundary panelName="Raid Campaigns">
+                  <CampaignSection
+                    userWallet={publicKeyBase58}
+                    isAdmin={false}
+                    campaigns={campaigns}
+                    loading={campaignsLoading}
+                    favoritedIds={favorites.filter((f) => f.kind === 'RAID').map((f) => f.id)}
+                    onToggleFavorite={connected && toggleFavorite ? (campaignId) => toggleFavorite('RAID', campaignId) : undefined}
+                    onRefresh={fetchCampaigns}
+                  />
+                </ErrorBoundary>
               </div>
             ) : !isCurrentTabAuthorized ? (
               <MembershipRestrictionScreen
@@ -1031,7 +1066,10 @@ export const IncubatorHub: React.FC = () => {
                 }}
               />
             ) : (
-              <div className="space-y-5">
+              <ErrorBoundary
+                panelName={currentTab === 'MAX_ALPHA' ? 'Max Alpha Feed' : 'Alpha Calls Feed'}
+              >
+                <div className="space-y-5">
                 {apiError && (
                   <div role="alert" className="rounded-xl bg-danger/10 border border-danger/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans text-xs">
                     <div className="flex items-center gap-2.5 text-danger font-semibold">
@@ -1108,6 +1146,8 @@ export const IncubatorHub: React.FC = () => {
                       {filteredTokens.map(renderUserAlphaCard)}
                     </div>
                   )
+                ) : apiLoading && alphas.length === 0 ? (
+                  <TradeWorkspaceSkeleton rows={6} />
                 ) : (
                   <div className="rounded-xl bg-surface border border-border-default overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[740px]">
@@ -1211,13 +1251,13 @@ export const IncubatorHub: React.FC = () => {
 
                                 <td className="py-3.5 px-4 text-right font-mono tnum">
                                   <div className="font-bold text-white text-sm">
-                                    {token.entryMarketCap || '—'}
+                                    <TabularValue value={token.entryMarketCap || null} />
                                   </div>
                                 </td>
 
                                 <td className="py-3.5 px-4 text-right font-mono tnum">
                                   <div className="font-black text-brand-bright text-sm">
-                                    {token.marketCap || '—'}
+                                    <TabularValue value={token.marketCap || null} />
                                   </div>
                                 </td>
 
@@ -1356,7 +1396,7 @@ export const IncubatorHub: React.FC = () => {
                                 className={`text-sm font-bold ${coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
                                   }`}
                               >
-                                {formatChangePct(coin.change24hPct)}
+                                <TabularValue value={formatChangePct(coin.change24hPct)} />
                               </div>
                               <a
                                 href={marketUrl}
@@ -1376,17 +1416,20 @@ export const IncubatorHub: React.FC = () => {
                   </div>
                 )}
               </div>
+              </ErrorBoundary>
             )}
           </div>
         </div>
       )}
 
       {/* INSPECTOR MODAL */}
-      <AlphaInspectorModal
-        token={inspectedToken}
-        onClose={() => setInspectedToken(null)}
-        showAdminControls={currentTab === 'ADMIN'}
-      />
+      <ErrorBoundary panelName="Call Inspector">
+        <AlphaInspectorModal
+          token={inspectedToken}
+          onClose={() => setInspectedToken(null)}
+          showAdminControls={currentTab === 'ADMIN'}
+        />
+      </ErrorBoundary>
     </div>
   );
 };

@@ -9,8 +9,14 @@ import { TrustWalletAdapter } from '@/lib/trustWalletAdapter';
 import { MAINTENANCE_CONFIG, SOLANA_RPC } from '@/lib/config';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { GenesisProvider } from '@/context/GenesisContext';
+import { useWalletGuard } from '@/hooks/useWalletGuard';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
+
+function WalletGuardBootstrap() {
+  useWalletGuard();
+  return null;
+}
 
 const SafeConnectionProvider = ConnectionProvider as unknown as React.ComponentType<{
   endpoint: string;
@@ -43,6 +49,7 @@ export function Providers({ children }: { children: ReactNode }) {
         }}
       >
         <WalletModalProvider>
+          <WalletGuardBootstrap />
           <GenesisProvider>{children}</GenesisProvider>
         </WalletModalProvider>
       </WalletProvider>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import { formatTokenDisplay, formatUsd } from '@/lib/stake/format';
 import { ArrowUpRight, ChevronDown, ChevronUp, Lock, RefreshCw, Sparkles } from 'lucide-react';
 import { StakePointPool } from '@/lib/stakepoint/types';
@@ -195,7 +196,27 @@ export function DashboardStakingCard({
 }: {
   showTelegram?: boolean;
 } = {}) {
-  const { connected, tier, publicKeyBase58 } = useGenesisBalance();
+  const {
+    connected,
+    tier,
+    publicKeyBase58,
+    needsSignature,
+    verificationState,
+    demoPreset,
+    demoEnabled,
+  } = useGenesisBalance();
+
+  const canFetchStakeStatus = canFetchSessionEndpoints(
+    {
+      connected,
+      publicKeyBase58,
+      needsSignature,
+      verificationState,
+      demoEnabled,
+      demoPreset,
+    },
+    false
+  );
 
   const [statusData, setStatusData] = useState<StakeStatusResponse | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -239,13 +260,16 @@ export function DashboardStakingCard({
   }, [loadPools]);
 
   const refreshStakeStatus = useCallback(async () => {
-    if (!connected || !publicKeyBase58) {
+    if (!canFetchStakeStatus || !publicKeyBase58) {
       setStatusData(null);
       return;
     }
     const currentGen = ++fetchGenRef.current;
     try {
-      const res = await fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`);
+      const res = await fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
       if (res.ok) {
         const json = await res.json();
         if (currentGen === fetchGenRef.current) {
@@ -255,17 +279,20 @@ export function DashboardStakingCard({
     } catch {
       // ignore
     }
-  }, [connected, publicKeyBase58]);
+  }, [canFetchStakeStatus, publicKeyBase58]);
 
   useEffect(() => {
-    // Immediately clear old wallet data when active wallet changes
+    // Immediately clear old wallet data when active wallet or verification state changes
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatusData(null);
-    if (!connected || !publicKeyBase58) return;
+    if (!canFetchStakeStatus || !publicKeyBase58) return;
 
     let active = true;
     const currentGen = ++fetchGenRef.current;
-    fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`)
+    fetch(`/api/stake/status?wallet=${encodeURIComponent(publicKeyBase58)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (!active || currentGen !== fetchGenRef.current || !json) return;
@@ -276,7 +303,7 @@ export function DashboardStakingCard({
     return () => {
       active = false;
     };
-  }, [connected, publicKeyBase58]);
+  }, [canFetchStakeStatus, publicKeyBase58]);
 
   const isPro = statusData?.current_tier === 'pro';
   const hasActiveStake = statusData?.stake?.status === 'active';

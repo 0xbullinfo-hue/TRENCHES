@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Toaster } from 'sonner';
 import './globals.css';
 import { Providers } from './providers';
 
@@ -22,7 +23,20 @@ export const viewport: Viewport = {
   themeColor: '#0A0E13',
 };
 
+function resolveMetadataBase(): URL {
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || '').trim();
+  if (raw) {
+    try {
+      return new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    } catch {
+      // fall through to canonical default
+    }
+  }
+  return new URL('https://trenchlabshq.xyz');
+}
+
 export const metadata: Metadata = {
+  metadataBase: resolveMetadataBase(),
   title: 'TrenchLabsHQ: research-backed token calls on Solana',
   description:
     'Token-gated Alpha Lab incubator powered by $H42 on Solana. Real-time multi-chain signals, verifiable ledger, and 90-day StakePoint staking.',
@@ -69,6 +83,7 @@ export default function RootLayout({
     <html lang="en" className={`dark ${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen flex flex-col bg-canvas text-ink font-sans antialiased">
         <Providers>{children}</Providers>
+        <Toaster theme="dark" position="bottom-right" richColors />
       </body>
     </html>
   );

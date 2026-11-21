@@ -97,6 +97,8 @@ export interface AuthContextValue {
   favorites: FavoritePostRecord[];
   toggleFavorite: (kind: FavoritePostKind, id: string) => void;
   isFavorited: (kind: FavoritePostKind, id: string) => boolean;
+  favoriteError: string | null;
+  clearFavoriteError: () => void;
   recordAllocation: (ticker: string, chain: Chain, amountSol: string) => void;
 
   searchQuery: string;
@@ -231,6 +233,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [favorites, setFavorites] = useState<FavoritePostRecord[]>([]);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const clearFavoriteError = useCallback(() => setFavoriteError(null), []);
   const watchlist = useMemo(
     () => favorites.filter((f) => f.kind !== 'RAID').map((f) => f.id),
     [favorites]
@@ -240,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const requestGenerationRef = useRef(0);
   const signCacheRef = useRef(new Map<string, { ts: number; headers: Record<string, string> }>());
   const prevPublicKeyRef = useRef<string | null>(null);
+  const pendingSessionClearRef = useRef<Promise<unknown> | null>(null);
   const fetchAlphasRef = useRef<(interactiveAuth?: boolean, gen?: number) => Promise<void>>(async () => { });
 
   const recordAllocation = useCallback(
@@ -284,10 +289,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (hadPrevious) {
         requestGenerationRef.current += 1;
         if (abortControllerRef.current) abortControllerRef.current.abort();
+        pendingSessionClearRef.current = fetch('/api/auth/session', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+        })
+          .catch(() => null)
+          .finally(() => {
+            pendingSessionClearRef.current = null;
+          });
         queueMicrotask(() => {
           setAlphas([]);
           setAdminAlphas([]);
           setAdminActionError(null);
+          setFavoriteError(null);
           setCallers([]);
           setPortfolio(null);
           setFavorites([]);
@@ -371,17 +385,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cleanId = id.trim();
       if (!cleanId) return;
       const targetKey = favoriteIdentityKey(kind, cleanId);
-      let nextActive = true;
+      setFavoriteError(null);
 
-      setFavorites((prev) => {
-        const exists = prev.some((f) => favoriteIdentityKey(f.kind, f.id) === targetKey);
-        nextActive = !exists;
-        const next = exists
-          ? prev.filter((f) => favoriteIdentityKey(f.kind, f.id) !== targetKey)
-          : [{ id: cleanId, kind, createdAt: new Date().toISOString() }, ...prev];
-        writeLocalFavoritesSnapshot(publicKeyBase58, next);
-        return next;
-      });
+      const prevSnapshot = favorites;
+      const exists = prevSnapshot.some((f) => favoriteIdentityKey(f.kind, f.id) === targetKey);
+      const nextActive = !exists;
+      const nextSnapshot = exists
+        ? prevSnapshot.filter((f) => favoriteIdentityKey(f.kind, f.id) !== targetKey)
+        : [{ id: cleanId, kind, createdAt: new Date().toISOString() }, ...prevSnapshot];
+      setFavorites(nextSnapshot);
+      writeLocalFavoritesSnapshot(publicKeyBase58, nextSnapshot);
 
       const isLiveAuthed =
         (!DEMO_ENABLED || demoPreset === 'live') &&
@@ -391,25 +404,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verificationState === 'VERIFIED';
 
       if (isLiveAuthed && publicKeyBase58) {
+        const requestWallet = publicKeyBase58;
         fetch('/api/favorites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
           body: JSON.stringify({ id: cleanId, kind, active: nextActive }),
         })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((json) => {
-            if (json?.ok && Array.isArray(json.favorites)) {
-              setFavorites(json.favorites);
-              writeLocalFavoritesSnapshot(publicKeyBase58, json.favorites);
+          .then(async (res) => {
+            const json = await res.json().catch(() => null);
+            if (prevPublicKeyRef.current !== requestWallet) return;
+            if (!res.ok || !json?.ok || !Array.isArray(json.favorites)) {
+              throw new Error(json?.message || 'Failed to update pinned post.');
             }
+            setFavorites(json.favorites);
+            writeLocalFavoritesSnapshot(requestWallet, json.favorites);
           })
-          .catch(() => {
-            // Keep optimistic local state if offline
+          .catch((err: unknown) => {
+            if (prevPublicKeyRef.current !== requestWallet) return;
+            setFavorites(prevSnapshot);
+            writeLocalFavoritesSnapshot(requestWallet, prevSnapshot);
+            setFavoriteError(
+              err instanceof Error ? err.message : 'Failed to save pinned post.'
+            );
           });
       }
     },
-    [publicKeyBase58, demoPreset, connected, needsSignature, verificationState]
+    [favorites, publicKeyBase58, demoPreset, connected, needsSignature, verificationState]
   );
 
   const toggleWatchlist = useCallback(
@@ -469,10 +490,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         try {
           sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
-          fetch('/api/auth/session', { method: 'POST', headers }).catch(() => { });
         } catch {
           // ignore cache write failure
         }
+        await fetch('/api/auth/session', {
+          method: 'POST',
+          headers,
+          credentials: 'same-origin',
+        }).catch(() => null);
         return headers;
       } catch {
         return null;
@@ -534,8 +559,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // In dev mode with a demo preset, load fixture directly
-      if (DEMO_ENABLED && demoPreset !== 'live') {
+      // In dev mode with an explicit non-live demo preset (never while a real wallet is connected), load fixture
+      if (
+        DEMO_ENABLED &&
+        demoPreset !== 'live' &&
+        demoPreset !== 'disconnected' &&
+        !(wallet.connected && wallet.publicKey)
+      ) {
         setApiLoading(true);
         try {
           const res = await fetch('/api/alphas/fixture', { cache: 'no-store' });
@@ -632,7 +662,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [connected, demoPreset, isAdmin, getAccessHeaders, setOnChainBalance, setServerTier]
+    [connected, demoPreset, isAdmin, getAccessHeaders, setOnChainBalance, setServerTier, wallet.connected, wallet.publicKey]
   );
 
   useEffect(() => {
@@ -640,7 +670,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchAlphasFromBackend]);
 
   const requestUnlockSignature = useCallback(async () => {
-    if (DEMO_ENABLED && demoPreset !== 'live') {
+    if (
+      DEMO_ENABLED &&
+      demoPreset !== 'live' &&
+      demoPreset !== 'disconnected' &&
+      !(wallet.connected && wallet.publicKey)
+    ) {
       setNeedsSignature(false);
       setVerificationState('VERIFIED');
       const gen = ++requestGenerationRef.current;
@@ -688,7 +723,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'x-signature': sigHex,
       };
       sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
-      fetch('/api/auth/session', { method: 'POST', headers }).catch(() => { });
+      if (pendingSessionClearRef.current) {
+        await pendingSessionClearRef.current;
+      }
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+      }).catch(() => null);
       setNeedsSignature(false);
       const gen = ++requestGenerationRef.current;
       await fetchAlphasFromBackend(true, gen);
@@ -999,6 +1041,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAlphas([]);
     setAdminAlphas([]);
     setAdminActionError(null);
+    setFavoriteError(null);
     setCallers([]);
     setPortfolio(null);
     setVerifiedUsersCount(0);
@@ -1049,6 +1092,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     favorites,
     toggleFavorite,
     isFavorited,
+    favoriteError,
+    clearFavoriteError,
     recordAllocation,
     resetAuthState,
   };

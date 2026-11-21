@@ -23,6 +23,7 @@ const cspHeader =
 const nextConfig = {
   reactStrictMode: true,
   images: { unoptimized: true }, // disables /_next/image attack surface
+  ...(isDev ? { allowedDevOrigins: ['127.0.0.1'] } : {}),
   async headers() {
     return [
       {
