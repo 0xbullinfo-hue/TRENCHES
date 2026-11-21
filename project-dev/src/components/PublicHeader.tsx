@@ -194,7 +194,7 @@ export const PublicHeader: React.FC = () => {
 
   const getDesktopNavClass = (sectionId: string) => {
     const isActive = isHome && activeSection === sectionId;
-    return `inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors ${isActive
+    return `inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isActive
         ? 'text-brand font-black bg-surface-card border border-brand/40 shadow-none'
         : 'text-muted hover:text-brand hover:bg-surface border border-transparent'
       }`;
@@ -202,7 +202,7 @@ export const PublicHeader: React.FC = () => {
 
   const getMobileNavClass = (sectionId: string) => {
     const isActive = isHome && activeSection === sectionId;
-    return `flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm uppercase tracking-wider transition-colors ${isActive
+    return `flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isActive
         ? 'text-brand font-black bg-surface-card border border-brand/40'
         : 'text-muted hover:bg-surface-card hover:text-brand border border-transparent'
       }`;
@@ -219,7 +219,10 @@ export const PublicHeader: React.FC = () => {
     <header className="sticky top-0 z-40 w-full bg-canvas border-b border-brand-border">
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Hex Cube Icon + Bold TrenchLabsHQ Wordmark */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-3 shrink-0 group">
+        <Link
+          href="/"
+          className="flex items-center gap-2 sm:gap-3 shrink-0 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
           <HexCubeLogo />
           <span className="font-sans font-extrabold tracking-tight text-base sm:text-2xl text-white">
             Trench<span className="text-brand">Labs</span>HQ
@@ -261,7 +264,7 @@ export const PublicHeader: React.FC = () => {
           </Link>
           <Link
             href="/ledger"
-            className={`inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors ${isPerformanceActive
+            className={`inline-flex items-center justify-center h-9 px-2.5 xl:px-3 rounded-lg uppercase font-sans text-xs xl:text-sm font-extrabold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isPerformanceActive
                 ? 'text-brand font-black bg-surface-card border border-brand/40 shadow-none'
                 : 'text-muted hover:text-brand hover:bg-surface border border-transparent'
               }`}
@@ -277,7 +280,7 @@ export const PublicHeader: React.FC = () => {
             href={communityUrl}
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 h-9 sm:h-11 px-3 sm:px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide transition-colors cursor-pointer shrink-0"
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 sm:h-11 px-3 sm:px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wide transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <Send className="w-3.5 h-3.5 fill-current" />
             <span>JOIN COMMUNITY</span>
@@ -288,7 +291,7 @@ export const PublicHeader: React.FC = () => {
           {connected ? (
             <Link
               href="/dashboard"
-              className="h-9 sm:h-11 px-2.5 sm:px-4 rounded-lg bg-surface border border-brand hover:border-brand-bright text-white font-sans text-xs sm:text-sm font-bold uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0"
+              className="h-9 sm:h-11 px-2.5 sm:px-4 rounded-lg bg-surface border border-brand hover:border-brand-bright text-white font-sans text-xs sm:text-sm font-bold uppercase tracking-wide inline-flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] text-brand" />
               <span className="hidden xl:inline">DASHBOARD ({shortAddress})</span>
@@ -393,7 +396,7 @@ export const PublicHeader: React.FC = () => {
           <Link
             href="/ledger"
             onClick={() => setMobileMenuOpen(false)}
-            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-brand transition-colors uppercase tracking-wider ${isPerformanceActive ? 'text-brand font-black bg-surface-card border border-brand/40' : 'text-muted'
+            className={`flex items-center h-12 min-h-[44px] px-4 rounded-lg font-sans font-bold text-sm hover:bg-surface-card hover:text-brand transition-colors uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isPerformanceActive ? 'text-brand font-black bg-surface-card border border-brand/40' : 'text-muted'
               }`}
           >
             PERFORMANCE
@@ -404,7 +407,7 @@ export const PublicHeader: React.FC = () => {
               target="_blank"
               rel="noreferrer"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-between h-12 min-h-[44px] px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wider transition-colors"
+              className="flex items-center justify-between h-12 min-h-[44px] px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               <span className="flex items-center gap-2">
                 <Send className="w-4 h-4 fill-current" />

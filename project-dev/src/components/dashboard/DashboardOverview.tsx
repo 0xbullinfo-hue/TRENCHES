@@ -271,7 +271,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 href={BUY_LINKS.pump}
                 target="_blank"
                 rel="noreferrer"
-                className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <span>Buy $H42</span>
                 <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />

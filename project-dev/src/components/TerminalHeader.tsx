@@ -40,7 +40,7 @@ export const TerminalHeader: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link
             href="/"
-            className="flex items-center gap-2 sm:gap-3 shrink-0 group cursor-pointer"
+            className="flex items-center gap-2 sm:gap-3 shrink-0 group cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             title="Go to TrenchLabs Landing Page"
           >
             <HexCubeLogo />
@@ -55,7 +55,7 @@ export const TerminalHeader: React.FC = () => {
           <button
             type="button"
             onClick={handleOpenCommandPalette}
-            className="flex-1 max-w-[260px] h-10 px-3 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center justify-between gap-2 transition-colors cursor-pointer"
+            className="flex-1 max-w-[260px] h-10 px-3 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center justify-between gap-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             title="Open quick jump & call lookup (Ctrl+K)"
             aria-label="Quick jump and call lookup"
           >
@@ -71,7 +71,7 @@ export const TerminalHeader: React.FC = () => {
           <Link
             href="/dashboard"
             title="Open Lab Analysis terminal"
-            className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+            className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
               pathname === '/dashboard'
                 ? 'bg-surface-card border-brand text-brand font-black'
                 : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
@@ -83,7 +83,7 @@ export const TerminalHeader: React.FC = () => {
           {!isDashboardRoute && (
             <Link
               href="/ledger"
-              className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+              className={`h-10 px-3.5 rounded-lg border font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                 pathname === '/ledger'
                   ? 'bg-surface-card border-brand text-brand font-black'
                   : 'bg-surface hover:bg-surface-card border-border-default hover:border-brand text-white'
@@ -97,7 +97,7 @@ export const TerminalHeader: React.FC = () => {
             href={communityUrl}
             target="_blank"
             rel="noreferrer"
-            className="h-10 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0"
+            className="h-10 px-3.5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <Send className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Community</span>
@@ -162,7 +162,7 @@ export const TerminalHeader: React.FC = () => {
         <button
           type="button"
           onClick={handleOpenCommandPalette}
-          className="flex-1 h-9 px-3 rounded-lg bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center gap-2 font-sans cursor-pointer truncate"
+          className="flex-1 h-9 px-3 rounded-lg bg-surface-card border border-border-default hover:border-brand text-xs text-muted hover:text-white inline-flex items-center gap-2 font-sans cursor-pointer truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           aria-label="Quick jump and token lookup"
         >
           <Search className="w-3.5 h-3.5 text-brand shrink-0" />
@@ -170,7 +170,7 @@ export const TerminalHeader: React.FC = () => {
         </button>
         <Link
           href="/dashboard"
-          className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
+          className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
             pathname === '/dashboard'
               ? 'bg-surface-card border-brand text-brand'
               : 'bg-surface-card border-border-default text-white'
@@ -181,7 +181,7 @@ export const TerminalHeader: React.FC = () => {
         {!isDashboardRoute && (
           <Link
             href="/ledger"
-            className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors ${
+            className={`h-9 px-3 rounded-lg border font-sans text-xs font-bold uppercase inline-flex items-center shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
               pathname === '/ledger'
                 ? 'bg-surface-card border-brand text-brand'
                 : 'bg-surface-card border-border-default text-white'

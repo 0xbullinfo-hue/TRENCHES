@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GenesisContext } from '@/context/GenesisContext';
+import { TelegramCountdown } from '@/components/dashboard/NextStepCard';
 import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 import type {
   GroupStatus,
@@ -242,6 +244,7 @@ export function TelegramVerificationCard({
   const [startingSession, setStartingSession] = useState(false);
   const [togglingNotif, setTogglingNotif] = useState(false);
   const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(null);
+  const [pendingExpiresAt, setPendingExpiresAt] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -313,6 +316,7 @@ export function TelegramVerificationCard({
         onStatusChange?.(confirmedConnected);
         if (confirmedConnected) {
           setPendingDeepLink(null);
+          setPendingExpiresAt(null);
           stopPolling();
         }
         return data;
@@ -334,6 +338,7 @@ export function TelegramVerificationCard({
     stopPolling();
     queueMicrotask(() => {
       setPendingDeepLink(null);
+      setPendingExpiresAt(null);
       setActionError(null);
       setFetchError(null);
     });
@@ -425,6 +430,7 @@ export function TelegramVerificationCard({
 
       const json = (await res.json().catch(() => ({}))) as {
         deep_link?: string;
+        expires_at?: string | number;
         already_in_group?: boolean;
         message?: string;
         reason?: string;
@@ -456,6 +462,13 @@ export function TelegramVerificationCard({
       }
 
       setPendingDeepLink(json.deep_link);
+      const parsedExpiry =
+        typeof json.expires_at === 'number'
+          ? json.expires_at
+          : typeof json.expires_at === 'string'
+            ? Date.parse(json.expires_at)
+            : Number.NaN;
+      setPendingExpiresAt(Number.isFinite(parsedExpiry) ? parsedExpiry : null);
       try {
         window.open(json.deep_link, '_blank', 'noopener,noreferrer');
       } catch {
@@ -773,7 +786,7 @@ export function TelegramVerificationCard({
           <div data-testid="telegram-ineligible-state" className="flex flex-wrap items-center gap-2">
             <Link
               href="/dashboard?tab=STAKE"
-              className="w-full sm:w-auto h-9 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand font-mono text-xs font-bold text-brand inline-flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full sm:w-auto h-9 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand font-mono text-xs font-bold text-brand inline-flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <ShieldAlert className="w-3.5 h-3.5" />
               <span>View Staking &amp; Access Tiers</span>
@@ -830,7 +843,7 @@ export function TelegramVerificationCard({
                 href={BOT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-8 px-3 rounded-md bg-surface border border-border-default hover:border-brand font-mono text-xs font-bold text-white inline-flex items-center gap-1 transition-colors"
+                className="h-8 px-3 rounded-md bg-surface border border-border-default hover:border-brand font-mono text-xs font-bold text-white inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <span>Open Bot</span>
                 <ArrowUpRight className="w-3 h-3 text-brand" />
@@ -853,7 +866,7 @@ export function TelegramVerificationCard({
         {/* Pending Verification / Pending Group Invite State */}
         {connected && !isUnauthenticated && !isConfirmedJoined && isPending && vm && (
           <div data-testid="telegram-pending-state" className="space-y-2.5">
-            <div className="rounded-lg bg-brand/10 border border-brand/30 p-3 space-y-2">
+            <div className="rounded-lg bg-brand/10 border border-brand/30 p-3 space-y-2.5">
               <div className="flex items-center gap-2 font-mono text-xs font-bold text-brand">
                 <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                 <span>
@@ -862,13 +875,46 @@ export function TelegramVerificationCard({
                     : 'Waiting for Telegram confirmation...'}
                 </span>
               </div>
+
+              {pendingDeepLink && pendingExpiresAt && (
+                <TelegramCountdown
+                  expiresAt={pendingExpiresAt}
+                  onRegenerate={() => void handleStartVerification()}
+                />
+              )}
+
+              {pendingDeepLink && (
+                <div
+                  data-testid="telegram-qr-panel"
+                  className="hidden md:flex items-center gap-3 rounded-lg bg-surface border border-border-default p-2.5"
+                >
+                  <div className="rounded bg-white p-1.5 shrink-0">
+                    <QRCodeSVG
+                      value={pendingDeepLink}
+                      size={96}
+                      bgColor="#ffffff"
+                      fgColor="#0A0E13"
+                      level="M"
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <div className="font-mono text-[11px] font-bold text-white">
+                      Scan with phone Telegram
+                    </div>
+                    <code className="block font-mono text-[10px] text-muted break-all">
+                      {pendingDeepLink}
+                    </code>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   href={pendingDeepLink || BOT_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   data-testid="telegram-deeplink-anchor"
-                  className="h-8 px-3 rounded-md bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1 transition-colors"
+                  className="h-8 px-3 rounded-md bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                 >
                   <span>{pendingDeepLink ? 'Open Telegram' : 'Open @Trenchlabs_bot'}</span>
                   <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -930,6 +976,7 @@ export function TelegramVerificationCard({
                     onClick={() => {
                       stopPolling();
                       setPendingDeepLink(null);
+                      setPendingExpiresAt(null);
                     }}
                     className="h-8 px-2.5 text-xs font-mono text-muted hover:text-white"
                   >

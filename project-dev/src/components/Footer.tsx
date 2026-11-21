@@ -55,27 +55,27 @@ export const Footer: React.FC = () => {
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/#hero-section" className="hover:text-brand transition-colors">
+                <Link href="/#hero-section" className="hover:text-brand transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works" className="hover:text-brand transition-colors">
+                <Link href="/#how-it-works" className="hover:text-brand transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   How The Lab Works
                 </Link>
               </li>
               <li>
-                <Link href="/#pipeline-section" className="hover:text-brand transition-colors">
+                <Link href="/#pipeline-section" className="hover:text-brand transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   Incubator Pipeline
                 </Link>
               </li>
               <li>
-                <Link href="/#choose-your-access" className="hover:text-brand transition-colors">
+                <Link href="/#choose-your-access" className="hover:text-brand transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   Membership Tiers
                 </Link>
               </li>
               <li>
-                <Link href="/ledger" className="hover:text-brand transition-colors inline-flex items-center gap-1">
+                <Link href="/ledger" className="hover:text-brand transition-colors inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   <span>Performance Ledger</span>
                   <ArrowUpRight className="w-3 h-3 text-brand" />
                 </Link>
@@ -94,7 +94,7 @@ export const Footer: React.FC = () => {
                   href={communityUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   <span>Telegram</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
@@ -105,7 +105,7 @@ export const Footer: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   <span>X (Twitter)</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
@@ -134,7 +134,7 @@ export const Footer: React.FC = () => {
                     href={BUY_LINKS.pump}
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-brand transition-colors inline-flex items-center gap-1"
+                    className="hover:text-brand transition-colors inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     <span>Buy on Pump.fun</span>
                     <ArrowUpRight className="w-3 h-3 text-brand" />
@@ -146,14 +146,14 @@ export const Footer: React.FC = () => {
                   href={SOLSCAN.token(GENESIS_MINT)}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-brand transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand transition-colors inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   <span>Solscan SPL Explorer</span>
                   <ArrowUpRight className="w-3 h-3 text-muted" />
                 </a>
               </li>
               <li>
-                <Link href="/dashboard" className="hover:text-brand transition-colors">
+                <Link href="/dashboard" className="hover:text-brand transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   Terminal Login
                 </Link>
               </li>
@@ -183,7 +183,7 @@ export const Footer: React.FC = () => {
           <Link
             href={isHomePage ? '#hero-section' : '/#hero-section'}
             onClick={handleBackToTop}
-            className="inline-flex items-center gap-1 text-muted hover:text-brand font-bold uppercase transition-colors"
+            className="inline-flex items-center gap-1 text-muted hover:text-brand font-bold uppercase transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <span>BACK TO TOP</span>
             <ArrowUp className="w-3.5 h-3.5" />

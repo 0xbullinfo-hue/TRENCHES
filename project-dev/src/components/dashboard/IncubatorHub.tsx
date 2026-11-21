@@ -22,6 +22,8 @@ import { TokenArtwork } from './TokenArtwork';
 import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
+import { NextStepCard } from '@/components/dashboard/NextStepCard';
+import { resolveUserState, stateMeta } from '@/lib/state/resolveUserState';
 import { StakeClientView, type InitialStakeData } from '@/components/stake/StakeClientView';
 import { LockedTerminal } from '@/components/LockedTerminal';
 import { AlphaInspectorModal, getPrimaryMarketUrl } from './AlphaInspectorModal';
@@ -959,7 +961,36 @@ export const IncubatorHub: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  <div className="lg:col-span-5">
+                  <div className="lg:col-span-5 space-y-4">
+                    {(() => {
+                      const resolvedTier =
+                        tier.id === 'PRO' || isAdmin
+                          ? 'pro'
+                          : tier.id === 'LAB_MEMBER'
+                            ? 'member'
+                            : 'free';
+                      const stakeState = resolveUserState({
+                        connected,
+                        needsSignature,
+                        hasActiveSession: isWalletVerified,
+                        tier: resolvedTier,
+                        telegramConnected: resolvedTier === 'pro' || resolvedTier === 'member',
+                        stakeUsd: stakeStatusData?.stake?.amount_usd ?? 0,
+                      });
+                      const meta = stateMeta[stakeState];
+                      if (stakeState === 'pro_active') return null;
+                      return (
+                        <NextStepCard
+                          state={stakeState}
+                          meta={meta}
+                          onAction={(actKey) => {
+                            if (actKey === 'connect') connectWallet();
+                            else if (actKey === 'sign') void requestUnlockSignature();
+                            else if (actKey === 'retry') void refreshAll();
+                          }}
+                        />
+                      );
+                    })()}
                     <ErrorBoundary panelName="StakePoint Pool Card">
                       <DashboardStakingCard showTelegram={false} />
                     </ErrorBoundary>
@@ -1165,8 +1196,20 @@ export const IncubatorHub: React.FC = () => {
                       <tbody className="divide-y divide-border-default font-sans text-xs">
                         {filteredTokens.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-10 text-center text-muted font-mono text-xs">
-                              No calls match active filters in this workspace.
+                            <td colSpan={7} className="py-10 text-center space-y-3">
+                              <p className="text-muted font-mono text-xs">
+                                No calls match active filters in this workspace.
+                              </p>
+                              {activeFilterableWorkspace && (
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => resetWorkspaceFilters(activeFilterableWorkspace)}
+                                >
+                                  Clear filters
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ) : (
