@@ -28,21 +28,28 @@ export function TelegramStatusBanner() {
   const pathname = usePathname();
   const genesis = useContext(GenesisContext);
   const [status, setStatus] = useState<VerificationStatus | null>(null);
-  const [dismissed, setDismissed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      const stored = sessionStorage.getItem(DISMISS_STORAGE_KEY);
-      if (stored) {
-        const timestamp = Number(stored);
-        if (Date.now() - timestamp < DISMISS_TTL_MS) {
-          return true;
+  const [dismissed, setDismissed] = useState<boolean>(true);
+  const walletKey = genesis?.publicKeyBase58
+    ? `${DISMISS_STORAGE_KEY}:${genesis.publicKeyBase58}`
+    : DISMISS_STORAGE_KEY;
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const stored = sessionStorage.getItem(walletKey);
+        if (stored) {
+          const timestamp = Number(stored);
+          if (Date.now() - timestamp < DISMISS_TTL_MS) {
+            setDismissed(true);
+            return;
+          }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
-    return false;
-  });
+      setDismissed(false);
+    });
+  }, [walletKey]);
 
   // Do not render on /dashboard/stake per §7.2
   const isStakeRoute = pathname === '/dashboard/stake';
@@ -69,7 +76,7 @@ export function TelegramStatusBanner() {
   const handleDismiss = () => {
     setDismissed(true);
     try {
-      sessionStorage.setItem(DISMISS_STORAGE_KEY, String(Date.now()));
+      sessionStorage.setItem(walletKey, String(Date.now()));
     } catch {
       // ignore
     }

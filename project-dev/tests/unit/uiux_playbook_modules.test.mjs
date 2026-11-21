@@ -54,6 +54,7 @@ const { TelegramVerificationCard } = await import(
 const { GET: shareImageGet } = await import(
   '../../src/app/api/signals/[id]/share-image/route.tsx'
 );
+const { createLedgerEntry, deleteLedgerEntry } = await import('../../src/server/db.ts');
 
 async function renderComponent(ui) {
   const container = dom.document.createElement('div');
@@ -298,16 +299,37 @@ test('TelegramVerificationCard renders QRCodeSVG and countdown on session initia
   }
 });
 
-test('GET /api/signals/[id]/share-image returns PNG OpenGraph card', async () => {
-  const req = new NextRequest(
-    'http://localhost/api/signals/sig-1/share-image?ticker=H42&chain=SOL&multiplier=4.2&entry=$180K',
+test('GET /api/signals/[id]/share-image rejects unknown signal IDs and returns PNG OpenGraph card for verified entries', async () => {
+  const unknownReq = new NextRequest(
+    'http://localhost/api/signals/sig-unverified/share-image?ticker=H42&chain=SOL&multiplier=4.2&entry=$180K',
     { headers: { 'x-forwarded-for': '198.51.100.88' } }
   );
-  const res = await shareImageGet(req, { params: Promise.resolve({ id: 'sig-1' }) });
-  assert.equal(res.status, 200);
-  assert.match(res.headers.get('content-type') || '', /^image\/png/i);
-  const buf = await res.arrayBuffer();
-  assert.ok(buf.byteLength > 1000);
+  const unknownRes = await shareImageGet(unknownReq, { params: Promise.resolve({ id: 'sig-unverified' }) });
+  assert.equal(unknownRes.status, 404);
+
+  const created = await createLedgerEntry({
+    ticker: 'H42',
+    chain: 'solana',
+    contract_address: 'EM9M8RaxSjSf2UT2e2xndaBjjC1ijkT2nH5U3j6epump',
+    multiplier: '4.2',
+    entry_price: '180000',
+    closed_at: new Date().toISOString(),
+    posted_by: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+  });
+
+  try {
+    const req = new NextRequest(
+      `http://localhost/api/signals/${created.id}/share-image`,
+      { headers: { 'x-forwarded-for': '198.51.100.88' } }
+    );
+    const res = await shareImageGet(req, { params: Promise.resolve({ id: created.id }) });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') || '', /^image\/png/i);
+    const buf = await res.arrayBuffer();
+    assert.ok(buf.byteLength > 1000);
+  } finally {
+    await deleteLedgerEntry(created.id);
+  }
 });
 
 test('TelegramVerificationCard renders Alert Preferences, persists toggles, and rolls back on failure', async () => {

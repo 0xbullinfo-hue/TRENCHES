@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getLedgerEntries } from '@/server/db';
-import { loadCallsRegistry } from '@/server/alphas-data';
+import { loadCallsRegistry, type AlphaRecord } from '@/server/alphas-data';
 import { computePerformanceStats } from '@/lib/ledger/performance-stats';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const { entries } = await getLedgerEntries({ limit: 1000, offset: 0, sort: 'newest' });
-    let calls: any[] = [];
+    let calls: AlphaRecord[] = [];
     try {
       calls = await loadCallsRegistry();
     } catch {

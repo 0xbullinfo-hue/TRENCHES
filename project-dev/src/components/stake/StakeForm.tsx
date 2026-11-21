@@ -182,7 +182,11 @@ export function StakeForm({
             value={amountStr}
             onChange={handleInputChange}
             placeholder="250.00"
-            className="w-full min-h-[44px] h-12 pl-8 pr-20 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className={`w-full min-h-[44px] h-12 pl-8 pr-20 rounded-lg bg-surface-card border ${
+              equivalentTokens !== null && walletBalanceTokens > 0 && equivalentTokens > walletBalanceTokens
+                ? 'border-danger focus:border-danger text-danger'
+                : 'border-line focus:border-brand text-ink'
+            } font-mono text-lg font-bold tnum transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
           />
           <button
             type="button"
@@ -193,7 +197,7 @@ export function StakeForm({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-2xs font-mono pt-1 text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-2xs font-mono pt-1 text-muted tnum">
           <span>
             {equivalentTokens !== null
               ? `≈ ${formatTokenDisplay(equivalentTokens)} $H42`
@@ -203,6 +207,11 @@ export function StakeForm({
             <span>Balance: {formatTokenDisplay(walletBalanceTokens)} $H42</span>
           )}
         </div>
+        {equivalentTokens !== null && walletBalanceTokens > 0 && equivalentTokens > walletBalanceTokens && (
+          <p role="alert" className="text-2xs font-mono font-bold text-danger">
+            Insufficient balance: entered amount exceeds connected wallet holdings.
+          </p>
+        )}
       </div>
 
       {/* Lock Duration Info */}

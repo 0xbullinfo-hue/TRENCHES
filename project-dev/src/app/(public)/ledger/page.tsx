@@ -17,21 +17,17 @@ export default async function PublicLedgerPage(props: {
   const chain = params?.chain || 'all';
   const sort = params?.sort || 'newest';
 
-  const [{ entries, total, has_more }, statsPool] = await Promise.all([
-    getLedgerEntries({
-      chain,
-      sort,
-      limit: 12,
-      offset: 0,
-    }),
-    getLedgerEntries({
-      chain: 'all',
-      sort: 'newest',
-      limit: 500,
-      offset: 0,
-    }),
-  ]);
-  const stats = computePerformanceStats(statsPool.entries);
+  const { entries: allEntries } = await getLedgerEntries({
+    chain: 'all',
+    sort,
+    limit: 500,
+    offset: 0,
+  });
+  const filtered = chain === 'all' ? allEntries : allEntries.filter((e) => e.chain.toLowerCase() === chain.toLowerCase());
+  const entries = filtered.slice(0, 12);
+  const total = filtered.length;
+  const has_more = filtered.length > 12;
+  const stats = computePerformanceStats(allEntries);
   const trustMetrics =
     stats.totalRecordedCalls > 0 && stats.winRate !== null
       ? {

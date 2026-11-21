@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from '@solana/web3.js';
+import { formatUnits } from '@/lib/math/tokenMath';
 import { GENESIS_MINT, SOLANA_RPC, TOKEN_DECIMALS, isBase58Address } from '@/lib/config';
 import { resolveStakePointConfig, type StakePointIntegrationState } from '@/lib/stakepoint/config';
 import { createStakeIfAbsent, getActiveStakes, loadDb, StakeRow } from '@/server/db';
@@ -536,7 +537,7 @@ export async function verifyAndRecordStakePointPosition(
       };
     }
 
-    const tokenAmountNumber = Number(amountRaw) / Math.pow(10, TOKEN_DECIMALS);
+    const tokenAmountNumber = Number(formatUnits(amountRaw, TOKEN_DECIMALS));
     const amountUsd = +(tokenAmountNumber * priceResult.priceUsd).toFixed(2);
 
     const minAcceptableUsd = PRO_STAKE_USD_THRESHOLD * 0.97;

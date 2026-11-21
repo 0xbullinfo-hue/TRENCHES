@@ -15,6 +15,7 @@ export const TerminalHeader: React.FC = () => {
     connected,
     shortAddress,
     tier,
+    isAdmin,
     connectWallet,
     switchWallet,
     disconnectDemoOrWallet,
@@ -128,7 +129,7 @@ export const TerminalHeader: React.FC = () => {
                 />
                 <span className="font-semibold">{shortAddress}</span>
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-xs font-sans font-bold bg-surface-card border border-border-default uppercase text-muted">
-                  {tier.id === 'PRO' ? 'PRO' : tier.id === 'LAB_MEMBER' ? 'MEMBER' : 'FREE'}
+                  {isAdmin ? 'ADMIN' : tier.id === 'PRO' ? 'PRO' : tier.id === 'LAB_MEMBER' ? 'MEMBER' : 'FREE'}
                 </span>
               </Button>
 

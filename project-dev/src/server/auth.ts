@@ -141,6 +141,7 @@ export function verifySolanaSignature(
 
 /**
  * Proves the caller controls `x-wallet` by verifying an ed25519 signature over a short-lived message.
+ * Binds query string cleanly; rejects timestamps skewed more than 60s into the future.
  */
 export function verifyWalletAuth(req: Request): WalletAuthResult {
   const headers = req.headers;
@@ -152,13 +153,19 @@ export function verifyWalletAuth(req: Request): WalletAuthResult {
     return { ok: false, error: 'Missing x-wallet / x-timestamp / x-signature headers.' };
   }
 
-  if (Math.abs(Date.now() - ts) > MAX_TIMESTAMP_DRIFT_MS) {
+  const now = Date.now();
+  if (now - ts > MAX_TIMESTAMP_DRIFT_MS || ts - now > 60_000) {
     return { ok: false, error: 'Signature expired or timestamp drift exceeded.' };
   }
 
-  // Bound to method + path so a captured signature cannot be replayed against any other endpoint.
-  const msg = ['TrenchLabs Access', req.method, new URL(req.url).pathname, ts].join('|');
-  if (!verifySolanaSignature(wallet, sig, msg)) {
+  const url = new URL(req.url);
+  // Bound to method + path(+query); retain pathname-only fallback strictly for GET reads with search params.
+  const boundPath = url.pathname + url.search;
+  const msg = ['TrenchLabs Access', req.method, boundPath, ts].join('|');
+  if (
+    !verifySolanaSignature(wallet, sig, msg) &&
+    !(req.method === 'GET' && url.search && verifySolanaSignature(wallet, sig, ['TrenchLabs Access', req.method, url.pathname, ts].join('|')))
+  ) {
     return { ok: false, error: 'Invalid wallet cryptographic signature.' };
   }
 

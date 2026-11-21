@@ -35,7 +35,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
   return (
     <tr
       key={entry.id}
-      className="border-b border-border-default/30 hover:bg-surface-elevated/40 transition-colors"
+      className="border-b border-border-default/30 hover:bg-surface-3/40 transition-colors"
     >
       {/* Column 1 — Ticker */}
       <td className="px-4 py-3.5 text-left whitespace-nowrap">
@@ -52,7 +52,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
       </td>
 
       {/* Column 2 — Entry MCAP */}
-      <td className="px-4 py-3.5 text-right font-mono text-xs sm:text-sm text-zinc-300 font-medium tnum whitespace-nowrap">
+      <td className="px-4 py-3.5 text-right font-mono text-xs sm:text-sm text-ink/90 font-medium tnum whitespace-nowrap">
         {formatMarketCap(entry.entry_price)}
       </td>
 
@@ -78,7 +78,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
           <span className="text-brand font-bold">{pnl.formatted}</span>
         )}
         {pnl.sign === 'negative' && (
-          <span className="text-rose-400 font-bold">{pnl.formatted}</span>
+          <span className="text-danger font-bold">{pnl.formatted}</span>
         )}
         {pnl.sign === 'zero' && (
           <span className="text-muted font-medium">{pnl.formatted}</span>
@@ -96,7 +96,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`View ${tickerFormatted} on DexScreener`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-xs font-sans font-bold text-zinc-300 hover:text-brand transition-colors cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-3 border border-border-default hover:border-brand text-xs font-sans font-bold text-ink/90 hover:text-brand transition-colors cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>View</span>
             <ExternalLink className="w-3 h-3 text-muted group-hover:text-brand transition-colors" />

@@ -249,21 +249,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const recordAllocation = useCallback(
     (ticker: string, chain: Chain, amountSol: string) => {
+      // Client cannot self-attest realized PnL or mint fake chain signatures;
+      // record only a clearly marked unverified entry without fabricated +42.50 SOL PnL.
       setPortfolio((prev) => {
         const base = prev ?? {
           claimedCount: 0,
-          totalRealizedPnl: '+42.50 SOL',
+          totalRealizedPnl: '—',
+          isSample: false,
+          note: 'Client-recorded entries require on-chain verification',
           history: [],
         };
         const newEntry = {
           ticker,
           chain,
           size: amountSol,
-          pnl: 'OPEN ALLOC',
+          pnl: 'UNVERIFIED',
           pnlPositive: true,
           slot: 0,
           claimedAt: new Date().toISOString(),
-          sig: `SIMULATED_${Date.now().toString(36)}`,
+          sig: 'UNVERIFIED',
         };
         return {
           ...base,
@@ -457,7 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const cached = JSON.parse(sessionStorage.getItem(ACCESS_STORAGE_KEY) || 'null');
         if (cached && cached.wallet === addr && Date.now() - cached.ts < 4 * 60_000) {
-          return cached.headers;
+          return cached.sessionAuthenticated ? {} : cached.headers;
         }
       } catch {
         // ignore cache read failure
@@ -479,7 +483,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const ts = Date.now();
-        const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
+        const msg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
         const sig = await activeSignMessage(new TextEncoder().encode(msg));
         const headers = {
           'x-wallet': addr,
@@ -488,17 +492,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .map((b) => (b as number).toString(16).padStart(2, '0'))
             .join(''),
         };
-        try {
-          sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
-        } catch {
-          // ignore cache write failure
-        }
-        await fetch('/api/auth/session', {
+        const sessionRes = await fetch('/api/auth/session', {
           method: 'POST',
           headers,
           credentials: 'same-origin',
-        }).catch(() => null);
-        return headers;
+        });
+        if (!sessionRes.ok) {
+          return null;
+        }
+        try {
+          sessionStorage.setItem(
+            ACCESS_STORAGE_KEY,
+            JSON.stringify({ wallet: addr, ts, sessionAuthenticated: true })
+          );
+        } catch {
+          // ignore cache write failure
+        }
+        return {};
       } catch {
         return null;
       }
@@ -614,6 +624,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch('/api/alphas', {
           headers,
+          credentials: 'same-origin',
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -621,6 +632,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof generation === 'number' && generation !== requestGenerationRef.current) return;
 
         if (!res.ok || !data.ok) {
+          if (res.status === 401) {
+            try {
+              sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+            } catch {
+              // ignore
+            }
+          }
           if (typeof data.balance === 'number') {
             setOnChainBalance(data.balance);
           }
@@ -712,7 +730,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setVerificationState('VERIFYING');
       setApiLoading(true);
       const ts = Date.now();
-      const msg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
+      const msg = `TrenchLabs Access|POST|/api/auth/session|${ts}`;
       const sigBytes = await activeSignMessage(new TextEncoder().encode(msg));
       const sigHex = Array.from(sigBytes)
         .map((b) => (b as number).toString(16).padStart(2, '0'))
@@ -722,15 +740,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'x-timestamp': String(ts),
         'x-signature': sigHex,
       };
-      sessionStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ wallet: addr, ts, headers }));
       if (pendingSessionClearRef.current) {
         await pendingSessionClearRef.current;
       }
-      await fetch('/api/auth/session', {
+      const sessionRes = await fetch('/api/auth/session', {
         method: 'POST',
         headers,
         credentials: 'same-origin',
-      }).catch(() => null);
+      });
+      if (!sessionRes.ok) {
+        throw new Error('Failed to verify wallet session with server.');
+      }
+      sessionStorage.setItem(
+        ACCESS_STORAGE_KEY,
+        JSON.stringify({ wallet: addr, ts, sessionAuthenticated: true })
+      );
       setNeedsSignature(false);
       const gen = ++requestGenerationRef.current;
       await fetchAlphasFromBackend(true, gen);

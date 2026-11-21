@@ -70,9 +70,9 @@ export const HeroTerminal: React.FC = () => {
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border-default font-mono text-[11px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <span className="text-muted">DASHBOARD:</span>
-            <span className="text-amber">COMING SOON</span>
+            <span className="text-brand">LIVE TERMINAL</span>
           </div>
         </div>
 
@@ -149,7 +149,6 @@ export const HeroTerminal: React.FC = () => {
                 width={620}
                 height={620}
                 priority
-                unoptimized
                 className="relative z-10 w-full h-auto max-h-[320px] xs:max-h-[380px] sm:max-h-[460px] lg:max-h-[560px] xl:max-h-[620px] object-contain block select-none"
               />
             </div>

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Send } from 'lucide-react';
 import { useGenesisBalance } from '@/context/GenesisContext';
+import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
 
 const ENABLED = process.env.NEXT_PUBLIC_TELEGRAM_ALERTS === 'true';
 const LINK_PATH = '/api/telegram/link';
@@ -11,7 +12,19 @@ const hintKey = (wallet: string) => `trenchlabs_tg_linked_v1:${wallet}`;
 export type TelegramLinkStatus = 'idle' | 'working' | 'waiting' | 'linked';
 
 export function useTelegramLink() {
-  const { publicKeyBase58, signRequestHeaders } = useGenesisBalance();
+  const {
+    connected,
+    publicKeyBase58,
+    needsSignature,
+    verificationState,
+    demoEnabled,
+    demoPreset,
+    signRequestHeaders,
+  } = useGenesisBalance();
+  const hasActiveSession = canFetchSessionEndpoints(
+    { connected, publicKeyBase58, needsSignature, verificationState, demoEnabled, demoPreset },
+    false
+  );
   const [status, setStatus] = useState<TelegramLinkStatus>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -30,7 +43,7 @@ export function useTelegramLink() {
     queueMicrotask(() => {
       setMessage(null);
     });
-    if (!publicKeyBase58) {
+    if (!publicKeyBase58 || !hasActiveSession) {
       queueMicrotask(() => {
         setStatus('idle');
       });
@@ -39,7 +52,10 @@ export function useTelegramLink() {
 
     let active = true;
     // Server-authoritative status query; never trust stale localStorage on wallet switch
-    fetch(`${LINK_PATH}?wallet=${encodeURIComponent(publicKeyBase58)}`)
+    fetch(`${LINK_PATH}?wallet=${encodeURIComponent(publicKeyBase58)}`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (!active || !json) return;
@@ -52,7 +68,7 @@ export function useTelegramLink() {
     return () => {
       active = false;
     };
-  }, [publicKeyBase58]);
+  }, [publicKeyBase58, hasActiveSession]);
 
   const call = useCallback(
     async (method: 'GET' | 'POST' | 'DELETE') => {
@@ -86,7 +102,11 @@ export function useTelegramLink() {
         }
         tries += 1;
         try {
-          const { linked } = await call('GET');
+          const pollRes = await fetch(`${LINK_PATH}?wallet=${encodeURIComponent(targetWallet)}`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          const { linked } = (pollRes.ok ? await pollRes.json() : {}) as { linked?: boolean };
           if (pollGenRef.current !== currentGen || targetWallet !== publicKeyBase58) return;
           if (linked) {
             stopPolling();

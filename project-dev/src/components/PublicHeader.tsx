@@ -22,27 +22,25 @@ export const PublicHeader: React.FC = () => {
   const isPerformanceActive = pathname === '/ledger';
   const { connected, shortAddress, connectWallet, disconnectDemoOrWallet } = useGenesisBalance();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('hero-section');
 
-  const isLocalhost =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === '0.0.0.0');
+  useEffect(() => {
+    queueMicrotask(() => {
+      const h = window.location.hostname;
+      setIsLocalhost(h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0');
+      const hash = window.location.hash.replace('#', '');
+      if (hash && LANDING_SECTIONS.some((s) => s.id === hash)) {
+        setActiveSection(hash);
+      }
+    });
+  }, []);
 
   const enableWalletConnect =
     !WALLET_LOCK &&
     (isLocalhost ||
       process.env.NODE_ENV !== 'production' ||
       process.env.NEXT_PUBLIC_ENABLE_WALLET === 'true');
-  const [activeSection, setActiveSection] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.replace('#', '');
-      if (hash && LANDING_SECTIONS.some((s) => s.id === hash)) {
-        return hash;
-      }
-    }
-    return 'hero-section';
-  });
 
   const isNavigatingRef = useRef(false);
   const navTimeoutRef = useRef<NodeJS.Timeout | null>(null);

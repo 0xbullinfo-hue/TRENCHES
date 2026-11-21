@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ImageResponse } from 'next/og';
 import { clientIp, rateLimit } from '@/server/ratelimit';
+import { loadCallsRegistry, resolvePublishStatus } from '@/server/alphas-data';
+import { getLedgerEntryById } from '@/server/db';
 
 export const runtime = 'nodejs';
 
@@ -23,12 +25,29 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const search = req.nextUrl.searchParams;
-  const ticker = cleanParam(search.get('ticker'), 'H42', 16).replace(/^\$+/, '');
-  const chain = cleanParam(search.get('chain'), 'SOL', 16).toUpperCase();
-  const multiplier = cleanParam(search.get('multiplier'), '—', 16);
-  const entry = cleanParam(search.get('entry'), '—', 24);
   const callId = cleanParam(id, 'signal', 24);
+  const [registry, ledgerEntry] = await Promise.all([
+    loadCallsRegistry().catch(() => []),
+    getLedgerEntryById(id).catch(() => null),
+  ]);
+  const call = registry.find((c) => c.id === id && resolvePublishStatus(c) === 'PUBLISHED');
+
+  if (!call && !ledgerEntry) {
+    return NextResponse.json(
+      { error: 'not_found', message: 'Verified signal not found' },
+      { status: 404, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  const ticker = cleanParam(call?.ticker ?? ledgerEntry?.ticker ?? '', 'SIGNAL', 16).replace(/^\$+/, '');
+  const chain = cleanParam(call?.chain ?? ledgerEntry?.chain ?? '', 'SOL', 16).toUpperCase();
+  const highestHit = call?.takeProfits?.filter((t) => t.hit).at(-1)?.label;
+  const multiplier = cleanParam(
+    highestHit ?? (ledgerEntry ? `${Number(ledgerEntry.multiplier).toFixed(2)}x` : '—'),
+    '—',
+    16
+  );
+  const entry = cleanParam(call?.entryMarketCap ?? ledgerEntry?.entry_price ?? '—', '—', 24);
 
   return new ImageResponse(
     (

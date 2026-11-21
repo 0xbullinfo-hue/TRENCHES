@@ -14,6 +14,8 @@ import { clientIp, rateLimit } from '@/server/ratelimit';
 
 export const dynamic = 'force-dynamic';
 
+const seenSessionSigs = new Map<string, number>();
+
 export async function GET(req: NextRequest) {
   const session = await getAuthSession(req);
   if (!session) {
@@ -57,19 +59,29 @@ export async function POST(req: NextRequest) {
   }
 
   const msg = ['TrenchLabs Access', req.method, new URL(req.url).pathname, ts].join('|');
-  const fallbackMsg = `TrenchLabs Access|GET|/api/alphas|${ts}`;
-  const valid = verifySolanaSignature(wallet, sig, msg) || verifySolanaSignature(wallet, sig, fallbackMsg);
+  const valid = verifySolanaSignature(wallet, sig, msg);
 
   if (!valid) {
     return NextResponse.json({ ok: false, error: 'Invalid signature' }, { status: 401 });
   }
 
   // A signature may mint a session cookie only once (shared lock across instances)
+  const replayId = crypto.createHash('sha256').update(`session:${sig}`).digest('hex');
   if (KV_CONFIGURED) {
-    const replayId = crypto.createHash('sha256').update(`session:${sig}`).digest('hex');
     const first = await kvLock(`session-replay:${replayId}`, '1', Math.ceil(MAX_TIMESTAMP_DRIFT_MS / 1000));
     if (!first) {
       return NextResponse.json({ ok: false, error: 'Signature already used' }, { status: 401 });
+    }
+  } else if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ ok: false, error: 'Replay store unavailable' }, { status: 503 });
+  } else {
+    const now = Date.now();
+    if (seenSessionSigs.has(replayId)) {
+      return NextResponse.json({ ok: false, error: 'Signature already used' }, { status: 401 });
+    }
+    seenSessionSigs.set(replayId, now + MAX_TIMESTAMP_DRIFT_MS);
+    for (const [k, exp] of seenSessionSigs) {
+      if (exp < now) seenSessionSigs.delete(k);
     }
   }
 

@@ -39,6 +39,8 @@ export const Modal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
       if (typeof document !== 'undefined' && document.activeElement) {
         previouslyFocusedElement.current = document.activeElement as HTMLElement;
       }
@@ -57,6 +59,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       return () => {
         clearTimeout(timer);
+        document.body.style.overflow = prevOverflow;
         if (previouslyFocusedElement.current && typeof previouslyFocusedElement.current.focus === 'function') {
           previouslyFocusedElement.current.focus();
         }
@@ -111,9 +114,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      role="button"
-      tabIndex={-1}
-      aria-label="Close modal overlay"
+      role="presentation"
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center p-4 bg-canvas/80 backdrop-blur-sm',
         containerClassName

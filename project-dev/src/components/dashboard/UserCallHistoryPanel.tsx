@@ -102,7 +102,7 @@ export const UserCallHistoryPanel: React.FC<UserCallHistoryPanelProps> = ({
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-white">{entry.ticker}</span>
-                    <span className="px-1.5 py-0.2 rounded bg-surface border border-border-default text-[10px] font-bold text-muted">
+                    <span className="px-1.5 py-0.5 rounded bg-surface border border-border-default text-2xs font-bold text-muted">
                       {entry.chain}
                     </span>
                     <span className="text-muted text-[11px] tnum">{entry.size}</span>

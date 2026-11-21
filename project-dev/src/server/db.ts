@@ -2718,36 +2718,34 @@ export async function getLedgerEntries(options?: {
   limit?: number;
   offset?: number;
 }): Promise<{ entries: LedgerEntryWithEdited[]; total: number; has_more: boolean }> {
-  return withDbLock(async () => {
-    const db = await loadDb();
-    let list = [...(db.ledger_entries || [])];
+  const db = await loadDb(); // Read-only snapshot; never block writes on DB_LOCK_KEY
+  let list = [...(db.ledger_entries || [])];
 
-    if (options?.chain && options.chain.toLowerCase() !== 'all') {
-      const c = options.chain.toLowerCase();
-      list = list.filter((e) => e.chain.toLowerCase() === c);
-    }
+  if (options?.chain && options.chain.toLowerCase() !== 'all') {
+    const c = options.chain.toLowerCase();
+    list = list.filter((e) => e.chain.toLowerCase() === c);
+  }
 
-    if (options?.sort === 'multi') {
-      list.sort((a, b) => Number(b.multiplier) - Number(a.multiplier));
-    } else {
-      list.sort((a, b) => new Date(b.closed_at).getTime() - new Date(a.closed_at).getTime());
-    }
+  if (options?.sort === 'multi') {
+    list.sort((a, b) => Number(b.multiplier) - Number(a.multiplier));
+  } else {
+    list.sort((a, b) => new Date(b.closed_at).getTime() - new Date(a.closed_at).getTime());
+  }
 
-    const total = list.length;
-    const offset = Math.max(0, options?.offset ?? 0);
-    const limit = Math.max(1, options?.limit ?? 12);
-    const slice = list.slice(offset, offset + limit);
-    const has_more = offset + limit < total;
+  const total = list.length;
+  const offset = Math.max(0, options?.offset ?? 0);
+  const limit = Math.max(1, options?.limit ?? 12);
+  const slice = list.slice(offset, offset + limit);
+  const has_more = offset + limit < total;
 
-    const entries: LedgerEntryWithEdited[] = slice.map((e) => ({
-      ...e,
-      verification_status:
-        e.verification_status || (e.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED'),
-      edited: !!e.updated_at && new Date(e.updated_at).getTime() > new Date(e.posted_at).getTime(),
-    }));
+  const entries: LedgerEntryWithEdited[] = slice.map((e) => ({
+    ...e,
+    verification_status:
+      e.verification_status || (e.proof_url?.trim() ? 'EVIDENCE_SUPPLIED' : 'REPORTED'),
+    edited: !!e.updated_at && new Date(e.updated_at).getTime() > new Date(e.posted_at).getTime(),
+  }));
 
-    return { entries, total, has_more };
-  });
+  return { entries, total, has_more };
 }
 
 export async function getLedgerEntryById(id: string): Promise<LedgerEntryWithEdited | null> {

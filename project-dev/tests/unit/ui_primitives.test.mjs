@@ -65,8 +65,8 @@ test('UI Primitives: Button handles variants, sizes, and loading state', async (
   assert.ok(primaryClass.includes('focus-visible:ring-2'));
 
   const dangerClass = getButtonClass({ variant: 'danger', size: 'sm' });
-  assert.ok(dangerClass.includes('#B42338'));
-  assert.ok(dangerClass.includes('text-white'));
+  assert.ok(dangerClass.includes('bg-danger'));
+  assert.ok(dangerClass.includes('text-ink'));
   assert.ok(dangerClass.includes('h-8'));
 
   const lgClass = getButtonClass({ variant: 'secondary', size: 'lg' });

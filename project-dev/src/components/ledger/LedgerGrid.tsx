@@ -184,6 +184,7 @@ export function LedgerGrid({
           <div className="flex items-center gap-2">
             <span className="font-sans text-xs font-bold uppercase tracking-wider text-muted">Sort:</span>
             <select
+              aria-label="Sort ledger entries"
               value={currentSort}
               onChange={(e) => handleFilterSort(e.target.value as 'newest' | 'multi')}
               className="h-8 px-2.5 rounded-md bg-surface border border-brand-border/40 text-white font-sans text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand cursor-pointer"
@@ -205,13 +206,13 @@ export function LedgerGrid({
 
       {/* Error state with retry */}
       {error && (
-        <div className="p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center justify-between">
+        <div className="p-3 rounded-md bg-danger/10 border border-danger/30 text-danger text-xs font-mono flex items-center justify-between">
           <span>{error}</span>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => fetchLedger(currentChain, currentSort, 0, false)}
-            className="h-auto p-0 inline-flex items-center gap-1 font-bold text-rose-300 hover:text-white underline"
+            className="h-auto p-0 inline-flex items-center gap-1 font-bold text-danger hover:text-ink underline"
           >
             <RefreshCw className="w-3 h-3" />
             <span>Retry</span>
@@ -220,7 +221,7 @@ export function LedgerGrid({
       )}
 
       {/* Structured Data Table Presentation */}
-      {loading && entries.length === 0 ? (
+      {loading ? (
         <LedgerCardSkeleton />
       ) : entries.length === 0 ? (
         /* Empty State */

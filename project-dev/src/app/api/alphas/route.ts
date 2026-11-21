@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { tierFor, allocationCap, calculateRequiredTokens, MEMBER_USD_TARGET, PRO_USD_TARGET, DEFAULT_GENESIS_USD_PRICE, TIERS, TierId } from '@/lib/tiers';
-import { resolveTier } from '@/server/db';
+import { resolveWalletEntitlement } from '@/server/entitlements';
 import {
   ADMIN_WALLET,
   GENESIS_MINT,
@@ -20,9 +20,8 @@ import {
   withRegistryLock,
   buildCallers,
 } from '@/server/alphas-data';
-import { verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
+import { getAuthSession, verifyAdminAuth, verifyWalletAuth } from '@/server/auth';
 import { clientIp, rateLimit } from '@/server/ratelimit';
-import { readGenesisBalanceCached } from '@/server/genesis';
 import { notifyNewCall, dispatchDelayedMemberCalls } from '@/server/telegram';
 import { getMarketData } from '@/server/market-data';
 import { hydrateAlphaItems } from '@/server/market-view';
@@ -105,12 +104,23 @@ export async function GET(req: NextRequest) {
   const ipLimit = await rateLimit(`get:ip:${clientIp(req)}`, 60, 60);
   if (!ipLimit.ok) return tooMany(ipLimit.retryAfter);
 
+  const hasWalletHeaders = Boolean(
+    req.headers.get('x-wallet') ||
+      req.headers.get('x-signature') ||
+      req.headers.get('x-timestamp')
+  );
   const auth = verifyWalletAuth(req);
-  if (!auth.ok) {
+  let wallet = auth.ok ? auth.wallet : undefined;
+  if (!wallet && !hasWalletHeaders) {
+    const session = await getAuthSession(req);
+    if (session?.wallet) {
+      wallet = session.wallet;
+    }
+  }
+  if (!wallet) {
     return err(401, 'UNAUTHORIZED', auth.error || 'Cryptographic wallet signature authentication required.');
   }
 
-  const wallet = auth.wallet!;
   if (!isBase58Address(wallet)) {
     return err(400, 'BAD_REQUEST', 'Invalid base58 Solana wallet address');
   }
@@ -127,15 +137,12 @@ export async function GET(req: NextRequest) {
       `Only Master Admin (${ADMIN_WALLET}) is authorized for admin scope.`
     );
   }
-  let balance = 0;
-  try {
-    balance = await readGenesisBalanceCached(wallet);
-  } catch {
-    // Fail CLOSED for everyone, admin included
+  const entitlement = await resolveWalletEntitlement(wallet);
+  const balance = entitlement.memberEligibility.balanceTokens;
+  const userTier = entitlement.tier;
+  if (userTier === 'unknown' && !isAdmin) {
     return err(502, 'RPC_UNAVAILABLE', 'Solana RPC unavailable. Retry shortly.');
   }
-
-  const userTier = await resolveTier(wallet);
   if (!isAdmin && userTier === 'free') {
     return NextResponse.json(
       {
@@ -463,9 +470,7 @@ export async function POST(req: NextRequest) {
       callerWinRate: '—',
       deployedVia: 'https://trenchlabshq.xyz',
       spotlightRank: pinned ? 1 : undefined,
-      serialTag:
-        payload.serialTag ||
-        `EXP${String((await loadCallsRegistry()).length + 1).padStart(2, '0')}`,
+      serialTag: payload.serialTag ? String(payload.serialTag).trim() : undefined,
       sparkline: [],
       art: {
         bgFrom: '#161C24',
@@ -479,6 +484,9 @@ export async function POST(req: NextRequest) {
 
     const saveRes = await withRegistryLock(async () => {
       const current = await loadCallsRegistry();
+      if (!newRecord.serialTag) {
+        newRecord.serialTag = `EXP${String(current.length + 1).padStart(2, '0')}`;
+      }
       const updated = [newRecord, ...current];
       return await saveCallsRegistry(updated);
     });
@@ -554,6 +562,15 @@ export async function PATCH(req: NextRequest) {
 
       if (typeof payload.ca === 'string' && payload.ca.trim()) {
         const newCa = payload.ca.trim();
+        if (target.chain === 'SOL' && !isBase58Address(newCa)) {
+          throw new Error('Invalid Solana token contract address format');
+        }
+        if (
+          ['ETH', 'BASE', 'BSC', 'AVAX'].includes(target.chain) &&
+          !/^0x[a-fA-F0-9]{40}$/.test(newCa)
+        ) {
+          throw new Error(`Invalid EVM token contract address for chain ${target.chain}`);
+        }
         target.ca = newCa;
         // Regenerate default DEX links for new CA
         if (target.chain === 'SOL') {
@@ -599,7 +616,11 @@ export async function PATCH(req: NextRequest) {
       }
 
       if (typeof payload.stopLoss === 'string' && payload.stopLoss.trim()) {
-        target.stopLoss = payload.stopLoss.trim().slice(0, 32);
+        const nextSl = payload.stopLoss.trim().slice(0, 32);
+        if (nextSl.startsWith('+') || /^\+?\d+%\s*TP/i.test(nextSl)) {
+          throw new Error('Stop loss cannot be a positive percentage target');
+        }
+        target.stopLoss = nextSl;
       }
 
       if (typeof payload.status === 'string') {

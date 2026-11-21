@@ -32,7 +32,7 @@ export function getButtonClass({
     primary: 'bg-brand text-canvas hover:bg-brand-hover',
     secondary: 'border border-border-default bg-surface-card text-ink hover:border-brand hover:bg-surface-3',
     ghost: 'text-muted hover:bg-surface-card hover:text-ink',
-    danger: 'bg-[#B42338] text-white hover:bg-[#911c2e]',
+    danger: 'bg-danger text-ink hover:bg-danger/85',
   };
 
   return cn(base, sizes[size], variants[variant], className);

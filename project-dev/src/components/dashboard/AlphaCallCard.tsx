@@ -64,18 +64,8 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
   const currentMcDisplay = coin.marketCap || '—';
 
   return (
-    <div
-      tabIndex={0}
-      role="button"
-      aria-label={`Inspect ${coin.name} (${coin.ticker}) call`}
-      onClick={() => onInspect?.(coin)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onInspect?.(coin);
-        }
-      }}
-      className={`group relative rounded-xl bg-surface flex flex-col justify-between h-full cursor-pointer transition-all duration-150 p-4 sm:p-5 focus:outline-none focus-visible:ring-1 focus-visible:ring-alpha-primary shadow-none ${coin.isMaxAlpha
+    <article
+      className={`group relative rounded-xl bg-surface flex flex-col justify-between h-full transition-all duration-150 p-4 sm:p-5 ${coin.isMaxAlpha
         ? 'border border-alpha-strong hover:border-alpha-primary'
         : 'border border-alpha-border hover:border-alpha-primary'
         }`}
@@ -125,7 +115,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             <MarketDataBadge item={coin} />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
+          <div className="relative z-10 flex items-center gap-1.5 shrink-0 text-muted font-mono text-xs">
             <span className="text-alpha-primary font-bold">{serial}</span>
 
             {/* Admin Controls */}
@@ -196,8 +186,15 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             locked={coin.locked}
           />
           <div className="min-w-0 flex-1">
-            <h3 className="font-sans font-extrabold text-base text-white truncate leading-tight group-hover:text-alpha-primary transition-colors">
-              {coin.name}
+            <h3 className="font-sans font-extrabold text-base text-ink truncate leading-tight">
+              <button
+                type="button"
+                aria-label={`Inspect ${coin.name} (${coin.ticker}) call`}
+                onClick={() => onInspect?.(coin)}
+                className="text-left cursor-pointer hover:text-alpha-primary group-hover:text-alpha-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-alpha-primary rounded after:absolute after:inset-0 after:z-0"
+              >
+                {coin.name}
+              </button>
             </h3>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="font-mono text-xs text-alpha-primary font-bold">
@@ -226,7 +223,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-between w-full h-11 min-h-[44px] px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-alpha-border text-white font-sans text-xs font-bold transition-colors"
+            className="relative z-10 inline-flex items-center justify-between w-full h-11 min-h-[44px] px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-alpha-border text-white font-sans text-xs font-bold transition-colors"
           >
             <span className="flex items-center gap-1.5">
               <ExternalLink className="w-3.5 h-3.5 text-alpha-primary" />
@@ -382,7 +379,7 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
               variant="ghost"
               size="sm"
               onClick={handleCopyCa}
-              className="h-auto text-alpha-primary hover:text-white font-bold gap-1 shrink-0 px-2 py-1"
+              className="relative z-10 h-auto text-alpha-primary hover:text-white font-bold gap-1 shrink-0 px-2 py-1"
               aria-label={`Copy ${coin.ticker} contract address`}
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -391,6 +388,6 @@ export const AlphaCallCard: React.FC<AlphaCallCardProps> = ({
           </div>
         ) : null}
       </div>
-    </div>
+    </article>
   );
 };

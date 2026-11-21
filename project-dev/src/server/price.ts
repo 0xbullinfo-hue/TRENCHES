@@ -22,7 +22,7 @@ interface CachedPrice {
 
 let lastGoodPrice: CachedPrice | null = null;
 let lastFailedLookupAt = 0;
-const FAILED_LOOKUP_COOLDOWN_MS = 60_000;
+const FAILED_LOOKUP_COOLDOWN_MS = 10_000;
 
 async function fetchFromJupiter(mint: string, timeoutMs = 3500): Promise<number | null> {
   const ctrl = new AbortController();

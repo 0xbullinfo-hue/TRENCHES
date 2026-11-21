@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, BarChart3, Lock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/components/ui/cn';
 import {
   generateWeeklyPerformanceDigest,
@@ -94,9 +95,18 @@ export const WeeklyPerformanceDigest: React.FC<WeeklyPerformanceDigestProps> = (
       </div>
 
       {loadState === 'loading' && (
-        <p className="font-mono text-xs text-muted" role="status">
-          Loading digest...
-        </p>
+        <div role="status" aria-label="Loading weekly digest" className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <Skeleton className="h-[74px] w-full rounded-lg" />
+            <Skeleton className="h-[74px] w-full rounded-lg" />
+            <Skeleton className="h-[74px] w-full rounded-lg" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+          </div>
+        </div>
       )}
 
       {loadState === 'unavailable' && (

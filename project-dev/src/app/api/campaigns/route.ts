@@ -4,8 +4,8 @@ import {
   getCampaignsWithUserStatus,
   isValidXUrl,
 } from '@/server/campaigns-data';
-import { getAuthSession, verifyAdminAuth } from '@/server/auth';
-import { ADMIN_WALLET, isAdminWallet } from '@/lib/config';
+import { verifyAdminAuth } from '@/server/auth';
+import { ADMIN_WALLET } from '@/lib/config';
 import { clientIp, rateLimit } from '@/server/ratelimit';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +29,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const adminLimit = await rateLimit(`admin:campaigns:${clientIp(req)}`, 30, 60);
+  if (!adminLimit.ok) {
+    return NextResponse.json({ ok: false, error: 'Too many requests' }, { status: 429, headers: NO_STORE });
+  }
+
   const rawBody = await req.text();
   let body: Record<string, unknown> = {};
   try {
@@ -40,16 +45,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Admin authentication check (via cryptographic headers or session)
+  // Strict cryptographic per-request admin auth (no ambient cookie fallback on admin mutations)
   const adminAuth = await verifyAdminAuth(req, rawBody);
   if (!adminAuth.authorized) {
-    const session = await getAuthSession(req);
-    if (!session || !isAdminWallet(session.wallet)) {
-      return NextResponse.json(
-        { ok: false, error: adminAuth.error || 'Unauthorized: Admin access required.' },
-        { status: 401, headers: NO_STORE }
-      );
-    }
+    return NextResponse.json(
+      { ok: false, error: adminAuth.error || 'Unauthorized: Admin signature required.' },
+      { status: 403, headers: NO_STORE }
+    );
   }
 
   const title = typeof body.title === 'string' ? body.title.trim() : '';
