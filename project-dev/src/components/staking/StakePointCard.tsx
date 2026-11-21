@@ -47,7 +47,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted hover:text-white transition-colors"
+              className="text-muted hover:text-white transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
               title="Open StakePoint"
             >
               <ArrowUpRight className="w-4 h-4" />
@@ -69,7 +69,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href="https://stakepoint.app/pools"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-surface-card hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>Explore StakePoint Pools</span>
             <ArrowUpRight className="w-4 h-4 text-brand" />
@@ -108,7 +108,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href={pool.poolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted hover:text-brand transition-colors"
+            className="text-muted hover:text-brand transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             title="Open Pool on StakePoint"
           >
             <ArrowUpRight className="w-4 h-4" />
@@ -179,7 +179,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
             href={pool.poolUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-brand hover:bg-brand-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+            className="w-full sm:w-auto h-11 px-6 rounded-lg bg-brand hover:bg-brand-hover text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>Stake on StakePoint →</span>
           </a>
@@ -191,7 +191,7 @@ export function StakePointCardView({ pools }: StakePointCardViewProps) {
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-brand hover:text-brand-hover inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-bold text-brand hover:text-brand-hover inline-flex items-center gap-1 transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>View all pools →</span>
             </a>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { TabularValue } from '@/components/primitives/TabularValue';
+import { CountValue } from '@/components/primitives/formats';
 import { ArrowUpRight, CheckCircle2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import type { PerformanceCalculationResult } from '@/lib/ledger/performance-stats';
 
@@ -80,7 +80,7 @@ export const PerformanceTrustSection: React.FC = () => {
               <button
                 type="button"
                 onClick={fetchStats}
-                className="h-11 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default text-muted hover:text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="h-11 px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default text-muted hover:text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Retry</span>
@@ -89,7 +89,7 @@ export const PerformanceTrustSection: React.FC = () => {
 
             <Link
               href="/ledger"
-              className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
+              className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-black uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>EXPLORE FULL LEDGER</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -108,7 +108,7 @@ export const PerformanceTrustSection: React.FC = () => {
             <button
               type="button"
               onClick={fetchStats}
-              className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-2 hover:border-brand cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white font-sans text-xs font-bold uppercase inline-flex items-center gap-2 hover:border-brand cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry Request</span>
@@ -138,7 +138,7 @@ export const PerformanceTrustSection: React.FC = () => {
             <div className="pt-2">
               <Link
                 href="/ledger"
-                className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white hover:text-brand font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors"
+                className="px-4 py-2 rounded-lg bg-surface-card border border-border-default text-white hover:text-brand font-sans text-xs font-bold uppercase inline-flex items-center gap-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
               >
                 <span>View Ledger Route</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 TOTAL RECORDED CALLS
               </div>
               <div className="font-sans text-3xl font-black text-white tnum">
-                <TabularValue value={stats.totalRecordedCalls} decimals={0} />
+                <CountValue value={stats.totalRecordedCalls} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Documented incubator entries on public ledger
@@ -166,7 +166,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 <CheckCircle2 className="w-4 h-4 text-brand" />
               </div>
               <div className="font-sans text-3xl font-black text-brand tnum">
-                <TabularValue value={stats.profitableCalls} decimals={0} />
+                <CountValue value={stats.profitableCalls} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Authoritative TP milestone or profitable close
@@ -178,7 +178,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 RECORDED LOSSES / SL
               </div>
               <div className="font-sans text-3xl font-black text-white tnum">
-                <TabularValue value={stats.losses} decimals={0} />
+                <CountValue value={stats.losses} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Authoritative SL invalidation or loss close
@@ -193,7 +193,7 @@ export const PerformanceTrustSection: React.FC = () => {
                 )}
               </div>
               <div className="font-sans text-3xl font-black text-amber tnum">
-                <TabularValue value={stats.openCalls > 0 ? stats.openCalls : 0} decimals={0} />
+                <CountValue value={stats.openCalls > 0 ? stats.openCalls : 0} />
               </div>
               <div className="font-sans text-xs text-muted">
                 Excluded from resolved win-rate denominator

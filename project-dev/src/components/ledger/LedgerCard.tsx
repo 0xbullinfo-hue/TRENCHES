@@ -96,7 +96,7 @@ export function LedgerTableRow({ entry }: { entry: LedgerCardData }) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`View ${tickerFormatted} on DexScreener`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-xs font-sans font-bold text-zinc-300 hover:text-brand transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-surface-elevated border border-border-default hover:border-brand text-xs font-sans font-bold text-zinc-300 hover:text-brand transition-colors cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>View</span>
             <ExternalLink className="w-3 h-3 text-muted group-hover:text-brand transition-colors" />

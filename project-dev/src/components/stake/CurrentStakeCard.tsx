@@ -56,7 +56,7 @@ export function CurrentStakeCard({
             <button
               onClick={onStakeAdditional}
               type="button"
-              className="font-sans text-xs text-muted hover:text-brand underline underline-offset-4 transition-colors"
+              className="font-sans text-xs text-muted hover:text-brand underline underline-offset-4 transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               Stake additional $H42 →
             </button>

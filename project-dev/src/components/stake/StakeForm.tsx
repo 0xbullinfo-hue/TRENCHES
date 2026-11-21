@@ -182,12 +182,12 @@ export function StakeForm({
             value={amountStr}
             onChange={handleInputChange}
             placeholder="250.00"
-            className="w-full min-h-[44px] h-12 pl-8 pr-20 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors outline-none"
+            className="w-full min-h-[44px] h-12 pl-8 pr-20 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-lg text-white font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           />
           <button
             type="button"
             onClick={handleMaxClick}
-            className="absolute right-2 min-h-[36px] px-3 py-1.5 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-brand cursor-pointer uppercase transition-colors"
+            className="absolute right-2 min-h-[36px] px-3 py-1.5 rounded bg-surface hover:bg-surface-3 border border-line font-sans text-2xs font-bold text-brand cursor-pointer uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             Max
           </button>
@@ -229,7 +229,7 @@ export function StakeForm({
               href={stakepointUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>Stake $H42 on StakePoint →</span>
               <ArrowUpRight className="w-4 h-4 stroke-[2.5] shrink-0" />
@@ -250,7 +250,7 @@ export function StakeForm({
               type="button"
               disabled
               aria-disabled="true"
-              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none"
+              className="w-full min-h-[44px] h-12 px-4 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <Lock className="w-4 h-4 shrink-0" />
               <span>Stake $H42 on StakePoint →</span>
@@ -295,7 +295,7 @@ export function StakeForm({
                 ? 'Paste transaction signature...'
                 : 'Staking verification pending pool configuration...'
             }
-            className="flex-1 min-h-[44px] h-11 px-3.5 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-h-[44px] h-11 px-3.5 rounded-lg bg-surface-card border border-line focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
@@ -305,7 +305,7 @@ export function StakeForm({
               isTimelineStepInProgress(timelineStep) ||
               !txSignature.trim()
             }
-            className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0"
+            className="w-full sm:w-auto min-h-[44px] h-11 px-5 rounded-lg bg-surface hover:bg-surface-3 border border-brand/50 hover:border-brand text-brand font-sans text-xs font-extrabold uppercase disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             {isVerifyingSignature || isTimelineStepInProgress(timelineStep)
               ? 'Verifying...'

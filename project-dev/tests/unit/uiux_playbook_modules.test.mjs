@@ -24,6 +24,9 @@ const {
   UsdAmount,
   PnlPercent,
   WalletAddress,
+  CountValue,
+  PercentValue,
+  MetricText,
 } = await import('../../src/components/primitives/formats.tsx');
 const { NextStepCard, TelegramCountdown } = await import(
   '../../src/components/dashboard/NextStepCard.tsx'
@@ -142,7 +145,13 @@ test('formats, NextStepCard, TrustStrip, and skeletons render cleanly with $H42 
       ' | ',
       React.createElement(WalletAddress, {
         value: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
-      })
+      }),
+      ' | ',
+      React.createElement(CountValue, { value: 42 }),
+      ' | ',
+      React.createElement(PercentValue, { value: 75 }),
+      ' | ',
+      React.createElement(MetricText, { value: '$1.4M' })
     )
   );
   assert.ok(fmtView.container.textContent.includes('$0.25'));
@@ -150,6 +159,9 @@ test('formats, NextStepCard, TrustStrip, and skeletons render cleanly with $H42 
   assert.ok(fmtView.container.textContent.includes('$250.00'));
   assert.ok(fmtView.container.textContent.includes('+14.25%'));
   assert.ok(fmtView.container.textContent.includes('FzFu…7p3e'));
+  assert.ok(fmtView.container.textContent.includes('42'));
+  assert.ok(fmtView.container.textContent.includes('75%'));
+  assert.ok(fmtView.container.textContent.includes('$1.4M'));
   await fmtView.cleanup();
 
   let clickedAction = null;

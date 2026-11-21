@@ -6,8 +6,7 @@ import { ArrowUpRight, CheckCircle2, Lock, Sparkles } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { GenesisContext } from '@/context/GenesisContext';
 import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
-import { TabularValue } from '@/components/primitives/TabularValue';
-import { UsdAmount } from '@/components/primitives/formats';
+import { PercentValue, UsdAmount } from '@/components/primitives/formats';
 import { MarketDataBadge } from './MarketDataBadge';
 import {
   toGenesisProvenanceItem,
@@ -134,7 +133,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
             {unlocked || isPro ? 'PRO TIER UNLOCKED' : 'PRO TIER UNLOCK PROGRESS'}
           </span>
           <span className="font-mono text-xs px-2 py-0.5 rounded bg-surface border border-border-default text-brand font-bold">
-            <TabularValue value={percent} decimals={0} suffix="%" />
+            <PercentValue value={percent} />
           </span>
         </div>
 
@@ -182,7 +181,7 @@ export const ProProgressBar: React.FC<ProProgressBarProps> = ({ className, isPro
           </p>
           <Link
             href="/dashboard/stake"
-            className="font-mono text-xs font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 shrink-0 self-start sm:self-auto transition-colors"
+            className="font-mono text-xs font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 shrink-0 self-start sm:self-auto transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>Stake to unlock Pro</span>
             <ArrowUpRight className="w-3.5 h-3.5" />

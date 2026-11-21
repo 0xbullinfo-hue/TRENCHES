@@ -56,7 +56,7 @@ export const MaintenanceScreen: React.FC = () => {
               href={SOCIAL_LINKS.telegram}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <Send className="w-4 h-4 stroke-[2.5]" />
               <span>LIVE TELEGRAM ALERTS</span>
@@ -67,7 +67,7 @@ export const MaintenanceScreen: React.FC = () => {
               href={SOCIAL_LINKS.x}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-brand-border hover:border-brand text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-brand-border hover:border-brand text-white font-sans font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <XIcon className="w-4 h-4 text-brand" />
               <span>UPDATES ON X</span>

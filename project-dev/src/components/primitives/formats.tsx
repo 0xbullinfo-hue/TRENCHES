@@ -57,3 +57,35 @@ export function WalletAddress({ value }: { value: string }) {
     </span>
   );
 }
+
+export function CountValue({
+  value,
+  suffix = '',
+}: {
+  value: bigint | number | string | null | undefined;
+  suffix?: string;
+}) {
+  return <TabularValue value={value} decimals={0} suffix={suffix} />;
+}
+
+export function PercentValue({
+  value,
+  decimals = 0,
+  showSign = false,
+}: {
+  value: bigint | number | string | null | undefined;
+  decimals?: number;
+  showSign?: boolean;
+}) {
+  return <TabularValue value={value} decimals={decimals} showSign={showSign} suffix="%" />;
+}
+
+export function MetricText({
+  value,
+  decimals,
+}: {
+  value: bigint | number | string | null | undefined;
+  decimals?: number;
+}) {
+  return <TabularValue value={value} decimals={decimals} />;
+}

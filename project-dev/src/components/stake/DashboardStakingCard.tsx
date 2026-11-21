@@ -65,7 +65,7 @@ function StakePointActionButton({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={`h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none ${className}`}
+        className={`h-10 sm:h-11 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${className}`}
       >
         <span>{label}</span>
         <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -79,7 +79,7 @@ function StakePointActionButton({
       disabled
       aria-disabled="true"
       title="StakePoint pool and program will be configured after token launch"
-      className={`h-10 sm:h-11 px-6 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none ${className}`}
+      className={`h-10 sm:h-11 px-6 rounded-lg bg-surface-card border border-line text-muted font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 opacity-60 cursor-not-allowed shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${className}`}
     >
       <Lock className="w-3.5 h-3.5" />
       <span>{label}</span>
@@ -348,7 +348,7 @@ export function DashboardStakingCard({
                   href={stakePointPoolUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted hover:text-brand transition-colors"
+                  className="text-muted hover:text-brand transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   title="Open Pool on StakePoint"
                 >
                   <ArrowUpRight className="w-4 h-4" />
@@ -397,7 +397,7 @@ export function DashboardStakingCard({
             />
             <Link
               href="/#choose-your-access"
-              className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center transition-colors cursor-pointer"
+              className="w-full sm:w-auto h-10 sm:h-11 px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default text-white font-sans text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>VIEW TIERS</span>
             </Link>
@@ -449,7 +449,7 @@ export function DashboardStakingCard({
                   href={stakePointPoolUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted hover:text-brand transition-colors"
+                  className="text-muted hover:text-brand transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   title="Open Pool on StakePoint"
                 >
                   <ArrowUpRight className="w-4 h-4" />
@@ -561,7 +561,7 @@ export function DashboardStakingCard({
                 href={stakePointPoolUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted hover:text-brand transition-colors"
+                className="text-muted hover:text-brand transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 title="Open Pool on StakePoint"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -615,7 +615,7 @@ export function DashboardStakingCard({
               href="https://stakepoint.app/pools"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>View all pools →</span>
             </a>

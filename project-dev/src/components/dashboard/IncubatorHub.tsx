@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { AlphaItem, Campaign, Chain, FavoritePostKind } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { TabularValue } from '@/components/primitives/TabularValue';
+import { MetricText } from '@/components/primitives/formats';
 import { TradeWorkspaceSkeleton } from '@/components/skeletons/TradeWorkspaceSkeleton';
 import { toast } from '@/lib/ui/toast';
 import {
@@ -22,8 +22,11 @@ import { AlphaCallCard } from './AlphaCallCard';
 import { MarketDataBadge, compareChangeDesc, formatChangePct } from './MarketDataBadge';
 import { DashboardStakingCard } from '@/components/stake/DashboardStakingCard';
 import { NextStepCard } from '@/components/dashboard/NextStepCard';
+import { NextStepCardSkeleton } from '@/components/dashboard/skeletons/NextStepCardSkeleton';
 import { SignalsGridSkeleton } from '@/components/dashboard/skeletons/SignalsGridSkeleton';
 import { StakeFormSkeleton } from '@/components/dashboard/skeletons/StakeFormSkeleton';
+import { TrustStripSkeleton } from '@/components/dashboard/skeletons/TrustStripSkeleton';
+import { TrustStrip, type TrustMetrics } from '@/components/trust/TrustStrip';
 import { resolveUserState, stateMeta } from '@/lib/state/resolveUserState';
 import { StakeClientView, type InitialStakeData } from '@/components/stake/StakeClientView';
 import { LockedTerminal } from '@/components/LockedTerminal';
@@ -195,6 +198,7 @@ export const IncubatorHub: React.FC = () => {
   const [stakeStatusLoading, setStakeStatusLoading] = useState(false);
   const [stakeStatusError, setStakeStatusError] = useState<string | null>(null);
   const [stakeRequiresAuth, setStakeRequiresAuth] = useState(false);
+  const [trustMetrics, setTrustMetrics] = useState<TrustMetrics | null>(null);
 
   const [inspectedToken, setInspectedToken] = useState<AlphaItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -331,6 +335,27 @@ export const IncubatorHub: React.FC = () => {
       }, 100);
       return () => clearTimeout(timer);
     }
+  }, [currentTab]);
+
+  useEffect(() => {
+    if (currentTab !== 'STAKE') return;
+    let active = true;
+    fetch('/api/ledger/stats', { cache: 'default' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data?.ok || !data?.stats) return;
+        const total = data.stats.totalRecordedCalls;
+        const wr = data.stats.winRate;
+        if (typeof total === 'number' && total > 0 && typeof wr === 'number' && Number.isFinite(wr)) {
+          setTrustMetrics({ signalCount: total, winRate: Math.round(wr) });
+        } else {
+          setTrustMetrics(null);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [currentTab]);
 
   const fetchStakeStatus = useCallback(async () => {
@@ -730,7 +755,7 @@ export const IncubatorHub: React.FC = () => {
                 e.preventDefault();
                 handleSelectTab('STAKE');
               }}
-              className="h-9 px-3.5 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand font-mono text-xs font-bold text-brand inline-flex items-center gap-1.5 transition-colors"
+              className="h-9 px-3.5 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand font-mono text-xs font-bold text-brand inline-flex items-center gap-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>Manage Staking</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -963,35 +988,40 @@ export const IncubatorHub: React.FC = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   <div className="lg:col-span-5 space-y-4">
-                    {(() => {
-                      const resolvedTier =
-                        tier.id === 'PRO' || isAdmin
-                          ? 'pro'
-                          : tier.id === 'LAB_MEMBER'
-                            ? 'member'
-                            : 'free';
-                      const stakeState = resolveUserState({
-                        connected,
-                        needsSignature,
-                        hasActiveSession: isWalletVerified,
-                        tier: resolvedTier,
-                        telegramConnected: resolvedTier === 'pro' || resolvedTier === 'member',
-                        stakeUsd: stakeStatusData?.stake?.amount_usd ?? 0,
-                      });
-                      const meta = stateMeta[stakeState];
-                      if (stakeState === 'pro_active') return null;
-                      return (
-                        <NextStepCard
-                          state={stakeState}
-                          meta={meta}
-                          onAction={(actKey) => {
-                            if (actKey === 'connect') connectWallet();
-                            else if (actKey === 'sign') void requestUnlockSignature();
-                            else if (actKey === 'retry') void refreshAll();
-                          }}
-                        />
-                      );
-                    })()}
+                    <Suspense fallback={<TrustStripSkeleton />}>
+                      <TrustStrip metrics={trustMetrics} />
+                    </Suspense>
+                    <Suspense fallback={<NextStepCardSkeleton />}>
+                      {(() => {
+                        const resolvedTier =
+                          tier.id === 'PRO' || isAdmin
+                            ? 'pro'
+                            : tier.id === 'LAB_MEMBER'
+                              ? 'member'
+                              : 'free';
+                        const stakeState = resolveUserState({
+                          connected,
+                          needsSignature,
+                          hasActiveSession: isWalletVerified,
+                          tier: resolvedTier,
+                          telegramConnected: resolvedTier === 'pro' || resolvedTier === 'member',
+                          stakeUsd: stakeStatusData?.stake?.amount_usd ?? 0,
+                        });
+                        const meta = stateMeta[stakeState];
+                        if (stakeState === 'pro_active') return null;
+                        return (
+                          <NextStepCard
+                            state={stakeState}
+                            meta={meta}
+                            onAction={(actKey) => {
+                              if (actKey === 'connect') connectWallet();
+                              else if (actKey === 'sign') void requestUnlockSignature();
+                              else if (actKey === 'retry') void refreshAll();
+                            }}
+                          />
+                        );
+                      })()}
+                    </Suspense>
                     <ErrorBoundary panelName="StakePoint Pool Card">
                       <DashboardStakingCard showTelegram={false} />
                     </ErrorBoundary>
@@ -1036,7 +1066,7 @@ export const IncubatorHub: React.FC = () => {
                             </Button>
                             <Link
                               href="/dashboard/stake"
-                              className="inline-flex items-center gap-1 text-xs font-mono font-bold text-brand hover:underline"
+                              className="inline-flex items-center gap-1 text-xs font-mono font-bold text-brand hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                             >
                               <span>Full view</span>
                               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1150,21 +1180,23 @@ export const IncubatorHub: React.FC = () => {
 
                 {/* Grid vs Table View */}
                 {activeFilterState.viewMode === 'GRID' ? (
-                  apiLoading && alphas.length === 0 ? (
-                    <SignalsGridSkeleton cols={3} rows={1} />
-                  ) : filteredTokens.length === 0 ? (
-                    <EmptyState
-                      message="No calls match active filters in this workspace."
-                      actionLabel="Clear filters"
-                      onAction={() =>
-                        activeFilterableWorkspace && resetWorkspaceFilters(activeFilterableWorkspace)
-                      }
-                    />
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-                      {filteredTokens.map(renderUserAlphaCard)}
-                    </div>
-                  )
+                  <Suspense fallback={<SignalsGridSkeleton cols={3} rows={1} />}>
+                    {apiLoading && alphas.length === 0 ? (
+                      <SignalsGridSkeleton cols={3} rows={1} />
+                    ) : filteredTokens.length === 0 ? (
+                      <EmptyState
+                        message="No calls match active filters in this workspace."
+                        actionLabel="Clear filters"
+                        onAction={() =>
+                          activeFilterableWorkspace && resetWorkspaceFilters(activeFilterableWorkspace)
+                        }
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+                        {filteredTokens.map(renderUserAlphaCard)}
+                      </div>
+                    )}
+                  </Suspense>
                 ) : apiLoading && alphas.length === 0 ? (
                   <TradeWorkspaceSkeleton rows={6} />
                 ) : (
@@ -1282,13 +1314,13 @@ export const IncubatorHub: React.FC = () => {
 
                                 <td className="py-3.5 px-4 text-right font-mono tnum">
                                   <div className="font-bold text-white text-sm">
-                                    <TabularValue value={token.entryMarketCap || null} />
+                                    <MetricText value={token.entryMarketCap || null} />
                                   </div>
                                 </td>
 
                                 <td className="py-3.5 px-4 text-right font-mono tnum">
                                   <div className="font-black text-brand-bright text-sm">
-                                    <TabularValue value={token.marketCap || null} />
+                                    <MetricText value={token.marketCap || null} />
                                   </div>
                                 </td>
 
@@ -1328,7 +1360,7 @@ export const IncubatorHub: React.FC = () => {
                                         e.stopPropagation();
                                         toggleWatchlist(token.id);
                                       }}
-                                      className="h-8 w-8 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default inline-flex items-center justify-center cursor-pointer"
+                                      className="h-8 w-8 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default inline-flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                                       title="Toggle Watchlist"
                                     >
                                       <Star
@@ -1341,7 +1373,7 @@ export const IncubatorHub: React.FC = () => {
                                       target="_blank"
                                       rel="noreferrer"
                                       onClick={(e) => e.stopPropagation()}
-                                      className="h-8 inline-flex items-center gap-1 px-3 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-extrabold"
+                                      className="h-8 inline-flex items-center gap-1 px-3 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-extrabold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                                     >
                                       <span>Market</span>
                                       <ExternalLink className="w-3.5 h-3.5 text-brand" />
@@ -1427,14 +1459,14 @@ export const IncubatorHub: React.FC = () => {
                                 className={`text-sm font-bold ${coin.change24hPct !== null && coin.change24hPct < 0 ? 'text-danger' : 'text-brand'
                                   }`}
                               >
-                                <TabularValue value={formatChangePct(coin.change24hPct)} />
+                                <MetricText value={formatChangePct(coin.change24hPct)} />
                               </div>
                               <a
                                 href={marketUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 text-xs text-brand hover:underline mt-1 font-bold"
+                                className="inline-flex items-center gap-1 text-xs text-brand hover:underline mt-1 font-bold rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                               >
                                 <span>Open Market</span>
                                 <ExternalLink className="w-3 h-3" />

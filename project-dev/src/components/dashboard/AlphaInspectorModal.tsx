@@ -529,7 +529,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     href={BUY_LINKS.pump}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-9 px-4 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
+                    className="h-9 px-4 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   >
                     <span>Buy $H42 on Pump.fun</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -597,7 +597,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                     href={primaryMarketUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-10 px-5 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5"
+                    className="h-10 px-5 rounded-md bg-brand hover:bg-brand-hover text-canvas font-sans text-xs font-extrabold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   >
                     <span>Open {token.ticker} Market</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -609,7 +609,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       href={link.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="h-10 px-4 rounded-md bg-surface hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center gap-1.5"
+                      className="h-10 px-4 rounded-md bg-surface hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                     >
                       <span>{link.label}</span>
                       <ExternalLink className="w-3 h-3 text-brand" />
@@ -625,7 +625,7 @@ export const AlphaInspectorModal: React.FC<AlphaInspectorModalProps> = ({
                       }
                       target="_blank"
                       rel="noreferrer"
-                      className="h-10 px-4 rounded-md bg-surface hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center gap-1.5"
+                      className="h-10 px-4 rounded-md bg-surface hover:bg-surface-3 border border-line text-white font-sans text-xs font-bold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                     >
                       <span>{chainMeta.explorerName}</span>
                       <ExternalLink className="w-3 h-3 text-muted" />

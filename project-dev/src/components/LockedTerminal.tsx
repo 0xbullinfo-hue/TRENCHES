@@ -241,7 +241,7 @@ export const LockedTerminal: React.FC = () => {
                 href={SOLSCAN.token(GENESIS_MINT)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-brand hover:underline truncate tnum"
+                className="font-mono text-brand hover:underline truncate tnum rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
               >
                 {GENESIS_MINT}
               </a>
@@ -282,7 +282,7 @@ export const LockedTerminal: React.FC = () => {
                 href={BUY_LINKS.pump}
                 target="_blank"
                 rel="noreferrer"
-                className="h-12 min-h-[44px] px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
+                className="h-12 min-h-[44px] px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
               >
                 <span>Buy $H42 on Pump.fun</span>
                 <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -291,7 +291,7 @@ export const LockedTerminal: React.FC = () => {
 
             <Link
               href="/dashboard/stake"
-              className="h-12 min-h-[44px] px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors"
+              className="h-12 min-h-[44px] px-5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-black uppercase inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <Sparkles className="w-3.5 h-3.5 text-brand" />
               <span>Stake on StakePoint</span>

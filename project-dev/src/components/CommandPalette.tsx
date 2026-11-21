@@ -296,7 +296,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 placeholder="Search calls (token, CA, chain) or jump to page..."
                 aria-label="Command palette search"
                 data-testid="command-palette-input"
-                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder:text-dim focus:outline-none font-sans"
+                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder:text-dim focus:outline-none focus-visible:ring-1 focus-visible:ring-brand/60 rounded font-sans"
               />
               {localQuery && (
                 <Button

@@ -150,7 +150,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
               href={BUY_LINKS.pump}
               target="_blank"
               rel="noreferrer"
-              className="font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 mt-1 text-xs"
+              className="font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 mt-1 text-xs rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>Get $H42</span>
               <ExternalLink className="w-3 h-3" />
@@ -175,7 +175,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
           {!step3Done && (
             <Link
               href="/dashboard/stake"
-              className="font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 mt-1 text-xs"
+              className="font-bold text-brand hover:text-brand-bright inline-flex items-center gap-1 mt-1 text-xs rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <span>Stake on StakePoint</span>
               <ArrowRight className="w-3 h-3" />

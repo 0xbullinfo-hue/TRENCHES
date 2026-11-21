@@ -109,7 +109,7 @@ export function TelegramStatusBanner() {
           <TelegramConnectButton compact onConnected={() => setStatus((prev) => prev ? { ...prev, telegram: { connected: true } } : null)} />
           <button
             onClick={handleDismiss}
-            className="text-muted hover:text-white p-1 rounded-md transition-colors"
+            className="text-muted hover:text-white p-1 rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             aria-label="Dismiss Telegram banner"
             title="Dismiss banner for this session"
           >

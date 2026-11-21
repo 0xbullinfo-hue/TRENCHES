@@ -210,7 +210,7 @@ export async function TierSection() {
                     href={BUY_LINKS.pump}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full h-12 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                    className="w-full h-12 px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   >
                     <span>BUY $H42 ON PUMP.FUN</span>
                     <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -221,7 +221,7 @@ export async function TierSection() {
                   href={communityUrl || SOCIAL_LINKS.telegram}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-11 px-6 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none"
+                  className="w-full h-11 px-6 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-extrabold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 >
                   <Send className="w-4 h-4 text-brand" />
                   <span>JOIN TELEGRAM</span>

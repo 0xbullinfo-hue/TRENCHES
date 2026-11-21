@@ -177,7 +177,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
           <button
             type="button"
             onClick={onVerifyClick}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-surface border border-brand text-brand hover:bg-surface-3 font-sans text-xs sm:text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-surface border border-brand text-brand hover:bg-surface-3 font-sans text-xs sm:text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>VERIFY WALLET OWNERSHIP</span>
           </button>
@@ -186,7 +186,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
           <button
             type="button"
             onClick={onUpgradeClick}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>{content.ctaLabel}</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />
@@ -194,7 +194,7 @@ export const MembershipRestrictionScreen: React.FC<MembershipRestrictionScreenPr
         ) : (
           <Link
             href={content.ctaHref}
-            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] px-8 py-3 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans text-xs sm:text-sm font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <span>{content.ctaLabel}</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />

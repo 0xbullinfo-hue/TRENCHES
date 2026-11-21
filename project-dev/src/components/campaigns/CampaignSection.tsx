@@ -158,7 +158,7 @@ export const CampaignSection: React.FC<CampaignSectionProps> = ({
         <button
           type="button"
           onClick={handleRefresh}
-          className="inline-flex items-center gap-1 text-xs font-mono text-raid-primary hover:text-raid-strong self-start sm:self-auto cursor-pointer transition-colors"
+          className="inline-flex items-center gap-1 text-xs font-mono text-raid-primary hover:text-raid-strong self-start sm:self-auto cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 rounded"
           title="Refresh campaigns"
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />

@@ -96,7 +96,7 @@ export const HeroTerminal: React.FC = () => {
                   href={communityUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full h-12 sm:h-[54px] px-6 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-sm sm:text-base tracking-wide uppercase flex items-center justify-center gap-2.5 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 >
                   <Send className="w-4 h-4 fill-current" />
                   <span>JOIN THE SOFT LAUNCH</span>
@@ -113,7 +113,7 @@ export const HeroTerminal: React.FC = () => {
                   href={SOCIAL_LINKS.x}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 >
                   <XIcon className="w-4 h-4 text-brand shrink-0" />
                   <span>FOLLOW ON X</span>
@@ -129,7 +129,7 @@ export const HeroTerminal: React.FC = () => {
                     href={BUY_LINKS.pump}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    className="h-12 min-h-[44px] px-3 sm:px-4 rounded-lg bg-surface hover:bg-surface-card border border-border-default hover:border-brand text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   >
                     <span className="text-brand">⚡</span>
                     <span>VIEW $H42</span>

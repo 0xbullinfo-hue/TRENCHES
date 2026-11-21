@@ -25,7 +25,7 @@ export default function NotFound() {
 
         <Link
           href="/"
-          className="w-full h-11 px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors"
+          className="w-full h-11 px-5 rounded-lg bg-brand hover:bg-brand-bright text-canvas font-sans font-black text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
         >
           <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
           <span>RETURN TO BASE</span>

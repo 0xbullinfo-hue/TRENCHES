@@ -143,7 +143,7 @@ export const PipelineGrid: React.FC = () => {
 
           <Link
             href="/ledger"
-            className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0"
+            className="self-start md:self-auto h-11 px-5 rounded-lg bg-surface hover:bg-surface-card border border-brand text-white hover:text-brand font-sans text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             <ShieldCheck className="w-4 h-4 text-brand" />
             <span>VIEW FULL PERFORMANCE LEDGER</span>
@@ -214,7 +214,7 @@ export const PipelineGrid: React.FC = () => {
                       <button
                         type="button"
                         onClick={(e) => handleCopyCa(token.contractAddress, e)}
-                        className="text-brand hover:text-brand-bright font-sans text-[11px] font-bold uppercase inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                        className="text-brand hover:text-brand-bright font-sans text-[11px] font-bold uppercase inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                         title="Copy Contract Address"
                         aria-label={`Copy ${token.name} contract address`}
                       >
@@ -270,7 +270,7 @@ export const PipelineGrid: React.FC = () => {
                     href={token.dexUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-extrabold uppercase inline-flex items-center justify-center gap-1.5 transition-colors"
+                    className="w-full h-10 px-4 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-extrabold uppercase inline-flex items-center justify-center gap-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   >
                     <span>VIEW ON DEXSCREENER</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-brand" />

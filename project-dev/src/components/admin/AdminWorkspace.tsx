@@ -547,7 +547,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/admin/ledger"
-              className="h-9 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+              className="h-9 px-3.5 rounded-lg bg-surface-card hover:bg-surface-3 border border-border-default hover:border-brand text-white font-sans text-xs font-bold inline-flex items-center gap-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
             >
               <BookOpen className="w-3.5 h-3.5 text-brand" />
               <span>Performance Ledger Admin</span>
@@ -614,7 +614,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
             type="button"
             data-testid="admin-subtab-content"
             onClick={() => setSubTab('CONTENT')}
-            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer ${
+            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
               subTab === 'CONTENT'
                 ? 'bg-brand text-canvas font-black'
                 : 'bg-surface-card text-muted hover:text-white border border-border-default'
@@ -628,7 +628,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
             type="button"
             data-testid="admin-subtab-editor"
             onClick={() => setSubTab('EDITOR')}
-            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer ${
+            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
               subTab === 'EDITOR'
                 ? 'bg-brand text-canvas font-black'
                 : 'bg-surface-card text-muted hover:text-white border border-border-default'
@@ -642,7 +642,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
             type="button"
             data-testid="admin-subtab-campaigns"
             onClick={() => setSubTab('CAMPAIGNS')}
-            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer ${
+            className={`h-9 px-4 rounded-lg font-sans text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
               subTab === 'CAMPAIGNS'
                 ? 'bg-brand text-canvas font-black'
                 : 'bg-surface-card text-muted hover:text-white border border-border-default'
@@ -676,7 +676,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                       type="button"
                       data-testid={`admin-status-tab-${tab.id.toLowerCase()}`}
                       onClick={() => setStatusFilter(tab.id)}
-                      className={`h-8 px-3 rounded-md font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-xs whitespace-nowrap ${
+                      className={`h-8 px-3 rounded-md font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-xs whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                         active ? 'bg-brand text-canvas' : 'text-muted hover:text-white'
                       }`}
                     >
@@ -702,7 +702,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search posts (ticker, CA, caller)..."
-                    className="w-full h-9 pl-8 pr-3 rounded-lg bg-surface border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                    className="w-full h-9 pl-8 pr-3 rounded-lg bg-surface border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
 
@@ -710,7 +710,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   aria-label="Filter by destination"
                   value={destFilter}
                   onChange={(e) => setDestFilter(e.target.value as DestinationFilter)}
-                  className="h-9 px-2.5 rounded-lg bg-surface border border-border-default font-sans text-xs text-white cursor-pointer"
+                  className="h-9 px-2.5 rounded-lg bg-surface border border-border-default font-sans text-xs text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 >
                   <option value="ALL">All Destinations</option>
                   <option value="ALPHA">Alpha Calls</option>
@@ -722,7 +722,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   aria-label="Filter by chain"
                   value={chainFilter}
                   onChange={(e) => setChainFilter(e.target.value as Chain | 'ALL')}
-                  className="h-9 px-2.5 rounded-lg bg-surface border border-border-default font-mono text-xs text-white cursor-pointer"
+                  className="h-9 px-2.5 rounded-lg bg-surface border border-border-default font-mono text-xs text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 >
                   <option value="ALL">All Chains</option>
                   {CHAINS.map((c) => (
@@ -816,7 +816,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                               type="button"
                               onClick={() => onSetOutcome(item.id, 'PROFIT')}
                               title="Mark Profit"
-                              className={`h-7 px-2 rounded border font-mono text-[11px] font-bold cursor-pointer transition-colors ${
+                              className={`h-7 px-2 rounded border font-mono text-[11px] font-bold cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                                 item.outcome === 'PROFIT'
                                   ? 'bg-brand text-canvas border-brand'
                                   : 'bg-surface-card border-border-default text-muted hover:text-brand'
@@ -829,7 +829,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                               type="button"
                               onClick={() => onSetOutcome(item.id, 'LOSS')}
                               title="Mark Loss"
-                              className={`h-7 px-2 rounded border font-mono text-[11px] font-bold cursor-pointer transition-colors ${
+                              className={`h-7 px-2 rounded border font-mono text-[11px] font-bold cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                                 item.outcome === 'LOSS'
                                   ? 'bg-danger text-white border-danger'
                                   : 'bg-surface-card border-border-default text-muted hover:text-danger'
@@ -862,7 +862,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                               onClick={() => onInspect(item)}
                               title="Preview Details"
                               aria-label={`Preview ${item.ticker}`}
-                              className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-brand text-muted hover:text-white inline-flex items-center justify-center cursor-pointer"
+                              className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-brand text-muted hover:text-white inline-flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
@@ -871,7 +871,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                               onClick={() => handleStartEdit(item)}
                               title="Edit Call"
                               aria-label={`Edit ${item.ticker}`}
-                              className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-brand text-muted hover:text-brand inline-flex items-center justify-center cursor-pointer"
+                              className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-brand text-muted hover:text-brand inline-flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
@@ -881,7 +881,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                               onClick={() => onTogglePin(item.id, !item.pinned)}
                               title={item.pinned ? 'Unpin' : 'Pin Priority'}
                               aria-label={`Toggle Pin ${item.ticker}`}
-                              className={`h-7 w-7 rounded border inline-flex items-center justify-center cursor-pointer ${
+                              className={`h-7 w-7 rounded border inline-flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                                 item.pinned
                                   ? 'bg-brand text-canvas border-brand'
                                   : 'border-border-default bg-surface-card text-muted hover:text-white'
@@ -895,7 +895,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => handleLifecycleChange(item, 'PUBLISHED')}
-                                className="h-7 px-2.5 rounded bg-brand hover:bg-brand-bright text-canvas font-sans text-[11px] font-black uppercase cursor-pointer disabled:opacity-50"
+                                className="h-7 px-2.5 rounded bg-brand hover:bg-brand-bright text-canvas font-sans text-[11px] font-black uppercase cursor-pointer disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                               >
                                 Publish
                               </button>
@@ -906,7 +906,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                                   disabled={isBusy}
                                   onClick={() => handleLifecycleChange(item, 'DRAFT')}
                                   title="Unpublish to Drafts"
-                                  className="h-7 px-2 rounded border border-border-default bg-surface-card hover:border-amber text-muted hover:text-amber font-sans text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                                  className="h-7 px-2 rounded border border-border-default bg-surface-card hover:border-amber text-muted hover:text-amber font-sans text-[11px] font-bold cursor-pointer disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                                 >
                                   Draft
                                 </button>
@@ -915,7 +915,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                                   disabled={isBusy}
                                   onClick={() => handleLifecycleChange(item, 'ARCHIVED')}
                                   title="Archive Call"
-                                  className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-amber text-muted hover:text-amber inline-flex items-center justify-center cursor-pointer disabled:opacity-50"
+                                  className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-amber text-muted hover:text-amber inline-flex items-center justify-center cursor-pointer disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                                 >
                                   <Archive className="w-3.5 h-3.5" />
                                 </button>
@@ -927,7 +927,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => handleDeleteRow(item)}
-                                className="h-7 px-2 rounded bg-danger text-white font-sans text-[11px] font-black cursor-pointer"
+                                className="h-7 px-2 rounded bg-danger text-white font-sans text-[11px] font-black cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                               >
                                 Confirm
                               </button>
@@ -938,7 +938,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                                 onClick={() => setConfirmDeleteId(item.id)}
                                 title="Delete Call"
                                 aria-label={`Delete ${item.ticker}`}
-                                className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-danger text-muted hover:text-danger inline-flex items-center justify-center cursor-pointer"
+                                className="h-7 w-7 rounded border border-border-default bg-surface-card hover:border-danger text-muted hover:text-danger inline-flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1007,7 +1007,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formCa}
                   onChange={(e) => setFormCa(e.target.value)}
                   placeholder="Paste Solana or EVM token contract address..."
-                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  className="flex-1 h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
                 <Button
                   type="button"
@@ -1035,7 +1035,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Synapse Labs"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1049,7 +1049,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formTicker}
                   onChange={(e) => setFormTicker(e.target.value)}
                   placeholder="e.g. $SYN"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1061,7 +1061,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   id="admin-form-chain"
                   value={formChain}
                   onChange={(e) => setFormChain(e.target.value as Chain)}
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white cursor-pointer focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   {CHAINS.map((c) => (
                     <option key={c} value={c}>{c}</option>
@@ -1082,7 +1082,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formEntryMc}
                   onChange={(e) => setFormEntryMc(e.target.value)}
                   placeholder="$250K"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1096,7 +1096,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formCurrentMc}
                   onChange={(e) => setFormCurrentMc(e.target.value)}
                   placeholder="$250K"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1111,7 +1111,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   max={5}
                   value={formRiskLevel}
                   onChange={(e) => setFormRiskLevel(Number(e.target.value))}
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1125,7 +1125,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formStopLoss}
                   onChange={(e) => setFormStopLoss(e.target.value)}
                   placeholder="-25% SL"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1139,7 +1139,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formTakeProfits}
                   onChange={(e) => setFormTakeProfits(e.target.value)}
                   placeholder="2x, 5x, 10x"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1151,7 +1151,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   id="admin-form-category"
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value as AlphaCategory)}
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white cursor-pointer focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -1171,7 +1171,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formCaller}
                   onChange={(e) => setFormCaller(e.target.value)}
                   placeholder="@TrenchLabsAdmin"
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
@@ -1185,7 +1185,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   value={formSerialTag}
                   onChange={(e) => setFormSerialTag(e.target.value)}
                   placeholder={nextSerialTag}
-                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-mono text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
             </div>
@@ -1200,7 +1200,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                 value={formSummary}
                 onChange={(e) => setFormSummary(e.target.value)}
                 placeholder="Catalyst summary, on-chain flow metrics, and key invalidation notes..."
-                className="w-full p-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none"
+                className="w-full p-3 rounded-lg bg-surface-card border border-border-default focus:border-brand font-sans text-xs text-white placeholder:text-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
             </div>
 
@@ -1221,7 +1221,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   data-testid="dest-select-alpha"
                   aria-pressed={formDestinations.includes('ALPHA')}
                   onClick={() => toggleDestination('ALPHA')}
-                  className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer ${
+                  className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                     formDestinations.includes('ALPHA')
                       ? 'bg-purple-950/35 border-purple-500 text-white'
                       : 'bg-surface-card border-border-default text-muted hover:text-white'
@@ -1247,7 +1247,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   data-testid="dest-select-max-alpha"
                   aria-pressed={formDestinations.includes('MAX_ALPHA')}
                   onClick={() => toggleDestination('MAX_ALPHA')}
-                  className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer ${
+                  className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
                     formDestinations.includes('MAX_ALPHA')
                       ? 'bg-amber-950/35 border-amber-500 text-white'
                       : 'bg-surface-card border-border-default text-muted hover:text-white'
@@ -1285,7 +1285,7 @@ export const AdminWorkspace: React.FC<AdminWorkspaceProps> = ({
                   type="checkbox"
                   checked={formPinned}
                   onChange={(e) => setFormPinned(e.target.checked)}
-                  className="w-4 h-4 rounded border-border-default text-brand"
+                  className="w-4 h-4 rounded border-border-default text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 />
                 <Pin className="w-3.5 h-3.5 text-brand" />
                 <span>Pin Priority to Top</span>

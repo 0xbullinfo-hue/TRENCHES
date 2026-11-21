@@ -57,7 +57,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => reset()}
-            className="w-full h-11 px-5 rounded-lg bg-[var(--ge-brand)] hover:bg-[var(--ge-brand-hover)] text-[#0A0E13] font-sans font-black text-xs inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            className="w-full h-11 px-5 rounded-lg bg-[var(--ge-brand)] hover:bg-[var(--ge-brand-hover)] text-[#0A0E13] font-sans font-black text-xs inline-flex items-center justify-center gap-2 cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ge-brand)] focus-visible:outline-offset-2"
           >
             <RefreshCw className="w-4 h-4 stroke-[2.5]" />
             <span>Reset lab environment</span>

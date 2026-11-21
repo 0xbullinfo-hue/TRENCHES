@@ -23,7 +23,7 @@ export function StakeSuccessToast({
       <span className="font-sans text-sm font-semibold">{message}</span>
       <button
         onClick={onClose}
-        className="ml-2 text-muted hover:text-white transition-colors"
+        className="ml-2 text-muted hover:text-white transition-colors rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
         aria-label="Close notification"
       >
         <X className="w-4 h-4" />

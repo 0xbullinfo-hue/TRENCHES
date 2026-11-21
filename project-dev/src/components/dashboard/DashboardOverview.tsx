@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { TabularValue } from '@/components/primitives/TabularValue';
+import { CountValue, TokenAmount } from '@/components/primitives/formats';
 import { LaunchLockedButton } from '@/components/LaunchLockedButton';
 import { BUY_LINKS, BUY_LOCK } from '@/lib/config';
 import type {
@@ -288,7 +288,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span className="text-brand font-mono text-[11px]">$H42</span>
             </div>
             <div className="text-white font-black text-sm tnum">
-              <TabularValue value={formattedBalance} suffix=" $H42" />
+              <TokenAmount value={formattedBalance} />
             </div>
           </div>
 
@@ -348,7 +348,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">Active Calls</div>
               <div className="text-sm font-black text-white tnum">
-                <TabularValue value={alphasCount} decimals={0} />
+                <CountValue value={alphasCount} />
               </div>
             </div>
             <Target className="w-4 h-4 text-alpha-primary shrink-0" />
@@ -367,7 +367,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">New Calls</div>
               <div className="text-sm font-black text-brand tnum">
-                <TabularValue value={newCallsCount} decimals={0} />
+                <CountValue value={newCallsCount} />
               </div>
             </div>
             <Sparkles className="w-4 h-4 text-brand shrink-0" />
@@ -383,7 +383,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">Active Raids</div>
               <div className="text-sm font-black text-raid-primary tnum">
-                <TabularValue value={raidsCount} decimals={0} />
+                <CountValue value={raidsCount} />
               </div>
             </div>
             <Gift className="w-4 h-4 text-raid-primary shrink-0" />
@@ -401,7 +401,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div>
               <div className="text-[10px] text-muted uppercase font-bold">My Pinned Posts</div>
               <div className="text-sm font-black text-amber tnum">
-                <TabularValue value={accessiblePinnedCount} decimals={0} />
+                <CountValue value={accessiblePinnedCount} />
               </div>
             </div>
             <Star className="w-4 h-4 text-amber shrink-0" />

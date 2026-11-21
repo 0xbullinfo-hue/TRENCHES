@@ -156,7 +156,7 @@ export function TelegramAlerts() {
           <button
             type="button"
             onClick={stop}
-            className="text-muted hover:text-danger text-[11px] underline cursor-pointer"
+            className="text-muted hover:text-danger text-[11px] underline cursor-pointer rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
           >
             Turn off
           </button>
@@ -166,7 +166,7 @@ export function TelegramAlerts() {
           type="button"
           onClick={start}
           disabled={!publicKeyBase58 || status === 'working' || status === 'waiting'}
-          className="w-full h-9 rounded bg-surface-card hover:bg-brand hover:text-canvas border border-line font-sans text-xs font-bold text-brand flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default"
+          className="w-full h-9 rounded bg-surface-card hover:bg-brand hover:text-canvas border border-line font-sans text-xs font-bold text-brand flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
         >
           <Send className="w-3.5 h-3.5" />
           <span>
