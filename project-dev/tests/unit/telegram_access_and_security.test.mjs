@@ -816,3 +816,115 @@ test('Delayed fan-out durable per-subscriber receipts prevent duplicate delivery
   assert.equal(budgetSent.length, 22);
   assert.equal(new Set(budgetSent).size, 22, 'Every subscriber must receive exactly one delayed message across budget retry');
 });
+
+// ============================================================================
+// 8. Persistent Notification Preferences (Route, Status, and Alert Filtering)
+// ============================================================================
+test('Section C: Notification preferences persist across routes and filter new calls, TP, SL, and chains', async () => {
+  const prefWallet = 'PrefWalletPro1111111111111111111111111111111';
+  const chatId = '97701';
+  await seedStake(prefWallet, '3000000000000', 90);
+  await db.upsertTelegramMember({
+    wallet_address: prefWallet,
+    telegram_user_id: 97701,
+    tier: 'pro',
+    in_group: true,
+    group_status: 'joined',
+  });
+  await db.setTelegramNotificationStatus(prefWallet, 'enabled', {
+    telegram_user_id: 97701,
+    telegram_chat_id: chatId,
+  });
+
+  // Invalid empty payload rejects cleanly
+  const badRes = await notifRoute.POST(
+    new NextRequest('http://localhost/api/verification/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: sessionCookieFor(prefWallet) },
+      body: JSON.stringify({}),
+    })
+  );
+  assert.equal(badRes.status, 400);
+
+  // Update preferences via API: allow only SOL & BASE chains, disable TP alerts
+  const saveRes = await notifRoute.POST(
+    new NextRequest('http://localhost/api/verification/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: sessionCookieFor(prefWallet) },
+      body: JSON.stringify({
+        preferences: { new_calls: true, tp_alerts: false, sl_alerts: true, chains: ['SOL', 'base'] },
+      }),
+    })
+  );
+  assert.equal(saveRes.status, 200);
+  const saveJson = await saveRes.json();
+  assert.deepEqual(saveJson.preferences, {
+    new_calls: true,
+    tp_alerts: false,
+    sl_alerts: true,
+    chains: ['SOL', 'BASE'],
+  });
+
+  // Status route exposes saved preferences
+  const statusRes = await statusRoute.GET(
+    new NextRequest('http://localhost/api/verification/status', {
+      headers: { Cookie: sessionCookieFor(prefWallet) },
+    })
+  );
+  assert.equal(statusRes.status, 200);
+  const statusJson = await statusRes.json();
+  assert.deepEqual(statusJson.telegram.notifications.preferences, {
+    new_calls: true,
+    tp_alerts: false,
+    sl_alerts: true,
+    chains: ['SOL', 'BASE'],
+  });
+
+  const ethCall = {
+    id: 'pref-eth-1',
+    name: 'EthToken',
+    ticker: 'ETHX',
+    chain: 'ETH',
+    ca: '0x1111111111111111111111111111111111111111',
+    entryMarketCap: '$200K',
+    risk: 3,
+    stopLoss: '-20% SL',
+    takeProfits: [{ label: '2x', multiple: 2, hit: false }],
+    minTier: 'PRO',
+    isMaxAlpha: true,
+  };
+  const solCall = { ...ethCall, id: 'pref-sol-1', ticker: 'SOLX', chain: 'SOL' };
+  const baseCall = { ...ethCall, id: 'pref-base-1', ticker: 'BASEX', chain: 'BASE' };
+
+  const beforeEth = mockState.sentMessages.length;
+  await tg.notifyNewCall(ethCall);
+  assert.equal(
+    mockState.sentMessages.slice(beforeEth).some((m) => String(m.chat_id) === chatId),
+    false,
+    'Excluded ETH chain must not be delivered'
+  );
+
+  const beforeSol = mockState.sentMessages.length;
+  await tg.notifyNewCall(solCall);
+  assert.equal(
+    mockState.sentMessages.slice(beforeSol).some((m) => String(m.chat_id) === chatId),
+    true,
+    'Allowed SOL chain new call must be delivered'
+  );
+
+  const beforeTp = mockState.sentMessages.length;
+  await tg.notifyTpTriggered(solCall, '2x', '$400K');
+  assert.equal(
+    mockState.sentMessages.slice(beforeTp).some((m) => String(m.chat_id) === chatId),
+    false,
+    'Disabled tp_alerts must suppress TP alert'
+  );
+
+  const beforeSl = mockState.sentMessages.length;
+  await tg.notifySlTriggered(baseCall, '$120K');
+  assert.equal(
+    mockState.sentMessages.slice(beforeSl).some((m) => String(m.chat_id) === chatId),
+    true,
+    'Enabled sl_alerts on allowed BASE chain must be delivered'
+  );
+});

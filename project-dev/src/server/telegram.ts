@@ -1,6 +1,13 @@
 import crypto from 'crypto';
 import { isAdminWallet } from '@/lib/config';
-import type { GroupStatus, UserTier } from '@/lib/telegram-types';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  normalizeAlertChain,
+  normalizeNotificationPreferences,
+  type GroupStatus,
+  type NotificationPreferences,
+  type UserTier,
+} from '@/lib/telegram-types';
 import {
   KV_CONFIGURED,
   isKvConfigured,
@@ -1549,6 +1556,40 @@ export async function getActiveNotificationSubscribers(): Promise<Record<string,
   return merged;
 }
 
+export type NotificationEventKind = 'new_calls' | 'tp_alerts' | 'sl_alerts';
+
+/** Checks whether a subscriber's saved alert preferences allow delivery for this event and chain. */
+export function shouldDeliverCallNotification(
+  preferences: NotificationPreferences | null | undefined,
+  eventKind: NotificationEventKind,
+  chain?: string | null
+): boolean {
+  if (!preferences) return true;
+  if (preferences[eventKind] === false) return false;
+  if (Array.isArray(preferences.chains) && preferences.chains.length > 0) {
+    const normalizedCallChain = normalizeAlertChain(chain);
+    if (!normalizedCallChain) return false;
+    return preferences.chains.some((c) => normalizeAlertChain(c) === normalizedCallChain);
+  }
+  return true;
+}
+
+async function loadSubscriberPreferencesMap(): Promise<Map<string, NotificationPreferences>> {
+  const map = new Map<string, NotificationPreferences>();
+  try {
+    const { loadDb } = await import('@/server/db');
+    const db = await loadDb();
+    for (const m of db.telegram_members || []) {
+      if (m.wallet_address && m.notification_preferences) {
+        map.set(m.wallet_address, normalizeNotificationPreferences(m.notification_preferences));
+      }
+    }
+  } catch {
+    // Allow KV-only mocked tests to default safely
+  }
+  return map;
+}
+
 // ---------- fan-out ----------
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1737,6 +1778,7 @@ export async function dispatchDelayedMemberCalls(
     }
 
     const subs = Object.entries(await getSubsFn());
+    const prefsByWallet = await loadSubscriberPreferencesMap();
     const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${siteUrl}/dashboard` }]] };
     const BATCH = 20;
     let dispatchedCount = 0;
@@ -1806,6 +1848,11 @@ export async function dispatchDelayedMemberCalls(
               const tier = await resolveTierFn(wallet);
               // Only deliver to verified Member tier holders ($20+ held); never unknown/free
               if (tier !== 'member') return;
+              const subPrefs = prefsByWallet.get(wallet) ?? DEFAULT_NOTIFICATION_PREFERENCES;
+              if (!shouldDeliverCallNotification(subPrefs, 'new_calls', item.call.chain)) {
+                await recordDurableReceipt(wallet);
+                return;
+              }
 
               const res = await sendFn(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
               if (res.ok) {
@@ -1864,6 +1911,7 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
   const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await getActiveNotificationSubscribers());
+  const prefsByWallet = await loadSubscriberPreferencesMap();
   const text = formatCallMessage(r);
   const keyboard = { inline_keyboard: [[{ text: 'Open terminal', url: `${siteUrl}/dashboard` }]] };
   const BATCH = 20;
@@ -1900,6 +1948,12 @@ export async function notifyNewCall(r: AlphaRecord, budgetMs = 50_000): Promise<
 
           // Strict check: only Pro & Admin reach instant delivery
           if (tier !== 'pro') {
+            result.skipped++;
+            return;
+          }
+
+          const subPrefs = prefsByWallet.get(wallet) ?? DEFAULT_NOTIFICATION_PREFERENCES;
+          if (!shouldDeliverCallNotification(subPrefs, 'new_calls', r.chain)) {
             result.skipped++;
             return;
           }
@@ -1978,6 +2032,7 @@ export async function notifyTpTriggered(
   const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await getActiveNotificationSubscribers());
+  const prefsByWallet = await loadSubscriberPreferencesMap();
   const text = formatTpTriggeredMessage(r, targetLabel, currentMcStr);
   const keyboard = { inline_keyboard: [[{ text: 'View on Terminal', url: `${siteUrl}/dashboard` }]] };
   const BATCH = 20;
@@ -1998,6 +2053,11 @@ export async function notifyTpTriggered(
           }
           // If this call is Pro-only, do not notify Member tier
           if (isProOnly && tier !== 'pro') {
+            result.skipped++;
+            return;
+          }
+          const subPrefs = prefsByWallet.get(wallet) ?? DEFAULT_NOTIFICATION_PREFERENCES;
+          if (!shouldDeliverCallNotification(subPrefs, 'tp_alerts', r.chain)) {
             result.skipped++;
             return;
           }
@@ -2035,6 +2095,7 @@ export async function notifySlTriggered(
   const isProOnly = isProOnlyCall(r);
   const started = Date.now();
   const subs = Object.entries(await getActiveNotificationSubscribers());
+  const prefsByWallet = await loadSubscriberPreferencesMap();
   const text = formatSlTriggeredMessage(r, currentMcStr);
   const keyboard = { inline_keyboard: [[{ text: 'View on Terminal', url: `${siteUrl}/dashboard` }]] };
   const BATCH = 20;
@@ -2055,6 +2116,11 @@ export async function notifySlTriggered(
           }
           // If this call is Pro-only, do not notify Member tier
           if (isProOnly && tier !== 'pro') {
+            result.skipped++;
+            return;
+          }
+          const subPrefs = prefsByWallet.get(wallet) ?? DEFAULT_NOTIFICATION_PREFERENCES;
+          if (!shouldDeliverCallNotification(subPrefs, 'sl_alerts', r.chain)) {
             result.skipped++;
             return;
           }

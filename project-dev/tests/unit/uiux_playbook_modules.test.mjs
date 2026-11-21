@@ -309,3 +309,115 @@ test('GET /api/signals/[id]/share-image returns PNG OpenGraph card', async () =>
   const buf = await res.arrayBuffer();
   assert.ok(buf.byteLength > 1000);
 });
+
+test('TelegramVerificationCard renders Alert Preferences, persists toggles, and rolls back on failure', async () => {
+  const origFetch = globalThis.fetch;
+  const postedBodies = [];
+  let failNextPrefSave = false;
+
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes('/api/verification/status')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          wallet: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+          tier: 'pro',
+          entitlement: { tier: 'pro', verified: true },
+          telegram: {
+            identity: { status: 'connected' },
+            community: { status: 'joined', tier: 'pro' },
+            notifications: {
+              status: 'enabled',
+              preferences: { new_calls: true, tp_alerts: true, sl_alerts: true, chains: [] },
+            },
+            connected: true,
+          },
+          actions: {
+            canConnect: false,
+            canJoinCommunity: false,
+            canEnableNotifications: true,
+          },
+          can_connect: true,
+          target_tier: null,
+        }),
+      };
+    }
+    if (u.includes('/api/verification/notifications') && init?.method === 'POST') {
+      const parsed = JSON.parse(String(init.body || '{}'));
+      postedBodies.push(parsed);
+      if (failNextPrefSave) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ message: 'Preference store unavailable' }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          status: 'enabled',
+          preferences: {
+            new_calls: true,
+            tp_alerts: parsed.preferences?.tp_alerts ?? true,
+            sl_alerts: true,
+            chains: parsed.preferences?.chains ?? [],
+          },
+        }),
+      };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+
+  const view = await renderComponent(
+    React.createElement(TelegramVerificationCard, {
+      connected: true,
+      isPro: true,
+      needsVerification: false,
+      walletAddress: 'FzFuSbWnTk7PR6fD84HHnE5w8qdwHjQr78HzfR817p3e',
+    })
+  );
+
+  try {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 40));
+    });
+
+    const prefsBox = view.container.querySelector('[data-testid="tg-notification-prefs"]');
+    assert.ok(prefsBox, 'Notification preferences panel renders');
+
+    const tpBtn = view.container.querySelector('[data-testid="tg-pref-tp_alerts"]');
+    assert.ok(tpBtn);
+    assert.equal(tpBtn.getAttribute('aria-pressed'), 'true');
+
+    await act(async () => {
+      tpBtn.dispatchEvent(new dom.Event('click', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 40));
+    });
+
+    assert.equal(postedBodies.length, 1);
+    assert.deepEqual(postedBodies[0], { preferences: { tp_alerts: false } });
+    assert.equal(tpBtn.getAttribute('aria-pressed'), 'false');
+
+    // Trigger failure and verify rollback + alert message
+    failNextPrefSave = true;
+    const solBtn = view.container.querySelector('[data-testid="tg-pref-chain-sol"]');
+    assert.ok(solBtn);
+    assert.equal(solBtn.getAttribute('aria-pressed'), 'false');
+
+    await act(async () => {
+      solBtn.dispatchEvent(new dom.Event('click', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 40));
+    });
+
+    assert.equal(solBtn.getAttribute('aria-pressed'), 'false', 'Failed chain update rolls back');
+    assert.ok(view.container.textContent.includes('Preference store unavailable'));
+  } finally {
+    await view.cleanup();
+    globalThis.fetch = origFetch;
+  }
+});

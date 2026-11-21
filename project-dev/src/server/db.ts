@@ -8,14 +8,16 @@ import { resolveStakePointConfig } from '@/lib/stakepoint/config';
 import { getGenesisPrice } from '@/server/price';
 import { DEFAULT_GENESIS_USD_PRICE } from '@/lib/tiers';
 import type { FavoritePostKind, FavoritePostRecord } from '@/lib/types';
-import type {
-  GroupStatus,
-  NotificationStatus,
-  TelegramIdentityStatus,
-  TelegramMemberRecord,
-  UserTier,
-  VerificationSessionStatus,
-  WebhookEventStatus,
+import {
+  normalizeNotificationPreferences,
+  type GroupStatus,
+  type NotificationPreferences,
+  type NotificationStatus,
+  type TelegramIdentityStatus,
+  type TelegramMemberRecord,
+  type UserTier,
+  type VerificationSessionStatus,
+  type WebhookEventStatus,
 } from '@/lib/telegram-types';
 
 export { TOKEN_DECIMALS, TOKEN_SYMBOL };
@@ -794,6 +796,7 @@ export function normalizeTelegramMemberRow(
     group_id: raw.group_id ?? null,
     in_group: effectiveInGroup,
     notification_status: notificationStatus,
+    notification_preferences: normalizeNotificationPreferences(raw.notification_preferences),
     verified_at:
       raw.verified_at !== undefined
         ? raw.verified_at
@@ -2275,6 +2278,41 @@ export async function disableTelegramNotificationsByChatId(
     existing.updated_at = now;
     await saveDb(db);
     return { disabled: wasEnabled, wallet: existing.wallet_address };
+  });
+}
+
+export async function setTelegramNotificationPreferences(
+  walletAddress: string,
+  patch: Partial<NotificationPreferences>
+): Promise<
+  | { ok: true; member: TelegramMemberRow; preferences: NotificationPreferences }
+  | { ok: false; reason: string }
+> {
+  return withDbLock(async () => {
+    const db = await loadDb();
+    const existing = db.telegram_members.find(
+      (m) => m.wallet_address === walletAddress && m.identity_status !== 'disconnected'
+    );
+    if (!existing) {
+      return { ok: false, reason: 'telegram_not_connected' };
+    }
+    const current = normalizeNotificationPreferences(existing.notification_preferences);
+    const next = normalizeNotificationPreferences({
+      new_calls: patch.new_calls ?? current.new_calls,
+      tp_alerts: patch.tp_alerts ?? current.tp_alerts,
+      sl_alerts: patch.sl_alerts ?? current.sl_alerts,
+      chains: patch.chains !== undefined ? patch.chains : current.chains,
+    });
+    const now = new Date().toISOString();
+    existing.notification_preferences = next;
+    existing.last_synced_at = now;
+    existing.updated_at = now;
+    await saveDb(db);
+    return {
+      ok: true,
+      member: normalizeTelegramMemberRow(existing),
+      preferences: next,
+    };
   });
 }
 

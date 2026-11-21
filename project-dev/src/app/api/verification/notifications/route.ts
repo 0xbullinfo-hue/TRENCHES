@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withRouteAuth } from '@/lib/auth/withAuth';
+import { normalizeNotificationPreferences } from '@/lib/telegram-types';
 import { resolveUserEntitlement } from '@/server/entitlements';
-import { getTelegramMember } from '@/server/db';
+import { getTelegramMember, setTelegramNotificationPreferences } from '@/server/db';
 import { setPrivateNotificationsEnabled } from '@/server/telegram';
 
 export const dynamic = 'force-dynamic';
 
-const notificationToggleSchema = z.object({
-  enabled: z.boolean(),
+const preferencesPatchSchema = z.object({
+  new_calls: z.boolean().optional(),
+  tp_alerts: z.boolean().optional(),
+  sl_alerts: z.boolean().optional(),
+  chains: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
 });
 
+const notificationToggleSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    preferences: preferencesPatchSchema.optional(),
+  })
+  .refine((v) => v.enabled !== undefined || v.preferences !== undefined, {
+    message: 'enabled boolean or preferences object is required',
+  });
+
 /**
- * Authenticated toggle for private Telegram call notifications, completely independent of group membership.
+ * Authenticated toggle & preferences update for private Telegram call notifications.
  */
 export const POST = withRouteAuth<NextRequest, typeof notificationToggleSchema>(
   async ({ session, input }) => {
@@ -28,7 +41,9 @@ export const POST = withRouteAuth<NextRequest, typeof notificationToggleSchema>(
       );
     }
 
-    if (input.enabled && entitlement.tier === 'free') {
+    const requiresQualification =
+      input.enabled === true || input.preferences !== undefined;
+    if (requiresQualification && entitlement.tier === 'free') {
       return NextResponse.json(
         {
           error: 'not_eligible',
@@ -49,7 +64,7 @@ export const POST = withRouteAuth<NextRequest, typeof notificationToggleSchema>(
       );
     }
 
-    if (input.enabled && member.identity_status === 'blocked') {
+    if (input.enabled === true && member.identity_status === 'blocked') {
       return NextResponse.json(
         {
           error: 'bot_blocked',
@@ -59,24 +74,41 @@ export const POST = withRouteAuth<NextRequest, typeof notificationToggleSchema>(
       );
     }
 
-    const res = await setPrivateNotificationsEnabled(session.wallet, input.enabled, {
-      entitlement_tier: entitlement.tier,
-    });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: res.reason, message: 'Could not update private notification state.' },
-        { status: 400 }
-      );
+    let finalStatus = member.notification_status;
+    let finalPreferences = normalizeNotificationPreferences(member.notification_preferences);
+
+    if (typeof input.enabled === 'boolean') {
+      const res = await setPrivateNotificationsEnabled(session.wallet, input.enabled, {
+        entitlement_tier: entitlement.tier,
+      });
+      if (!res.ok) {
+        return NextResponse.json(
+          { error: res.reason, message: 'Could not update private notification state.' },
+          { status: 400 }
+        );
+      }
+      finalStatus = res.status;
+    }
+
+    if (input.preferences) {
+      const prefRes = await setTelegramNotificationPreferences(session.wallet, input.preferences);
+      if (!prefRes.ok) {
+        return NextResponse.json(
+          { error: prefRes.reason, message: 'Could not update notification preferences.' },
+          { status: 400 }
+        );
+      }
+      finalPreferences = prefRes.preferences;
     }
 
     return NextResponse.json(
-      { ok: true, status: res.status },
+      { ok: true, status: finalStatus, preferences: finalPreferences },
       { status: 200, headers: { 'Cache-Control': 'no-store' } }
     );
   },
   {
     schema: notificationToggleSchema,
-    invalidBodyMessage: 'enabled boolean is required',
+    invalidBodyMessage: 'enabled boolean or preferences object is required',
     rateLimit: { prefix: 'verif-notif', limit: 30, windowSec: 60 },
   }
 );

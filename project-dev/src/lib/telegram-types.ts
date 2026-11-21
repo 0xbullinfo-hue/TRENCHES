@@ -46,6 +46,48 @@ export type NotificationStatus =
   | 'enabled'
   | 'blocked';
 
+export type NotificationPreferences = {
+  new_calls: boolean;
+  tp_alerts: boolean;
+  sl_alerts: boolean;
+  chains: string[];
+};
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  new_calls: true,
+  tp_alerts: true,
+  sl_alerts: true,
+  chains: [],
+};
+
+export function normalizeAlertChain(chain?: string | null): string {
+  const clean = String(chain || '').trim().toUpperCase();
+  if (clean === 'SOLANA') return 'SOL';
+  return clean;
+}
+
+export function normalizeNotificationPreferences(
+  raw?: Partial<NotificationPreferences> | null
+): NotificationPreferences {
+  const seenChains = new Set<string>();
+  const normalizedChains: string[] = [];
+  if (Array.isArray(raw?.chains)) {
+    for (const c of raw.chains) {
+      const code = normalizeAlertChain(c);
+      if (code && !seenChains.has(code) && normalizedChains.length < 12) {
+        seenChains.add(code);
+        normalizedChains.push(code);
+      }
+    }
+  }
+  return {
+    new_calls: raw?.new_calls !== false,
+    tp_alerts: raw?.tp_alerts !== false,
+    sl_alerts: raw?.sl_alerts !== false,
+    chains: normalizedChains,
+  };
+}
+
 export type TelegramNotifications = {
   wallet: string;
   telegramChatId: string | null;
@@ -81,6 +123,7 @@ export type TelegramMemberRecord = {
   group_id: string | null;
   in_group: boolean;
   notification_status: NotificationStatus;
+  notification_preferences?: NotificationPreferences;
   verified_at: string | null;
   invite_created_at: string | null;
   invite_expires_at: string | null;
@@ -118,6 +161,7 @@ export type VerificationStatusResponse = {
     };
     notifications: {
       status: NotificationStatus;
+      preferences?: NotificationPreferences;
     };
     /** Legacy compatibility summary fields; connected reflects confirmed active community join. */
     connected: boolean;

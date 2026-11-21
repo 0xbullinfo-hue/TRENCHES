@@ -8,12 +8,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { GenesisContext } from '@/context/GenesisContext';
 import { TelegramCountdown } from '@/components/dashboard/NextStepCard';
 import { canFetchSessionEndpoints } from '@/lib/auth/sessionGate';
-import type {
-  GroupStatus,
-  NotificationStatus,
-  TelegramIdentityStatus,
-  UserTier,
-  VerificationStatusResponse,
+import {
+  normalizeNotificationPreferences,
+  type GroupStatus,
+  type NotificationPreferences,
+  type NotificationStatus,
+  type TelegramIdentityStatus,
+  type UserTier,
+  type VerificationStatusResponse,
 } from '@/lib/telegram-types';
 import {
   AlertCircle,
@@ -58,6 +60,7 @@ interface NormalizedViewModel {
   communityStatus: GroupStatus;
   joinedAt: string | null;
   notificationStatus: NotificationStatus;
+  notificationPreferences: NotificationPreferences;
   canConnect: boolean;
   canJoinCommunity: boolean;
   canEnableNotifications: boolean;
@@ -107,6 +110,9 @@ function normalizeStatusData(
 
   const notificationStatus: NotificationStatus =
     data.telegram?.notifications?.status ?? (legacyConnected ? 'enabled' : 'disabled');
+  const notificationPreferences = normalizeNotificationPreferences(
+    data.telegram?.notifications?.preferences
+  );
 
   const canConnect = Boolean(data.actions?.canConnect ?? data.can_connect);
   const canJoinCommunity = Boolean(
@@ -134,6 +140,7 @@ function normalizeStatusData(
     communityStatus,
     joinedAt: data.telegram?.community?.joinedAt ?? data.telegram?.connected_at ?? null,
     notificationStatus,
+    notificationPreferences,
     canConnect,
     canJoinCommunity,
     canEnableNotifications,
@@ -243,6 +250,7 @@ export function TelegramVerificationCard({
 
   const [startingSession, setStartingSession] = useState(false);
   const [togglingNotif, setTogglingNotif] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
   const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(null);
   const [pendingExpiresAt, setPendingExpiresAt] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -514,6 +522,96 @@ export function TelegramVerificationCard({
     } finally {
       if (mountedRef.current) {
         setTogglingNotif(false);
+      }
+    }
+  };
+
+  const handleUpdatePreferences = async (patch: Partial<NotificationPreferences>) => {
+    if (savingPrefs || !vm) return;
+    const prevPrefs = vm.notificationPreferences;
+    const optimisticPrefs = normalizeNotificationPreferences({ ...prevPrefs, ...patch });
+
+    setSavingPrefs(true);
+    setActionError(null);
+    setStatusData((prev) =>
+      prev
+        ? {
+            ...prev,
+            telegram: {
+              ...(prev.telegram ?? {
+                identity: { status: vm.identityStatus },
+                community: { tier: vm.communityTier, status: vm.communityStatus, joinedAt: vm.joinedAt },
+                connected: vm.identityStatus === 'connected' && vm.communityStatus === 'joined',
+                connected_tier: vm.communityTier,
+                connected_at: vm.joinedAt,
+              }),
+              notifications: {
+                status: prev.telegram?.notifications?.status ?? vm.notificationStatus,
+                preferences: optimisticPrefs,
+              },
+            },
+          }
+        : prev
+    );
+
+    try {
+      const res = await fetch('/api/verification/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ preferences: patch }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        message?: string;
+        preferences?: NotificationPreferences;
+      };
+      if (!mountedRef.current) return;
+      if (res.status === 401) {
+        setAuthRequiredError(true);
+        setActionError('Session expired. Verify your wallet first.');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(json.message || 'Could not save alert preferences.');
+      }
+      if (json.preferences) {
+        setStatusData((prev) =>
+          prev?.telegram
+            ? {
+                ...prev,
+                telegram: {
+                  ...prev.telegram,
+                  notifications: {
+                    status: prev.telegram.notifications?.status ?? vm.notificationStatus,
+                    preferences: normalizeNotificationPreferences(json.preferences),
+                  },
+                },
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setActionError(
+        err instanceof Error ? err.message : 'Network error saving alert preferences.'
+      );
+      setStatusData((prev) =>
+        prev?.telegram
+          ? {
+              ...prev,
+              telegram: {
+                ...prev.telegram,
+                notifications: {
+                  status: prev.telegram.notifications?.status ?? vm.notificationStatus,
+                  preferences: prevPrefs,
+                },
+              },
+            }
+          : prev
+      );
+    } finally {
+      if (mountedRef.current) {
+        setSavingPrefs(false);
       }
     }
   };
@@ -1061,6 +1159,105 @@ export function TelegramVerificationCard({
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Refresh</span>
               </Button>
+            </div>
+          )}
+
+        {/* Notification Preferences (Persisted server-side for connected & qualified wallets) */}
+        {connected &&
+          !isUnauthenticated &&
+          !fetchError &&
+          !isUnknownEntitlement &&
+          vm &&
+          vm.canEnableNotifications && (
+            <div
+              data-testid="tg-notification-prefs"
+              className="rounded-lg bg-surface-card border border-border-default/80 p-3 space-y-2.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
+                  Alert Preferences
+                </span>
+                <span className="font-mono text-[10px] text-dim">
+                  {savingPrefs
+                    ? 'Saving...'
+                    : vm.notificationPreferences.chains.length === 0
+                      ? 'All chains'
+                      : vm.notificationPreferences.chains.join(', ')}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { key: 'new_calls', label: 'New Calls' },
+                    { key: 'tp_alerts', label: 'TP Hits' },
+                    { key: 'sl_alerts', label: 'SL Triggers' },
+                  ] as const
+                ).map(({ key, label }) => {
+                  const active = vm.notificationPreferences[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      data-testid={`tg-pref-${key}`}
+                      aria-pressed={active}
+                      disabled={savingPrefs}
+                      onClick={() => void handleUpdatePreferences({ [key]: !active })}
+                      className={`px-2.5 py-1 rounded border font-mono text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
+                        active
+                          ? 'bg-brand/15 border-brand/50 text-brand'
+                          : 'bg-surface border-border-default text-muted hover:text-white'
+                      }`}
+                    >
+                      {active ? '✓ ' : ''}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border-default/50">
+                <button
+                  type="button"
+                  data-testid="tg-pref-chain-all"
+                  aria-pressed={vm.notificationPreferences.chains.length === 0}
+                  disabled={savingPrefs}
+                  onClick={() => void handleUpdatePreferences({ chains: [] })}
+                  className={`px-2 py-0.5 rounded border font-mono text-[10px] font-bold uppercase transition-colors cursor-pointer disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
+                    vm.notificationPreferences.chains.length === 0
+                      ? 'bg-brand text-canvas border-brand'
+                      : 'bg-surface border-border-default text-muted hover:text-white'
+                  }`}
+                >
+                  All Chains
+                </button>
+                {(['SOL', 'BASE', 'ETH', 'BSC', 'AVAX'] as const).map((chain) => {
+                  const selected = vm.notificationPreferences.chains.includes(chain);
+                  return (
+                    <button
+                      key={chain}
+                      type="button"
+                      data-testid={`tg-pref-chain-${chain.toLowerCase()}`}
+                      aria-pressed={selected}
+                      disabled={savingPrefs}
+                      onClick={() => {
+                        const cur = vm.notificationPreferences.chains;
+                        const next = selected
+                          ? cur.filter((c) => c !== chain)
+                          : [...cur, chain];
+                        void handleUpdatePreferences({ chains: next });
+                      }}
+                      className={`px-2 py-0.5 rounded border font-mono text-[10px] font-bold uppercase transition-colors cursor-pointer disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 ${
+                        selected
+                          ? 'bg-brand/20 border-brand text-brand'
+                          : 'bg-surface border-border-default text-muted hover:text-white'
+                      }`}
+                    >
+                      {chain}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

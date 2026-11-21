@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Command as Cmdk } from 'cmdk';
 import { ArrowRight, Command, Compass, Flame, Search, X } from 'lucide-react';
 import { GenesisContext } from '@/context/GenesisContext';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/components/ui/cn';
 import type { AlphaItem } from '@/lib/types';
 
 export interface CommandPaletteItem {
@@ -148,6 +148,12 @@ export interface CommandPaletteProps {
   onNavigate?: (href: string) => void;
 }
 
+const ITEM_CATEGORIES: CommandPaletteItem['category'][] = [
+  'Search Filter',
+  'Alpha Call',
+  'Navigation',
+];
+
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   defaultOpen = false,
   initialAlphas,
@@ -157,7 +163,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const [localQuery, setLocalQuery] = useState<string>('');
-  const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const alphas = useMemo(
@@ -170,9 +175,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     [localQuery, alphas, genesis?.isAdmin]
   );
 
+  const groupedItems = useMemo(() => {
+    return ITEM_CATEGORIES.map((category) => ({
+      category,
+      items: items.filter((item) => item.category === category),
+    })).filter((g) => g.items.length > 0);
+  }, [items]);
+
   const openPalette = useCallback(() => {
     setLocalQuery(genesis?.searchQuery ?? '');
-    setSelectedIndex(0);
     setIsOpen(true);
   }, [genesis?.searchQuery]);
 
@@ -192,25 +203,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         return;
       }
 
-      if (!isOpen) return;
-
-      if (e.key === 'Escape') {
+      if (isOpen && e.key === 'Escape') {
         e.preventDefault();
         closePalette();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (items.length > 0 ? (prev + 1) % items.length : 0));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) =>
-          items.length > 0 ? (prev - 1 + items.length) % items.length : 0
-        );
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, items.length, openPalette, closePalette]);
+  }, [isOpen, openPalette, closePalette]);
 
   useEffect(() => {
     if (isOpen) {
@@ -244,13 +245,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     [genesis, closePalette, onNavigate]
   );
 
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && items[selectedIndex]) {
-      e.preventDefault();
-      handleSelectItem(items[selectedIndex]);
-    }
-  };
-
   return (
     <>
       {/* Screen-reader / focusable quick-launch trigger (visual trigger lives in TerminalHeader without overlapping content) */}
@@ -280,19 +274,26 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           aria-label="Command palette"
           className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-canvas/80 backdrop-blur-sm"
         >
-          <div className="w-full max-w-xl rounded-xl bg-surface border border-brand/40 shadow-lg overflow-hidden">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Dismiss command palette"
+            onClick={closePalette}
+            className="fixed inset-0 cursor-default focus:outline-none"
+          />
+          <Cmdk
+            label="Command palette"
+            shouldFilter={false}
+            loop
+            className="relative z-10 w-full max-w-xl rounded-xl bg-surface border border-brand/40 shadow-lg overflow-hidden"
+          >
             {/* Search Input Header */}
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-default bg-surface-card">
               <Search className="w-4 h-4 text-brand shrink-0" aria-hidden="true" />
-              <input
+              <Cmdk.Input
                 ref={inputRef}
-                type="text"
                 value={localQuery}
-                onChange={(e) => {
-                  setLocalQuery(e.target.value);
-                  setSelectedIndex(0);
-                }}
-                onKeyDown={handleInputKeyDown}
+                onValueChange={setLocalQuery}
                 placeholder="Search calls (token, CA, chain) or jump to page..."
                 aria-label="Command palette search"
                 data-testid="command-palette-input"
@@ -303,10 +304,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setLocalQuery('');
-                    setSelectedIndex(0);
-                  }}
+                  onClick={() => setLocalQuery('')}
                   aria-label="Clear palette query"
                   className="h-7 w-7 p-0 text-muted hover:text-white"
                 >
@@ -326,30 +324,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               </Button>
             </div>
 
-            {/* Results List */}
-            <div className="max-h-80 overflow-y-auto p-2 space-y-1" role="listbox" aria-label="Command results">
-              {items.length === 0 ? (
-                <div className="py-8 text-center font-mono text-xs text-muted">
-                  No matching calls or destinations found.
-                </div>
-              ) : (
-                items.map((item, idx) => {
-                  const isSelected = idx === selectedIndex;
-                  return (
-                    <Button
+            {/* Results List via cmdk */}
+            <Cmdk.List
+              aria-label="Command results"
+              className="max-h-80 overflow-y-auto p-2 space-y-2"
+            >
+              <Cmdk.Empty className="py-8 text-center font-mono text-xs text-muted">
+                No matching calls or destinations found.
+              </Cmdk.Empty>
+
+              {groupedItems.map(({ category, items: groupItems }) => (
+                <Cmdk.Group
+                  key={category}
+                  heading={category}
+                  className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-dim"
+                >
+                  {groupItems.map((item) => (
+                    <Cmdk.Item
                       key={item.id}
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => handleSelectItem(item)}
-                      className={cn(
-                        'w-full h-auto py-2.5 px-3 rounded-lg flex items-center justify-between gap-3 text-left transition-colors',
-                        isSelected
-                          ? 'bg-surface-card border border-brand/40 text-white'
-                          : 'border border-transparent hover:bg-surface-card text-muted hover:text-white'
-                      )}
+                      value={item.id}
+                      onSelect={() => handleSelectItem(item)}
+                      className="w-full py-2.5 px-3 rounded-lg flex items-center justify-between gap-3 text-left transition-colors cursor-pointer border border-transparent text-muted hover:bg-surface-card hover:text-white aria-selected:bg-surface-card aria-selected:border-brand/40 aria-selected:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {item.category === 'Alpha Call' ? (
@@ -374,18 +369,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                         </span>
                         <ArrowRight className="w-3.5 h-3.5 text-brand" aria-hidden="true" />
                       </div>
-                    </Button>
-                  );
-                })
-              )}
-            </div>
+                    </Cmdk.Item>
+                  ))}
+                </Cmdk.Group>
+              ))}
+            </Cmdk.List>
 
             {/* Footer hint */}
             <div className="px-4 py-2 border-t border-border-default bg-surface-card flex items-center justify-between font-mono text-[11px] text-muted">
               <span>Use ↑↓ arrows to navigate, Enter to select</span>
               <span>ESC to dismiss</span>
             </div>
-          </div>
+          </Cmdk>
         </div>
       )}
     </>

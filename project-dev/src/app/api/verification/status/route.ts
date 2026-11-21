@@ -6,11 +6,12 @@ import {
   getActivePendingVerificationSessionForWallet,
   getTelegramMember,
 } from '@/server/db';
-import type {
-  GroupStatus,
-  NotificationStatus,
-  TelegramIdentityStatus,
-  VerificationStatusResponse,
+import {
+  normalizeNotificationPreferences,
+  type GroupStatus,
+  type NotificationStatus,
+  type TelegramIdentityStatus,
+  type VerificationStatusResponse,
 } from '@/lib/telegram-types';
 
 export const dynamic = 'force-dynamic';
@@ -67,10 +68,13 @@ export async function GET(req: NextRequest) {
       communityTier = isProOrAdmin ? 'pro' : 'member';
     }
 
-    // 3. Private notification subscription status (independent of community group membership)
+    // 3. Private notification subscription status & preferences (independent of community group membership)
     const notificationStatus: NotificationStatus = member
       ? member.notification_status
       : 'disabled';
+    const notificationPreferences = normalizeNotificationPreferences(
+      member?.notification_preferences
+    );
 
     // 4. Target & Action eligibility
     const expectedCommunityTier: 'member' | 'pro' | null =
@@ -115,6 +119,7 @@ export async function GET(req: NextRequest) {
         },
         notifications: {
           status: notificationStatus,
+          preferences: notificationPreferences,
         },
         connected: legacyConnected,
         connected_tier: legacyConnectedTier,
